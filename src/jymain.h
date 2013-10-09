@@ -14,6 +14,11 @@
 #endif
 
 #include "lua.h"
+#if LUA_VERSION_NUM > 501
+  #define LUA_COMPAT_MODULE
+  #define lua_open luaL_newstate
+  #define luaL_reg luaL_Reg
+#endif
 #include "lualib.h"
 #include "lauxlib.h"
  

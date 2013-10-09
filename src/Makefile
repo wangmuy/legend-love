@@ -1,2 +1,3 @@
+LUA_VERSION=lua5.2
 all:
-	gcc `sdl-config --cflags --libs` -lsdl -llua -lsdl_ttf -lsdl_image -lsdl_mixer -lsmpeg *.c -o ../bin/jy
+	gcc *.c `pkg-config $(LUA_VERSION) --libs --cflags` `sdl-config --cflags --libs` `smpeg-config --cflags --libs` -lSDL_ttf -lSDL_image -lSDL_mixer -o ../bin/jy
