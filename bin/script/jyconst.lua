@@ -1,3 +1,24 @@
+function RGB(r,g,b)          --设置颜色RGB
+   return r*65536+g*256+b;
+end
+
+function GetRGB(color)      --分离颜色的RGB分量
+    color=color%(65536*256);
+    local r=math.floor(color/65536);
+    color=color%65536;
+    local g=math.floor(color/256);
+    local b=color%256;
+    return r,g,b
+end
+
+function limitX(x,minv,maxv)       --限制x的范围
+    if x<minv then
+        x=minv;
+    elseif x>maxv then
+        x=maxv;
+    end
+    return x
+end
 
 --设置全局变量CC，保存游戏中使用的常数
 function SetGlobalConst()
@@ -55,55 +76,55 @@ function SetGlobalConst()
    CC.ScreenH=CONFIG.Height;
 
    --定义记录文件名。S和D由于是固定大小，因此不再定义idx了。
-   CC.R_IDXFilename={[0]=CONFIG.DataPath .. "ranger.idx",
+   CC.R_IDXFilename={[0]=CONFIG.DataPath .. "Ranger.idx",
                      CONFIG.DataPath .. "r1.idx",
 					 CONFIG.DataPath .. "r2.idx",
 					 CONFIG.DataPath .. "r3.idx",};
-   CC.R_GRPFilename={[0]=CONFIG.DataPath .. "ranger.grp",
+   CC.R_GRPFilename={[0]=CONFIG.DataPath .. "Ranger.grp",
                      CONFIG.DataPath .. "r1.grp",
 					 CONFIG.DataPath .. "r2.grp",
 					 CONFIG.DataPath .. "r3.grp",};
-   CC.S_Filename={[0]=CONFIG.DataPath .. "allsin.grp",
+   CC.S_Filename={[0]=CONFIG.DataPath .. "Allsin.grp",
                   CONFIG.DataPath .. "s1.grp",
 				  CONFIG.DataPath .. "s2.grp",
 				  CONFIG.DataPath .. "s3.grp",};
 
    CC.TempS_Filename=CONFIG.DataPath .. "allsinbk.grp";
 
-   CC.D_Filename={[0]=CONFIG.DataPath .. "alldef.grp",
+   CC.D_Filename={[0]=CONFIG.DataPath .. "Alldef.grp",
                    CONFIG.DataPath .. "d1.grp",
 				   CONFIG.DataPath .. "d2.grp",
 				   CONFIG.DataPath .. "d3.grp",};
 
-   CC.PaletteFile=CONFIG.DataPath .. "mmap.col";
+   CC.PaletteFile=CONFIG.DataPath .. "Mmap.col";
 
    CC.FirstFile=CONFIG.PicturePath .. "title.png";
    CC.DeadFile=CONFIG.PicturePath .. "dead.png";
 
-   CC.MMapFile={CONFIG.DataPath .. "earth.002",
-                CONFIG.DataPath .. "surface.002",
-				CONFIG.DataPath .. "building.002",
-		        CONFIG.DataPath .. "buildx.002",
-				CONFIG.DataPath .. "buildy.002"};
+   CC.MMapFile={CONFIG.DataPath .. "Earth.002",
+                CONFIG.DataPath .. "Surface.002",
+				CONFIG.DataPath .. "Building.002",
+		        CONFIG.DataPath .. "Buildx.002",
+				CONFIG.DataPath .. "Buildy.002"};
 
    --各种贴图文件名。
-   CC.MMAPPicFile={CONFIG.DataPath .. "mmap.idx",CONFIG.DataPath .. "mmap.grp"};
+   CC.MMAPPicFile={CONFIG.DataPath .. "Mmap.idx",CONFIG.DataPath .. "Mmap.grp"};
    CC.SMAPPicFile={CONFIG.DataPath .. "smap.idx",CONFIG.DataPath .. "smap.grp"};
-   CC.WMAPPicFile={CONFIG.DataPath .. "wmap.idx",CONFIG.DataPath .. "wmap.grp"};
-   CC.EffectFile={CONFIG.DataPath .. "eft.idx",CONFIG.DataPath .. "eft.grp"};
-   CC.FightPicFile={CONFIG.DataPath .. "fight%03d.idx",CONFIG.DataPath .. "fight%03d.grp"};  --此处为字符串格式，类似于C中printf的格式。
+   CC.WMAPPicFile={CONFIG.DataPath .. "Wmap.idx",CONFIG.DataPath .. "wmap.grp"};
+   CC.EffectFile={CONFIG.DataPath .. "Eft.idx",CONFIG.DataPath .. "Eft.grp"};
+   CC.FightPicFile={CONFIG.DataPath .. "Fight%03d.idx",CONFIG.DataPath .. "Fight%03d.grp"};  --此处为字符串格式，类似于C中printf的格式。
 
-   CC.HeadPicFile={CONFIG.DataPath .. "hdgrp.idx",CONFIG.DataPath .. "hdgrp.grp"};
+   CC.HeadPicFile={CONFIG.DataPath .. "Hdgrp.idx",CONFIG.DataPath .. "Hdgrp.grp"};
    CC.ThingPicFile={CONFIG.DataPath .. "thing.idx",CONFIG.DataPath .. "thing.grp"};
 
 
-   CC.MIDIFile=CONFIG.SoundPath .. "game%02d.mid";
-   CC.ATKFile=CONFIG.SoundPath .. "atk%02d.wav";
-   CC.EFile=CONFIG.SoundPath .. "e%02d.wav";
+   CC.MIDIFile=CONFIG.SoundPath .. "game%02d.MID";
+   CC.ATKFile=CONFIG.SoundPath .. "Atk%02d.wav";
+   CC.EFile=CONFIG.SoundPath .. "E%02d.wav";
 
-   CC.WarFile=CONFIG.DataPath .. "war.sta";
-   CC.WarMapFile={CONFIG.DataPath .. "warfld.idx",
-                  CONFIG.DataPath .. "warfld.grp"};
+   CC.WarFile=CONFIG.DataPath .. "War.sta";
+   CC.WarMapFile={CONFIG.DataPath .. "Warfld.idx",
+                  CONFIG.DataPath .. "Warfld.grp"};
 
    CC.TalkIdxFile=CONFIG.ScriptPath .. "oldtalk.idx";
    CC.TalkGrpFile=CONFIG.ScriptPath .. "oldtalk.grp";

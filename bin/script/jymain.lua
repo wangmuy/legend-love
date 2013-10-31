@@ -122,7 +122,7 @@ function JY_Main_sub()        --真正的游戏主程序入口
 
     math.randomseed(os.time());          --初始化随机数发生器
 
-    lib.EnableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRePeatInterval);   --设置键盘重复率
+    lib.EnableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);   --设置键盘重复率
 
     JY.Status=GAME_START;
 
@@ -1811,28 +1811,6 @@ function SaveData(t,t_struct,data)      --数据写入data Byte数组中。
             Byte.setstr(data,v[1],v[3],s);
         end
     end
-end
-
-function limitX(x,minv,maxv)       --限制x的范围
-    if x<minv then
-        x=minv;
-    elseif x>maxv then
-        x=maxv;
-    end
-    return x
-end
-
-function RGB(r,g,b)          --设置颜色RGB
-   return r*65536+g*256+b;
-end
-
-function GetRGB(color)      --分离颜色的RGB分量
-    color=color%(65536*256);
-    local r=math.floor(color/65536);
-    color=color%65536;
-    local g=math.floor(color/256);
-    local b=color%256;
-    return r,g,b
 end
 
 --等待键盘输入

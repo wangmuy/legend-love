@@ -7,6 +7,8 @@
 CONFIG={};
 
 CONFIG.Debug=1;         --输出调试和错误信息，=0不输出 =1 输出信息在debug.txt和error.txt到当前目录
+CONFIG.DEBUG_FILE="debug.txt";
+CONFIG.ERROR_FILE="error.txt";
 
 --窗口设置类别。小于640*480(最小为320*240) 设为0，大于等于640*480 设为1
 --目前只做了这两个类别，其他分辨率虽然可用，信息都能够显示，但是显示效果不一定好看。
@@ -28,14 +30,14 @@ CONFIG.EnableSound=1     -- 是否打开声音    1 打开 0 关闭   关闭了�
 
 CONFIG.KeyRepeat=0       -- 是否激活键盘重复 0 不激活，只在走路菜单时键盘重复，1激活，包括对话的所有时候键盘均重复
 CONFIG.KeyRepeatDelay =300;   --第一次键盘重复等待ms数
-CONFIG.KeyRePeatInterval=30;  --一秒钟重复次数
+CONFIG.KeyRepeatInterval=40;  --一秒钟重复次数
 
 CONFIG.XScale = 18    -- 贴图宽度的一半
 CONFIG.YScale = 9     -- 贴图高度的一半
 
 
 --设置各个数据文件的路径，如果是其他目录标志和windows不同的OS, 如linux，则改为合适的路径
-CONFIG.CurrentPath ="./"
+CONFIG.CurrentPath =""
 CONFIG.DataPath=CONFIG.CurrentPath .. "data/";
 CONFIG.PicturePath=CONFIG.CurrentPath .. "pic/";
 CONFIG.SoundPath=CONFIG.CurrentPath .. "sound/";
