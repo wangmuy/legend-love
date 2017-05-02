@@ -5,6 +5,12 @@ Ubuntu下编译成功。
 # Ubuntu下编译
 
  - 安装 ```libsdl1.2-dev libsdl-image1.2-dev libsdl-mixer1.2-dev libsdl-ttf2.0-dev libsmpeg-dev timidity```
+
+```
+cd src
+make installbuilddeps
+```
+
  - 编译
 
 ```
