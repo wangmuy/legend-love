@@ -102,13 +102,19 @@ function myErrFun(err)      --错误处理，打印错误信息
 end
 
 function JY_Main_sub()        --真正的游戏主程序入口
+    lib.Debug("JY_Main_sub started")
     IncludeFile();         --导入其他模块
-    SetGlobalConst();    --设置全程变量CC, 程序使用的常量
-    SetGlobal();         --设置全程变量JY
+    lib.Debug("IncludeFile done")
+    SetGlobalConst();    --设置全程变量 CC, 程序使用的常量
+    lib.Debug("SetGlobalConst done")
+    SetGlobal();         --设置全程变量 JY
+    lib.Debug("SetGlobal done")
 
-    GenTalkIdx();        --生成对话idx
+    GenTalkIdx();        --生成对话 idx
+    lib.Debug("GenTalkIdx done")
 
     SetModify();         --设置对函数的修改，定义新的物品，事件等等
+    lib.Debug("SetModify done")
 
     --禁止访问全程变量
     setmetatable(_G,{ __newindex =function (_,n)

@@ -40,7 +40,14 @@ function GetKey()
 end
 
 function EnableKeyRepeat(delay, interval)
-    love.keyboard.setKeyRepeat(delay/1000.0, 1.0/interval) -- 0.8.0 and earliar
+    -- LOVE 11.x API: setKeyRepeat(repeat, delay) - both in seconds
+    -- delay: initial delay before repeat starts (in ms)
+    -- interval: time between repeats (in ms)
+    if delay > 0 and interval > 0 then
+        love.keyboard.setKeyRepeat(true)
+    else
+        love.keyboard.setKeyRepeat(false)
+    end
 end
 
 function Delay(millis)
@@ -48,7 +55,7 @@ function Delay(millis)
 end
 
 function GetTime()
-    return love.timer.getMicroTime() * 100
+    return love.timer.getTime() * 1000  -- LOVE 11.x returns seconds, convert to ms
 end
 
 local fontTbl = {}
@@ -232,7 +239,7 @@ function LoadPic(openfile, idx1, idx2)
                 local color = color32Pallette[palletteIdx]
                 local r,g,b = GetRGB(color)
                 --print("setPixel:" .. "(" .. x .. "," .. y .. ") " .. r .. "," .. g .. "," .. b)
-                imgdata:setPixel(x, y, r, g, b, 255)
+                imgdata:setPixel(x, y, r, g, b, 1)
                 x = x+1
                 offset = offset+1
             end
@@ -258,7 +265,7 @@ function LoadPic(openfile, idx1, idx2)
                     idx1 = idx1+1
                     local r,g,b = GetRGB(color)
                     --print("setPixel:" .. "(" .. x .. "," .. y .. ") " .. r .. "," .. g .. "," .. b)
-                    imgdata:setPixel(x, y, r, g, b, 255)
+                    imgdata:setPixel(x, y, r, g, b, 1)
                     x = x+1
                     solidnum = solidnum-1
                 end
