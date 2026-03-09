@@ -3,6 +3,7 @@ function love.load()
     if love.graphics then
         love.graphics.setBlendMode("alpha")
         love.graphics.setDefaultFilter("nearest", "nearest")
+        love.graphics.setBackgroundColor(0, 0, 0, 1)
     end
     
     math.randomseed(os.time())
