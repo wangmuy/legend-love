@@ -421,11 +421,19 @@ function PlayMIDI(filename)
     end
     
     local filepath = filename
+    Debug("PlayMIDI: filename=" .. tostring(filename))
+    
     if not filepath:match("^/") and not filepath:match("^%a:") then
-        filepath = CONFIG.SoundPath .. filename
+        if not filepath:match("^sound/") then
+            filepath = CONFIG.SoundPath .. filepath
+        end
     end
+    Debug("PlayMIDI: filepath=" .. filepath)
     
     local success, source_or_err = pcall(love.audio.newSource, filepath, "stream")
+    if not success then
+        Debug("PlayMIDI error: " .. tostring(source_or_err))
+    end
     if success then
         if currentMusic then
             currentMusic:stop()
@@ -445,7 +453,9 @@ function PlayWAV(filename)
     
     local filepath = filename
     if not filepath:match("^/") and not filepath:match("^%a:") then
-        filepath = CONFIG.SoundPath .. filename
+        if not filepath:match("^sound/") then
+            filepath = CONFIG.SoundPath .. filepath
+        end
     end
     
     local success, source_or_err = pcall(love.audio.newSource, filepath, "static")
