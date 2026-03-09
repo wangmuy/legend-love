@@ -1,5 +1,27 @@
 
---设置全局变量CC，保存游戏中使用的常数
+function RGB(r,g,b)          --设置颜色 RGB
+   return r*65536+g*256+b;
+end
+
+function GetRGB(color)      --分离颜色的 RGB 分量
+    color=color%(65536*256);
+    local r=math.floor(color/65536);
+    color=color%65536;
+    local g=math.floor(color/256);
+    local b=color%256;
+    return r,g,b
+end
+
+function limitX(x,minv,maxv)       --限制 x 的范围
+    if x<minv then
+        x=minv;
+    elseif x>maxv then
+        x=maxv;
+    end
+    return x
+end
+
+--设置全局变量 CC，保存游戏中使用的常数
 function SetGlobalConst()
     -- SDL 键码定义，这里名字仍然使用directx的名字
     VK_ESCAPE=27
