@@ -9,7 +9,8 @@ function GetRGB(color)      --分离颜色的 RGB 分量
     color=color%65536;
     local g=math.floor(color/256);
     local b=color%256;
-    return r,g,b
+    -- LOVE 11.x expects colors in 0-1 range
+    return r/255, g/255, b/255
 end
 
 function limitX(x,minv,maxv)       --限制 x 的范围
