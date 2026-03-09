@@ -2,6 +2,7 @@ function love.load()
     -- 使用 regular alpha 模式（非预乘）
     if love.graphics then
         love.graphics.setBlendMode("alpha")
+        love.graphics.setDefaultFilter("nearest", "nearest")
     end
     
     math.randomseed(os.time())

@@ -94,7 +94,6 @@ function FillColor(x1, y1, x2, y2, color)
     love.graphics.setScissor()
     
     local r,g,b = GetRGB(color)
-    --Debug("FillColor: %d, %d, %d", r,g,b)
     love.graphics.clear(r, g, b, 1)
 end
 
@@ -138,13 +137,17 @@ local color32Pallette = {}
 local function LoadPallette(filename)
     local f = io.open(filename, "rb")
     if f == nil then return false end
+    Debug("Loading palette from: %s", filename)
     for i=1,256 do
         local c0, c1, c2 = f:read(3):byte(1,3)
         -- Palette values are 0-63, multiply by 4 to get 0-255 range
         color32Pallette[i] = (c0*4)*65536+(c1*4)*256+(c2*4)
-        --print(i .. ":" .. color32Pallette[i] .. "," .. c0 .. "," .. c1 .. "," .. c2)
+        if i <= 5 then
+            Debug("Palette[%d]: raw=%d,%d,%d -> color=%d", i, c0, c1, c2, color32Pallette[i])
+        end
     end
     f:close()
+    Debug("Palette loaded, first entry: %d", color32Pallette[1])
 end
 
 --[[
@@ -365,11 +368,8 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
         ynew = y - piccache.yoff
     end
 
-    -- 图片使用 premultiplied alpha 绘制
-    love.graphics.setBlendMode("alpha", "premultiplied")
+    -- 使用 regular alpha 模式绘制图片
     love.graphics.draw(piccache.img, xnew, ynew)
-    -- 恢复到 regular alpha 用于文字等
-    love.graphics.setBlendMode("alpha")
 end
 
 local JY_LoadPic = PicLoadCache
