@@ -69,10 +69,12 @@ end
   
 function DrawStr(x, y, str, color, size, fontname)
     --Debug("DrawStr: x,y=%d,%d, str=%s, color=%d, size=%d, fontname=%s", x,y,str,color,size,fontname)
+    local oldR, oldG, oldB, oldA = love.graphics.getColor()
     love.graphics.setFont(getFont(fontname))
     local r, g, b = GetRGB(color)
-    love.graphics.setColor(r, g, b, 1)  -- 确保 alpha 为 1
+    love.graphics.setColor(r, g, b, 1)
     love.graphics.print(str, x, y)
+    love.graphics.setColor(oldR, oldG, oldB, oldA)
 end
 
 --//设置裁剪
@@ -90,11 +92,9 @@ end
 // color, 填充色，用 RGB 表示，从高到低字节为 0RGB
 --]]
 function FillColor(x1, y1, x2, y2, color)
-    -- 先重置 scissor
     love.graphics.setScissor()
-    
     local r,g,b = GetRGB(color)
-    love.graphics.clear(r, g, b, 1)
+    love.graphics.clear(r, g, b)
 end
 
 --[[
@@ -103,10 +103,11 @@ end
 // bright 亮度等级 0-256 --]]
 function Background(x1, y1, x2, y2, Bright)
     if x2<x1 or y2<y1 then return end
-    -- Convert Bright from 0-256 to 0-1 range for LOVE 11.x
     local alpha = Bright / 256
+    local oldR, oldG, oldB, oldA = love.graphics.getColor()
     love.graphics.setColor(0, 0, 0, alpha)
     love.graphics.rectangle("fill", x1, y1, x2-x1+1, y2-y1+1)
+    love.graphics.setColor(oldR, oldG, oldB, oldA)
 end
 
 --[[
@@ -116,9 +117,11 @@ end
 --]]
 function DrawRect(x1, y1, x2, y2, color)
     --if x2<x1 or y2<y1 then return end
+    local oldR, oldG, oldB, oldA = love.graphics.getColor()
     local r, g, b = GetRGB(color)
     love.graphics.setColor(r, g, b, 1)
     love.graphics.rectangle("line", x1, y1, x2-x1+1, y2-y1+1)
+    love.graphics.setColor(oldR, oldG, oldB, oldA)
 end
 
 --[[
