@@ -70,7 +70,8 @@ end
 function DrawStr(x, y, str, color, size, fontname)
     --Debug("DrawStr: x,y=%d,%d, str=%s, color=%d, size=%d, fontname=%s", x,y,str,color,size,fontname)
     love.graphics.setFont(getFont(fontname))
-    love.graphics.setColor(GetRGB(color))
+    local r, g, b = GetRGB(color)
+    love.graphics.setColor(r, g, b, 1)  -- 确保 alpha 为 1
     love.graphics.print(str, x, y)
 end
 
@@ -85,23 +86,27 @@ end
 
 --[[
 // 图形填充
-// 如果x1,y1,x2,y2均为0，则填充整个表面
-// color, 填充色，用RGB表示，从高到低字节为0RGB
+// 如果 x1,y1,x2,y2 均为 0，则填充整个表面
+// color, 填充色，用 RGB 表示，从高到低字节为 0RGB
 --]]
 function FillColor(x1, y1, x2, y2, color)
+    -- 先重置 scissor
+    love.graphics.setScissor()
+    
     local r,g,b = GetRGB(color)
     --Debug("FillColor: %d, %d, %d", r,g,b)
-        love.graphics.setBackgroundColor(r,g,b)
-        love.graphics.clear()
+    love.graphics.clear(r, g, b, 1)
 end
 
 --[[
 // 背景变暗
-// 把源表面(x1,y1,x2,y2)矩形内的所有点亮度降低
+// 把源表面 (x1,y1,x2,y2) 矩形内的所有点亮度降低
 // bright 亮度等级 0-256 --]]
 function Background(x1, y1, x2, y2, Bright)
     if x2<x1 or y2<y1 then return end
-    love.graphics.setColor(0, 0, 0, Bright)
+    -- Convert Bright from 0-256 to 0-1 range for LOVE 11.x
+    local alpha = Bright / 256
+    love.graphics.setColor(0, 0, 0, alpha)
     love.graphics.rectangle("fill", x1, y1, x2-x1+1, y2-y1+1)
 end
 
@@ -112,7 +117,8 @@ end
 --]]
 function DrawRect(x1, y1, x2, y2, color)
     --if x2<x1 or y2<y1 then return end
-    love.graphics.setColor(GetRGB(color))
+    local r, g, b = GetRGB(color)
+    love.graphics.setColor(r, g, b, 1)
     love.graphics.rectangle("line", x1, y1, x2-x1+1, y2-y1+1)
 end
 
@@ -134,7 +140,8 @@ local function LoadPallette(filename)
     if f == nil then return false end
     for i=1,256 do
         local c0, c1, c2 = f:read(3):byte(1,3)
-        color32Pallette[i] = c0*4*65536+c1*4*256+c2*4
+        -- Palette values are 0-63, multiply by 4 to get 0-255 range
+        color32Pallette[i] = (c0*4)*65536+(c1*4)*256+(c2*4)
         --print(i .. ":" .. color32Pallette[i] .. "," .. c0 .. "," .. c1 .. "," .. c2)
     end
     f:close()
@@ -278,7 +285,8 @@ function LoadPic(openfile, idx1, idx2)
     cache.h = h
     cache.xoff = xoff
     cache.yoff = yoff
-    cache.img = love.graphics.newImage(imgdata)
+    -- 设置 premultipliedAlpha 为 false，因为我们使用的是非预乘 alpha
+    cache.img = love.graphics.newImage(imgdata, {mipmaps=false, linear=false, dpiscale=1})
     imgdata = nil
     return cache
 end
@@ -357,7 +365,11 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
         ynew = y - piccache.yoff
     end
 
+    -- 图片使用 premultiplied alpha 绘制
+    love.graphics.setBlendMode("alpha", "premultiplied")
     love.graphics.draw(piccache.img, xnew, ynew)
+    -- 恢复到 regular alpha 用于文字等
+    love.graphics.setBlendMode("alpha")
 end
 
 local JY_LoadPic = PicLoadCache
