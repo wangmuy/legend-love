@@ -1,4 +1,11 @@
 function love.load()
+    -- 使用 regular alpha 模式（非预乘）
+    if love.graphics then
+        love.graphics.setBlendMode("alpha")
+    end
+    
+    math.randomseed(os.time())
+    math.random()
     require "config"
     Byte = require "lib_Byte"
     lib = require "lib_love"

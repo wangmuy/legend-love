@@ -1,0 +1,30 @@
+23:21:15
+JY_Main_sub started
+
+23:21:15
+IncludeFile done
+
+23:21:15
+SetGlobalConst done
+
+23:21:15
+SetGlobal done
+
+23:21:15
+GenTalkIdx done
+
+23:21:15
+SetModify done
+
+23:21:15
+JY_Main start.
+
+23:21:20
+Loadrecord time=423
+
+23:21:20
+Start game cycle
+
+23:21:20
+PicLoadFile: last not at the end
+
