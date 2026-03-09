@@ -120,7 +120,7 @@ function SetGlobalConst()
    CC.ThingPicFile={CONFIG.DataPath .. "thing.idx",CONFIG.DataPath .. "thing.grp"};
 
 
-   CC.MIDIFile=CONFIG.SoundPath .. "game%02d.opus";
+    CC.MIDIFile=CONFIG.SoundPath .. "game%02d.ogg";
    CC.ATKFile=CONFIG.SoundPath .. "atk%02d.wav";
    CC.EFile=CONFIG.SoundPath .. "e%02d.wav";
 

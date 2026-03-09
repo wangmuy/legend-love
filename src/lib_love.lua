@@ -407,13 +407,55 @@ function LoadPicture(filename, x, y)
     end
 end
 
+local currentMusic = nil
+
 function PlayMIDI(filename)
+    if not love.audio then return end
+    
+    if filename == "" or filename == nil then
+        if currentMusic then
+            currentMusic:stop()
+            currentMusic = nil
+        end
+        return
+    end
+    
+    local filepath = filename
+    if not filepath:match("^/") and not filepath:match("^%a:") then
+        filepath = CONFIG.SoundPath .. filename
+    end
+    
+    local success, source_or_err = pcall(love.audio.newSource, filepath, "stream")
+    if success then
+        if currentMusic then
+            currentMusic:stop()
+        end
+        currentMusic = source_or_err
+        currentMusic:setLooping(true)
+        currentMusic:play()
+    end
 end
 
 function PlayWAV(filename)
+    if not love.audio then return end
+    
+    if filename == "" or filename == nil then
+        return
+    end
+    
+    local filepath = filename
+    if not filepath:match("^/") and not filepath:match("^%a:") then
+        filepath = CONFIG.SoundPath .. filename
+    end
+    
+    local success, source_or_err = pcall(love.audio.newSource, filepath, "static")
+    if success then
+        source_or_err:play()
+    end
 end
 
 function PlayMPEG(filename)
+    PlayMIDI(filename)
 end
 
 local BuildingType = {}
