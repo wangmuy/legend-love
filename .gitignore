@@ -1,3 +1,2 @@
-bin/debug.txt
-bin/error.txt
+bin/*.txt
 bin/jy
