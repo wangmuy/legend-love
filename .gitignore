@@ -1,2 +1,4 @@
 bin/*.txt
 bin/jy
+src/debug.txt
+opencode.json
