@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "aliyuncoding/qwen3.5-plus",
+  "provider": {
+    "poe": {
+      "options": {
+        "baseURL": "https://api.poe.com/v1",
+        "apiKey": "{env:POE_API_KEY}"
+      },
+      "models": {
+        "gpt-5.3-codex-spark": {}
+      }
+    },
+    "aliyuncoding": {
+      "options": {
+        "baseURL": "https://coding.dashscope.aliyuncs.com/v1",
+        "apiKey": "{env:ALIYUN_CODING_PLAN_API_KEY}"
+      },
+      "models": {
+        "qwen3.5-plus": {},
+        "kimi-k2.5": {},
+        "MiniMax-M2.5": {},
+        "glm-5": {}
+      }
+    }
+  }
+}
