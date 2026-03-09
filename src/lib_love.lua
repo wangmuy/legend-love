@@ -92,9 +92,12 @@ end
 // color, 填充色，用 RGB 表示，从高到低字节为 0RGB
 --]]
 function FillColor(x1, y1, x2, y2, color)
+    local oldScissor = {love.graphics.getScissor()}
     love.graphics.setScissor()
     local r,g,b = GetRGB(color)
     love.graphics.clear(r, g, b)
+    love.graphics.setScissor(oldScissor[1], oldScissor[2], oldScissor[3], oldScissor[4])
+    Debug("FillColor: r=" .. r .. ", g=" .. g .. ", b=" .. b)
 end
 
 --[[
