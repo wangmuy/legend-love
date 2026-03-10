@@ -1992,6 +1992,7 @@ end
 --flag =0 or nil 全部刷新屏幕
 --      1 考虑脏矩形的快速刷新
 function ShowScreen(flag)              --刷新屏幕显示
+    lib.Debug(string.format("ShowScreen called: flag=%s, Darkness=%d", tostring(flag), JY.Darkness));
     if JY.Darkness==0 then
         if flag==nil then
             flag=0;
@@ -2030,6 +2031,8 @@ end
 --         <0 选中的菜单项，调用函数要求退出父菜单，这个用于退出多层菜单
 
 function ShowMenu(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,selectColor)     --通用菜单函数
+    lib.Debug(string.format("ShowMenu called: numItem=%d, numShow=%d", numItem, numShow));
+    
     local w=0;
     local h=0;   --边框的宽高
     local i=0;
@@ -2152,6 +2155,7 @@ function ShowMenu(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,se
 
     Cls(x1,y1,x1+w+1,y1+h+1,0,1);
 
+    lib.Debug(string.format("ShowMenu returned: returnValue=%d", returnValue));
     return returnValue;
 end
 
@@ -2640,9 +2644,12 @@ end
 --flag 1 空格触发，2，物品触发，3，路过触发
 function EventExecute(id,flag)               --事件调用主入口
     JY.CurrentD=id;
+    lib.Debug(string.format("EventExecute: id=%d, flag=%d, SubScene=%d", id, flag, JY.SubScene));
     if JY.SceneNewEventFunction[JY.SubScene]==nil then         --没有定义新的事件处理函数，调用旧的
+        lib.Debug("EventExecute: calling oldEventExecute");
         oldEventExecute(flag)
     else
+        lib.Debug("EventExecute: calling SceneNewEventFunction");
         JY.SceneNewEventFunction[JY.SubScene](flag)         --调用新的事件处理函数
     end
     JY.CurrentD=-1;
@@ -2662,6 +2669,8 @@ function oldEventExecute(flag)            --调用原有的指定位置的函数
         eventnum=GetD(JY.SubScene,JY.CurrentD,4);
     end
 
+    lib.Debug(string.format("oldEventExecute: flag=%d, CurrentD=%d, eventnum=%d", flag, JY.CurrentD, eventnum or -1));
+
     if eventnum>0 then
         oldCallEvent(eventnum);
     end
@@ -2670,8 +2679,9 @@ end
 
 function oldCallEvent(eventnum)     --执行旧的事件函数
     local eventfilename=string.format("oldevent_%d.lua",eventnum);
-    lib.Debug(eventfilename);
+    lib.Debug(string.format("oldCallEvent: eventnum=%d, filename=%s", eventnum, eventfilename));
     dofile(CONFIG.OldEventPath .. eventfilename);
+    lib.Debug(string.format("oldCallEvent: eventnum=%d finished", eventnum));
 end
 
 
@@ -2702,6 +2712,7 @@ function Cls(x1,y1,x2,y2)                    --清除屏幕
         y2=0;
     end
 
+    lib.Debug(string.format("Cls called: x1=%s, y1=%s, x2=%s, y2=%s, Status=%d", tostring(x1), tostring(y1), tostring(x2), tostring(y2), JY.Status));
     lib.SetClip(x1,y1,x2,y2);
 
     if JY.Status==GAME_START then
@@ -2774,6 +2785,8 @@ end
 --复杂版本对话
 --s 字符串，必须加上*作为分行，如果里面没有*,则会自动加上
 function TalkEx(s,headid,flag)          --复杂版本对话
+    lib.Debug(string.format("TalkEx called: headid=%d, flag=%d, s=%s", headid, flag, string.sub(s, 1, 30)));
+    
     local picw=100;       --最大头像图片宽高
     local pich=100;
     local talkxnum=12;         --对话一行字数
@@ -2829,10 +2842,13 @@ function TalkEx(s,headid,flag)          --复杂版本对话
             Cls();
             if headid>=0 then
                 DrawBox(xy[flag].headx, xy[flag].heady, xy[flag].headx + boxpicw, xy[flag].heady + boxpich,C_WHITE);
+                lib.Debug(string.format("TalkEx: loading headid=%d, picid=%d", headid, headid*2));
                 local w,h=lib.PicGetXY(1,headid*2);
+                lib.Debug(string.format("TalkEx: PicGetXY returned w=%s, h=%s", tostring(w), tostring(h)));
                 local x=(picw-w)/2;
                 local y=(pich-h)/2;
                 lib.PicLoadCache(1,headid*2,xy[flag].headx+5+x,xy[flag].heady+5+y,1);
+                lib.Debug("TalkEx: PicLoadCache called");
             end
             DrawBox(xy[flag].talkx, xy[flag].talky, xy[flag].talkx +boxtalkw, xy[flag].talky + boxtalkh,C_WHITE);
         end
@@ -2882,11 +2898,15 @@ end
 --            5 屏幕下方显示, 左边头像，右边对话
 
 function instruct_1(talkid,headid,flag)        --对话
+    lib.Debug(string.format("instruct_1: talkid=%d, headid=%d, flag=%d", talkid, headid, flag));
     local s=ReadTalk(talkid);
     if s==nil then        --对话id不存在
+        lib.Debug(string.format("instruct_1: talkid=%d not found", talkid));
         return ;
     end
+    lib.Debug(string.format("instruct_1: calling TalkEx with talkid=%d", talkid));
     TalkEx(s,headid,flag);
+    lib.Debug(string.format("instruct_1: TalkEx returned for talkid=%d", talkid));
 end
 
 --根据oldtalk.grp文件来idx索引文件。供后面读对话使用
@@ -2922,6 +2942,7 @@ function ReadTalk(talkid)            --从文件读取一条对话
     local length=filelength(idxfile);
 
     if talkid<0 and talkid>=length/4 then
+        lib.Debug(string.format("ReadTalk: talkid=%d out of range", talkid));
         return
     end
 
@@ -2941,6 +2962,8 @@ function ReadTalk(talkid)            --从文件读取一条对话
     p:seek("set",id1);
     local talk=p:read("*line");
     p:close();
+
+    lib.Debug(string.format("ReadTalk: talkid=%d, talk=%s", talkid, string.sub(talk or "nil", 1, 30)));
 
     return talk;
 
@@ -3942,21 +3965,27 @@ end
 
 --小宝卖东西
 function instruct_64()                 --小宝卖东西
-    local headid=111;           --小宝头像
+    local headid=0;           --小宝头像（原111，但hdgrp.grp只有109个有效头像，111超出范围）
 
+    lib.Debug(string.format("instruct_64: JY.SubScene=%d, JY.ShopNum=%d", JY.SubScene, JY.ShopNum));
+    lib.Debug(string.format("instruct_64: CurrentD=%d, CurrentEventType=%d", JY.CurrentD, JY.CurrentEventType));
 
     local id=-1;
     for i=0,JY.ShopNum-1 do                --找到当前商店id
+        lib.Debug(string.format("  ShopScene[%d].sceneid=%d", i, CC.ShopScene[i].sceneid));
         if CC.ShopScene[i].sceneid==JY.SubScene then
             id=i;
             break;
         end
     end
     if id<0 then
-        return ;
+        lib.Debug("instruct_64: Shop scene not found, using default shop 0");
+        id=0;  -- 默认使用第一个商店
     end
 
+    lib.Debug("instruct_64: About to call TalkEx");
     TalkEx("这位小哥，看看有什麽需要*的，小宝我卖的东西价钱绝*对公道．",headid,0);
+    lib.Debug("instruct_64: TalkEx returned");
 
     local menu={};
     for i=1,5 do
