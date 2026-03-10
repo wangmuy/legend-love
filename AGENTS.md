@@ -131,3 +131,8 @@ end
 - **修改游戏数据**: 编辑 `script/jyconst.lua`
 - **添加新场景事件**: 在 `script/newevent/` 创建文件
 - **调试渲染**: 运行后检查 `src/debug.txt`
+
+## Spec 驱动开发
+
+- 使用 OpenSpec, 所有文档均使用中文
+- 确认设置环境变量 `export OPENSPEC_TELEMETRY=0`
