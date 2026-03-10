@@ -252,14 +252,54 @@ function LoadPic(openfile, idx1, idx2)
         return nil 
     end
     openfile:seek("set", idx1)
-    local data1 = openfile:read(2)
-    local data2 = openfile:read(2)
-    local data3 = openfile:read(2)
-    local data4 = openfile:read(2)
-    if data1 == nil or data2 == nil or data3 == nil or data4 == nil then
+    
+    -- 读取前8字节检查是否是PNG文件
+    local header = openfile:read(8)
+    if header == nil then
         Debug("LoadPic: failed to read header data")
         return nil
     end
+    
+    -- 检查PNG文件头 (89 50 4E 47 0D 0A 1A 0A)
+    if header:byte(1) == 0x89 and header:byte(2) == 0x50 and header:byte(3) == 0x4E and header:byte(4) == 0x47 then
+        -- 这是PNG文件，使用love2d的PNG加载
+        Debug("LoadPic: detected PNG format at idx1=%d", idx1)
+        local pngSize = idx2 - idx1
+        openfile:seek("set", idx1)
+        local pngData = openfile:read(pngSize)
+        if pngData == nil then
+            Debug("LoadPic: failed to read PNG data")
+            return nil
+        end
+        
+        -- 使用love.image.newImageData加载PNG
+        local success, imgdata = pcall(function()
+            return love.image.newImageData(love.filesystem.newFileData(pngData, "temp.png"))
+        end)
+        
+        if not success or imgdata == nil then
+            Debug("LoadPic: failed to load PNG image")
+            return nil
+        end
+        
+        local w = imgdata:getWidth()
+        local h = imgdata:getHeight()
+        Debug("LoadPic: loaded PNG image, w=%d, h=%d", w, h)
+        
+        local cache = PicCache:new()
+        cache.w = w
+        cache.h = h
+        cache.xoff = 0
+        cache.yoff = 0
+        cache.img = love.graphics.newImage(imgdata, {mipmaps=false, linear=false, dpiscale=1})
+        return cache
+    end
+    
+    -- 不是PNG，按RLE格式处理
+    local data1 = header:sub(1, 2)
+    local data2 = header:sub(3, 4)
+    local data3 = header:sub(5, 6)
+    local data4 = header:sub(7, 8)
     local w = Byte.byte2ushortl(data1:byte(1,2))
     local h = Byte.byte2ushortl(data2:byte(1,2))
     local xoff = Byte.byte2ushortl(data3:byte(1,2))
