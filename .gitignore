@@ -1,4 +1,8 @@
 bin/*.txt
 bin/jy
 src/debug.txt
-opencode.json
+
+# opencode
+.opencode/
+!.opencode/command/
+!.opencode/skills/
