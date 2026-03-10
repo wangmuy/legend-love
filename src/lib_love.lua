@@ -92,11 +92,25 @@ end
 // color, 填充色，用 RGB 表示，从高到低字节为 0RGB
 --]]
 function FillColor(x1, y1, x2, y2, color)
-    local oldScissor = {love.graphics.getScissor()}
-    love.graphics.setScissor()
     local r,g,b = GetRGB(color)
-    love.graphics.clear(r, g, b)
-    love.graphics.setScissor(oldScissor[1], oldScissor[2], oldScissor[3], oldScissor[4])
+    if x1 == 0 and y1 == 0 and x2 == 0 and y2 == 0 then
+        -- 清除整个屏幕
+        love.graphics.clear(r, g, b)
+    else
+        -- 只清除指定区域：保存当前scissor，设置新的scissor，绘制矩形，恢复scissor
+        local oldScissor = {love.graphics.getScissor()}
+        love.graphics.setScissor(x1, y1, x2-x1, y2-y1)
+        -- 使用矩形填充而不是clear，因为clear不受scissor影响
+        love.graphics.setColor(r, g, b, 1)
+        love.graphics.rectangle("fill", x1, y1, x2-x1, y2-y1)
+        love.graphics.setColor(1, 1, 1, 1)  -- 恢复默认颜色
+        -- 恢复原来的scissor（如果存在）
+        if oldScissor[1] then
+            love.graphics.setScissor(oldScissor[1], oldScissor[2], oldScissor[3], oldScissor[4])
+        else
+            love.graphics.setScissor()
+        end
+    end
 end
 
 --[[
@@ -201,12 +215,25 @@ end
 
 function PicFile:getPic(picid)
     if self.pcache[picid] == nil then
+        Debug("getPic: loading picid=%d from %s", picid, self.grpfilename)
         local f = io.open(self.grpfilename, "rb")
+        if f == nil then
+            Debug("getPic: failed to open file %s", self.grpfilename)
+            return nil
+        end
         if self.idx[picid]==nil or self.idx[picid+1]==nil then
             Debug("getPic: %s picid=%d, idx=%d,%d", self.grpfilename, picid, self.idx[picid] or -1, self.idx[picid+1] or -1)
+            f:close()
+            return nil
         end
+        Debug("getPic: calling LoadPic with idx[%d]=%d, idx[%d]=%d", picid, self.idx[picid], picid+1, self.idx[picid+1])
         self.pcache[picid] = LoadPic(f, self.idx[picid], self.idx[picid+1])
         f:close()
+        if self.pcache[picid] == nil then
+            Debug("getPic: LoadPic returned nil for picid=%d", picid)
+        else
+            Debug("getPic: loaded picid=%d successfully, w=%d, h=%d", picid, self.pcache[picid].w, self.pcache[picid].h)
+        end
     end
     return self.pcache[picid]
 end
@@ -220,13 +247,24 @@ local function FileLength(fname)
 end
 
 function LoadPic(openfile, idx1, idx2)
-    if openfile == nil or idx2 <= idx1 then return nil end
+    if openfile == nil or idx2 <= idx1 then 
+        Debug("LoadPic: invalid parameters, openfile=%s, idx1=%d, idx2=%d", tostring(openfile), idx1, idx2)
+        return nil 
+    end
     openfile:seek("set", idx1)
-    local w = Byte.byte2ushortl(openfile:read(2):byte(1,2))
-    local h = Byte.byte2ushortl(openfile:read(2):byte(1,2))
-    local xoff = Byte.byte2ushortl(openfile:read(2):byte(1,2))
-    local yoff = Byte.byte2ushortl(openfile:read(2):byte(1,2))
-    --Debug("LoadPic: %d %d, off: %d, %d" , w, h, xoff, yoff)
+    local data1 = openfile:read(2)
+    local data2 = openfile:read(2)
+    local data3 = openfile:read(2)
+    local data4 = openfile:read(2)
+    if data1 == nil or data2 == nil or data3 == nil or data4 == nil then
+        Debug("LoadPic: failed to read header data")
+        return nil
+    end
+    local w = Byte.byte2ushortl(data1:byte(1,2))
+    local h = Byte.byte2ushortl(data2:byte(1,2))
+    local xoff = Byte.byte2ushortl(data3:byte(1,2))
+    local yoff = Byte.byte2ushortl(data4:byte(1,2))
+    Debug("LoadPic: idx1=%d, idx2=%d, w=%d, h=%d, off: %d, %d" , idx1, idx2, w, h, xoff, yoff)
 
     -- 根据grp读入图像
     -- 先初始化为透明图片
@@ -338,10 +376,17 @@ end
 -- //得到贴图大小
 function PicGetXY(fileid, picid)
     if picid<0 then return 0,0,0,0 end
+    local original_picid = picid
     picid = math.floor(picid/2)
     picid = picid+1 -- lua starts with 1
     fileid = fileid+1 -- lua starts with 1
+    Debug("PicGetXY: fileid=%d, original_picid=%d, calculated_picid=%d", fileid, original_picid, picid)
     local pcache = picFileCache[fileid]:getPic(picid)
+    if pcache == nil then
+        Debug("PicGetXY: pcache is nil!")
+        return 0,0,0,0
+    end
+    Debug("PicGetXY: pcache.w=%d, pcache.h=%d", pcache.w, pcache.h)
     return pcache.w, pcache.h, pcache.xoff, pcache.yoff
 end
 
@@ -358,14 +403,21 @@ end
 //  value 按照flag定义，为alpha值， 
 --]]
 function PicLoadCache(fileid, picid, x, y, flag, value)
+    local original_picid = picid
     picid = math.floor(picid/2)
     fileid = fileid+1 -- lua starts with 1
     picid = picid+1 -- lua starts with 1
     picfile = picFileCache[fileid]
+    Debug("PicLoadCache: fileid=%d, original_picid=%d, calculated_picid=%d, idx_count=%d", fileid, original_picid, picid, picfile and #(picfile.idx) or -1)
     if picfile == nil or fileid < 1 or picid < 1 or picid > #(picfile.idx) then
+        Debug("PicLoadCache: invalid picfile or picid out of range")
         return
     end
     local piccache = picfile:getPic(picid)
+    if piccache == nil then
+        Debug("PicLoadCache: piccache is nil!")
+        return
+    end
     local xnew = x
     local ynew = y
     if bit32.band(flag, 0x1) == 0 then
@@ -374,6 +426,7 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
     end
 
     -- 使用 regular alpha 模式绘制图片
+    Debug("PicLoadCache: drawing image at xnew=%d, ynew=%d", xnew, ynew)
     love.graphics.draw(piccache.img, xnew, ynew)
 end
 
@@ -633,6 +686,8 @@ end
 
 -- // 绘制主地图
 function DrawMMap(x, y, Mypic)
+    local oldScissor = {love.graphics.getScissor()}
+    
     local rect = {x=nil, y=nil, w=nil, h=nil}
     rect.x, rect.y, rect.w, rect.h = love.graphics.getScissor()
     rect.x = rect.x or 0
@@ -686,6 +741,8 @@ function DrawMMap(x, y, Mypic)
             JY_LoadPic(0,picnum,x1,y1,0,0)
         end
     end
+    
+    love.graphics.setScissor(oldScissor[1], oldScissor[2], oldScissor[3], oldScissor[4])
 end
 
 function UnloadMMap()
@@ -780,6 +837,8 @@ end
 
 -- 绘制场景地图
 function DrawSMap(sceneid, x,  y, xoff, yoff, Mypic)
+    local oldScissor = {love.graphics.getScissor()}
+    
     local rect = {x=nil, y=nil, w=nil, h=nil}
     rect.x, rect.y, rect.w, rect.h = love.graphics.getScissor()
     rect.x = rect.x or 0
@@ -853,6 +912,8 @@ function DrawSMap(sceneid, x,  y, xoff, yoff, Mypic)
             end
         end
     end
+    
+    love.graphics.setScissor(oldScissor[1], oldScissor[2], oldScissor[3], oldScissor[4])
 end
 
 local War_XMax=0 -- 战斗地图大小
