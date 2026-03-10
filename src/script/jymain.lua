@@ -3965,7 +3965,7 @@ end
 
 --小宝卖东西
 function instruct_64()                 --小宝卖东西
-    local headid=0;           --小宝头像（原111，但hdgrp.grp只有109个有效头像，111超出范围）
+    local headid=111;           --小宝头像
 
     lib.Debug(string.format("instruct_64: JY.SubScene=%d, JY.ShopNum=%d", JY.SubScene, JY.ShopNum));
     lib.Debug(string.format("instruct_64: CurrentD=%d, CurrentEventType=%d", JY.CurrentD, JY.CurrentEventType));
