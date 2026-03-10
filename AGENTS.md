@@ -1,133 +1,133 @@
-# AGENTS.md - Coding Guidelines for Legend of Love
+# AGENTS.md - 金庸群侠传 Love2D 项目编码指南
 
-This file provides guidelines for AI agents working on the Legend of Love (金庸群侠传) Love2D project.
+本文档为 AI 智能体提供金庸群侠传 Love2D 项目的编码规范和工作指南。
 
-## Project Overview
+## 项目概述
 
-A Lua/Love2D remake of the classic Chinese RPG "Legend of the Condor Heroes" (金庸群侠传).
-- **Language**: Lua 5.1+ (Love2D framework)
-- **Platform**: Cross-platform (Linux, macOS, Windows)
-- **Encoding**: UTF-8
+这是一个基于 Lua/Love2D 的经典国产 RPG 游戏《金庸群侠传》复刻版。
+- **开发语言**: Lua 5.1+ (Love2D 框架)
+- **支持平台**: 跨平台 (Linux, macOS, Windows)
+- **文件编码**: UTF-8
 
-## Build/Run Commands
+## 构建/运行命令
 
 ```bash
-# Run the game
+# 运行游戏
 love src/
 
-# Or from the game directory
+# 或在游戏目录下运行
 cd src && love .
 
-# Debug output goes to src/debug.txt
-# Error output goes to src/error.txt
+# 调试输出保存在 src/debug.txt
+# 错误输出保存在 src/error.txt
 ```
 
-**Note**: There are no formal test suites or linting tools configured. Testing is done manually by running the game.
+**注意**: 本项目没有正式的测试套件或代码检查工具。测试通过手动运行游戏完成。
 
-## Code Style Guidelines
+## 代码风格规范
 
-### Naming Conventions
+### 命名规范
 
-- **Global constants**: `UPPER_CASE` (e.g., `VK_ESCAPE`, `C_WHITE`, `GAME_MMAP`)
-- **Configuration**: `CONFIG.*` prefix (e.g., `CONFIG.Width`, `CONFIG.Debug`)
-- **Game constants**: `CC.*` prefix in `jyconst.lua` (e.g., `CC.ScreenW`, `CC.R_GRPFilename`)
-- **Global game state**: `JY.*` prefix (e.g., `JY.Status`, `JY.Person`)
-- **Functions**: `CamelCase` for public, `camelCase` or `snake_case` for local
-- **Local variables**: `camelCase` or `snake_case`
-- **File-local functions**: `local function FunctionName()`
+- **全局常量**: `UPPER_CASE` (例如: `VK_ESCAPE`, `C_WHITE`, `GAME_MMAP`)
+- **配置项**: `CONFIG.*` 前缀 (例如: `CONFIG.Width`, `CONFIG.Debug`)
+- **游戏常量**: `CC.*` 前缀，定义在 `jyconst.lua` (例如: `CC.ScreenW`, `CC.R_GRPFilename`)
+- **游戏状态**: `JY.*` 前缀 (例如: `JY.Status`, `JY.Person`)
+- **函数名**: 公共函数使用 `CamelCase`，局部函数使用 `camelCase` 或 `snake_case`
+- **局部变量**: 使用 `camelCase` 或 `snake_case`
+- **文件内函数**: `local function FunctionName()`
 
-### File Organization
+### 文件组织结构
 
 ```
 src/
-├── main.lua          # Entry point, Love2D callbacks
-├── conf.lua          # Love2D configuration
-├── config.lua        # Game configuration (CONFIG.*)
-├── lib_love.lua      # Graphics/audio wrapper (lib.*)
-├── lib_Byte.lua      # Binary data utilities (Byte.*)
-├── lib_log.lua       # Logging utilities
-├── luabit.lua        # Bit manipulation
+├── main.lua          # 程序入口，Love2D 回调函数
+├── conf.lua          # Love2D 配置
+├── config.lua        # 游戏配置 (CONFIG.*)
+├── lib_love.lua      # 图形/音频封装 (lib.*)
+├── lib_Byte.lua      # 二进制数据工具 (Byte.*)
+├── lib_log.lua       # 日志工具
+├── luabit.lua        # 位运算操作
 ├── script/
-│   ├── jymain.lua    # Main game logic (~230KB)
-│   ├── jyconst.lua   # Constants and game data
-│   ├── jymodify.lua  # Modifications and extensions
-│   ├── oldevent/     # Legacy event scripts
-│   └── newevent/     # New event scripts
-└── data/             # Game assets (grp, idx, 002 files)
+│   ├── jymain.lua    # 主游戏逻辑 (~230KB)
+│   ├── jyconst.lua   # 常量和游戏数据
+│   ├── jymodify.lua  # 修改和扩展
+│   ├── oldevent/     # 旧版事件脚本
+│   └── newevent/     # 新版事件脚本
+└── data/             # 游戏资源 (grp, idx, 002 文件)
 ```
 
-### Function Conventions
+### 函数规范
 
 ```lua
--- Public function
+-- 公共函数
 function FunctionName(arg1, arg2)
-    -- implementation
+    -- 实现代码
 end
 
--- Local function
+-- 局部函数
 local function localFunctionName(arg1)
-    -- implementation
+    -- 实现代码
 end
 
--- Event function (oldevent)
+-- 事件函数 (oldevent)
 function oldevent_XXX()
-    instruct_1(1234, 0, 1);  -- Dialog
-    instruct_0();              -- Clear screen
-    instruct_3(...);           -- Modify event
+    instruct_1(1234, 0, 1);  -- 对话
+    instruct_0();              -- 清屏
+    instruct_3(...);           -- 修改事件
 end
 ```
 
-### Key Patterns
+### 关键模式
 
-1. **Game Loop**: Uses Love2D's `love.run()` with custom `JY_Main()`
-2. **Event System**: Legacy events in `oldevent/` use `instruct_XXX()` functions
-3. **Image Loading**: Custom GRP format with PNG fallback (see `LoadPic()`)
-4. **Screen States**: `GAME_START`, `GAME_MMAP`, `GAME_SMAP`, `GAME_WMAP`
+1. **游戏循环**: 使用 Love2D 的 `love.run()` 配合自定义 `JY_Main()`
+2. **事件系统**: `oldevent/` 目录下的旧版事件使用 `instruct_XXX()` 函数
+3. **图像加载**: 自定义 GRP 格式，支持 PNG 回退 (参考 `LoadPic()`)
+4. **屏幕状态**: `GAME_START`, `GAME_MMAP`, `GAME_SMAP`, `GAME_WMAP`
 
-### Error Handling
+### 错误处理
 
-- Use `lib.Debug()` for debug output (writes to debug.txt when `CONFIG.Debug=1`)
-- Use `pcall()` for potentially failing operations (e.g., image loading)
-- Check nil returns from file operations
+- 使用 `lib.Debug()` 输出调试信息 (当 `CONFIG.Debug=1` 时写入 debug.txt)
+- 对可能失败的操作使用 `pcall()` (例如图像加载)
+- 检查文件操作的 nil 返回值
 
-### Graphics Conventions
+### 图形规范
 
-- Use `lib.SetClip()` / `lib.FillColor()` for screen regions
-- Use `lib.PicLoadCache()` for sprite rendering
-- Use `Cls()` to clear screen before redraws
-- Colors use `RGB(r,g,b)` helper returning packed integer
+- 使用 `lib.SetClip()` / `lib.FillColor()` 设置屏幕区域
+- 使用 `lib.PicLoadCache()` 渲染精灵
+- 重绘前使用 `Cls()` 清屏
+- 颜色使用 `RGB(r,g,b)` 辅助函数返回打包整数
 
-### Data Files
+### 数据文件
 
-- **GRP files**: Custom image format (RLE + PNG hybrid)
-- **IDX files**: Index files for GRP (4-byte offsets)
-- **002 files**: Map data files
-- All paths use `CONFIG.DataPath` prefix
+- **GRP 文件**: 自定义图像格式 (RLE + PNG 混合)
+- **IDX 文件**: GRP 索引文件 (4 字节偏移)
+- **002 文件**: 地图数据文件
+- 所有路径使用 `CONFIG.DataPath` 前缀
 
-### Comments
+### 注释规范
 
-- Use `--` for single-line comments
-- Use `--[[ ... --]]` for multi-line comments
-- Chinese comments are common in this codebase
-- Document function purpose with `--` above definition
+- 单行注释使用 `--`
+- 多行注释使用 `--[[ ... --]]`
+- 本代码库中常见中文注释
+- 函数定义上方使用 `--` 说明函数用途
 
-### Indentation
+### 缩进规范
 
-- Use 4 spaces for indentation
-- Align related assignments
-- Keep line length reasonable (<120 chars)
+- 使用 4 个空格缩进
+- 相关赋值对齐
+- 行长度保持合理 (<120 字符)
 
-## Important Notes
+## 重要提示
 
-1. **No formal tests**: Test by running the game and checking debug.txt
-2. **Debug mode**: Set `CONFIG.Debug=1` in config.lua for verbose logging
-3. **Resource files**: Don't modify GRP/IDX files without understanding the format
-4. **Love2D version**: Targets Love2D 11.x (check conf.lua for version)
-5. **Encoding**: All source files are UTF-8
+1. **无正式测试**: 通过运行游戏并检查 debug.txt 进行测试
+2. **调试模式**: 在 config.lua 中设置 `CONFIG.Debug=1` 启用详细日志
+3. **资源文件**: 不理解格式前不要修改 GRP/IDX 文件
+4. **Love2D 版本**: 目标 Love2D 11.x (版本见 conf.lua)
+5. **文件编码**: 所有源文件使用 UTF-8
 
-## Common Tasks
+## 常见任务
 
-- **Add NPC dialog**: Create/edit files in `script/oldevent/`
-- **Modify game data**: Edit `script/jyconst.lua`
-- **Add new scene events**: Create files in `script/newevent/`
-- **Debug rendering**: Check `src/debug.txt` after running
+- **添加 NPC 对话**: 在 `script/oldevent/` 创建/编辑文件
+- **修改游戏数据**: 编辑 `script/jyconst.lua`
+- **添加新场景事件**: 在 `script/newevent/` 创建文件
+- **调试渲染**: 运行后检查 `src/debug.txt`
