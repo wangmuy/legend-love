@@ -19,16 +19,39 @@ require "lib_log"
 local Byte = require "lib_Byte"
 
 keymap = {
-    ["escape"] = VK_ESCAPE,
-    [" "] = VK_SPACE,
-    ["return"] = VK_RETURN,
-    ["up"] = VK_UP,
-    ["down"] = VK_DOWN,
-    ["left"] = VK_LEFT,
-    ["right"] = VK_RIGHT,
+    ["escape"] = 27,        -- VK_ESCAPE
+    [" "] = 32,             -- VK_SPACE
+    ["return"] = 13,        -- VK_RETURN
+    ["up"] = 1073741906,    -- VK_UP (SDLK_UP)
+    ["down"] = 1073741905,  -- VK_DOWN (SDLK_DOWN)
+    ["left"] = 1073741904,  -- VK_LEFT (SDLK_LEFT)
+    ["right"] = 1073741903, -- VK_RIGHT (SDLK_RIGHT)
 }
 
 function GetKey()
+    -- 使用事件驱动的输入管理器
+    -- 如果input_manager已加载，使用其getKey方法
+    local InputManager = package.loaded["input_manager"]
+    if InputManager then
+        -- 先处理Love2D事件，确保按键事件被捕获
+        if love.event then
+            love.event.pump()
+            local name, a, b, c, d = love.event.poll()
+            while name do
+                if name == "keypressed" then
+                    InputManager.getInstance():onKeyPressed(a, b, c)
+                elseif name == "keyreleased" then
+                    InputManager.getInstance():onKeyReleased(a, b)
+                end
+                name, a, b, c, d = love.event.poll()
+            end
+        end
+        
+        local key = InputManager.getInstance():getKey()
+        return key
+    end
+    
+    -- 回退到原始实现(用于初始化阶段)
     --love.graphics.present()
     local e,a,b,c,d
     if not love.event then return -1 end
@@ -40,13 +63,17 @@ function GetKey()
 end
 
 function EnableKeyRepeat(delay, interval)
-    -- LOVE 11.x API: setKeyRepeat(repeat, delay) - both in seconds
-    -- delay: initial delay before repeat starts (in ms)
-    -- interval: time between repeats (in ms)
-    if delay > 0 and interval > 0 then
-        love.keyboard.setKeyRepeat(true)
+    -- 使用事件驱动的输入管理器
+    local InputManager = package.loaded["input_manager"]
+    if InputManager then
+        InputManager.getInstance():setKeyRepeat(delay > 0)
     else
-        love.keyboard.setKeyRepeat(false)
+        -- 回退到原始实现
+        if delay > 0 and interval > 0 then
+            love.keyboard.setKeyRepeat(true)
+        else
+            love.keyboard.setKeyRepeat(false)
+        end
     end
 end
 
