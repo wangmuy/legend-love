@@ -1,6 +1,7 @@
 -- event_bridge.lua
 -- 事件桥接模块
 -- 连接新旧架构，提供向后兼容的API
+-- 集成协程调度器和异步对话框
 
 local EventBridge = {}
 EventBridge.__index = EventBridge
@@ -8,18 +9,10 @@ EventBridge.__index = EventBridge
 -- 依赖模块
 local StateMachine = require("state_machine")
 local InputManager = require("input_manager")
+local CoroutineScheduler = require("coroutine_scheduler")
+local AsyncDialog = require("async_dialog")
 
--- 调试输出函数(如果lib未加载则使用print)
-local function debugLog(msg)
-    if lib and lib.Debug then
-        lib.Debug(msg)
-    else
-        print(msg)
-    end
-end
-
--- 游戏状态常量 (从jyconst.lua导入)
--- 这里先声明，实际值会在初始化时从CC表获取
+-- 游戏状态常量
 local GAME_STATES = {
     GAME_START = 0,
     GAME_MMAP = 1,
@@ -55,8 +48,11 @@ function EventBridge:init()
         GAME_STATES.GAME_END = GAME_END or 5
     end
     
-    -- 初始化输入管理器
+    -- 初始化各模块
+    StateMachine.getInstance():init()
     InputManager.getInstance():init()
+    CoroutineScheduler.getInstance():init()
+    AsyncDialog.getInstance():init()
     
     -- 注册Love2D事件回调
     self:registerLoveCallbacks()
@@ -64,24 +60,11 @@ end
 
 -- 注册Love2D事件回调
 function EventBridge:registerLoveCallbacks()
-    -- 保存原始的keypressed回调(如果有)
     local originalKeyPressed = love.keypressed
     local originalKeyReleased = love.keyreleased
     
-    -- 使用全局的Debug函数(如果可用)
-    local function log(msg)
-        if _G.Debug then
-            Debug(msg)
-        elseif _G.lib and _G.lib.Debug then
-            lib.Debug(msg)
-        end
-    end
-    
-    log("Registering Love2D key callbacks")
-    
     -- 重写keypressed
     love.keypressed = function(key, scancode, isrepeat)
-        log("Key pressed: " .. tostring(key))
         InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
         if originalKeyPressed then
             originalKeyPressed(key, scancode, isrepeat)
@@ -90,14 +73,11 @@ function EventBridge:registerLoveCallbacks()
     
     -- 重写keyreleased
     love.keyreleased = function(key, scancode)
-        log("Key released: " .. tostring(key))
         InputManager.getInstance():onKeyReleased(key, scancode)
         if originalKeyReleased then
             originalKeyReleased(key, scancode)
         end
     end
-    
-    log("Love2D key callbacks registered")
 end
 
 -- 注册游戏状态处理器
@@ -108,14 +88,26 @@ function EventBridge:registerState(stateId, handlers)
 end
 
 -- 切换到指定状态
-function EventBridge:switchState(stateId)
+function EventBridge:switchState(stateId, data)
     local sm = StateMachine.getInstance()
-    sm:switchTo(stateId)
+    sm:switchTo(stateId, data)
     
     -- 同步JY.Status
     if JY then
         JY.Status = stateId
     end
+end
+
+-- 进入子状态
+function EventBridge:pushSubState(subStateId, data)
+    local sm = StateMachine.getInstance()
+    sm:pushSubState(subStateId, data)
+end
+
+-- 退出子状态
+function EventBridge:popSubState(result)
+    local sm = StateMachine.getInstance()
+    return sm:popSubState(result)
 end
 
 -- 获取当前状态
@@ -124,13 +116,28 @@ function EventBridge:getCurrentState()
     return sm:getCurrentState()
 end
 
+-- 获取当前子状态
+function EventBridge:getCurrentSubState()
+    local sm = StateMachine.getInstance()
+    return sm:getCurrentSubState()
+end
+
 -- 更新 (在love.update中调用)
 function EventBridge:update(dt)
-    -- 重置按键消费状态(每帧开始时)
+    -- 重置按键消费状态
     InputManager.getInstance():resetKeyConsumed()
+    
+    -- 更新输入管理器（处理按键重复）
+    InputManager.getInstance():update(dt)
     
     -- 处理输入事件
     InputManager.getInstance():processEvents()
+    
+    -- 更新协程调度器
+    CoroutineScheduler.getInstance():update(dt)
+    
+    -- 更新对话框
+    AsyncDialog.getInstance():update(dt)
     
     -- 更新当前状态
     StateMachine.getInstance():update(dt)
@@ -138,7 +145,46 @@ end
 
 -- 渲染 (在love.draw中调用)
 function EventBridge:draw()
+    -- 渲染当前状态
     StateMachine.getInstance():draw()
+    
+    -- 渲染对话框（在最上层）
+    AsyncDialog.getInstance():draw()
+end
+
+-- 创建协程
+function EventBridge:createCoroutine(fn, name)
+    return CoroutineScheduler.getInstance():create(fn, name)
+end
+
+-- 启动协程
+function EventBridge:startCoroutine(id, ...)
+    return CoroutineScheduler.getInstance():start(id, ...)
+end
+
+-- 在协程中等待按键
+function EventBridge:waitForKey()
+    return CoroutineScheduler.getInstance():waitForKey()
+end
+
+-- 在协程中等待时间
+function EventBridge:waitForTime(seconds)
+    return CoroutineScheduler.getInstance():waitForTime(seconds)
+end
+
+-- 显示确认对话框
+function EventBridge:showYesNo(message, callback, options)
+    AsyncDialog.getInstance():showYesNo(message, callback, options)
+end
+
+-- 显示输入对话框
+function EventBridge:showInput(prompt, callback, options)
+    AsyncDialog.getInstance():showInput(prompt, callback, options)
+end
+
+-- 显示选择对话框
+function EventBridge:showSelect(title, items, callback, options)
+    AsyncDialog.getInstance():showSelect(title, items, callback, options)
 end
 
 -- 获取输入管理器实例
@@ -151,6 +197,16 @@ function EventBridge:getStateMachine()
     return StateMachine.getInstance()
 end
 
+-- 获取协程调度器实例
+function EventBridge:getCoroutineScheduler()
+    return CoroutineScheduler.getInstance()
+end
+
+-- 获取对话框管理器实例
+function EventBridge:getAsyncDialog()
+    return AsyncDialog.getInstance()
+end
+
 -- 向后兼容的GetKey函数
 function EventBridge:getKey()
     return InputManager.getInstance():getKey()
@@ -158,9 +214,10 @@ end
 
 -- 向后兼容的EnableKeyRepeat函数
 function EventBridge:enableKeyRepeat(delay, interval)
-    -- 原API使用delay和interval，新API只使用enabled
-    -- 如果delay > 0则启用重复
     InputManager.getInstance():setKeyRepeat(delay > 0)
+    if delay > 0 and interval > 0 then
+        InputManager.getInstance():setKeyRepeatParams(delay / 1000, interval / 1000)
+    end
 end
 
 -- 检查按键是否按下
@@ -173,10 +230,12 @@ function EventBridge:getGameStates()
     return GAME_STATES
 end
 
--- 重置桥接器 (用于测试)
+-- 重置桥接器
 function EventBridge:reset()
     StateMachine.getInstance():reset()
     InputManager.getInstance():reset()
+    CoroutineScheduler.getInstance():reset()
+    AsyncDialog.getInstance():reset()
     stateHandlers = {}
     instance = nil
 end

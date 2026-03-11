@@ -1,9 +1,9 @@
--- 金庸群侠传 Love2D 完全事件驱动架构主入口
+-- 金庸群侠传 Love2D 事件驱动架构主入口
 -- 重构后的标准Love2D回调实现
 
 -- 全局模块引用
 local EventBridge = require("event_bridge")
-local MenuAsync = require("menu_async")
+local JYMainAdapter = require("jymain_adapter")
 
 function love.load()
     -- 使用 regular alpha 模式（非预乘）
@@ -22,38 +22,39 @@ function love.load()
     lib = require "lib_love"
     
     -- 加载事件桥接器并初始化
+    -- 注意：这会注册love.keypressed/keyreleased回调
     EventBridge.getInstance():init()
     
     -- 加载游戏主逻辑
     require(CONFIG.ScriptPath .. "jymain")
     
-    -- 初始化游戏
-    JY_Main()
+    -- 初始化游戏适配器
+    JYMainAdapter.init()
 end
 
 function love.update(dt)
+    -- 更新游戏适配器
+    JYMainAdapter.update(dt)
+    
     -- 通过事件桥接器更新游戏逻辑
     EventBridge.getInstance():update(dt)
-    
-    -- 更新异步菜单
-    MenuAsync.update(dt)
 end
 
 function love.draw()
     -- 通过事件桥接器渲染游戏
     EventBridge.getInstance():draw()
-    
-    -- 渲染异步菜单
-    MenuAsync.draw()
 end
 
--- 按键事件由event_bridge在init()中注册
--- 这里不需要定义love.keypressed/love.keyreleased
+-- 注意：love.keypressed和love.keyreleased由event_bridge在init()中注册
+-- 不要在main.lua中定义这些函数，否则会覆盖event_bridge的设置
 
 function love.quit()
     -- 清理资源
     if EventBridge then
         EventBridge.getInstance():reset()
+    end
+    if JYMainAdapter then
+        JYMainAdapter.reset()
     end
     return false
 end
