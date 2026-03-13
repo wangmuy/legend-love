@@ -133,7 +133,8 @@ end
 
 -- 开始新游戏
 function JYMainAdapter.startNewGame(menux)
-    local scheduler = CoroutineScheduler.getInstance()
+    JY.Status = getStateId("GAME_SMAP")
+    JY.MMAPMusic = -1
     
     Cls()
     DrawString(menux, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
@@ -148,9 +149,6 @@ function JYMainAdapter.startNewGame(menux)
     JY.MyPic = CC.NewPersonPic
     
     lib.ShowSlow(50, 1)
-    
-    JY.Status = getStateId("GAME_SMAP")
-    JY.MMAPMusic = -1
     
     CleanMemory()
     
@@ -168,8 +166,6 @@ end
 
 -- 载入游戏
 function JYMainAdapter.loadGame()
-    local scheduler = CoroutineScheduler.getInstance()
-    
     Cls()
     local loadMenu = {
         {"进度一", nil, 1},
@@ -181,6 +177,8 @@ function JYMainAdapter.loadGame()
     
     local r = MenuAsync.ShowMenuCoroutine(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
     
+    JY.Status = getStateId("GAME_FIRSTMMAP")
+    
     Cls()
     DrawString(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
@@ -189,8 +187,6 @@ function JYMainAdapter.loadGame()
     
     Cls()
     ShowScreen()
-    
-    JY.Status = getStateId("GAME_FIRSTMMAP")
     
     lib.LoadPicture("", 0, 0)
     
