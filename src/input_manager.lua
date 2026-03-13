@@ -201,6 +201,7 @@ function InputManager:getKey()
     local key = currentKey
     if key ~= -1 then
         keyConsumed = true
+        currentKey = -1
     end
     return key
 end
