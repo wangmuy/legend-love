@@ -133,9 +133,6 @@ end
 
 -- 开始新游戏
 function JYMainAdapter.startNewGame(menux)
-    JY.Status = getStateId("GAME_SMAP")
-    JY.MMAPMusic = -1
-    
     Cls()
     DrawString(menux, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
@@ -150,6 +147,9 @@ function JYMainAdapter.startNewGame(menux)
     
     lib.ShowSlow(50, 1)
     
+    JY.Status = getStateId("GAME_SMAP")
+    JY.MMAPMusic = -1
+    
     CleanMemory()
     
     Init_SMap(0)
@@ -157,8 +157,6 @@ function JYMainAdapter.startNewGame(menux)
     if CC.NewGameEvent > 0 then
         oldCallEvent(CC.NewGameEvent)
     end
-    
-    lib.LoadPicture("", 0, 0)
     
     -- 切换到场景状态
     EventBridge.getInstance():switchState(getStateId("GAME_SMAP"))
@@ -177,8 +175,6 @@ function JYMainAdapter.loadGame()
     
     local r = MenuAsync.ShowMenuCoroutine(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
     
-    JY.Status = getStateId("GAME_FIRSTMMAP")
-    
     Cls()
     DrawString(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
@@ -188,7 +184,7 @@ function JYMainAdapter.loadGame()
     Cls()
     ShowScreen()
     
-    lib.LoadPicture("", 0, 0)
+    JY.Status = getStateId("GAME_FIRSTMMAP")
     
     -- 切换到首次主地图状态
     EventBridge.getInstance():switchState(getStateId("GAME_FIRSTMMAP"))
