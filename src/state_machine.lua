@@ -171,6 +171,13 @@ end
 -- 更新当前状态
 -- @param dt: delta time (秒)
 function StateMachine:update(dt)
+    -- 同步 JY.Status 到状态机
+    if JY and JY.Status and JY.Status ~= currentState then
+        if states[JY.Status] then
+            self:switchTo(JY.Status)
+        end
+    end
+    
     -- 更新当前状态的子状态（如果有）
     if currentState and #subStateStack > 0 then
         local currentSubState = subStateStack[#subStateStack]
