@@ -29,37 +29,13 @@ keymap = {
 }
 
 function GetKey()
-    -- 使用事件驱动的输入管理器
-    -- 如果input_manager已加载，使用其getKey方法
     local InputManager = package.loaded["input_manager"]
     if InputManager then
-        -- 先处理Love2D事件，确保按键事件被捕获
-        if love.event then
-            love.event.pump()
-            local name, a, b, c, d = love.event.poll()
-            while name do
-                if name == "keypressed" then
-                    InputManager.getInstance():onKeyPressed(a, b, c)
-                elseif name == "keyreleased" then
-                    InputManager.getInstance():onKeyReleased(a, b)
-                end
-                name, a, b, c, d = love.event.poll()
-            end
-        end
-        
         local key = InputManager.getInstance():getKey()
         return key
     end
     
-    -- 回退到原始实现(用于初始化阶段)
-    --love.graphics.present()
-    local e,a,b,c,d
-    if not love.event then return -1 end
-    love.event.pump()
-    local f, s, var = love.event.poll()
-    e,a,b,c,d = f(s, var)
-    if e==nil or e~="keypressed" then return -1 end
-    return keymap[a]
+    return -1
 end
 
 function EnableKeyRepeat(delay, interval)
@@ -86,18 +62,33 @@ function GetTime()
 end
 
 local fontTbl = {}
-local function getFont(fontname)
-    if fontname==nil then return end
-    if fontTbl[fontname] == nil then
-        fontTbl[fontname] = love.graphics.newFont(fontname, 20)
+local defaultFont = nil
+local function getFont(fontname, size)
+    size = size or 20
+    if fontname==nil then 
+        if defaultFont == nil then
+            defaultFont = love.graphics.newFont(20)
+        end
+        return defaultFont
     end
-    return fontTbl[fontname]
+    local cacheKey = fontname .. "_" .. tostring(size)
+    if fontTbl[cacheKey] == nil then
+        local success, font = pcall(function() return love.graphics.newFont(fontname, size) end)
+        if success then
+            fontTbl[cacheKey] = font
+        else
+            if defaultFont == nil then
+                defaultFont = love.graphics.newFont(20)
+            end
+            fontTbl[cacheKey] = defaultFont
+        end
+    end
+    return fontTbl[cacheKey]
 end
   
 function DrawStr(x, y, str, color, size, fontname)
-    --Debug("DrawStr: x,y=%d,%d, str=%s, color=%d, size=%d, fontname=%s", x,y,str,color,size,fontname)
     local oldR, oldG, oldB, oldA = love.graphics.getColor()
-    love.graphics.setFont(getFont(fontname))
+    love.graphics.setFont(getFont(fontname, size))
     local r, g, b = GetRGB(color)
     love.graphics.setColor(r, g, b, 1)
     love.graphics.print(str, x, y)

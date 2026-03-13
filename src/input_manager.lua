@@ -213,7 +213,6 @@ end
 -- 重置消费状态
 function InputManager:resetKeyConsumed()
     keyConsumed = false
-    currentKey = -1
 end
 
 -- 查询按键是否被按下

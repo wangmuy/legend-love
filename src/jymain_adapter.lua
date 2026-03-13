@@ -1,14 +1,19 @@
 -- jymain_adapter.lua
 -- JY_Main适配器，连接新旧架构
+-- 完全事件驱动版本
 
 local JYMainAdapter = {}
 
 -- 导入模块
 local EventBridge = require("event_bridge")
 local GameStates = require("game_states")
+local MenuAsync = require("menu_async")
+local CoroutineScheduler = require("coroutine_scheduler")
+local InputAsync = require("input_async")
 
 -- 游戏初始化标志
 local isInitialized = false
+local initCoroutine = nil
 
 -- 获取状态ID的辅助函数
 local function getStateId(stateName)
@@ -28,13 +33,24 @@ local function getStateId(stateName)
     return nil
 end
 
--- 初始化游戏
+-- 初始化游戏（事件驱动版本）
 function JYMainAdapter.init()
     if isInitialized then
         return
     end
     
-    lib.Debug("JYMainAdapter.init started")
+    -- 使用协程执行初始化流程
+    local scheduler = CoroutineScheduler.getInstance()
+    initCoroutine = scheduler:create(function()
+        JYMainAdapter.initCoroutine()
+    end, "init")
+    
+    scheduler:start(initCoroutine)
+end
+
+-- 初始化协程
+function JYMainAdapter.initCoroutine()
+    lib.Debug("JYMainAdapter.initCoroutine started")
     
     -- 导入其他模块
     IncludeFile()
@@ -75,38 +91,28 @@ function JYMainAdapter.init()
     -- 注册游戏状态
     GameStates.registerAll()
     
-    -- 注册GAME_START状态
-    EventBridge.getInstance():registerState(getStateId("GAME_START"), {
-        enter = function()
-            lib.Debug("Enter GAME_START state")
-        end,
-        exit = function()
-            lib.Debug("Exit GAME_START state")
-        end,
-        update = function(dt)
-            -- 显示开场菜单
-            JYMainAdapter.showStartMenu()
-        end,
-        draw = function()
-            -- 渲染在update中完成(原有逻辑)
-        end
-    })
-    
-    -- 切换到初始状态
+    -- 切换到开始菜单状态
     EventBridge.getInstance():switchState(getStateId("GAME_START"))
     
+    -- 显示开始菜单（使用协程版本的菜单）
+    JYMainAdapter.showStartMenuCoroutine()
+    
     isInitialized = true
-    lib.Debug("JYMainAdapter.init completed")
+    lib.Debug("JYMainAdapter.initCoroutine completed")
 end
 
--- 显示开始菜单
-function JYMainAdapter.showStartMenu()
+-- 显示开始菜单（协程版本）
+function JYMainAdapter.showStartMenuCoroutine()
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    -- 播放开场视频/音乐
     lib.PlayMPEG(CONFIG.DataPath .. "start.mpg", VK_ESCAPE)
     
-    Cls()
+    -- 等待一小段时间让视频播放
+    scheduler:waitForTime(0.5)
     
+    -- 播放菜单音乐
     PlayMIDI(16)
-    lib.ShowSlow(50, 0)
     
     local menu = {
         {"重新开始", nil, 1},
@@ -115,71 +121,83 @@ function JYMainAdapter.showStartMenu()
     }
     local menux = (CC.ScreenW - 4 * CC.StartMenuFontSize - 2 * CC.MenuBorderPixel) / 2
     
-    local menuReturn = ShowMenu(menu, 3, 0, menux, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
+    -- 使用协程版本的菜单等待用户选择
+    local menuReturn = MenuAsync.ShowMenuCoroutine(menu, 3, 0, menux, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
     
     if menuReturn == 1 then
         -- 重新开始游戏
-        Cls()
-        DrawString(menux, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
-        ShowScreen()
-        
-        NewGame()
-        
-        JY.SubScene = CC.NewGameSceneID
-        JY.Scene[JY.SubScene]["名称"] = JY.Person[0]["姓名"] .. "居"
-        JY.Base["人X1"] = CC.NewGameSceneX
-        JY.Base["人Y1"] = CC.NewGameSceneY
-        JY.MyPic = CC.NewPersonPic
-        
-        lib.ShowSlow(50, 1)
-        JY.Status = getStateId("GAME_SMAP")
-        JY.MMAPMusic = -1
-        
-        CleanMemory()
-        
-        Init_SMap(0)
-        
-        if CC.NewGameEvent > 0 then
-            oldCallEvent(CC.NewGameEvent)
-        end
-        
-        -- 切换到场景状态
-        EventBridge.getInstance():switchState(getStateId("GAME_SMAP"))
+        JYMainAdapter.startNewGame(menux)
         
     elseif menuReturn == 2 then
         -- 载入旧的进度
-        Cls()
-        local loadMenu = {
-            {"进度一", nil, 1},
-            {"进度二", nil, 1},
-            {"进度三", nil, 1}
-        }
-        
-        local menux2 = (CC.ScreenW - 3 * CC.StartMenuFontSize - 2 * CC.MenuBorderPixel) / 2
-        
-        local r = ShowMenu(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
-        Cls()
-        DrawString(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
-        ShowScreen()
-        LoadRecord(r)
-        Cls()
-        ShowScreen()
-        JY.Status = getStateId("GAME_FIRSTMMAP")
-        
-        -- 切换到首次主地图状态
-        EventBridge.getInstance():switchState(getStateId("GAME_FIRSTMMAP"))
+        JYMainAdapter.loadGame()
         
     elseif menuReturn == 3 then
         -- 离开游戏
         JY.Status = getStateId("GAME_END")
         love.event.quit()
     end
-    
-    lib.LoadPicture("", 0, 0)
-    lib.GetKey()
 end
 
--- 更新函数(每帧调用)
+-- 开始新游戏
+function JYMainAdapter.startNewGame(menux)
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    -- 设置状态为加载中
+    JY.Status = getStateId("GAME_SMAP")
+    JY.MMAPMusic = -1
+    
+    -- 初始化游戏数据
+    NewGame()
+    
+    JY.SubScene = CC.NewGameSceneID
+    JY.Scene[JY.SubScene]["名称"] = JY.Person[0]["姓名"] .. "居"
+    JY.Base["人X1"] = CC.NewGameSceneX
+    JY.Base["人Y1"] = CC.NewGameSceneY
+    JY.MyPic = CC.NewPersonPic
+    
+    -- 等待渐变
+    scheduler:waitForTime(0.5)
+    
+    CleanMemory()
+    
+    Init_SMap(0)
+    
+    if CC.NewGameEvent > 0 then
+        oldCallEvent(CC.NewGameEvent)
+    end
+    
+    -- 切换到场景状态
+    EventBridge.getInstance():switchState(getStateId("GAME_SMAP"))
+end
+
+-- 载入游戏
+function JYMainAdapter.loadGame()
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    local loadMenu = {
+        {"进度一", nil, 1},
+        {"进度二", nil, 1},
+        {"进度三", nil, 1}
+    }
+    
+    local menux2 = (CC.ScreenW - 3 * CC.StartMenuFontSize - 2 * CC.MenuBorderPixel) / 2
+    
+    -- 使用协程版本的菜单
+    local r = MenuAsync.ShowMenuCoroutine(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
+    
+    -- 等待一帧让菜单关闭
+    scheduler:yield("load")
+    
+    LoadRecord(r)
+    
+    JY.Status = getStateId("GAME_FIRSTMMAP")
+    
+    -- 切换到首次主地图状态
+    EventBridge.getInstance():switchState(getStateId("GAME_FIRSTMMAP"))
+end
+
+-- 更新函数（每帧调用）
 function JYMainAdapter.update(dt)
     if not isInitialized then
         return
@@ -201,7 +219,7 @@ function JYMainAdapter.update(dt)
     collectgarbage("step", 0)
 end
 
--- 渲染函数(每帧调用)
+-- 渲染函数（每帧调用）
 function JYMainAdapter.draw()
     -- 渲染由状态机的draw处理
 end
@@ -209,6 +227,7 @@ end
 -- 重置适配器
 function JYMainAdapter.reset()
     isInitialized = false
+    initCoroutine = nil
 end
 
 return JYMainAdapter

@@ -13,21 +13,36 @@ local currentCallback = nil
 -- 显示菜单（异步版本）
 -- 参数与ShowMenu相同，但使用回调返回结果
 function MenuAsync.ShowMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor, callback)
+    if lib and lib.Debug then
+        lib.Debug("MenuAsync.ShowMenu called")
+    end
+    
     local msm = MenuStateMachine.getInstance()
     
     -- 创建菜单数据
     local menuData = msm:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
+    
+    if lib and lib.Debug then
+        lib.Debug("MenuAsync.ShowMenu: menuData created, newNumItem=" .. tostring(menuData.newNumItem))
+    end
     
     -- 保存回调
     currentCallback = callback
     
     -- 打开菜单
     msm:openMenu(menuData, function(returnValue)
+        if lib and lib.Debug then
+            lib.Debug("MenuAsync.ShowMenu: menu closed, returnValue=" .. tostring(returnValue))
+        end
         currentCallback = nil
         if callback then
             callback(returnValue)
         end
     end)
+    
+    if lib and lib.Debug then
+        lib.Debug("MenuAsync.ShowMenu: menu opened")
+    end
     
     return 0  -- 立即返回，不阻塞
 end
@@ -74,6 +89,9 @@ end
 
 -- 渲染菜单（在love.draw中调用）
 function MenuAsync.draw()
+    if lib and lib.Debug then
+        lib.Debug("MenuAsync.draw called")
+    end
     local msm = MenuStateMachine.getInstance()
     msm:draw()
 end

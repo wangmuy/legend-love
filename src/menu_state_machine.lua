@@ -31,6 +31,12 @@ function MenuStateMachine.getInstance()
     if not instance then
         instance = setmetatable({}, MenuStateMachine)
         instance:init()
+        if lib and lib.Debug then
+            lib.Debug("MenuStateMachine: created new instance, id=" .. tostring(instance))
+        end
+    end
+    if lib and lib.Debug then
+        lib.Debug("MenuStateMachine.getInstance: returning instance id=" .. tostring(instance))
     end
     return instance
 end
@@ -116,6 +122,10 @@ end
 
 -- 打开菜单
 function MenuStateMachine:openMenu(menuData, callback)
+    if lib and lib.Debug then
+        lib.Debug("MenuStateMachine:openMenu called, self=" .. tostring(self) .. ", activeMenu before=" .. tostring(self.activeMenu))
+    end
+    
     -- 如果有活动的菜单，先暂停
     if self.activeMenu then
         table.insert(self.menuStack, self.activeMenu)
@@ -128,6 +138,10 @@ function MenuStateMachine:openMenu(menuData, callback)
     -- 播放打开动画
     self.activeMenu.animationState = "opening"
     self.activeMenu.animationTime = 0
+    
+    if lib and lib.Debug then
+        lib.Debug("MenuStateMachine:openMenu: activeMenu after=" .. tostring(self.activeMenu))
+    end
 end
 
 -- 关闭菜单
@@ -183,12 +197,15 @@ function MenuStateMachine:handleInput()
     
     local menu = self.activeMenu
     
-    -- 只有在打开状态才处理输入
-    if menu.animationState ~= "open" then
+    -- 在打开或正在打开状态都处理输入
+    if menu.animationState ~= "open" and menu.animationState ~= "opening" then
         return
     end
     
     local key = lib.GetKey()
+    if lib and lib.Debug then
+        lib.Debug("MenuStateMachine:handleInput: key=" .. tostring(key))
+    end
     if key == -1 then
         return
     end
@@ -316,6 +333,11 @@ end
 
 -- 渲染菜单
 function MenuStateMachine:draw()
+    -- 调试：记录draw被调用
+    if lib and lib.Debug then
+        lib.Debug("MenuStateMachine:draw called, activeMenu=" .. tostring(self.activeMenu ~= nil))
+    end
+    
     if not self.activeMenu then
         return
     end
@@ -325,10 +347,17 @@ function MenuStateMachine:draw()
     -- 计算动画进度
     local progress = 1
     if menu.animationState == "opening" then
-        progress = menu.animationTime / 0.2
+        progress = menu.animationTime / ANIMATION_CONFIG.openDuration
     elseif menu.animationState == "closing" then
-        progress = 1 - (menu.animationTime / 0.2)
+        progress = 1 - (menu.animationTime / ANIMATION_CONFIG.closeDuration)
     end
+    
+    -- 绘制半透明背景，确保文字可见
+    local bgX = menu.x1
+    local bgY = menu.y1
+    local bgW = menu.w * progress
+    local bgH = menu.h * progress
+    lib.Background(bgX, bgY, bgX + bgW, bgY + bgH, 200)  -- 半透明黑色背景
     
     -- 绘制边框
     if menu.isBox == 1 then
@@ -346,8 +375,14 @@ function MenuStateMachine:draw()
             drawColor = menu.selectColor
         end
         
+        -- 使用白色作为测试颜色，确保可见
+        local testColor = C_WHITE
+        if i == menu.current then
+            testColor = C_RED
+        end
+        
         local y = menu.y1 + CC.MenuBorderPixel + (i - menu.start) * (menu.size + CC.RowPixel)
-        DrawString(menu.x1 + CC.MenuBorderPixel, y, menu.newMenu[i][1], drawColor, menu.size)
+        DrawString(menu.x1 + CC.MenuBorderPixel, y, menu.newMenu[i][1], testColor, menu.size)
     end
 end
 

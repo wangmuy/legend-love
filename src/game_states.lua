@@ -294,6 +294,28 @@ handlers["GAME_SMAP"] = {
     end
 }
 
+-- GAME_START 状态处理器(开始菜单)
+handlers["GAME_START"] = {
+    enter = function()
+        lib.Debug("Enter GAME_START state")
+    end,
+    
+    exit = function()
+        lib.Debug("Exit GAME_START state")
+    end,
+    
+    update = function(dt)
+        -- 开始菜单的更新逻辑在jymain_adapter中处理
+    end,
+    
+    draw = function()
+        -- 绘制开始界面背景
+        if CC.FirstFile then
+            lib.LoadPicture(CC.FirstFile, -1, -1)
+        end
+    end
+}
+
 -- GAME_FIRSTMMAP 状态处理器(首次进入主地图)
 handlers["GAME_FIRSTMMAP"] = {
     enter = function()

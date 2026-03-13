@@ -133,6 +133,10 @@ end
 -- 更新所有协程
 -- @param dt: delta time
 function CoroutineScheduler:update(dt)
+    if lib and lib.Debug then
+        lib.Debug("CoroutineScheduler.update called, coroutines count=" .. tostring(#coroutines))
+    end
+    
     local activeCoroutines = {}
     
     -- 收集所有需要更新的协程
@@ -142,10 +146,17 @@ function CoroutineScheduler:update(dt)
         end
     end
     
+    if lib and lib.Debug then
+        lib.Debug("CoroutineScheduler.update: active coroutines=" .. tostring(#activeCoroutines))
+    end
+    
     -- 尝试恢复所有挂起的协程
     for _, id in ipairs(activeCoroutines) do
         local info = coroutines[id]
         if info and info.status == "suspended" then
+            if lib and lib.Debug then
+                lib.Debug("CoroutineScheduler.update: resuming coroutine id=" .. tostring(id))
+            end
             self:resume(id)
         end
     end
