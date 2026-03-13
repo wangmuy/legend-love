@@ -1862,8 +1862,7 @@ end
 
 --显示阴影字符串
 function DrawString(x,y,str,color,size)         --显示阴影字符串
-    local fontname = CC.FontName or "simsun.ttf"
-    lib.DrawStr(x,y,str,color,size,fontname);
+    lib.DrawStr(x,y,str,color,size,CC.FontName);
 end
 
 --显示带框的字符串
