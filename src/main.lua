@@ -4,6 +4,7 @@
 -- 全局模块引用
 local EventBridge = require("event_bridge")
 local MenuAsync = require("menu_async")
+local JYMainAdapter = require("jymain_adapter")
 
 function love.load()
     -- 使用 regular alpha 模式（非预乘）
@@ -27,11 +28,14 @@ function love.load()
     -- 加载游戏主逻辑
     require(CONFIG.ScriptPath .. "jymain")
     
-    -- 初始化游戏
-    JY_Main()
+    -- 初始化游戏（事件驱动版本）
+    JYMainAdapter.init()
 end
 
 function love.update(dt)
+    -- 更新游戏适配器
+    JYMainAdapter.update(dt)
+    
     -- 通过事件桥接器更新游戏逻辑
     EventBridge.getInstance():update(dt)
     
@@ -40,6 +44,11 @@ function love.update(dt)
 end
 
 function love.draw()
+    -- 调试：记录draw被调用
+    if lib and lib.Debug then
+        lib.Debug("love.draw called")
+    end
+    
     -- 通过事件桥接器渲染游戏
     EventBridge.getInstance():draw()
     
@@ -54,6 +63,9 @@ function love.quit()
     -- 清理资源
     if EventBridge then
         EventBridge.getInstance():reset()
+    end
+    if JYMainAdapter then
+        JYMainAdapter.reset()
     end
     return false
 end

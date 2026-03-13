@@ -24,8 +24,18 @@ local instance = nil
 function StateMachine.getInstance()
     if not instance then
         instance = setmetatable({}, StateMachine)
+        instance:init()
     end
     return instance
+end
+
+-- 初始化状态机
+function StateMachine:init()
+    states = {}
+    currentState = nil
+    previousState = nil
+    subStateStack = {}
+    stateData = {}
 end
 
 -- 注册一个状态及其处理器

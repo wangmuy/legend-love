@@ -124,23 +124,49 @@ end
 
 -- 更新 (在love.update中调用)
 function EventBridge:update(dt)
+    if lib and lib.Debug then
+        lib.Debug("EventBridge.update: start")
+    end
+    
     -- 重置按键消费状态
     InputManager.getInstance():resetKeyConsumed()
+    if lib and lib.Debug then
+        lib.Debug("EventBridge.update: resetKeyConsumed done")
+    end
     
     -- 更新输入管理器（处理按键重复）
     InputManager.getInstance():update(dt)
+    if lib and lib.Debug then
+        lib.Debug("EventBridge.update: InputManager.update done")
+    end
     
     -- 处理输入事件
     InputManager.getInstance():processEvents()
+    if lib and lib.Debug then
+        lib.Debug("EventBridge.update: processEvents done")
+    end
     
     -- 更新协程调度器
     CoroutineScheduler.getInstance():update(dt)
+    if lib and lib.Debug then
+        lib.Debug("EventBridge.update: CoroutineScheduler.update done")
+    end
     
     -- 更新对话框
     AsyncDialog.getInstance():update(dt)
+    if lib and lib.Debug then
+        lib.Debug("EventBridge.update: AsyncDialog.update done")
+    end
     
     -- 更新当前状态
     StateMachine.getInstance():update(dt)
+    if lib and lib.Debug then
+        lib.Debug("EventBridge.update: StateMachine.update done")
+    end
+    
+    if lib and lib.Debug then
+        lib.Debug("EventBridge.update: end")
+    end
 end
 
 -- 渲染 (在love.draw中调用)
