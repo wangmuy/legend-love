@@ -63,32 +63,30 @@ end
 
 local fontTbl = {}
 local defaultFont = nil
-local function getFont(fontname, size)
-    size = size or 20
+local function getFont(fontname)
     if fontname==nil then 
         if defaultFont == nil then
             defaultFont = love.graphics.newFont(20)
         end
         return defaultFont
     end
-    local cacheKey = fontname .. "_" .. tostring(size)
-    if fontTbl[cacheKey] == nil then
-        local success, font = pcall(function() return love.graphics.newFont(fontname, size) end)
+    if fontTbl[fontname] == nil then
+        local success, font = pcall(function() return love.graphics.newFont(fontname, 20) end)
         if success then
-            fontTbl[cacheKey] = font
+            fontTbl[fontname] = font
         else
             if defaultFont == nil then
                 defaultFont = love.graphics.newFont(20)
             end
-            fontTbl[cacheKey] = defaultFont
+            fontTbl[fontname] = defaultFont
         end
     end
-    return fontTbl[cacheKey]
+    return fontTbl[fontname]
 end
   
 function DrawStr(x, y, str, color, size, fontname)
     local oldR, oldG, oldB, oldA = love.graphics.getColor()
-    love.graphics.setFont(getFont(fontname, size))
+    love.graphics.setFont(getFont(fontname))
     local r, g, b = GetRGB(color)
     love.graphics.setColor(r, g, b, 1)
     love.graphics.print(str, x, y)
