@@ -323,12 +323,14 @@ handlers["GAME_FIRSTMMAP"] = {
         CleanMemory()
         lib.ShowSlow(50, 1)
         JY.MmapMusic = 16
-        JY.Status = getStateId("GAME_MMAP")
         
         Init_MMap()
         
         lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], GetMyPic())
         lib.ShowSlow(50, 0)
+        
+        -- 直接在这里切换状态，不等到update
+        JY.Status = getStateId("GAME_MMAP")
     end,
     
     exit = function()
@@ -336,12 +338,9 @@ handlers["GAME_FIRSTMMAP"] = {
     end,
     
     update = function(dt)
-        -- 首次进入后直接切换到GAME_MMAP
-        EventBridge.getInstance():switchState(getStateId("GAME_MMAP"))
     end,
     
     draw = function()
-        -- 渲染已在enter中完成
     end
 }
 
