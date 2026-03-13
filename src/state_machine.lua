@@ -173,8 +173,15 @@ end
 function StateMachine:update(dt)
     -- 同步 JY.Status 到状态机
     if JY and JY.Status and JY.Status ~= currentState then
+        if lib and lib.Debug then
+            lib.Debug("StateMachine:update syncing: JY.Status=" .. tostring(JY.Status) .. " -> currentState=" .. tostring(currentState))
+        end
         if states[JY.Status] then
             self:switchTo(JY.Status)
+        else
+            if lib and lib.Debug then
+                lib.Debug("StateMachine:update state not registered: " .. tostring(JY.Status))
+            end
         end
     end
     
@@ -198,6 +205,9 @@ end
 function StateMachine:draw()
     -- 先渲染当前状态
     if currentState and states[currentState] then
+        if lib and lib.Debug then
+            lib.Debug("StateMachine:draw currentState=" .. tostring(currentState) .. ", JY.Status=" .. tostring(JY and JY.Status))
+        end
         states[currentState].draw(states[currentState].context)
         
         -- 再渲染子状态（如果有）
@@ -207,6 +217,10 @@ function StateMachine:draw()
             if subHandler and subHandler.draw then
                 subHandler.draw(currentSubState.context)
             end
+        end
+    else
+        if lib and lib.Debug then
+            lib.Debug("StateMachine:draw NO STATE! currentState=" .. tostring(currentState) .. ", JY.Status=" .. tostring(JY and JY.Status))
         end
     end
 end
