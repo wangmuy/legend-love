@@ -35,7 +35,7 @@
 - [ ] 4.4 替换 jymain.lua 中所有 ShowMenu2 调用为协程版本
 - [ ] 4.5 替换 jymodify.lua 中的菜单调用
 - [ ] 4.6 替换 newevent/*.lua 中的菜单调用
-- [ ] 4.7 改造 MMenu 主菜单为协程版本
+- [x] 4.7 改造 MMenu 主菜单为协程版本
 - [x] 4.8 在旧 ShowMenu/ShowMenu2 函数中添加废弃警告
 - [ ] 4.9 测试所有菜单功能
 
@@ -58,19 +58,19 @@
 
 ## 6. 战斗状态处理器
 
-- [ ] 6.1 创建 GAME_WMAP 状态处理器框架
-- [ ] 6.2 实现 enter 处理器：加载战斗资源
-- [ ] 6.3 实现 update 处理器：更新战斗逻辑
-- [ ] 6.4 实现 draw 处理器：渲染战斗画面
-- [ ] 6.5 实现 exit 处理器：清理战斗资源
-- [ ] 6.6 在 GameStates.registerAll 中注册 GAME_WMAP
+- [x] 6.1 创建 GAME_WMAP 状态处理器框架
+- [x] 6.2 实现 enter 处理器：加载战斗资源
+- [x] 6.3 实现 update 处理器：更新战斗逻辑
+- [x] 6.4 实现 draw 处理器：渲染战斗画面
+- [x] 6.5 实现 exit 处理器：清理战斗资源
+- [x] 6.6 在 GameStates.registerAll 中注册 GAME_WMAP
 - [ ] 6.7 测试状态切换流程
 
 ## 7. 战斗主函数改造
 
 - [ ] 7.1 分析 WarMain 战斗主循环结构
-- [ ] 7.2 创建 WarAsync 模块
-- [ ] 7.3 将 WarMain 改造为协程入口函数
+- [x] 7.2 创建 WarAsync 模块
+- [x] 7.3 将 WarMain 改造为协程入口函数
 - [ ] 7.4 改造战斗主循环为协程状态驱动
 - [ ] 7.5 改造 WarSelectTeam 选择队伍
 - [ ] 7.6 改造 WarSelectEnemy 选择敌人

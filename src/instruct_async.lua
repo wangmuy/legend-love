@@ -148,10 +148,8 @@ end
 
 -- WarMain 协程版本（战斗主函数）
 function WarMainCoroutine(warid, isexp)
-    -- 这个函数将在战斗系统改造时实现
-    -- 目前调用原版函数
-    lib.Debug("WarMainCoroutine: warid=" .. tostring(warid))
-    return WarMain(warid, isexp)
+    local WarAsync = require("war_async")
+    return WarAsync.WarMainCoroutine(warid, isexp)
 end
 
 return InstructAsync

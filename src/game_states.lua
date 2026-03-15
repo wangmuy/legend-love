@@ -344,6 +344,35 @@ handlers["GAME_FIRSTMMAP"] = {
     end
 }
 
+-- GAME_WMAP 状态处理器(战斗)
+handlers["GAME_WMAP"] = {
+    enter = function()
+        lib.Debug("Enter GAME_WMAP state (battle)")
+    end,
+    
+    exit = function()
+        lib.Debug("Exit GAME_WMAP state (battle)")
+        -- 清理战斗资源
+        if WAR then
+            WAR.Person = {}
+            WAR.Data = {}
+        end
+    end,
+    
+    update = function(dt)
+        -- 战斗逻辑在 WarMain 协程中处理
+        -- 这里不需要额外处理
+    end,
+    
+    draw = function()
+        -- 战斗渲染在战斗协程中处理
+        -- 绘制战斗地图和人物
+        if JY.Status == getStateId("GAME_WMAP") then
+            WarDrawMap(0)
+        end
+    end
+}
+
 -- 注册所有状态到状态机
 function GameStates.registerAll()
     local eb = EventBridge.getInstance()
