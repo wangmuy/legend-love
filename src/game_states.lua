@@ -134,9 +134,8 @@ handlers["GAME_MMAP"] = {
             JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
             JY.Base["人Y1"] = JY.Scene[JY.SubScene]["入口Y"]
             
-            lib.Debug("Calling Init_SMap")
-            Init_SMap(0)  -- 使用0而不是1，避免显示场景名称时的阻塞调用
-            lib.Debug("Init_SMap completed")
+            -- Init_SMap moved to GAME_SMAP.enter
+            lib.Debug("Subscene transition completed")
         end
     end,
     
@@ -170,6 +169,8 @@ handlers["GAME_MMAP"] = {
 handlers["GAME_SMAP"] = {
     enter = function()
         lib.Debug("Enter GAME_SMAP state")
+        -- 在enter中调用Init_SMap，确保状态已经切换
+        Init_SMap(0)
     end,
     
     exit = function()
