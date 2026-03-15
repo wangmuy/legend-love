@@ -18,6 +18,8 @@ local function startMenuCoroutine()
     local scheduler = CoroutineScheduler.getInstance()
     local co = scheduler:create(function()
         JyMainAsync.MMenuCoroutine()
+        -- 菜单关闭后清理状态
+        MenuAsync.clear()
     end, "main_menu")
     scheduler:start(co)
 end
