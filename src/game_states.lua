@@ -57,6 +57,11 @@ handlers["GAME_MMAP"] = {
     -- 状态退出时调用
     exit = function()
         lib.Debug("Exit GAME_MMAP state")
+        -- 清理大地图资源
+        CleanMemory()
+        lib.UnloadMMap()
+        lib.PicInit()
+        lib.ShowSlow(50, 1)
     end,
     
     -- 每帧更新逻辑
@@ -120,11 +125,8 @@ handlers["GAME_MMAP"] = {
         -- 检查是否进入子场景
         if JY.SubScene >= 0 then
             lib.Debug("Entering subscene: " .. tostring(JY.SubScene))
-            CleanMemory()
-            lib.UnloadMMap()
-            lib.PicInit()
-            lib.ShowSlow(50, 1)
             
+            -- 先切换状态，让exit处理资源清理
             local newState = getStateId("GAME_SMAP")
             lib.Debug("Setting JY.Status to GAME_SMAP: " .. tostring(newState))
             JY.Status = newState
@@ -134,7 +136,6 @@ handlers["GAME_MMAP"] = {
             JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
             JY.Base["人Y1"] = JY.Scene[JY.SubScene]["入口Y"]
             
-            -- Init_SMap moved to GAME_SMAP.enter
             lib.Debug("Subscene transition completed")
         end
     end,
