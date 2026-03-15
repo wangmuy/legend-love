@@ -168,26 +168,26 @@ function CoroutineScheduler:update(dt)
     
     -- 检查是否有按键按下
     local keyPressed = false
+    local pressedKey = -1
     if #keyWaitingCoroutines > 0 then
-        local key = lib.GetKey()
-        if key ~= -1 then
+        pressedKey = lib.GetKey()
+        if pressedKey ~= -1 then
             keyPressed = true
             if lib and lib.Debug then
-                lib.Debug("CoroutineScheduler.update: key pressed=" .. tostring(key))
+                lib.Debug("CoroutineScheduler.update: key pressed=" .. tostring(pressedKey))
             end
         end
     end
     
     -- 恢复等待按键的协程（如果有按键按下）
     if keyPressed then
-        local key = lib.GetKey()  -- 获取按键值
         for _, id in ipairs(keyWaitingCoroutines) do
             local info = coroutines[id]
             if info and info.status == "suspended" and info.waitingFor == "key" then
                 if lib and lib.Debug then
-                    lib.Debug("CoroutineScheduler.update: resuming key-waiting coroutine id=" .. tostring(id) .. " with key=" .. tostring(key))
+                    lib.Debug("CoroutineScheduler.update: resuming key-waiting coroutine id=" .. tostring(id) .. " with key=" .. tostring(pressedKey))
                 end
-                self:resume(id, key)  -- 传递按键值给协程
+                self:resume(id, pressedKey)  -- 传递按键值给协程
             end
         end
     end
