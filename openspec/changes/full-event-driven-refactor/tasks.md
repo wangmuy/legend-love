@@ -126,3 +126,47 @@
 - [x] 12.3 更新 ARCHITECTURE.md 文档
 - [ ] 12.4 清理调试日志
 - [ ] 12.5 代码格式化和整理
+
+## 改造总结
+
+### 核心改造完成项
+
+1. **协程调度器** - `coroutine_scheduler.lua`
+   - waitForKey()、waitForTime()、waitForCondition()
+   
+2. **状态机** - `state_machine.lua`
+   - 自动同步 JY.Status
+   - 状态历史记录
+   - returnToPrevious() 战斗结束返回
+
+3. **输入系统** - `input_manager.lua` + `input_async.lua`
+   - 事件驱动输入
+   - WaitKeyCoroutine
+
+4. **菜单系统** - `menu_async.lua` + `menu_state_machine.lua`
+   - ShowMenuCoroutine
+   - ShowMenu2Coroutine
+
+5. **对话系统** - `talk_async.lua`
+   - TalkExCoroutine
+   - 分页、头像显示
+
+6. **战斗系统** - `war_async.lua`
+   - WarMainCoroutine
+   - 所有战斗菜单协程版本
+
+7. **事件指令** - `instruct_async.lua`
+   - 所有 67 个 instruct_XXX 协程版本
+
+8. **全局替换** - `async_globals.lua`
+   - 自动检测协程环境
+   - 替换 DrawStrBoxWaitKey、DrawStrBoxYesNo、WaitKey、ShowMenu、ShowMenu2、TalkEx、lib.Delay
+
+9. **事件执行器** - `event_executor.lua`
+   - EventExecuteSync
+   - 自动安装/卸载 AsyncGlobals
+
+10. **游戏状态** - `game_states.lua`
+    - GAME_START, GAME_MMAP, GAME_SMAP, GAME_WMAP, GAME_FIRSTMMAP
+    - startMenuCoroutine 替代 MMenu
+    - EventExecuteSync 替代 EventExecute
