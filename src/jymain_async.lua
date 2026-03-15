@@ -96,7 +96,8 @@ function JyMainAsync.Menu_SaveRecord()
     
     if r > 0 then
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
-        ShowScreen()
+        -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
+        -- ShowScreen()
         SaveRecord(r)
         Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
     end
@@ -114,7 +115,8 @@ function JyMainAsync.Menu_ReadRecord()
     
     if r > 0 then
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
-        ShowScreen()
+        -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
+        -- ShowScreen()
         LoadRecord(r)
         JY.Status = GAME_FIRSTMMAP
     end

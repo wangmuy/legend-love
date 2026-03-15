@@ -149,7 +149,9 @@ handlers["GAME_MMAP"] = {
             DrawString(10, CC.ScreenH - 20, string.format("%d %d", JY.Base["人X"], JY.Base["人Y"]), C_GOLD, 16)
         end
         
-        ShowScreen(CONFIG.FastShowScreen)
+        -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
+        -- 不需要手动调用 ShowScreen，否则可能导致抖动
+        -- ShowScreen(CONFIG.FastShowScreen)
         lib.SetClip(0, 0, 0, 0)
         
         JY.oldMMapX = JY.Base["人X"]
@@ -304,7 +306,8 @@ handlers["GAME_SMAP"] = {
             DrawString(10, CC.ScreenH - 20, string.format("%s %d %d", JY.Scene[JY.SubScene]["名称"], JY.Base["人X1"], JY.Base["人Y1"]), C_GOLD, 16)
         end
         
-        ShowScreen(0)
+        -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
+        -- ShowScreen(0)
         lib.SetClip(0, 0, 0, 0)
     end
 }
@@ -360,7 +363,8 @@ handlers["GAME_FIRSTMMAP"] = {
         -- 绘制主地图
         local pic = GetMyPic()
         lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
-        ShowScreen(0)
+        -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
+        -- ShowScreen(0)
     end
 }
 

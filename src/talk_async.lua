@@ -146,7 +146,8 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
             -- 最后一行
             DrawString(xy.talkx + 5, xy.talky + 5 + talkBorder + dy * (CC.DefaultFont + talkBorder),
                        string.sub(s, startp), C_WHITE, CC.DefaultFont)
-            ShowScreen()
+            -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
+            -- ShowScreen()
             InputAsync.WaitKeyCoroutine()
             break
         else
@@ -158,7 +159,8 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
         startp = endp + 1
         
         if dy >= talkynum then
-            ShowScreen()
+            -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
+            -- ShowScreen()
             InputAsync.WaitKeyCoroutine()
             dy = 0
         end
