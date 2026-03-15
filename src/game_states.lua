@@ -6,9 +6,21 @@ local GameStates = {}
 
 -- 导入必要的模块
 local EventBridge = require("event_bridge")
+local EventExecutor = require("event_executor")
+local JyMainAsync = require("jymain_async")
+local CoroutineScheduler = require("coroutine_scheduler")
 
 -- 游戏状态处理器表
 local handlers = {}
+
+-- 启动菜单协程的辅助函数
+local function startMenuCoroutine()
+    local scheduler = CoroutineScheduler.getInstance()
+    local co = scheduler:create(function()
+        JyMainAsync.MMenuCoroutine()
+    end, "main_menu")
+    scheduler:start(co)
+end
 
 -- 获取状态ID的辅助函数
 -- 在模块加载时，常量可能还未定义，所以使用函数延迟获取
@@ -54,7 +66,7 @@ handlers["GAME_MMAP"] = {
         if keypress ~= -1 then
             JY.MyTick = 0
             if keypress == VK_ESCAPE then
-                MMenu()
+                startMenuCoroutine()
                 if JY.Status == getStateId("GAME_FIRSTMMAP") then
                     return
                 end
@@ -165,7 +177,7 @@ handlers["GAME_SMAP"] = {
         local d_pass = GetS(JY.SubScene, JY.Base["人X1"], JY.Base["人Y1"], 3)
         if d_pass >= 0 then
             if d_pass ~= JY.OldDPass then
-                EventExecute(d_pass, 3)
+                EventExecuteSync(d_pass, 3)
                 JY.OldDPass = d_pass
                 JY.oldSMapX = -1
                 JY.oldSMapY = -1
@@ -232,7 +244,7 @@ handlers["GAME_SMAP"] = {
         if keypress ~= -1 then
             JY.MyTick = 0
             if keypress == VK_ESCAPE then
-                MMenu()
+                startMenuCoroutine()
                 JY.oldSMapX = -1
                 JY.oldSMapY = -1
             elseif keypress == VK_UP then
@@ -247,7 +259,7 @@ handlers["GAME_SMAP"] = {
                 if JY.Base["人方向"] >= 0 then
                     local d_num = GetS(JY.SubScene, JY.Base["人X1"] + CC.DirectX[JY.Base["人方向"] + 1], JY.Base["人Y1"] + CC.DirectY[JY.Base["人方向"] + 1], 3)
                     if d_num >= 0 then
-                        EventExecute(d_num, 1)
+                        EventExecuteSync(d_num, 1)
                         JY.oldSMapX = -1
                         JY.oldSMapY = -1
                         JY.D_Valid = nil
