@@ -11,10 +11,10 @@
 - [x] 2.2 实现 DrawStrBoxWaitKey 的协程版本
 - [x] 2.3 实现 DrawStrBoxYesNo 的协程版本
 - [x] 2.4 在 jymain.lua 中添加旧函数的废弃警告
-- [ ] 2.5 替换 jymain.lua 中所有 DrawStrBoxWaitKey 调用
-- [ ] 2.6 替换 jymain.lua 中所有 DrawStrBoxYesNo 调用
-- [ ] 2.7 替换 jymodify.lua 中的阻塞调用
-- [ ] 2.8 替换 newevent/*.lua 中的阻塞调用
+- [x] 2.5 替换 jymain.lua 中所有 DrawStrBoxWaitKey 调用
+- [x] 2.6 替换 jymain.lua 中所有 DrawStrBoxYesNo 调用
+- [x] 2.7 替换 jymodify.lua 中的阻塞调用
+- [x] 2.8 替换 newevent/*.lua 中的阻塞调用
 - [ ] 2.9 测试消息框显示和交互
 
 ## 3. 对话系统改造
@@ -31,10 +31,10 @@
 
 - [x] 4.1 确认 MenuAsync.ShowMenuCoroutine 正常工作
 - [x] 4.2 确认 MenuAsync.ShowMenu2Coroutine 正常工作
-- [ ] 4.3 替换 jymain.lua 中所有 ShowMenu 调用为协程版本
-- [ ] 4.4 替换 jymain.lua 中所有 ShowMenu2 调用为协程版本
-- [ ] 4.5 替换 jymodify.lua 中的菜单调用
-- [ ] 4.6 替换 newevent/*.lua 中的菜单调用
+- [x] 4.3 替换 jymain.lua 中所有 ShowMenu 调用为协程版本
+- [x] 4.4 替换 jymain.lua 中所有 ShowMenu2 调用为协程版本
+- [x] 4.5 替换 jymodify.lua 中的菜单调用
+- [x] 4.6 替换 newevent/*.lua 中的菜单调用
 - [x] 4.7 改造 MMenu 主菜单为协程版本
 - [x] 4.8 在旧 ShowMenu/ShowMenu2 函数中添加废弃警告
 - [ ] 4.9 测试所有菜单功能
@@ -52,7 +52,7 @@
 - [x] 5.9 实现 instruct_30 主角走动指令的协程版本
 - [x] 5.10 实现 instruct_58 武道大会指令的协程版本
 - [x] 5.11 实现 instruct_64 小宝卖东西指令的协程版本
-- [ ] 5.12 改造其他 instruct_XXX 指令（约60个）
+- [x] 5.12 改造其他 instruct_XXX 指令（约60个）
 - [x] 5.13 修改 EventExecute 支持协程执行
 - [ ] 5.14 测试事件指令执行流程
 
@@ -68,13 +68,13 @@
 
 ## 7. 战斗主函数改造
 
-- [ ] 7.1 分析 WarMain 战斗主循环结构
+- [x] 7.1 分析 WarMain 战斗主循环结构
 - [x] 7.2 创建 WarAsync 模块
 - [x] 7.3 将 WarMain 改造为协程入口函数
-- [ ] 7.4 改造战斗主循环为协程状态驱动
-- [ ] 7.5 改造 WarSelectTeam 选择队伍
-- [ ] 7.6 改造 WarSelectEnemy 选择敌人
-- [ ] 7.7 改造 WarLoadMap 加载战斗地图
+- [x] 7.4 改造战斗主循环为协程状态驱动
+- [x] 7.5 改造 WarSelectTeam 选择队伍
+- [x] 7.6 改造 WarSelectEnemy 选择敌人
+- [x] 7.7 改造 WarLoadMap 加载战斗地图
 - [ ] 7.8 测试战斗启动流程
 
 ## 8. 战斗菜单改造
@@ -86,7 +86,7 @@
 - [x] 8.5 改造 War_StatusMenu 战斗状态显示
 - [x] 8.6 改造 War_AutoMenu 自动战斗设置
 - [x] 8.7 改造 War_WaitMenu 等待菜单
-- [ ] 8.8 测试战斗菜单操作
+- [x] 8.8 测试战斗菜单操作
 
 ## 9. 战斗执行改造
 
@@ -102,7 +102,7 @@
 - [x] 10.1 确保 StateMachine:update 正确同步 JY.Status
 - [x] 10.2 添加状态历史记录功能
 - [x] 10.3 实现战斗结束后返回上一状态
-- [ ] 10.4 处理状态切换时的资源竞争
+- [x] 10.4 处理状态切换时的资源竞争
 - [ ] 10.5 测试状态同步正确性
 
 ## 11. 集成测试
