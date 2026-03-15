@@ -142,6 +142,7 @@ handlers["GAME_MMAP"] = {
     
     -- 每帧渲染
     draw = function()
+        lib.Debug("GAME_MMAP.draw called")
         local pic = GetMyPic()
         
         -- 在 Love2D 中，每一帧都需要重新绘制整个屏幕
@@ -303,6 +304,7 @@ handlers["GAME_SMAP"] = {
     end,
     
     draw = function()
+        lib.Debug("GAME_SMAP.draw called, SubScene=" .. tostring(JY.SubScene))
         -- 在 Love2D 中，每一帧都需要重新绘制
         -- 禁用 FastShowScreen 优化以避免黑屏
         DrawSMap(0)
