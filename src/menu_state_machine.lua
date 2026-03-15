@@ -359,13 +359,6 @@ function MenuStateMachine:draw()
         progress = 1 - (menu.animationTime / ANIMATION_CONFIG.closeDuration)
     end
     
-    -- 绘制半透明背景，确保文字可见
-    local bgX = menu.x1
-    local bgY = menu.y1
-    local bgW = menu.w * progress
-    local bgH = menu.h * progress
-    lib.Background(bgX, bgY, bgX + bgW, bgY + bgH, 200)  -- 半透明黑色背景
-    
     -- 绘制边框
     if menu.isBox == 1 then
         DrawBox(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
@@ -382,14 +375,8 @@ function MenuStateMachine:draw()
             drawColor = menu.selectColor
         end
         
-        -- 使用白色作为测试颜色，确保可见
-        local testColor = C_WHITE
-        if i == menu.current then
-            testColor = C_RED
-        end
-        
         local y = menu.y1 + CC.MenuBorderPixel + (i - menu.start) * (menu.size + CC.RowPixel)
-        DrawString(menu.x1 + CC.MenuBorderPixel, y, menu.newMenu[i][1], testColor, menu.size)
+        DrawString(menu.x1 + CC.MenuBorderPixel, y, menu.newMenu[i][1], drawColor, menu.size)
     end
 end
 
