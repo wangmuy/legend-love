@@ -98,6 +98,10 @@ function CoroutineScheduler:yield(waitingFor)
         error("Cannot yield from outside a coroutine")
     end
     
+    if lib and lib.Debug then
+        lib.Debug("CoroutineScheduler.yield: currentCoroutine=" .. tostring(currentCoroutine) .. ", waitingFor=" .. tostring(waitingFor))
+    end
+    
     local info = coroutines[currentCoroutine]
     if info then
         info.status = "suspended"
