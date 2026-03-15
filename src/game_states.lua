@@ -49,10 +49,9 @@ handlers["GAME_MMAP"] = {
     -- 状态进入时调用
     enter = function()
         lib.Debug("Enter GAME_MMAP state")
-        -- 初始化主地图(如果不是从其他状态切换过来)
-        if JY.oldMMapX == -1 then
-            Init_MMap()
-        end
+        -- 初始化主地图
+        -- 注意：需要加载地图数据，否则会导致黑屏
+        Init_MMap()
     end,
     
     -- 状态退出时调用
@@ -140,28 +139,11 @@ handlers["GAME_MMAP"] = {
     draw = function()
         local pic = GetMyPic()
         
-        -- 使用FastShowScreen优化：位置不变时只更新变化区域
-        if CONFIG.FastShowScreen == 1 then
-            if JY.oldMMapX == JY.Base["人X"] and JY.oldMMapY == JY.Base["人Y"] then
-                -- 位置不变，只有贴图变化时才更新
-                if JY.oldMMapPic >= 0 and JY.oldMMapPic ~= pic then
-                    local rr = ClipRect(Cal_PicClip(0, 0, JY.oldMMapPic, 0, 0, 0, pic, 0))
-                    if rr ~= nil then
-                        lib.SetClip(rr.x1, rr.y1, rr.x2, rr.y2)
-                        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
-                    end
-                end
-                -- 位置和贴图都不变，不重绘
-            else
-                -- 位置变化，全屏重绘
-                lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
-                lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
-            end
-        else
-            -- 不使用优化，全屏重绘
-            lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
-            lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
-        end
+        -- 在 Love2D 中，每一帧都需要重新绘制整个屏幕
+        -- 原来的 FastShowScreen 优化在 SDL 中有效，但在 Love2D 中会导致黑屏
+        -- 因此简化绘制逻辑，始终全屏重绘
+        lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
+        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
         
         if CC.ShowXY == 1 then
             DrawString(10, CC.ScreenH - 20, string.format("%d %d", JY.Base["人X"], JY.Base["人Y"]), C_GOLD, 16)
@@ -314,13 +296,15 @@ handlers["GAME_SMAP"] = {
     end,
     
     draw = function()
-        DrawSMap(CONFIG.FastShowScreen)
+        -- 在 Love2D 中，每一帧都需要重新绘制
+        -- 禁用 FastShowScreen 优化以避免黑屏
+        DrawSMap(0)
         
         if CC.ShowXY == 1 then
             DrawString(10, CC.ScreenH - 20, string.format("%s %d %d", JY.Scene[JY.SubScene]["名称"], JY.Base["人X1"], JY.Base["人Y1"]), C_GOLD, 16)
         end
         
-        ShowScreen(CONFIG.FastShowScreen)
+        ShowScreen(0)
         lib.SetClip(0, 0, 0, 0)
     end
 }
@@ -376,7 +360,7 @@ handlers["GAME_FIRSTMMAP"] = {
         -- 绘制主地图
         local pic = GetMyPic()
         lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
-        ShowScreen(CONFIG.FastShowScreen)
+        ShowScreen(0)
     end
 }
 
