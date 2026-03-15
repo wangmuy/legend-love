@@ -11,11 +11,11 @@ local currentDialog = nil
 
 -- 动画配置
 local animationConfig = {
-    enabled = true,
-    openDuration = 0.15,   -- 打开动画持续时间
-    closeDuration = 0.1,   -- 关闭动画持续时间
-    fadeInOpacity = true,  -- 启用淡入效果
-    scaleAnimation = true, -- 启用缩放动画
+    enabled = false,      -- 禁用动画
+    openDuration = 0,     -- 打开动画持续时间
+    closeDuration = 0,    -- 关闭动画持续时间
+    fadeInOpacity = false, -- 禁用淡入效果
+    scaleAnimation = false, -- 禁用缩放动画
 }
 
 -- 单例实例
@@ -190,7 +190,6 @@ function AsyncDialog:doCloseDialog()
 end
 
 -- 更新对话框
--- @param dt: delta time
 function AsyncDialog:update(dt)
     if not currentDialog or currentDialog.paused then
         return
@@ -198,14 +197,23 @@ function AsyncDialog:update(dt)
     
     -- 处理动画
     if currentDialog.state == "opening" then
-        currentDialog.animationTime = currentDialog.animationTime + dt
-        if currentDialog.animationTime >= animationConfig.duration then
+        if animationConfig.enabled then
+            currentDialog.animationTime = currentDialog.animationTime + dt
+            if currentDialog.animationTime >= animationConfig.openDuration then
+                currentDialog.state = "open"
+                currentDialog.animationTime = animationConfig.openDuration
+            end
+        else
             currentDialog.state = "open"
-            currentDialog.animationTime = animationConfig.duration
         end
     elseif currentDialog.state == "closing" then
-        currentDialog.animationTime = currentDialog.animationTime + dt
-        if currentDialog.animationTime >= animationConfig.duration then
+        if animationConfig.enabled then
+            currentDialog.animationTime = currentDialog.animationTime + dt
+            if currentDialog.animationTime >= animationConfig.closeDuration then
+                self:doCloseDialog()
+                return
+            end
+        else
             self:doCloseDialog()
             return
         end
@@ -280,43 +288,38 @@ function AsyncDialog:draw()
         return
     end
     
-    -- 计算动画进度
-    local progress = 1
-    if currentDialog.state == "opening" then
-        progress = currentDialog.animationTime / animationConfig.duration
-    elseif currentDialog.state == "closing" then
-        progress = 1 - (currentDialog.animationTime / animationConfig.duration)
+    -- 只有在 open 状态才绘制
+    if currentDialog.state ~= "open" then
+        return
     end
     
-    -- 计算位置和大小
-    local x, y, w, h
-    if currentDialog.x == -1 then
-        x = (CC.ScreenW - currentDialog.width) / 2
-    else
-        x = currentDialog.x
+    -- 绘制对话框
+    self:drawDialog(currentDialog)
+end
+
+-- 绘制对话框
+function AsyncDialog:drawDialog(dialog)
+    if not dialog then
+        return
     end
-    if currentDialog.y == -1 then
-        y = (CC.ScreenH - currentDialog.height) / 2
-    else
-        y = currentDialog.y
-    end
-    w = currentDialog.width * progress
-    h = currentDialog.height * progress
-    x = x + (currentDialog.width - w) / 2
-    y = y + (currentDialog.height - h) / 2
     
-    -- 绘制对话框背景
+    local x = dialog.x
+    local y = dialog.y
+    local w = dialog.width
+    local h = dialog.height
+    
+    -- 绘制背景
     DrawBox(x, y, x + w, y + h, C_WHITE)
     
     -- 绘制内容
-    if currentDialog.type == "message" then
-        self:drawMessage(currentDialog, x, y, w, h)
-    elseif currentDialog.type == "yesno" then
-        self:drawYesNo(currentDialog, x, y, w, h)
-    elseif currentDialog.type == "input" then
-        self:drawInput(currentDialog, x, y, w, h)
-    elseif currentDialog.type == "select" then
-        self:drawSelect(currentDialog, x, y, w, h)
+    if dialog.type == "message" then
+        self:drawMessage(dialog, x, y, w, h)
+    elseif dialog.type == "yesno" then
+        self:drawYesNo(dialog, x, y, w, h)
+    elseif dialog.type == "input" then
+        self:drawInput(dialog, x, y, w, h)
+    elseif dialog.type == "select" then
+        self:drawSelect(dialog, x, y, w, h)
     end
 end
 
@@ -383,7 +386,8 @@ end
 -- 设置动画配置
 function AsyncDialog:setAnimationConfig(config)
     animationConfig.enabled = config.enabled ~= false
-    animationConfig.duration = config.duration or 0.2
+    animationConfig.openDuration = config.duration or config.openDuration or 0.2
+    animationConfig.closeDuration = config.duration or config.closeDuration or 0.2
 end
 
 -- 重置对话框管理器
