@@ -134,22 +134,8 @@ handlers["GAME_MMAP"] = {
     draw = function()
         local pic = GetMyPic()
         
-        if CONFIG.FastShowScreen == 1 then
-            if JY.oldMMapX == JY.Base["人X"] and JY.oldMMapY == JY.Base["人Y"] then
-                if JY.oldMMapPic >= 0 and JY.oldMMapPic ~= pic then
-                    local rr = ClipRect(Cal_PicClip(0, 0, JY.oldMMapPic, 0, 0, 0, pic, 0))
-                    if rr ~= nil then
-                        lib.SetClip(rr.x1, rr.y1, rr.x2, rr.y2)
-                        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
-                    end
-                end
-            else
-                lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
-                lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
-            end
-        else
-            lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
-        end
+        lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
+        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
         
         if CC.ShowXY == 1 then
             DrawString(10, CC.ScreenH - 20, string.format("%d %d", JY.Base["人X"], JY.Base["人Y"]), C_GOLD, 16)
