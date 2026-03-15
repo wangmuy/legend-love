@@ -42,11 +42,15 @@ end
 function AsyncDialog:showYesNo(message, callback, options)
     options = options or {}
     
-    -- 计算默认尺寸
+    -- 计算默认尺寸（使用菜单样式）
     local size = options.size or CC.DefaultFont
     local ll = #message
-    local width = size * ll / 2 + 2 * CC.MenuBorderPixel
-    local height = size + 2 * CC.MenuBorderPixel
+    -- 宽度：根据消息长度或选项宽度（取较大值）
+    local msgWidth = size * ll / 2
+    local optionWidth = size * 2  -- "是"/"否" 的宽度
+    local width = math.max(msgWidth, optionWidth) + 2 * CC.MenuBorderPixel
+    -- 高度：消息行 + 两个选项行 + 边距和间距
+    local height = CC.MenuBorderPixel * 2 + size + (size + CC.RowPixel) * 2 + CC.RowPixel
     
     -- 计算默认位置（居中）
     local x = options.x
@@ -325,15 +329,24 @@ end
 
 -- 绘制确认对话框
 function AsyncDialog:drawYesNo(dialog, x, y, w, h)
-    -- 绘制消息
-    DrawString(x + 10, y + 10, dialog.message, C_WHITE, CC.DefaultFont)
+    -- 绘制消息（使用菜单边框样式）
+    DrawBox(x, y, x + w, y + h, C_WHITE)
+    
+    -- 绘制提示文本
+    local msgY = y + CC.MenuBorderPixel
+    DrawString(x + CC.MenuBorderPixel, msgY, dialog.message, C_WHITE, CC.DefaultFont)
     
     -- 绘制选项（上下排列，配合上下方向键选择）
     local yesColor = dialog.selected == 1 and C_RED or C_WHITE
     local noColor = dialog.selected == 2 and C_RED or C_WHITE
-    -- "是"在上，"否"在下
-    DrawString(x + w/2 - CC.DefaultFont, y + h - 60, "是", yesColor, CC.DefaultFont)
-    DrawString(x + w/2 - CC.DefaultFont, y + h - 30, "否", noColor, CC.DefaultFont)
+    
+    -- 计算选项起始Y位置（在消息下方）
+    local optionStartY = msgY + CC.DefaultFont + CC.RowPixel
+    
+    -- "是"在上，"否"在下，使用菜单样式居中显示
+    local optionX = x + w/2 - CC.DefaultFont
+    DrawString(optionX, optionStartY, "是", yesColor, CC.DefaultFont)
+    DrawString(optionX, optionStartY + CC.DefaultFont + CC.RowPixel, "否", noColor, CC.DefaultFont)
 end
 
 -- 绘制消息对话框
