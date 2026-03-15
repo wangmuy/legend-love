@@ -139,8 +139,28 @@ handlers["GAME_MMAP"] = {
     draw = function()
         local pic = GetMyPic()
         
-        lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
-        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
+        -- 使用FastShowScreen优化：位置不变时只更新变化区域
+        if CONFIG.FastShowScreen == 1 then
+            if JY.oldMMapX == JY.Base["人X"] and JY.oldMMapY == JY.Base["人Y"] then
+                -- 位置不变，只有贴图变化时才更新
+                if JY.oldMMapPic >= 0 and JY.oldMMapPic ~= pic then
+                    local rr = ClipRect(Cal_PicClip(0, 0, JY.oldMMapPic, 0, 0, 0, pic, 0))
+                    if rr ~= nil then
+                        lib.SetClip(rr.x1, rr.y1, rr.x2, rr.y2)
+                        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
+                    end
+                end
+                -- 位置和贴图都不变，不重绘
+            else
+                -- 位置变化，全屏重绘
+                lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
+                lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
+            end
+        else
+            -- 不使用优化，全屏重绘
+            lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
+            lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
+        end
         
         if CC.ShowXY == 1 then
             DrawString(10, CC.ScreenH - 20, string.format("%d %d", JY.Base["人X"], JY.Base["人Y"]), C_GOLD, 16)
