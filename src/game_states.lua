@@ -61,6 +61,11 @@ handlers["GAME_MMAP"] = {
     
     -- 每帧更新逻辑
     update = function(dt)
+        -- 如果有活动菜单，不处理游戏输入
+        if MenuAsync.hasActiveMenu() then
+            return
+        end
+        
         -- 原有的Game_MMap逻辑(除去渲染部分)
         local direct = -1
         local keypress = lib.GetKey()
@@ -161,6 +166,11 @@ handlers["GAME_SMAP"] = {
     end,
     
     update = function(dt)
+        -- 如果有活动菜单，不处理游戏输入
+        if MenuAsync.hasActiveMenu() then
+            return
+        end
+        
         -- 处理路过事件
         local d_pass = GetS(JY.SubScene, JY.Base["人X1"], JY.Base["人Y1"], 3)
         if d_pass >= 0 then
