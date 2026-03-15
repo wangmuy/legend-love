@@ -138,19 +138,50 @@ function CoroutineScheduler:update(dt)
     end
     
     local activeCoroutines = {}
+    local keyWaitingCoroutines = {}
     
     -- 收集所有需要更新的协程
     for id, info in pairs(coroutines) do
         if info.status == "suspended" then
-            table.insert(activeCoroutines, id)
+            if info.waitingFor == "key" then
+                -- 等待按键的协程单独处理
+                table.insert(keyWaitingCoroutines, id)
+            else
+                table.insert(activeCoroutines, id)
+            end
         end
     end
     
     if lib and lib.Debug then
-        lib.Debug("CoroutineScheduler.update: active coroutines=" .. tostring(#activeCoroutines))
+        lib.Debug("CoroutineScheduler.update: active coroutines=" .. tostring(#activeCoroutines) .. ", key waiting=" .. tostring(#keyWaitingCoroutines))
     end
     
-    -- 尝试恢复所有挂起的协程
+    -- 检查是否有按键按下
+    local keyPressed = false
+    if #keyWaitingCoroutines > 0 then
+        local key = lib.GetKey()
+        if key ~= -1 then
+            keyPressed = true
+            if lib and lib.Debug then
+                lib.Debug("CoroutineScheduler.update: key pressed=" .. tostring(key))
+            end
+        end
+    end
+    
+    -- 恢复等待按键的协程（如果有按键按下）
+    if keyPressed then
+        for _, id in ipairs(keyWaitingCoroutines) do
+            local info = coroutines[id]
+            if info and info.status == "suspended" and info.waitingFor == "key" then
+                if lib and lib.Debug then
+                    lib.Debug("CoroutineScheduler.update: resuming key-waiting coroutine id=" .. tostring(id))
+                end
+                self:resume(id)
+            end
+        end
+    end
+    
+    -- 恢复其他挂起的协程
     for _, id in ipairs(activeCoroutines) do
         local info = coroutines[id]
         if info and info.status == "suspended" then
