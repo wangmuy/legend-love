@@ -170,13 +170,14 @@ function CoroutineScheduler:update(dt)
     
     -- 恢复等待按键的协程（如果有按键按下）
     if keyPressed then
+        local key = lib.GetKey()  -- 获取按键值
         for _, id in ipairs(keyWaitingCoroutines) do
             local info = coroutines[id]
             if info and info.status == "suspended" and info.waitingFor == "key" then
                 if lib and lib.Debug then
-                    lib.Debug("CoroutineScheduler.update: resuming key-waiting coroutine id=" .. tostring(id))
+                    lib.Debug("CoroutineScheduler.update: resuming key-waiting coroutine id=" .. tostring(id) .. " with key=" .. tostring(key))
                 end
-                self:resume(id)
+                self:resume(id, key)  -- 传递按键值给协程
             end
         end
     end
