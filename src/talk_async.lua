@@ -132,6 +132,7 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
     while true do
         if dy == 0 then
             lines = {}  -- 清空行列表
+            lib.Debug("TalkExCoroutine: starting new page")
         end
         
         endp = string.find(s, "*", startp)
@@ -139,6 +140,7 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
         if endp == nil then
             -- 最后一行
             table.insert(lines, string.sub(s, startp))
+            lib.Debug("TalkExCoroutine: last line, lines count=" .. #lines)
             
             -- 设置当前对话状态，让draw函数绘制
             currentTalk = {
@@ -152,8 +154,9 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
                 pich = pich,
                 talkBorder = talkBorder,
             }
-            
+            lib.Debug("TalkExCoroutine: waiting for key (last page)")
             InputAsync.WaitKeyCoroutine()
+            lib.Debug("TalkExCoroutine: key pressed, clearing currentTalk")
             currentTalk = nil  -- 清除对话状态
             break
         else
@@ -164,6 +167,7 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
         startp = endp + 1
         
         if dy >= talkynum then
+            lib.Debug("TalkExCoroutine: page full, lines count=" .. #lines)
             -- 设置当前对话状态，让draw函数绘制
             currentTalk = {
                 headid = headid,
@@ -176,14 +180,16 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
                 pich = pich,
                 talkBorder = talkBorder,
             }
-            
+            lib.Debug("TalkExCoroutine: waiting for key (page full)")
             InputAsync.WaitKeyCoroutine()
+            lib.Debug("TalkExCoroutine: key pressed, resetting dy")
             dy = 0
-            -- 继续下一页，不清除currentTalk，让draw继续绘制直到下一页准备好
+            currentTalk = nil  -- 清除当前页，准备下一页
         end
     end
     
     currentTalk = nil
+    lib.Debug("TalkExCoroutine: finished")
 end
 
 -- 绘制对话（在draw函数中调用）
