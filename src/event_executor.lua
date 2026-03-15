@@ -1,0 +1,95 @@
+-- event_executor.lua
+-- 事件执行器模块
+-- 提供协程版本的事件执行函数
+
+local EventExecutor = {}
+
+local CoroutineScheduler = require("coroutine_scheduler")
+
+-- 事件执行状态
+local executingEvent = nil
+local eventQueue = {}
+
+-- 协程版本的事件执行
+-- @param id: D*中的编号
+-- @param flag: 1=空格触发, 2=物品触发, 3=路过触发
+function EventExecuteCoroutine(id, flag)
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    JY.CurrentD = id
+    lib.Debug(string.format("EventExecuteCoroutine: id=%d, flag=%d", id, flag))
+    
+    if JY.SceneNewEventFunction[JY.SubScene] == nil then
+        -- 旧事件处理
+        oldEventExecuteCoroutine(flag)
+    else
+        -- 新事件处理
+        JY.SceneNewEventFunction[JY.SubScene](flag)
+    end
+    
+    JY.CurrentD = -1
+    JY.Darkness = 0
+end
+
+-- 协程版本的旧事件执行
+function oldEventExecuteCoroutine(flag)
+    local eventnum
+    
+    if flag == 1 then
+        eventnum = GetD(JY.SubScene, JY.CurrentD, 2)
+    elseif flag == 2 then
+        eventnum = GetD(JY.SubScene, JY.CurrentD, 3)
+    elseif flag == 3 then
+        eventnum = GetD(JY.SubScene, JY.CurrentD, 4)
+    end
+    
+    lib.Debug(string.format("oldEventExecuteCoroutine: eventnum=%d", eventnum or -1))
+    
+    if eventnum and eventnum > 0 then
+        oldCallEventCoroutine(eventnum)
+    end
+end
+
+-- 协程版本的调用旧事件
+function oldCallEventCoroutine(eventnum)
+    local eventfilename = string.format("oldevent_%d.lua", eventnum)
+    lib.Debug(string.format("oldCallEventCoroutine: %s", eventfilename))
+    
+    -- 执行事件文件
+    -- 注意：事件文件中的 instruct_XXX 需要使用协程版本
+    local success, err = pcall(function()
+        dofile(CONFIG.OldEventPath .. eventfilename)
+    end)
+    
+    if not success then
+        lib.Debug("oldCallEventCoroutine error: " .. tostring(err))
+    end
+    
+    lib.Debug(string.format("oldCallEventCoroutine: %s finished", eventfilename))
+end
+
+-- 启动事件协程
+-- @param id: 事件ID
+-- @param flag: 触发类型
+-- @param callback: 完成回调（可选）
+function EventExecutor.startEvent(id, flag, callback)
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    local co = scheduler:create(function()
+        EventExecuteCoroutine(id, flag)
+        if callback then
+            callback()
+        end
+    end, "event_" .. tostring(id))
+    
+    scheduler:start(co)
+    
+    return co
+end
+
+-- 检查是否有事件正在执行
+function EventExecutor.isExecuting()
+    return executingEvent ~= nil
+end
+
+return EventExecutor
