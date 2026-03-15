@@ -11,6 +11,10 @@ local states = {}
 local currentState = nil
 local previousState = nil
 
+-- 状态历史栈（用于战斗结束后返回）
+local stateHistory = {}
+local maxHistoryLength = 10
+
 -- 子状态栈
 local subStateStack = {}
 
@@ -69,6 +73,14 @@ function StateMachine:switchTo(stateId, data)
         states[currentState].exit(stateId)
         -- 保存当前状态数据
         stateData[currentState] = states[currentState].context
+        
+        -- 添加到历史栈（排除战斗状态，因为战斗结束后需要返回之前的状态）
+        if currentState ~= (GAME_WMAP or 5) then
+            table.insert(stateHistory, 1, currentState)
+            if #stateHistory > maxHistoryLength then
+                table.remove(stateHistory)
+            end
+        end
     end
     
     -- 记录状态历史
@@ -233,6 +245,30 @@ end
 -- 获取上一个状态ID
 function StateMachine:getPreviousState()
     return previousState
+end
+
+-- 返回上一状态（用于战斗结束后）
+-- @param data: 传递给状态的参数
+-- @return: 是否成功
+function StateMachine:returnToPrevious(data)
+    if #stateHistory > 0 then
+        local targetState = stateHistory[1]
+        table.remove(stateHistory, 1)
+        return self:switchTo(targetState, data)
+    elseif previousState then
+        return self:switchTo(previousState, data)
+    end
+    return false
+end
+
+-- 获取状态历史
+function StateMachine:getStateHistory()
+    return stateHistory
+end
+
+-- 清空状态历史
+function StateMachine:clearHistory()
+    stateHistory = {}
 end
 
 -- 获取状态上下文数据
