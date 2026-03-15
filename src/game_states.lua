@@ -348,7 +348,9 @@ handlers["GAME_FIRSTMMAP"] = {
     
     update = function(dt)
         -- 首次进入后立即切换到主地图状态
-        JY.Status = getStateId("GAME_MMAP")
+        local newState = getStateId("GAME_MMAP")
+        lib.Debug("GAME_FIRSTMMAP update: setting JY.Status=" .. tostring(newState))
+        JY.Status = newState
     end,
     
     draw = function()
