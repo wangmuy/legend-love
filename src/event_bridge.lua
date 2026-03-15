@@ -54,6 +54,10 @@ function EventBridge:init()
     CoroutineScheduler.getInstance():init()
     AsyncDialog.getInstance():init()
     
+    -- 启用按键重复，以便按住方向键时持续移动
+    InputManager.getInstance():setKeyRepeat(true)
+    InputManager.getInstance():setKeyRepeatParams(0.3, 0.1)  -- 首次延迟300ms，后续间隔100ms
+    
     -- 注册Love2D事件回调
     self:registerLoveCallbacks()
 end

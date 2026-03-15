@@ -201,7 +201,8 @@ function InputManager:getKey()
     local key = currentKey
     if key ~= -1 then
         keyConsumed = true
-        currentKey = -1
+        -- 不要在这里清空 currentKey，让 keyStates 和 keyReleased 来处理
+        -- currentKey = -1
     end
     return key
 end
