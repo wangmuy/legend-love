@@ -263,10 +263,12 @@ function newSceneEvent_1(flag)
             GetD(JY.SubScene, 16, 4)));
     end
     
+    -- 检查是否在协程中，如果在协程中使用异步版本
+    local EventExecutor = require("event_executor")
     if JY.CurrentD<=18 then     --对以前编号的D*，仍然调用旧的处理函数
-        lib.Debug("newSceneEvent_1: calling oldEventExecute");
-        oldEventExecute(flag);
-        lib.Debug("newSceneEvent_1: oldEventExecute returned");
+        lib.Debug("newSceneEvent_1: calling oldEventExecuteCoroutine");
+        EventExecutor.oldEventExecuteCoroutine(flag);
+        lib.Debug("newSceneEvent_1: oldEventExecuteCoroutine returned");
     else
         lib.Debug("newSceneEvent_1: calling newCallEvent");
         newCallEvent(flag);
