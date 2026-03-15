@@ -192,6 +192,8 @@ function TalkAsync.draw()
         return
     end
     
+    lib.Debug("TalkAsync.draw: drawing talk with headid=" .. tostring(currentTalk.headid))
+    
     local talk = currentTalk
     local xy = talk.xy
     local picw = talk.picw
