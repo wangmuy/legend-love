@@ -74,9 +74,15 @@ function CoroutineScheduler:start(id, ...)
     end
     
     info.status = coroutine.status(info.co)
+    if lib and lib.Debug then
+        lib.Debug("CoroutineScheduler.start: coroutine.status=" .. tostring(info.status) .. ", result=" .. tostring(result))
+    end
     if info.status == "dead" then
         info.result = result
         coroutines[id] = nil  -- 清理已完成的协程
+        if lib and lib.Debug then
+            lib.Debug("CoroutineScheduler.start: coroutine " .. tostring(id) .. " cleaned up")
+        end
     end
     
     return true, result
