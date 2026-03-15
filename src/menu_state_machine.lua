@@ -333,13 +333,20 @@ end
 
 -- 渲染菜单
 function MenuStateMachine:draw()
-    -- 调试：记录draw被调用
     if lib and lib.Debug then
         lib.Debug("MenuStateMachine:draw called, activeMenu=" .. tostring(self.activeMenu ~= nil))
     end
     
     if not self.activeMenu then
         return
+    end
+    
+    -- 如果菜单正在关闭，检查是否动画完成
+    if self.activeMenu.animationState == "closing" then
+        if self.activeMenu.animationTime >= ANIMATION_CONFIG.closeDuration then
+            self:doCloseMenu()
+            return
+        end
     end
     
     local menu = self.activeMenu
