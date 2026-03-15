@@ -10,6 +10,7 @@ local GameStates = require("game_states")
 local MenuAsync = require("menu_async")
 local CoroutineScheduler = require("coroutine_scheduler")
 local InputAsync = require("input_async")
+local EventExecutor = require("event_executor")
 
 -- 游戏初始化标志
 local isInitialized = false
@@ -155,7 +156,17 @@ function JYMainAdapter.startNewGame(menux)
     Init_SMap(0)
     
     if CC.NewGameEvent > 0 then
-        oldCallEvent(CC.NewGameEvent)
+        -- 在协程中执行新游戏事件
+        local AsyncGlobals = require("async_globals")
+        AsyncGlobals.install()
+        local success, err = pcall(function()
+            oldCallEvent(CC.NewGameEvent)
+        end)
+        AsyncGlobals.uninstall()
+        
+        if not success then
+            lib.Debug("startNewGame event error: " .. tostring(err))
+        end
     end
     
     -- 切换到场景状态
