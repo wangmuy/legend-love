@@ -1,0 +1,128 @@
+## 1. 基础异步函数完善
+
+- [x] 1.1 扩展 AsyncDialog 添加 showMessageCoroutine 函数
+- [x] 1.2 扩展 AsyncDialog 添加 showYesNoCoroutine 函数
+- [x] 1.3 扩展 InputAsync 添加 WaitKeyCoroutine 函数
+- [ ] 1.4 测试基础异步函数正常工作
+
+## 2. 消息框系统改造
+
+- [x] 2.1 创建 async_message_box.lua 模块
+- [x] 2.2 实现 DrawStrBoxWaitKey 的协程版本
+- [x] 2.3 实现 DrawStrBoxYesNo 的协程版本
+- [x] 2.4 在 jymain.lua 中添加旧函数的废弃警告
+- [ ] 2.5 替换 jymain.lua 中所有 DrawStrBoxWaitKey 调用
+- [ ] 2.6 替换 jymain.lua 中所有 DrawStrBoxYesNo 调用
+- [ ] 2.7 替换 jymodify.lua 中的阻塞调用
+- [ ] 2.8 替换 newevent/*.lua 中的阻塞调用
+- [ ] 2.9 测试消息框显示和交互
+
+## 3. 对话系统改造
+
+- [ ] 3.1 分析 TalkEx 函数的执行流程
+- [ ] 3.2 创建 TalkAsync 模块
+- [ ] 3.3 实现对话显示的协程版本 TalkExCoroutine
+- [ ] 3.4 实现对话分页的异步等待
+- [ ] 3.5 实现头像显示的异步管理
+- [ ] 3.6 修改 instruct_1 使用协程版本
+- [ ] 3.7 测试对话显示流程
+
+## 4. 菜单系统完善
+
+- [x] 4.1 确认 MenuAsync.ShowMenuCoroutine 正常工作
+- [x] 4.2 确认 MenuAsync.ShowMenu2Coroutine 正常工作
+- [ ] 4.3 替换 jymain.lua 中所有 ShowMenu 调用为协程版本
+- [ ] 4.4 替换 jymain.lua 中所有 ShowMenu2 调用为协程版本
+- [ ] 4.5 替换 jymodify.lua 中的菜单调用
+- [ ] 4.6 替换 newevent/*.lua 中的菜单调用
+- [ ] 4.7 改造 MMenu 主菜单为协程版本
+- [x] 4.8 在旧 ShowMenu/ShowMenu2 函数中添加废弃警告
+- [ ] 4.9 测试所有菜单功能
+
+## 5. 事件指令系统改造
+
+- [x] 5.1 创建 instruct_async.lua 模块
+- [x] 5.2 实现 instruct_1 对话指令的协程版本
+- [x] 5.3 实现 instruct_2 得到物品指令的协程版本
+- [x] 5.4 实现 instruct_5 选择战斗指令的协程版本
+- [x] 5.5 实现 instruct_6 战斗指令的协程版本
+- [x] 5.6 实现 instruct_9 加入队伍指令的协程版本
+- [x] 5.7 实现 instruct_12 住宿指令的协程版本
+- [ ] 5.8 实现 instruct_27 显示动画指令的协程版本
+- [ ] 5.9 实现 instruct_30 主角走动指令的协程版本
+- [ ] 5.10 实现 instruct_58 武道大会指令的协程版本
+- [ ] 5.11 实现 instruct_64 小宝卖东西指令的协程版本
+- [ ] 5.12 改造其他 instruct_XXX 指令（约60个）
+- [ ] 5.13 修改 EventExecute 支持协程执行
+- [ ] 5.14 测试事件指令执行流程
+
+## 6. 战斗状态处理器
+
+- [ ] 6.1 创建 GAME_WMAP 状态处理器框架
+- [ ] 6.2 实现 enter 处理器：加载战斗资源
+- [ ] 6.3 实现 update 处理器：更新战斗逻辑
+- [ ] 6.4 实现 draw 处理器：渲染战斗画面
+- [ ] 6.5 实现 exit 处理器：清理战斗资源
+- [ ] 6.6 在 GameStates.registerAll 中注册 GAME_WMAP
+- [ ] 6.7 测试状态切换流程
+
+## 7. 战斗主函数改造
+
+- [ ] 7.1 分析 WarMain 战斗主循环结构
+- [ ] 7.2 创建 WarAsync 模块
+- [ ] 7.3 将 WarMain 改造为协程入口函数
+- [ ] 7.4 改造战斗主循环为协程状态驱动
+- [ ] 7.5 改造 WarSelectTeam 选择队伍
+- [ ] 7.6 改造 WarSelectEnemy 选择敌人
+- [ ] 7.7 改造 WarLoadMap 加载战斗地图
+- [ ] 7.8 测试战斗启动流程
+
+## 8. 战斗菜单改造
+
+- [ ] 8.1 改造 War_Manual_Sub 手动战斗菜单
+- [ ] 8.2 改造攻击目标选择菜单
+- [ ] 8.3 改造移动位置选择
+- [ ] 8.4 改造 War_ThingMenu 战斗物品菜单
+- [ ] 8.5 改造 War_StatusMenu 战斗状态显示
+- [ ] 8.6 改造 War_AutoMenu 自动战斗设置
+- [ ] 8.7 改造 War_WaitMenu 等待菜单
+- [ ] 8.8 测试战斗菜单操作
+
+## 9. 战斗执行改造
+
+- [ ] 9.1 改造 War_Fight_Sub 执行战斗
+- [ ] 9.2 改造 War_ShowFight 显示战斗动画
+- [ ] 9.3 改造 War_Auto 自动战斗
+- [ ] 9.4 改造战斗结算流程
+- [ ] 9.5 改造经验分配和升级显示
+- [ ] 9.6 测试战斗完整流程
+
+## 10. 状态机同步完善
+
+- [ ] 10.1 确保 StateMachine:update 正确同步 JY.Status
+- [ ] 10.2 添加状态历史记录功能
+- [ ] 10.3 实现战斗结束后返回上一状态
+- [ ] 10.4 处理状态切换时的资源竞争
+- [ ] 10.5 测试状态同步正确性
+
+## 11. 集成测试
+
+- [ ] 11.1 测试开始菜单流程
+- [ ] 11.2 测试新游戏流程
+- [ ] 11.3 测试读档流程
+- [ ] 11.4 测试主地图行走
+- [ ] 11.5 测试进入小场景
+- [ ] 11.6 测试场景内对话
+- [ ] 11.7 测试事件触发
+- [ ] 11.8 测试战斗触发和进行
+- [ ] 11.9 测试坐船功能
+- [ ] 11.10 测试存档功能
+- [ ] 11.11 测试退出游戏
+
+## 12. 代码清理
+
+- [ ] 12.1 移除或标记所有废弃函数
+- [ ] 12.2 添加代码注释说明异步改造
+- [ ] 12.3 更新 ARCHITECTURE.md 文档
+- [ ] 12.4 清理调试日志
+- [ ] 12.5 代码格式化和整理

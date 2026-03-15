@@ -14,6 +14,9 @@ function InputAsync.WaitKey()
     return scheduler:waitForKey()
 end
 
+-- WaitKeyCoroutine 是 WaitKey 的别名，保持命名一致性
+InputAsync.WaitKeyCoroutine = InputAsync.WaitKey
+
 -- 等待按键（带超时，协程版本）
 -- @param timeout: 超时时间（秒）
 -- @return: 按键值，如果超时返回-1
