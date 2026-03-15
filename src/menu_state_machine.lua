@@ -16,11 +16,11 @@ local MENU_STATE = {
 
 -- 动画配置
 local ANIMATION_CONFIG = {
-    openDuration = 0.15,      -- 打开动画持续时间
-    closeDuration = 0.15,     -- 关闭动画持续时间
-    selectDuration = 0.1,     -- 选项切换动画持续时间
-    enableOpenClose = true,   -- 启用打开/关闭动画
-    enableSelect = true,      -- 启用选项切换动画
+    openDuration = 0,       -- 禁用打开动画
+    closeDuration = 0,      -- 禁用关闭动画
+    selectDuration = 0,     -- 禁用选项切换动画
+    enableOpenClose = false, -- 禁用打开/关闭动画
+    enableSelect = false,    -- 禁用选项切换动画
 }
 
 -- 单例实例
@@ -135,9 +135,14 @@ function MenuStateMachine:openMenu(menuData, callback)
     self.callback = callback
     self.activeMenu.state = MENU_STATE.NAVIGATING
     
-    -- 播放打开动画
-    self.activeMenu.animationState = "opening"
-    self.activeMenu.animationTime = 0
+    -- 处理打开动画
+    if ANIMATION_CONFIG.enableOpenClose then
+        self.activeMenu.animationState = "opening"
+        self.activeMenu.animationTime = 0
+    else
+        self.activeMenu.animationState = "open"
+        self.activeMenu.animationTime = ANIMATION_CONFIG.openDuration
+    end
     
     if lib and lib.Debug then
         lib.Debug("MenuStateMachine:openMenu: activeMenu after=" .. tostring(self.activeMenu))
@@ -150,10 +155,21 @@ function MenuStateMachine:closeMenu(returnValue)
         return
     end
     
+    if lib and lib.Debug then
+        lib.Debug("MenuStateMachine:closeMenu called, returnValue=" .. tostring(returnValue))
+    end
+    
     self.activeMenu.returnValue = returnValue or 0
     self.activeMenu.state = MENU_STATE.CLOSING
-    self.activeMenu.animationState = "closing"
-    self.activeMenu.animationTime = 0
+    
+    -- 处理关闭动画
+    if ANIMATION_CONFIG.enableOpenClose then
+        self.activeMenu.animationState = "closing"
+        self.activeMenu.animationTime = 0
+    else
+        -- 禁用动画时立即关闭
+        self:doCloseMenu()
+    end
 end
 
 -- 更新菜单
@@ -177,6 +193,11 @@ function MenuStateMachine:update(dt)
             self:doCloseMenu()
             return
         end
+    end
+    
+    -- 只有在 open 状态才处理输入
+    if menu.animationState ~= "open" then
+        return
     end
     
     -- 处理选项切换动画
@@ -311,6 +332,10 @@ function MenuStateMachine:doCloseMenu()
         return
     end
     
+    if lib and lib.Debug then
+        lib.Debug("MenuStateMachine:doCloseMenu called, returnValue=" .. tostring(self.activeMenu.returnValue))
+    end
+    
     local returnValue = self.activeMenu.returnValue
     
     -- 清理当前菜单区域
@@ -333,30 +358,15 @@ end
 
 -- 渲染菜单
 function MenuStateMachine:draw()
-    if lib and lib.Debug then
-        lib.Debug("MenuStateMachine:draw called, activeMenu=" .. tostring(self.activeMenu ~= nil))
-    end
-    
     if not self.activeMenu then
         return
     end
     
-    -- 如果菜单正在关闭，检查是否动画完成
-    if self.activeMenu.animationState == "closing" then
-        if self.activeMenu.animationTime >= ANIMATION_CONFIG.closeDuration then
-            self:doCloseMenu()
-            return
-        end
-    end
-    
     local menu = self.activeMenu
     
-    -- 计算动画进度
-    local progress = 1
-    if menu.animationState == "opening" then
-        progress = menu.animationTime / ANIMATION_CONFIG.openDuration
-    elseif menu.animationState == "closing" then
-        progress = 1 - (menu.animationTime / ANIMATION_CONFIG.closeDuration)
+    -- 只有在 open 状态才绘制
+    if menu.animationState ~= "open" then
+        return
     end
     
     -- 绘制边框
