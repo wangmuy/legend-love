@@ -11,13 +11,14 @@ local InputAsync = require("input_async")
 local MenuAsync = require("menu_async")
 local TalkAsync = require("talk_async")
 
--- 保存原始函数
-local _DrawStrBoxWaitKey = DrawStrBoxWaitKey
-local _DrawStrBoxYesNo = DrawStrBoxYesNo
-local _WaitKey = WaitKey
-local _ShowMenu = ShowMenu
-local _ShowMenu2 = ShowMenu2
-local _TalkEx = TalkEx
+-- 保存原始函数（在安装时获取）
+local _DrawStrBoxWaitKey
+local _DrawStrBoxYesNo
+local _WaitKey
+local _ShowMenu
+local _ShowMenu2
+local _TalkEx
+local _libDelay
 
 -- 检查是否在协程中
 local function isInCoroutine()
@@ -79,8 +80,27 @@ function AsyncGlobals.TalkEx_Async(s, headid, flag)
     end
 end
 
+-- 替换的 lib.Delay
+function AsyncGlobals.lib_Delay_Async(millis)
+    if isInCoroutine() then
+        local scheduler = CoroutineScheduler.getInstance()
+        return scheduler:waitForTime(millis / 1000)
+    else
+        return _libDelay(millis)
+    end
+end
+
 -- 安装替换
 function AsyncGlobals.install()
+    -- 保存原始函数
+    _DrawStrBoxWaitKey = _G.DrawStrBoxWaitKey
+    _DrawStrBoxYesNo = _G.DrawStrBoxYesNo
+    _WaitKey = _G.WaitKey
+    _ShowMenu = _G.ShowMenu
+    _ShowMenu2 = _G.ShowMenu2
+    _TalkEx = _G.TalkEx
+    _libDelay = lib and lib.Delay
+    
     -- 替换全局函数
     _G.DrawStrBoxWaitKey = AsyncGlobals.DrawStrBoxWaitKey_Async
     _G.DrawStrBoxYesNo = AsyncGlobals.DrawStrBoxYesNo_Async
@@ -88,6 +108,11 @@ function AsyncGlobals.install()
     _G.ShowMenu = AsyncGlobals.ShowMenu_Async
     _G.ShowMenu2 = AsyncGlobals.ShowMenu2_Async
     _G.TalkEx = AsyncGlobals.TalkEx_Async
+    
+    -- 替换 lib.Delay
+    if lib then
+        lib.Delay = AsyncGlobals.lib_Delay_Async
+    end
 end
 
 -- 卸载替换
@@ -98,6 +123,10 @@ function AsyncGlobals.uninstall()
     _G.ShowMenu = _ShowMenu
     _G.ShowMenu2 = _ShowMenu2
     _G.TalkEx = _TalkEx
+    
+    if lib and _libDelay then
+        lib.Delay = _libDelay
+    end
 end
 
 return AsyncGlobals
