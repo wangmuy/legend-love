@@ -3080,7 +3080,14 @@ end
 
 
 function instruct_6(warid,tmp,tmp,flag)      --战斗
-    return WarMain(warid,flag);
+    -- 检查是否在协程中
+    local co = coroutine.running()
+    if co then
+        local WarAsync = require("war_async")
+        return WarAsync.WarMainCoroutine(warid, flag)
+    else
+        return WarMain(warid, flag)
+    end
 end
 
 
