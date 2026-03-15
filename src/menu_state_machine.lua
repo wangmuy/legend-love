@@ -46,6 +46,7 @@ function MenuStateMachine:init()
     self.activeMenu = nil       -- 当前活动的菜单
     self.menuStack = {}         -- 菜单堆栈（支持嵌套）
     self.callback = nil         -- 菜单关闭时的回调
+    self.keyProcessed = false   -- 标记当前按键是否已处理（防止按键重复导致菜单快速移动）
 end
 
 -- 创建菜单数据
@@ -227,7 +228,15 @@ function MenuStateMachine:handleInput()
     if lib and lib.Debug then
         lib.Debug("MenuStateMachine:handleInput: key=" .. tostring(key))
     end
+    
+    -- 如果没有按键，重置处理标志
     if key == -1 then
+        self.keyProcessed = false
+        return
+    end
+    
+    -- 如果当前按键已处理，等待按键释放
+    if self.keyProcessed then
         return
     end
     
@@ -292,6 +301,9 @@ function MenuStateMachine:handleInput()
         -- 选择菜单项
         self:selectMenuItem()
     end
+    
+    -- 标记按键已处理，防止重复触发
+    self.keyProcessed = true
 end
 
 -- 选择菜单项
