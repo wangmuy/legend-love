@@ -119,10 +119,10 @@ function WarAsync.WarMainCoroutine(warid, isexp)
                     if WAR.AutoFight == 0 then
                         r = WarAsync.War_ManualCoroutine()
                     else
-                        r = War_Auto()
+                        r = WarAsync.War_AutoCoroutine()
                     end
                 else
-                    r = War_Auto()
+                    r = WarAsync.War_AutoCoroutine()
                 end
                 
                 warStatus = War_isEnd()
@@ -142,11 +142,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     end
     
     -- 战斗结束
-    if warStatus == 1 then
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗胜利", C_WHITE, CC.DefaultFont)
-    else
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗失败", C_WHITE, CC.DefaultFont)
-    end
+    WarAsync.War_SettlementCoroutine(warStatus)
     
     War_EndPersonData(warState.isExp, warStatus)
     
@@ -301,6 +297,109 @@ function WarAsync.War_WaitMenuCoroutine()
     table.remove(WAR.Person, WAR.CurID)
     
     return 7
+end
+
+-- 执行战斗（协程版本）
+function WarAsync.War_Fight_SubCoroutine(id, wugongnum, x, y)
+    local pid = WAR.Person[id]["人物编号"]
+    local wugongid = JY.Person[pid]["武功" .. (wugongnum + 1)]
+    local wugongtype = JY.Wugong[wugongid]["类型"]
+    local level = math.modf(JY.Person[pid]["武功等级" .. (wugongnum + 1)] / 100) + 1
+    
+    -- 显示战斗动画
+    WarAsync.War_ShowFightCoroutine(id, wugongid, wugongtype, level, x, y, -1)
+    
+    -- 计算伤害
+    -- 原始逻辑保留
+    War_Fight_Sub(id, wugongnum, x, y)
+end
+
+-- 显示战斗动画（协程版本）
+function WarAsync.War_ShowFightCoroutine(pid, wugong, wugongtype, level, x, y, eft)
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    -- 播放武功动画
+    local animFrames = 5
+    for i = 1, animFrames do
+        WarDrawMap(0)
+        ShowScreen()
+        scheduler:waitForTime(0.05)
+    end
+    
+    -- 显示效果
+    if eft >= 0 then
+        for i = 1, 3 do
+            WarDrawMap(0)
+            ShowScreen()
+            scheduler:waitForTime(0.03)
+        end
+    end
+end
+
+-- 自动战斗（协程版本）
+function WarAsync.War_AutoCoroutine()
+    local id = WAR.CurID
+    local pid = WAR.Person[id]["人物编号"]
+    
+    -- 简单AI：选择第一个敌人攻击
+    local targetId = -1
+    for i = 0, WAR.PersonNum - 1 do
+        if WAR.Person[i]["死亡"] == false and WAR.Person[i]["我方"] == false then
+            targetId = i
+            break
+        end
+    end
+    
+    if targetId < 0 then
+        return 0
+    end
+    
+    -- 选择第一个武功
+    local wugongnum = 0
+    for i = 1, 10 do
+        if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
+            wugongnum = i - 1
+            break
+        end
+    end
+    
+    War_Fight_Sub(id, wugongnum, targetId, targetId)
+    
+    return 0
+end
+
+-- 战斗结算（协程版本）
+function WarAsync.War_SettlementCoroutine(warStatus)
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    if warStatus == 1 then
+        -- 胜利
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗胜利", C_WHITE, CC.DefaultFont)
+        
+        -- 分配经验
+        for i = 0, WAR.PersonNum - 1 do
+            if WAR.Person[i]["我方"] == true and WAR.Person[i]["死亡"] == false then
+                local pid = WAR.Person[i]["人物编号"]
+                local exp = WAR.Person[i]["经验"] or 0
+                
+                AddPersonAttrib(pid, "经验值", exp)
+                
+                -- 检查升级
+                local newExp = JY.Person[pid]["经验值"]
+                local levelUpExp = JY.Person[pid]["等级"] * 100
+                
+                if newExp >= levelUpExp then
+                    JY.Person[pid]["等级"] = JY.Person[pid]["等级"] + 1
+                    JY.Person[pid]["经验值"] = newExp - levelUpExp
+                    AsyncMessageBox.ShowMessageCoroutine(-1, -1, 
+                        JY.Person[pid]["姓名"] .. " 升级了！", C_WHITE, CC.DefaultFont)
+                end
+            end
+        end
+    else
+        -- 失败
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗失败", C_WHITE, CC.DefaultFont)
+    end
 end
     
     return 0
