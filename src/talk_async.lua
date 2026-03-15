@@ -155,8 +155,8 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
                 talkBorder = talkBorder,
             }
             lib.Debug("TalkExCoroutine: waiting for key (last page)")
-            InputAsync.WaitKeyCoroutine()
-            lib.Debug("TalkExCoroutine: key pressed, clearing currentTalk")
+            local key = InputAsync.WaitKeyCoroutine()
+            lib.Debug("TalkExCoroutine: key pressed=" .. tostring(key) .. ", clearing currentTalk")
             currentTalk = nil  -- 清除对话状态
             break
         else
@@ -181,8 +181,8 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
                 talkBorder = talkBorder,
             }
             lib.Debug("TalkExCoroutine: waiting for key (page full)")
-            InputAsync.WaitKeyCoroutine()
-            lib.Debug("TalkExCoroutine: key pressed, resetting dy")
+            local key = InputAsync.WaitKeyCoroutine()
+            lib.Debug("TalkExCoroutine: key pressed=" .. tostring(key) .. ", resetting dy")
             dy = 0
             currentTalk = nil  -- 清除当前页，准备下一页
         end
