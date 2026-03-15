@@ -219,22 +219,212 @@ function WarAsync.War_Manual_SubCoroutine()
     elseif r == 9 then
         -- 自动
         War_AutoMenu()
+return 0
+end
+
+-- 战斗物品菜单（协程版本）
+function WarAsync.War_ThingMenuCoroutine()
+    local things = {}
+    local count = 0
+    
+    for i = 0, JY.ThingNum - 1 do
+        if JY.Thing[i]["数量"] > 0 then
+            local canUse = false
+            -- 检查物品是否可以在战斗中使用
+            local thingType = JY.Thing[i]["类型"]
+            if thingType == 0 or thingType == 1 or thingType == 2 then
+                canUse = true
+            end
+            
+            if canUse then
+                table.insert(things, {JY.Thing[i]["名称"], nil, 1, i})
+                count = count + 1
+            end
+        end
+    end
+    
+    if count == 0 then
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "没有可用的物品", C_WHITE, CC.DefaultFont)
         return 0
     end
+    
+    local r = MenuAsync.ShowMenuCoroutine(things, count, count,
+        0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    if r > 0 then
+        local thingid = things[r][4]
+        -- 使用物品
+        UseThing(WAR.Person[WAR.CurID]["人物编号"], thingid)
+    end
+    
+    return 0
+end
+
+-- 战斗状态显示（协程版本）
+function WarAsync.War_StatusMenuCoroutine()
+    local menu = {}
+    
+    for i = 0, JY.PersonNum - 1 do
+        local id = JY.Base["队伍" .. (i + 1)]
+        if id and id >= 0 then
+            table.insert(menu, {JY.Person[id]["姓名"], nil, 1, id})
+        end
+    end
+    
+    if #menu == 0 then
+        return 0
+    end
+    
+    local r = MenuAsync.ShowMenuCoroutine(menu, #menu, #menu,
+        0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    if r > 0 then
+        ShowPersonStatus(menu[r][4])
+    end
+    
+    return 0
+end
+
+-- 自动战斗设置（协程版本）
+function WarAsync.War_AutoMenuCoroutine()
+    WAR.AutoFight = 1
+    AsyncMessageBox.ShowMessageCoroutine(-1, -1, "已切换为自动战斗", C_WHITE, CC.DefaultFont)
+    return 0
+end
+
+-- 等待菜单（协程版本）
+function WarAsync.War_WaitMenuCoroutine()
+    -- 将当前人物移到队尾
+    local cur = WAR.Person[WAR.CurID]
+    table.insert(WAR.Person, cur)
+    WAR.Person[WAR.CurID] = nil
+    table.remove(WAR.Person, WAR.CurID)
+    
+    return 7
+end
     
     return 0
 end
 
 -- 攻击选择（协程版本）
 function WarAsync.War_AttackCoroutine()
-    -- 选择武功和目标的逻辑
-    -- 简化实现，实际需要更复杂的交互
+    local pid = WAR.Person[WAR.CurID]["人物编号"]
+    
+    -- 获取可用的武功列表
+    local menu = {}
+    local wugongCount = 0
+    
+    for i = 1, 10 do
+        local wugongid = JY.Person[pid]["武功" .. i]
+        if wugongid and wugongid > 0 then
+            local level = JY.Person[pid]["武功等级" .. i] or 0
+            table.insert(menu, {JY.Wugong[wugongid]["名称"], nil, 1, wugongid})
+            wugongCount = wugongCount + 1
+        end
+    end
+    
+    if wugongCount == 0 then
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "没有可用的武功", C_WHITE, CC.DefaultFont)
+        return 7
+    end
+    
+    local r = MenuAsync.ShowMenuCoroutine(menu, wugongCount, wugongCount, 
+        0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    if r == 0 then
+        return 7
+    end
+    
+    local wugongid = menu[r][4]
+    local wugongtype = JY.Wugong[wugongid]["类型"]
+    
+    -- 选择目标（简化实现）
+    local targetId = WarAsync.SelectTargetCoroutine()
+    if targetId < 0 then
+        return 7
+    end
+    
+    -- 执行攻击
+    War_Fight_Sub(WAR.CurID, r - 1, targetId, targetId)
+    
     return 0
+end
+
+-- 选择目标（协程版本）
+function WarAsync.SelectTargetCoroutine()
+    -- 获取敌方列表
+    local targets = {}
+    for i = 0, WAR.PersonNum - 1 do
+        if WAR.Person[i]["死亡"] == false and WAR.Person[i]["我方"] == false then
+            table.insert(targets, {JY.Person[WAR.Person[i]["人物编号"]]["姓名"], nil, 1, i})
+        end
+    end
+    
+    if #targets == 0 then
+        return -1
+    end
+    
+    if #targets == 1 then
+        return targets[1][4]
+    end
+    
+    local r = MenuAsync.ShowMenuCoroutine(targets, #targets, #targets,
+        0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    if r == 0 then
+        return -1
+    end
+    
+    return targets[r][4]
 end
 
 -- 移动选择（协程版本）
 function WarAsync.War_MoveCoroutine()
-    -- 移动位置选择的逻辑
+    local move = WAR.Person[WAR.CurID]["移动步数"]
+    if move <= 0 then
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "不能移动", C_WHITE, CC.DefaultFont)
+        return 7
+    end
+    
+    -- 简化实现：显示移动范围，等待用户选择位置
+    -- 实际游戏需要更复杂的交互
+    
+    local x = WAR.Person[WAR.CurID]["x"]
+    local y = WAR.Person[WAR.CurID]["y"]
+    
+    -- 方向选择菜单
+    local menu = {
+        {"上", nil, 1},
+        {"下", nil, 1},
+        {"左", nil, 1},
+        {"右", nil, 1},
+        {"取消", nil, 1},
+    }
+    
+    local r = MenuAsync.ShowMenuCoroutine(menu, 5, 5, 0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    if r == 0 or r == 5 then
+        return 7
+    end
+    
+    local dx, dy = 0, 0
+    if r == 1 then dy = -1
+    elseif r == 2 then dy = 1
+    elseif r == 3 then dx = -1
+    elseif r == 4 then dx = 1
+    end
+    
+    local newX = x + dx
+    local newY = y + dy
+    
+    -- 检查是否可以移动
+    if GetWarMap(newX, newY, 2) == 0 then
+        SetWarMap(x, y, 2, 0)
+        SetWarMap(newX, newY, 2, WAR.CurID)
+        WAR.Person[WAR.CurID]["x"] = newX
+        WAR.Person[WAR.CurID]["y"] = newY
+    end
+    
     return 0
 end
 
