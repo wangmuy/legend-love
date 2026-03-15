@@ -1820,7 +1820,9 @@ function SaveData(t,t_struct,data)      --数据写入data Byte数组中。
 end
 
 --等待键盘输入
+--DEPRECATED: 此函数为阻塞版本，请在协程中使用 InputAsync.WaitKeyCoroutine
 function WaitKey()       --等待键盘输入
+    lib.Debug("WARNING: WaitKey is deprecated, use InputAsync.WaitKeyCoroutine in coroutines")
     local keyPress=-1;
     while true do
         keyPress=lib.GetKey();
@@ -1885,7 +1887,9 @@ end
 --显示并询问Y/N，如果点击Y，则返回true, N则返回false
 --(x,y) 坐标，如果都为-1,则在屏幕中间显示
 --改为用菜单询问是否
+--DEPRECATED: 此函数为阻塞版本，请在协程中使用 AsyncMessageBox.ShowYesNoCoroutine
 function DrawStrBoxYesNo(x,y,str,color,size)        --显示字符串并询问Y/N
+    lib.Debug("WARNING: DrawStrBoxYesNo is deprecated, use AsyncMessageBox.ShowYesNoCoroutine in coroutines")
     lib.GetKey();
     local ll=#str;
     local w=size*ll/2+2*CC.MenuBorderPixel;
@@ -1913,7 +1917,9 @@ end
 
 
 --显示字符串并等待击键，字符串带框，显示在屏幕中间
+--DEPRECATED: 此函数为阻塞版本，请在协程中使用 AsyncMessageBox.ShowMessageCoroutine
 function DrawStrBoxWaitKey(s,color,size)          --显示字符串并等待击键
+    lib.Debug("WARNING: DrawStrBoxWaitKey is deprecated, use AsyncMessageBox.ShowMessageCoroutine in coroutines")
     lib.GetKey();
     Cls();
     DrawStrBox(-1,-1,s,color,size);
@@ -2030,7 +2036,9 @@ end
 --         >0 选中的菜单项(1表示第一项)
 --         <0 选中的菜单项，调用函数要求退出父菜单，这个用于退出多层菜单
 
+--DEPRECATED: 此函数为阻塞版本，请在协程中使用 MenuAsync.ShowMenuCoroutine
 function ShowMenu(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,selectColor)     --通用菜单函数
+    lib.Debug("WARNING: ShowMenu is deprecated, use MenuAsync.ShowMenuCoroutine in coroutines")
     lib.Debug(string.format("ShowMenu called: numItem=%d, numShow=%d", numItem, numShow));
     
     local w=0;
@@ -2160,7 +2168,9 @@ function ShowMenu(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,se
 end
 
 --横向显示菜单，参数和ShowMenu一样
+--DEPRECATED: 此函数为阻塞版本，请在协程中使用 MenuAsync.ShowMenu2Coroutine
 function ShowMenu2(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,selectColor)     --通用菜单函数
+    lib.Debug("WARNING: ShowMenu2 is deprecated, use MenuAsync.ShowMenu2Coroutine in coroutines")
     local w=0;
     local h=0;   --边框的宽高
     local i=0;

@@ -226,7 +226,11 @@ function AsyncDialog:handleInput()
         return
     end
     
-    if currentDialog.type == "yesno" then
+    if currentDialog.type == "message" then
+        if key == VK_RETURN or key == VK_SPACE then
+            self:closeDialog(true)
+        end
+    elseif currentDialog.type == "yesno" then
         if key == VK_ESCAPE then
             self:closeDialog(false)
         elseif key == VK_RETURN or key == VK_SPACE then
@@ -305,7 +309,9 @@ function AsyncDialog:draw()
     DrawBox(x, y, x + w, y + h, C_WHITE)
     
     -- 绘制内容
-    if currentDialog.type == "yesno" then
+    if currentDialog.type == "message" then
+        self:drawMessage(currentDialog, x, y, w, h)
+    elseif currentDialog.type == "yesno" then
         self:drawYesNo(currentDialog, x, y, w, h)
     elseif currentDialog.type == "input" then
         self:drawInput(currentDialog, x, y, w, h)
@@ -324,6 +330,11 @@ function AsyncDialog:drawYesNo(dialog, x, y, w, h)
     local noColor = dialog.selected == 2 and C_RED or C_WHITE
     DrawString(x + w/4, y + h - 30, "是", yesColor, CC.DefaultFont)
     DrawString(x + w*3/4, y + h - 30, "否", noColor, CC.DefaultFont)
+end
+
+-- 绘制消息对话框
+function AsyncDialog:drawMessage(dialog, x, y, w, h)
+    DrawString(x + 10, y + 10, dialog.message, dialog.color, dialog.size)
 end
 
 -- 绘制输入对话框
@@ -379,6 +390,91 @@ end
 function AsyncDialog:reset()
     self:clear()
     instance = nil
+end
+
+-- ============================================
+-- 协程版本的对话框函数
+-- ============================================
+
+-- 显示消息框并等待按键（协程版本）
+-- @param message: 显示的消息
+-- @param options: 可选配置（x, y, color, size等）
+-- @return: 无返回值
+function AsyncDialog:showMessageCoroutine(message, options)
+    local scheduler = require("coroutine_scheduler").getInstance()
+    local result = nil
+    local done = false
+    
+    self:showMessage(message, function()
+        done = true
+        result = true
+    end, options)
+    
+    while not done do
+        scheduler:yield("dialog")
+    end
+    
+    return result
+end
+
+-- 显示消息框（回调版本）
+-- @param message: 显示的消息
+-- @param callback: 回调函数
+-- @param options: 可选配置
+function AsyncDialog:showMessage(message, callback, options)
+    options = options or {}
+    
+    local size = options.size or CC.DefaultFont
+    local ll = #message
+    local width = size * ll / 2 + 2 * CC.MenuBorderPixel
+    local height = size + 2 * CC.MenuBorderPixel
+    
+    local x = options.x
+    local y = options.y
+    if x == -1 or x == nil then
+        x = (CC.ScreenW - size / 2 * ll - 2 * CC.MenuBorderPixel) / 2
+    end
+    if y == -1 or y == nil then
+        y = (CC.ScreenH - size - 2 * CC.MenuBorderPixel) / 2
+    end
+    
+    local dialog = {
+        type = "message",
+        message = message,
+        callback = callback,
+        x = x,
+        y = y,
+        width = width,
+        height = height,
+        color = options.color or C_WHITE,
+        size = size,
+        result = nil,
+        state = "opening",
+        animationTime = 0,
+    }
+    
+    self:pushDialog(dialog)
+end
+
+-- 显示确认框并等待选择（协程版本）
+-- @param message: 显示的消息
+-- @param options: 可选配置
+-- @return: boolean (true=是，false=否)
+function AsyncDialog:showYesNoCoroutine(message, options)
+    local scheduler = require("coroutine_scheduler").getInstance()
+    local result = nil
+    local done = false
+    
+    self:showYesNo(message, function(choice)
+        done = true
+        result = choice
+    end, options)
+    
+    while not done do
+        scheduler:yield("dialog")
+    end
+    
+    return result
 end
 
 return AsyncDialog
