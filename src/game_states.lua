@@ -119,19 +119,24 @@ handlers["GAME_MMAP"] = {
         
         -- 检查是否进入子场景
         if JY.SubScene >= 0 then
+            lib.Debug("Entering subscene: " .. tostring(JY.SubScene))
             CleanMemory()
             lib.UnloadMMap()
             lib.PicInit()
             lib.ShowSlow(50, 1)
             
-            JY.Status = getStateId("GAME_SMAP")
+            local newState = getStateId("GAME_SMAP")
+            lib.Debug("Setting JY.Status to GAME_SMAP: " .. tostring(newState))
+            JY.Status = newState
             JY.MMAPMusic = -1
             
             JY.MyPic = GetMyPic()
             JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
             JY.Base["人Y1"] = JY.Scene[JY.SubScene]["入口Y"]
             
+            lib.Debug("Calling Init_SMap")
             Init_SMap(1)
+            lib.Debug("Init_SMap completed")
         end
     end,
     
