@@ -41,7 +41,7 @@ function EventExecuteCoroutine(id, flag)
 end
 
 -- 协程版本的旧事件执行
-function oldEventExecuteCoroutine(flag)
+function EventExecutor.oldEventExecuteCoroutine(flag)
     local eventnum
     
     if flag == 1 then
