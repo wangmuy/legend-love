@@ -16,42 +16,37 @@ local TalkAsync = require("talk_async")
 
 -- 主菜单（协程版本）
 function JyMainAsync.MMenuCoroutine()
-    while true do
-        local menu = {
-            {"医疗", nil, 1},
-            {"解毒", nil, 1},
-            {"物品", nil, 1},
-            {"状态", nil, 1},
-            {"离队", nil, 1},
-            {"系统", nil, 1},
-        }
-        
-        if JY.Status == GAME_SMAP then
-            menu[5][3] = 0
-            menu[6][3] = 0
-        end
-        
-        local r = MenuAsync.ShowMenuCoroutine(menu, 6, 0, CC.MainMenuX, CC.MainMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
-        
-        if r == 0 then
-            return  -- ESC退出菜单
-        elseif r == 1 then
-            JyMainAsync.Menu_Doctor()
-        elseif r == 2 then
-            JyMainAsync.Menu_DecPoison()
-        elseif r == 3 then
-            JyMainAsync.Menu_Thing()
-        elseif r == 4 then
-            JyMainAsync.Menu_Status()
-        elseif r == 5 then
-            JyMainAsync.Menu_PersonExit()
-        elseif r == 6 then
-            local result = JyMainAsync.Menu_System()
-            if result == 1 then
-                return  -- 退出所有菜单
-            end
-        end
+    local menu = {
+        {"医疗", nil, 1},
+        {"解毒", nil, 1},
+        {"物品", nil, 1},
+        {"状态", nil, 1},
+        {"离队", nil, 1},
+        {"系统", nil, 1},
+    }
+    
+    if JY.Status == GAME_SMAP then
+        menu[5][3] = 0
+        menu[6][3] = 0
     end
+    
+    local r = MenuAsync.ShowMenuCoroutine(menu, 6, 0, CC.MainMenuX, CC.MainMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    -- 根据选择执行对应功能
+    if r == 1 then
+        JyMainAsync.Menu_Doctor()
+    elseif r == 2 then
+        JyMainAsync.Menu_DecPoison()
+    elseif r == 3 then
+        JyMainAsync.Menu_Thing()
+    elseif r == 4 then
+        JyMainAsync.Menu_Status()
+    elseif r == 5 then
+        JyMainAsync.Menu_PersonExit()
+    elseif r == 6 then
+        JyMainAsync.Menu_System()
+    end
+    -- r == 0 表示 ESC 退出，不执行任何操作
 end
 
 -- 系统子菜单
