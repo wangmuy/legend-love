@@ -243,7 +243,7 @@ function AsyncDialog:handleInput()
             self:closeDialog(false)
         elseif key == VK_RETURN or key == VK_SPACE then
             self:closeDialog(currentDialog.selected == 1)
-        elseif key == VK_LEFT or key == VK_RIGHT then
+        elseif key == VK_UP or key == VK_DOWN then
             currentDialog.selected = currentDialog.selected == 1 and 2 or 1
         end
     elseif currentDialog.type == "input" then

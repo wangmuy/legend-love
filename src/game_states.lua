@@ -397,6 +397,27 @@ handlers["GAME_WMAP"] = {
     end
 }
 
+-- GAME_END 状态处理器(游戏结束)
+handlers["GAME_END"] = {
+    enter = function()
+        lib.Debug("Enter GAME_END state")
+        -- 退出游戏
+        love.event.quit()
+    end,
+    
+    exit = function()
+        lib.Debug("Exit GAME_END state")
+    end,
+    
+    update = function(dt)
+        -- 游戏结束状态不需要更新
+    end,
+    
+    draw = function()
+        -- 游戏结束状态不需要绘制
+    end
+}
+
 -- 注册所有状态到状态机
 function GameStates.registerAll()
     local eb = EventBridge.getInstance()
