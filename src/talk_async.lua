@@ -91,6 +91,14 @@ local function GenTalkString(s, linelen)
     return newstr
 end
 
+-- 当前对话状态（用于在draw中绘制）
+local currentTalk = nil
+
+-- 获取当前对话状态
+function TalkAsync.getCurrentTalk()
+    return currentTalk
+end
+
 -- 对话显示（协程版本）
 -- @param s: 对话字符串，用*分隔行
 -- @param headid: 头像ID，-1表示不显示
@@ -119,54 +127,98 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
     local startp = 1
     local endp
     local dy = 0
+    local lines = {}  -- 存储当前页要显示的行
     
     while true do
         if dy == 0 then
-            Cls()
-            
-            -- 显示头像
-            if headid >= 0 then
-                local boxpicw = picw + 10
-                local boxpich = pich + 10
-                DrawBox(xy.headx, xy.heady, xy.headx + boxpicw, xy.heady + boxpich, C_WHITE)
-                
-                local w, h = lib.PicGetXY(1, headid * 2)
-                local x = (picw - w) / 2
-                local y = (pich - h) / 2
-                lib.PicLoadCache(1, headid * 2, xy.headx + 5 + x, xy.heady + 5 + y, 1)
-            end
-            
-            -- 绘制对话框
-            DrawBox(xy.talkx, xy.talky, xy.talkx + boxtalkw, xy.talky + boxtalkh, C_WHITE)
+            lines = {}  -- 清空行列表
         end
         
         endp = string.find(s, "*", startp)
         
         if endp == nil then
             -- 最后一行
-            DrawString(xy.talkx + 5, xy.talky + 5 + talkBorder + dy * (CC.DefaultFont + talkBorder),
-                       string.sub(s, startp), C_WHITE, CC.DefaultFont)
-            -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
-            -- ShowScreen()
+            table.insert(lines, string.sub(s, startp))
+            
+            -- 设置当前对话状态，让draw函数绘制
+            currentTalk = {
+                headid = headid,
+                flag = flag,
+                lines = lines,
+                xy = xy,
+                boxtalkw = boxtalkw,
+                boxtalkh = boxtalkh,
+                picw = picw,
+                pich = pich,
+                talkBorder = talkBorder,
+            }
+            
             InputAsync.WaitKeyCoroutine()
+            currentTalk = nil  -- 清除对话状态
             break
         else
-            DrawString(xy.talkx + 5, xy.talky + 5 + talkBorder + dy * (CC.DefaultFont + talkBorder),
-                       string.sub(s, startp, endp - 1), C_WHITE, CC.DefaultFont)
+            table.insert(lines, string.sub(s, startp, endp - 1))
         end
         
         dy = dy + 1
         startp = endp + 1
         
         if dy >= talkynum then
-            -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
-            -- ShowScreen()
+            -- 设置当前对话状态，让draw函数绘制
+            currentTalk = {
+                headid = headid,
+                flag = flag,
+                lines = lines,
+                xy = xy,
+                boxtalkw = boxtalkw,
+                boxtalkh = boxtalkh,
+                picw = picw,
+                pich = pich,
+                talkBorder = talkBorder,
+            }
+            
             InputAsync.WaitKeyCoroutine()
             dy = 0
+            -- 继续下一页，不清除currentTalk，让draw继续绘制直到下一页准备好
         end
     end
     
-    Cls()
+    currentTalk = nil
+end
+
+-- 绘制对话（在draw函数中调用）
+function TalkAsync.draw()
+    if not currentTalk then
+        return
+    end
+    
+    local talk = currentTalk
+    local xy = talk.xy
+    local picw = talk.picw
+    local pich = talk.pich
+    local talkBorder = talk.talkBorder
+    local headid = talk.headid
+    
+    -- 显示头像
+    if headid >= 0 then
+        local boxpicw = picw + 10
+        local boxpich = pich + 10
+        DrawBox(xy.headx, xy.heady, xy.headx + boxpicw, xy.heady + boxpich, C_WHITE)
+        
+        local w, h = lib.PicGetXY(1, headid * 2)
+        local x = (picw - w) / 2
+        local y = (pich - h) / 2
+        lib.PicLoadCache(1, headid * 2, xy.headx + 5 + x, xy.heady + 5 + y, 1)
+    end
+    
+    -- 绘制对话框
+    DrawBox(xy.talkx, xy.talky, xy.talkx + talk.boxtalkw, xy.talky + talk.boxtalkh, C_WHITE)
+    
+    -- 绘制文字
+    for i, line in ipairs(talk.lines) do
+        DrawString(xy.talkx + 5, xy.talky + 5 + talkBorder + (i-1) * (CC.DefaultFont + talkBorder),
+                   line, C_WHITE, CC.DefaultFont)
+    end
 end
 
 -- 简单版本对话（协程版本）
