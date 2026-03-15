@@ -328,11 +328,12 @@ function AsyncDialog:drawYesNo(dialog, x, y, w, h)
     -- 绘制消息
     DrawString(x + 10, y + 10, dialog.message, C_WHITE, CC.DefaultFont)
     
-    -- 绘制选项
+    -- 绘制选项（上下排列，配合上下方向键选择）
     local yesColor = dialog.selected == 1 and C_RED or C_WHITE
     local noColor = dialog.selected == 2 and C_RED or C_WHITE
-    DrawString(x + w/4, y + h - 30, "是", yesColor, CC.DefaultFont)
-    DrawString(x + w*3/4, y + h - 30, "否", noColor, CC.DefaultFont)
+    -- "是"在上，"否"在下
+    DrawString(x + w/2 - CC.DefaultFont, y + h - 60, "是", yesColor, CC.DefaultFont)
+    DrawString(x + w/2 - CC.DefaultFont, y + h - 30, "否", noColor, CC.DefaultFont)
 end
 
 -- 绘制消息对话框
