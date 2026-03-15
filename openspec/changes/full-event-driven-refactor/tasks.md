@@ -79,13 +79,13 @@
 
 ## 8. 战斗菜单改造
 
-- [ ] 8.1 改造 War_Manual_Sub 手动战斗菜单
-- [ ] 8.2 改造攻击目标选择菜单
-- [ ] 8.3 改造移动位置选择
-- [ ] 8.4 改造 War_ThingMenu 战斗物品菜单
-- [ ] 8.5 改造 War_StatusMenu 战斗状态显示
-- [ ] 8.6 改造 War_AutoMenu 自动战斗设置
-- [ ] 8.7 改造 War_WaitMenu 等待菜单
+- [x] 8.1 改造 War_Manual_Sub 手动战斗菜单
+- [x] 8.2 改造攻击目标选择菜单
+- [x] 8.3 改造移动位置选择
+- [x] 8.4 改造 War_ThingMenu 战斗物品菜单
+- [x] 8.5 改造 War_StatusMenu 战斗状态显示
+- [x] 8.6 改造 War_AutoMenu 自动战斗设置
+- [x] 8.7 改造 War_WaitMenu 等待菜单
 - [ ] 8.8 测试战斗菜单操作
 
 ## 9. 战斗执行改造
