@@ -1,16 +1,27 @@
 -- event_executor.lua
 -- 事件执行器模块
 -- 提供协程版本的事件执行函数
+-- 所有事件都在协程中执行，支持异步调用
 
 local EventExecutor = {}
 
 local CoroutineScheduler = require("coroutine_scheduler")
+local AsyncWrapper = require("async_wrapper")
+local AsyncGlobals = require("async_globals")
 
 -- 事件执行状态
 local executingEvent = nil
 local eventQueue = {}
 
--- 协程版本的事件执行
+-- 是否使用协程执行事件
+local useCoroutine = true
+
+-- 启用/禁用协程模式
+function EventExecutor.setCoroutineMode(enabled)
+    useCoroutine = enabled
+end
+
+-- 事件执行入口（自动选择同步/异步模式）
 -- @param id: D*中的编号
 -- @param flag: 1=空格触发, 2=物品触发, 3=路过触发
 function EventExecuteCoroutine(id, flag)
@@ -20,10 +31,8 @@ function EventExecuteCoroutine(id, flag)
     lib.Debug(string.format("EventExecuteCoroutine: id=%d, flag=%d", id, flag))
     
     if JY.SceneNewEventFunction[JY.SubScene] == nil then
-        -- 旧事件处理
         oldEventExecuteCoroutine(flag)
     else
-        -- 新事件处理
         JY.SceneNewEventFunction[JY.SubScene](flag)
     end
     
@@ -55,11 +64,15 @@ function oldCallEventCoroutine(eventnum)
     local eventfilename = string.format("oldevent_%d.lua", eventnum)
     lib.Debug(string.format("oldCallEventCoroutine: %s", eventfilename))
     
-    -- 执行事件文件
-    -- 注意：事件文件中的 instruct_XXX 需要使用协程版本
+    -- 安装异步全局函数替换
+    AsyncGlobals.install()
+    
     local success, err = pcall(function()
         dofile(CONFIG.OldEventPath .. eventfilename)
     end)
+    
+    -- 卸载异步全局函数替换
+    AsyncGlobals.uninstall()
     
     if not success then
         lib.Debug("oldCallEventCoroutine error: " .. tostring(err))
@@ -85,6 +98,24 @@ function EventExecutor.startEvent(id, flag, callback)
     scheduler:start(co)
     
     return co
+end
+
+-- 同步事件执行入口（在主游戏循环中调用）
+-- 此函数会自动在协程中执行事件
+function EventExecuteSync(id, flag)
+    if useCoroutine then
+        EventExecutor.startEvent(id, flag)
+    else
+        -- 回退到原版同步执行
+        JY.CurrentD = id
+        if JY.SceneNewEventFunction[JY.SubScene] == nil then
+            oldEventExecute(flag)
+        else
+            JY.SceneNewEventFunction[JY.SubScene](flag)
+        end
+        JY.CurrentD = -1
+        JY.Darkness = 0
+    end
 end
 
 -- 检查是否有事件正在执行
