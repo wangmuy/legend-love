@@ -340,9 +340,6 @@ handlers["GAME_FIRSTMMAP"] = {
         
         lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], GetMyPic())
         lib.ShowSlow(50, 0)
-        
-        -- 直接在这里切换状态，不等到update
-        JY.Status = getStateId("GAME_MMAP")
     end,
     
     exit = function()
@@ -350,9 +347,15 @@ handlers["GAME_FIRSTMMAP"] = {
     end,
     
     update = function(dt)
+        -- 首次进入后立即切换到主地图状态
+        JY.Status = getStateId("GAME_MMAP")
     end,
     
     draw = function()
+        -- 绘制主地图
+        local pic = GetMyPic()
+        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
+        ShowScreen(CONFIG.FastShowScreen)
     end
 }
 
