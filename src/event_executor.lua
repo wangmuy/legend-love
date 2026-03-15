@@ -67,16 +67,11 @@ function oldCallEventCoroutine(eventnum)
     -- 安装异步全局函数替换
     AsyncGlobals.install()
     
-    local success, err = pcall(function()
-        dofile(CONFIG.OldEventPath .. eventfilename)
-    end)
+    -- 直接执行事件脚本，不在pcall中（pcall会干扰yield）
+    dofile(CONFIG.OldEventPath .. eventfilename)
     
     -- 卸载异步全局函数替换
     AsyncGlobals.uninstall()
-    
-    if not success then
-        lib.Debug("oldCallEventCoroutine error: " .. tostring(err))
-    end
     
     lib.Debug(string.format("oldCallEventCoroutine: %s finished", eventfilename))
 end
