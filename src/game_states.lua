@@ -9,6 +9,7 @@ local EventBridge = require("event_bridge")
 local EventExecutor = require("event_executor")
 local JyMainAsync = require("jymain_async")
 local CoroutineScheduler = require("coroutine_scheduler")
+local MenuAsync = require("menu_async")
 
 -- 游戏状态处理器表
 local handlers = {}
