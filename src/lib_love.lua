@@ -160,12 +160,30 @@ end
 //显示表面
 //flag = 0 显示全部表面  =1 按照SetClip设置的矩形显示，如果没有矩形，则不显示
 --]]
+-- 标记是否在 love.draw() 中
+local inDrawLoop = false
+
+function SetDrawLoopFlag(flag)
+    inDrawLoop = flag
+end
+
 function ShowSurface(flag)
-    love.graphics.present()
+    -- 在 Love2D 事件驱动架构中，只有 love.draw() 应该调用 present()
+    -- 如果在其他地方调用，会导致屏幕抖动/闪烁
+    if inDrawLoop then
+        love.graphics.present()
+    else
+        Debug("ShowSurface called outside love.draw() - skipping present()")
+    end
 end
 
 function ShowSlow(delaytime, flag)
-    love.graphics.present()
+    -- 同上，只有 love.draw() 应该调用 present()
+    if inDrawLoop then
+        love.graphics.present()
+    else
+        Debug("ShowSlow called outside love.draw() - skipping present()")
+    end
 end
 
 local color32Pallette = {}

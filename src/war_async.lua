@@ -322,7 +322,8 @@ function WarAsync.War_ShowFightCoroutine(pid, wugong, wugongtype, level, x, y, e
     local animFrames = 5
     for i = 1, animFrames do
         WarDrawMap(0)
-        ShowScreen()
+        -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
+        -- ShowScreen()
         scheduler:waitForTime(0.05)
     end
     
@@ -330,7 +331,8 @@ function WarAsync.War_ShowFightCoroutine(pid, wugong, wugongtype, level, x, y, e
     if eft >= 0 then
         for i = 1, 3 do
             WarDrawMap(0)
-            ShowScreen()
+            -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
+            -- ShowScreen()
             scheduler:waitForTime(0.03)
         end
     end

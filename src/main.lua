@@ -49,11 +49,21 @@ function love.draw()
         lib.Debug("love.draw called")
     end
     
+    -- 设置标志，表示现在在 love.draw() 中
+    if lib and lib.SetDrawLoopFlag then
+        lib.SetDrawLoopFlag(true)
+    end
+    
     -- 通过事件桥接器渲染游戏
     EventBridge.getInstance():draw()
     
     -- 渲染异步菜单
     MenuAsync.draw()
+    
+    -- 清除标志
+    if lib and lib.SetDrawLoopFlag then
+        lib.SetDrawLoopFlag(false)
+    end
 end
 
 -- 按键事件由event_bridge在init()中注册

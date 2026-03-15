@@ -204,7 +204,8 @@ function InstructAsync.instruct_27(id, startpic, endpic)
         end
         DtoSMap()
         DrawSMap()
-        ShowScreen()
+        -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
+        -- ShowScreen()
         local t2 = lib.GetTime()
         if t2 - t1 < CC.AnimationFrame then
             scheduler:waitForTime((CC.AnimationFrame - (t2 - t1)) / 1000)
