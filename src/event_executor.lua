@@ -90,7 +90,7 @@ function EventExecutor.startEvent(id, flag, callback)
         end
     end, "event_" .. tostring(id))
     
-    scheduler:start(co)
+    scheduler:start(co, "start")  -- 传递一个参数，避免coroutine.yield返回nil
     
     return co
 end
