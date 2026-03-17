@@ -253,8 +253,12 @@ function JyMainAsync.Menu_Thing()
     
     if thingId >= 0 then
         -- 使用选中的物品
-        -- TODO: 实现 UseThingAsync
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "物品选择: " .. JY.Thing[thingId]["名称"], C_WHITE, CC.DefaultFont)
+        local success = ItemAsync.UseThingAsync(thingId)
+        if success then
+            -- 使用成功，减少物品数量（如果需要）
+            -- 注意：某些物品（如装备）不会减少数量
+            -- 实际减少数量的逻辑在 UseThingAsync 中处理
+        end
     end
     
     Cls()
