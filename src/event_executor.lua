@@ -62,18 +62,23 @@ end
 -- 协程版本的调用旧事件
 function oldCallEventCoroutine(eventnum)
     local eventfilename = string.format("oldevent_%d.lua", eventnum)
-    lib.Debug(string.format("oldCallEventCoroutine: %s", eventfilename))
+    lib.Debug(string.format("oldCallEventCoroutine: %s START", eventfilename))
     
     -- 安装异步全局函数替换
     AsyncGlobals.install()
     
-    -- 直接执行事件脚本，不在pcall中（pcall会干扰yield）
-    dofile(CONFIG.OldEventPath .. eventfilename)
+    -- 使用 loadfile 加载事件脚本，避免 dofile 的 C 调用边界问题
+    local chunk, err = loadfile(CONFIG.OldEventPath .. eventfilename)
+    if chunk then
+        chunk()  -- 直接执行，不在 pcall 中
+    else
+        lib.Debug("oldCallEventCoroutine: failed to load " .. eventfilename .. ": " .. tostring(err))
+    end
     
     -- 卸载异步全局函数替换
     AsyncGlobals.uninstall()
     
-    lib.Debug(string.format("oldCallEventCoroutine: %s finished", eventfilename))
+    lib.Debug(string.format("oldCallEventCoroutine: %s FINISHED", eventfilename))
 end
 
 -- 启动事件协程
@@ -99,6 +104,16 @@ end
 -- 此函数会自动在协程中执行事件
 function EventExecuteSync(id, flag)
     if useCoroutine then
+        -- 检查是否已经有事件协程在运行（只检查状态为 "suspended" 的协程）
+        local scheduler = CoroutineScheduler.getInstance()
+        local coroutines = scheduler:getAllCoroutines()
+        for _, coId in ipairs(coroutines) do
+            local info = scheduler:getInfo(coId)
+            if info and info.status == "suspended" and info.name and string.find(info.name, "event_") then
+                lib.Debug("EventExecuteSync: event already running, ignoring new trigger")
+                return
+            end
+        end
         EventExecutor.startEvent(id, flag)
     else
         -- 回退到原版同步执行

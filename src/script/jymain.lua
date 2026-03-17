@@ -2884,7 +2884,9 @@ end
 
 --清屏
 function instruct_0()         --清屏
+    lib.Debug("instruct_0: START");
     Cls();
+    lib.Debug("instruct_0: FINISHED");
 end
 
 --对话
@@ -2898,7 +2900,7 @@ end
 --            5 屏幕下方显示, 左边头像，右边对话
 
 function instruct_1(talkid,headid,flag)        --对话
-    lib.Debug(string.format("instruct_1: talkid=%d, headid=%d, flag=%d", talkid, headid, flag));
+    lib.Debug(string.format("instruct_1: START talkid=%d, headid=%d, flag=%d", talkid, headid, flag));
     local s=ReadTalk(talkid);
     if s==nil then        --对话id不存在
         lib.Debug(string.format("instruct_1: talkid=%d not found", talkid));
@@ -2906,7 +2908,7 @@ function instruct_1(talkid,headid,flag)        --对话
     end
     lib.Debug(string.format("instruct_1: calling TalkEx with talkid=%d", talkid));
     TalkEx(s,headid,flag);
-    lib.Debug(string.format("instruct_1: TalkEx returned for talkid=%d", talkid));
+    lib.Debug(string.format("instruct_1: FINISHED talkid=%d", talkid));
 end
 
 --根据oldtalk.grp文件来idx索引文件。供后面读对话使用
