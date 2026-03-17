@@ -127,7 +127,7 @@ function JyMainAsync.Menu_Status()
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
 
-    local r = SelectTeamMenu(CC.MainSubMenuX, nexty)
+    local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if r > 0 then
         ShowPersonStatus(r)
     else
@@ -140,7 +140,7 @@ function JyMainAsync.Menu_PersonExit()
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要求谁离队", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
 
-    local r = SelectTeamMenu(CC.MainSubMenuX, nexty)
+    local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if r == 1 then
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "抱歉！没有你游戏进行不下去", C_WHITE, CC.DefaultFont)
     elseif r > 1 then
@@ -161,12 +161,28 @@ function JyMainAsync.Menu_PersonExit()
     Cls()
 end
 
+-- 异步版本的选择队友菜单
+local function SelectTeamMenuAsync(x, y)
+    local menu = {}
+    for i = 1, CC.TeamNum do
+        menu[i] = {"", nil, 0}
+        local id = JY.Base["队伍" .. i]
+        if id >= 0 then
+            if JY.Person[id]["生命"] > 0 then
+                menu[i][1] = JY.Person[id]["姓名"]
+                menu[i][3] = 1
+            end
+        end
+    end
+    return MenuAsync.ShowMenuCoroutine(menu, CC.TeamNum, 0, x, y, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+end
+
 -- 医疗子菜单
 function JyMainAsync.Menu_Doctor()
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要医疗谁", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
     
-    local r = SelectTeamMenu(CC.MainSubMenuX, nexty)
+    local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if r > 0 then
         local id = JY.Base["队伍" .. r]
         
@@ -203,7 +219,7 @@ function JyMainAsync.Menu_DecPoison()
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要为谁解毒", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
     
-    local r = SelectTeamMenu(CC.MainSubMenuX, nexty)
+    local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if r > 0 then
         local id = JY.Base["队伍" .. r]
         
@@ -226,32 +242,11 @@ end
 
 -- 物品子菜单
 function JyMainAsync.Menu_Thing()
-    local things = {}
-    local num = 0
-    
-    for i = 0, JY.ThingNum - 1 do
-        if JY.Thing[i]["数量"] > 0 then
-            num = num + 1
-            things[num] = {JY.Thing[i]["名称"], nil, 1, i}
-        end
-    end
-    
-    if num == 0 then
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "没有物品", C_WHITE, CC.DefaultFont)
-        Cls()
-        return
-    end
-    
-    local x1 = (CC.ScreenW - 10 * CC.DefaultFont - 2 * CC.MenuBorderPixel) / 2
-    local y1 = (CC.ScreenH - 10 * CC.DefaultFont - 2 * CC.MenuBorderPixel) / 2
-    
-    local r = MenuAsync.ShowMenuCoroutine(things, num, 0, x1, y1, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
-    
-    if r > 0 then
-        local thingid = things[r][4]
-        UseThingSelect(thingid)
-    end
-    
+    -- 调用原始的 Menu_Thing 函数
+    -- 注意：Menu_Thing 使用了 ShowMenu 和 SelectThing，它们已经被 AsyncGlobals 替换为异步版本
+    -- 但 SelectThing 内部使用了 WaitKey，可能无法在协程中正常工作
+    -- 暂时显示提示信息
+    AsyncMessageBox.ShowMessageCoroutine(-1, -1, "物品功能正在开发中...", C_WHITE, CC.DefaultFont)
     Cls()
 end
 
