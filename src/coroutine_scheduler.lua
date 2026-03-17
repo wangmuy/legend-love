@@ -70,6 +70,11 @@ function CoroutineScheduler:start(id, ...)
     if not success then
         info.status = "error"
         info.error = result
+        if lib and lib.Debug then
+            lib.Debug("CoroutineScheduler.start: ERROR in coroutine " .. tostring(id) .. ": " .. tostring(result))
+        end
+        -- 清理出错的协程，防止阻塞后续事件
+        coroutines[id] = nil
         return false, result
     end
     
@@ -77,7 +82,13 @@ function CoroutineScheduler:start(id, ...)
     if lib and lib.Debug then
         lib.Debug("CoroutineScheduler.start: info.status before=" .. tostring(info.status) .. ", coroutine.status=" .. tostring(actualStatus) .. ", result=" .. tostring(result))
     end
-    info.status = actualStatus
+    -- 修复：如果 coroutine.status 返回 "running"，将其视为 "suspended"
+    -- 因为协程已经调用了 yield，只是 coroutine.status 返回了错误的状态
+    if actualStatus == "running" then
+        info.status = "suspended"
+    else
+        info.status = actualStatus
+    end
     if info.status == "dead" then
         info.result = result
         coroutines[id] = nil  -- 清理已完成的协程
@@ -153,6 +164,9 @@ function CoroutineScheduler:update(dt)
     
     -- 收集所有需要更新的协程
     for id, info in pairs(coroutines) do
+        if lib and lib.Debug then
+            lib.Debug("CoroutineScheduler.update: checking coroutine id=" .. tostring(id) .. ", status=" .. tostring(info.status) .. ", waitingFor=" .. tostring(info.waitingFor) .. ", name=" .. tostring(info.name))
+        end
         if info.status == "suspended" then
             if info.waitingFor == "key" then
                 -- 等待按键的协程单独处理
@@ -172,6 +186,9 @@ function CoroutineScheduler:update(dt)
     local pressedKey = -1
     if #keyWaitingCoroutines > 0 then
         pressedKey = lib.GetKey()
+        if lib and lib.Debug then
+            lib.Debug("CoroutineScheduler.update: checking key, pressedKey=" .. tostring(pressedKey) .. ", keyWaitingCoroutines=" .. tostring(#keyWaitingCoroutines))
+        end
         if pressedKey ~= -1 then
             keyPressed = true
             if lib and lib.Debug then

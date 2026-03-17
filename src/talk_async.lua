@@ -155,6 +155,9 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
                 talkBorder = talkBorder,
             }
             lib.Debug("TalkExCoroutine: waiting for key (last page)")
+            -- 清除当前按键，防止同一按键立即触发下一页/下一个对话
+            local InputManager = require("input_manager")
+            InputManager.getInstance():clearCurrentKey()
             local key = InputAsync.WaitKeyCoroutine()
             lib.Debug("TalkExCoroutine: key pressed=" .. tostring(key) .. ", clearing currentTalk")
             currentTalk = nil  -- 清除对话状态
@@ -181,6 +184,9 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
                 talkBorder = talkBorder,
             }
             lib.Debug("TalkExCoroutine: waiting for key (page full)")
+            -- 清除当前按键，防止同一按键立即触发下一页/下一个对话
+            local InputManager = require("input_manager")
+            InputManager.getInstance():clearCurrentKey()
             local key = InputAsync.WaitKeyCoroutine()
             lib.Debug("TalkExCoroutine: key pressed=" .. tostring(key) .. ", resetting dy")
             dy = 0

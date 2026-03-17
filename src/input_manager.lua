@@ -217,6 +217,21 @@ function InputManager:resetKeyConsumed()
     keyConsumed = false
 end
 
+-- 清除当前按键（用于防止同一按键连续触发）
+function InputManager:clearCurrentKey()
+    if lib and lib.Debug then
+        lib.Debug("InputManager.clearCurrentKey: currentKey=" .. tostring(currentKey) .. ", keyStates=" .. tostring(#keyStates))
+    end
+    currentKey = -1
+    keyConsumed = false
+    -- 同时清除 keyStates，防止 InputManager.update() 重新设置 currentKey
+    keyStates = {}
+    keyRepeatTimers = {}
+    if lib and lib.Debug then
+        lib.Debug("InputManager.clearCurrentKey: cleared")
+    end
+end
+
 -- 查询按键是否被按下
 function InputManager:isKeyDown(gameKey)
     return keyStates[gameKey] == true
