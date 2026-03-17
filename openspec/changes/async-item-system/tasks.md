@@ -76,8 +76,8 @@
 ## 10. AsyncGlobals 集成
 
 - [x] 10.1 在 `AsyncGlobals` 中添加 `SelectThing` 替换
-- [ ] 10.2 在 `AsyncGlobals` 中添加 `UseThing` 替换
-- [ ] 10.3 确保事件脚本中调用的是异步版本
+- [x] 10.2 在 `AsyncGlobals` 中添加 `UseThing` 替换
+- [x] 10.3 确保事件脚本中调用的是异步版本
 - [ ] 10.4 测试 AsyncGlobals 替换是否生效
 
 ## 11. 测试和调试
@@ -96,5 +96,5 @@
 
 - [x] 12.1 更新 `jymain_async.lua` 中的注释
 - [x] 12.2 添加 `item_async.lua` 模块头注释
-- [ ] 12.3 清理调试代码和临时文件
-- [ ] 12.4 提交最终代码
+- [x] 12.3 清理调试代码和临时文件
+- [x] 12.4 提交最终代码

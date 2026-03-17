@@ -95,6 +95,34 @@ function ItemAsync.SelectThingAsync()
     end
 end
 
+-- 减少物品数量的辅助函数
+-- thingId: 物品ID
+-- amount: 减少数量（默认为1）
+-- 返回: 是否成功减少
+local function ReduceThingCount(thingId, amount)
+    amount = amount or 1
+    
+    -- 查找物品在背包中的位置
+    for i = 0, CC.MyThingNum - 1 do
+        local id = JY.Base["物品" .. i + 1]
+        if id == thingId then
+            local currentCount = JY.Base["物品数量" .. i + 1]
+            if currentCount >= amount then
+                JY.Base["物品数量" .. i + 1] = currentCount - amount
+                -- 如果数量为0，清空该位置
+                if JY.Base["物品数量" .. i + 1] <= 0 then
+                    JY.Base["物品" .. i + 1] = -1
+                    JY.Base["物品数量" .. i + 1] = 0
+                end
+                return true
+            else
+                return false  -- 数量不足
+            end
+        end
+    end
+    return false  -- 未找到物品
+end
+
 -- 异步选择队友菜单（辅助函数）
 local function SelectTeamMemberAsync(title)
     local menu = {}
@@ -261,6 +289,8 @@ function ItemAsync.UseThing_Type2Async(thingId)
     
     -- 增加武功等级（简化处理）
     -- 实际应该根据秘籍类型增加对应武功
+    -- 减少物品数量（秘籍修炼后消失）
+    ReduceThingCount(thingId, 1)
     AsyncMessageBox.ShowMessageCoroutine(-1, -1, JY.Person[personId]["姓名"] .. "修炼了" .. thingName, C_ORANGE, CC.DefaultFont)
     return true
 end
@@ -328,6 +358,8 @@ function ItemAsync.UseThing_Type3Async(thingId)
     end
     
     if hasEffect then
+        -- 减少物品数量
+        ReduceThingCount(thingId, 1)
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, personName .. "使用" .. thingName .. ": " .. effectText, C_ORANGE, CC.DefaultFont)
         return true
     else

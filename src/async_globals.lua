@@ -119,6 +119,14 @@ function AsyncGlobals.install()
     if _G.SelectThing then
         _G.SelectThing = function() return ItemAsync.SelectThingAsync() end
     end
+    if _G.UseThing then
+        _G.UseThing = function(thingId) 
+            -- UseThing 原函数返回 1/0，异步版本返回 true/false
+            -- 这里转换为兼容的返回值
+            local success = ItemAsync.UseThingAsync(thingId)
+            return success and 1 or 0
+        end
+    end
 end
 
 -- 卸载替换
