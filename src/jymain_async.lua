@@ -125,6 +125,46 @@ function JyMainAsync.Menu_ReadRecord()
     end
 end
 
+-- 异步显示人物状态
+-- teamid: 队伍位置（1-6）
+function JyMainAsync.ShowPersonStatusAsync(teamid)
+    local page = 1
+    local pagenum = 2
+    local teamnum = GetTeamNum()
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    while true do
+        Cls()
+        local id = JY.Base["队伍" .. teamid]
+        if id >= 0 then
+            ShowPersonStatus_sub(id, page)
+        end
+        
+        ShowScreen()
+        
+        -- 异步等待按键
+        local keypress = InputAsync.WaitKeyCoroutine()
+        
+        if keypress == VK_ESCAPE then
+            break
+        elseif keypress == VK_UP then
+            teamid = teamid - 1
+        elseif keypress == VK_DOWN then
+            teamid = teamid + 1
+        elseif keypress == VK_LEFT then
+            page = page - 1
+        elseif keypress == VK_RIGHT then
+            page = page + 1
+        end
+        
+        teamid = limitX(teamid, 1, teamnum)
+        page = limitX(page, 1, pagenum)
+        
+        -- 小延迟防止按键过快
+        scheduler:waitForTime(0.1)
+    end
+end
+
 -- 状态子菜单
 function JyMainAsync.Menu_Status()
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
@@ -132,7 +172,7 @@ function JyMainAsync.Menu_Status()
 
     local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if r > 0 then
-        ShowPersonStatus(r)
+        JyMainAsync.ShowPersonStatusAsync(r)
     else
         Cls()
     end
