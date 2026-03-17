@@ -113,6 +113,12 @@ function AsyncGlobals.install()
     if lib then
         lib.Delay = AsyncGlobals.lib_Delay_Async
     end
+    
+    -- 导入并替换物品系统函数
+    local ItemAsync = require("item_async")
+    if _G.SelectThing then
+        _G.SelectThing = function() return ItemAsync.SelectThingAsync() end
+    end
 end
 
 -- 卸载替换
