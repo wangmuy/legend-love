@@ -1,6 +1,8 @@
 -- jymain_async.lua
 -- 游戏主逻辑的异步版本
 -- 替换 MMenu、物品系统等函数中的阻塞调用
+-- 更新日期: 2026-03-18
+-- 变更: 添加异步物品系统支持
 
 local JyMainAsync = {}
 
@@ -9,6 +11,7 @@ local MenuAsync = require("menu_async")
 local AsyncMessageBox = require("async_message_box")
 local InputAsync = require("input_async")
 local TalkAsync = require("talk_async")
+local ItemAsync = require("item_async")
 
 -- ============================================
 -- 主菜单系统
@@ -240,13 +243,20 @@ function JyMainAsync.Menu_DecPoison()
     Cls()
 end
 
+-- 导入物品异步模块
+local ItemAsync = require("item_async")
+
 -- 物品子菜单
 function JyMainAsync.Menu_Thing()
-    -- 调用原始的 Menu_Thing 函数
-    -- 注意：Menu_Thing 使用了 ShowMenu 和 SelectThing，它们已经被 AsyncGlobals 替换为异步版本
-    -- 但 SelectThing 内部使用了 WaitKey，可能无法在协程中正常工作
-    -- 暂时显示提示信息
-    AsyncMessageBox.ShowMessageCoroutine(-1, -1, "物品功能正在开发中...", C_WHITE, CC.DefaultFont)
+    -- 使用异步物品选择菜单
+    local thingId = ItemAsync.SelectThingAsync()
+    
+    if thingId >= 0 then
+        -- 使用选中的物品
+        -- TODO: 实现 UseThingAsync
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "物品选择: " .. JY.Thing[thingId]["名称"], C_WHITE, CC.DefaultFont)
+    end
+    
     Cls()
 end
 
