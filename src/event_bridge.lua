@@ -178,6 +178,10 @@ function EventBridge:draw()
     -- 渲染当前状态
     StateMachine.getInstance():draw()
     
+    -- 渲染人物状态（在场景之上）
+    local PersonStatusAsync = require("person_status_async")
+    PersonStatusAsync.draw()
+    
     -- 渲染对话（在场景之上，对话框之下）
     local TalkAsync = require("talk_async")
     TalkAsync.draw()
