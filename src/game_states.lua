@@ -252,6 +252,12 @@ handlers["GAME_SMAP"] = {
         local keypress = lib.GetKey()
         local direct = -1
         
+        -- 检查是否正在显示人物状态，如果是则跳过按键处理
+        local PersonStatusAsync = require("person_status_async")
+        if PersonStatusAsync.isShowingStatus then
+            keypress = -1  -- 忽略按键
+        end
+        
         if keypress ~= -1 then
             JY.MyTick = 0
             if keypress == VK_ESCAPE then
