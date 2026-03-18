@@ -138,7 +138,7 @@ function JyMainAsync.Menu_Status()
     if lib and lib.Debug then
         lib.Debug("JyMainAsync.Menu_Status: calling SelectTeamMenuAsync")
     end
-    local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
+    local r = JyMainAsync.SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if lib and lib.Debug then
         lib.Debug("JyMainAsync.Menu_Status: SelectTeamMenuAsync returned r=" .. tostring(r))
     end
@@ -166,7 +166,7 @@ function JyMainAsync.Menu_PersonExit()
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要求谁离队", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
 
-    local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
+    local r = JyMainAsync.SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if r == 1 then
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "抱歉！没有你游戏进行不下去", C_WHITE, CC.DefaultFont)
     elseif r > 1 then
@@ -188,7 +188,7 @@ function JyMainAsync.Menu_PersonExit()
 end
 
 -- 异步版本的选择队友菜单
-local function SelectTeamMenuAsync(x, y)
+function JyMainAsync.SelectTeamMenuAsync(x, y)
     local menu = {}
     for i = 1, CC.TeamNum do
         menu[i] = {"", nil, 0}
@@ -208,7 +208,7 @@ function JyMainAsync.Menu_Doctor()
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要医疗谁", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
     
-    local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
+    local r = JyMainAsync.SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if r > 0 then
         local id = JY.Base["队伍" .. r]
         
@@ -245,7 +245,7 @@ function JyMainAsync.Menu_DecPoison()
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要为谁解毒", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
     
-    local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
+    local r = JyMainAsync.SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
     if r > 0 then
         local id = JY.Base["队伍" .. r]
         
