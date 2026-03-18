@@ -11,7 +11,13 @@ local AsyncMessageBox = require("async_message_box")
 local AsyncDialog = require("async_dialog")
 local InputAsync = require("input_async")
 
--- 异步物品选择菜单
+-- 当前显示的物品选择状态（用于draw函数）
+local currentItemSelect = nil
+
+-- 是否正在显示物品选择（用于阻止游戏主循环处理按键）
+ItemAsync.isSelectingItem = false
+
+-- 异步物品选择菜单（Grid形式，带缩略图和描述）
 -- 返回选择的物品ID，-1表示取消选择
 function ItemAsync.SelectThingAsync()
     -- 显示物品分类菜单
@@ -56,7 +62,9 @@ function ItemAsync.SelectThingAsync()
                     id = id,
                     name = JY.Thing[id]["名称"],
                     count = JY.Base["物品数量" .. i + 1],
-                    type = JY.Thing[id]["类型"]
+                    type = JY.Thing[id]["类型"],
+                    desc = JY.Thing[id]["物品说明"],
+                    user = JY.Thing[id]["使用人"]
                 }
             end
         end
@@ -68,31 +76,211 @@ function ItemAsync.SelectThingAsync()
         return -1
     end
     
-    -- 构建物品菜单
-    local itemMenu = {}
-    for i = 1, itemCount do
-        local displayName = items[i].name
-        -- 如果物品已装备，显示装备者
-        if (items[i].type == 1 or items[i].type == 2) and JY.Thing[items[i].id]["使用人"] >= 0 then
-            local userName = JY.Person[JY.Thing[items[i].id]["使用人"]]["姓名"]
-            displayName = displayName .. "(" .. userName .. ")"
+    -- 使用Grid形式选择物品
+    return ItemAsync.SelectThingGridAsync(items, itemCount)
+end
+
+-- Grid形式物品选择（带缩略图和描述）
+-- items: 物品列表，每个元素包含 id, name, count, type, desc, user
+-- itemCount: 物品数量
+-- 返回选择的物品ID，-1表示取消
+function ItemAsync.SelectThingGridAsync(items, itemCount)
+    -- Grid配置
+    local xnum = CC.MenuThingXnum or 5  -- 每行物品数
+    local ynum = CC.MenuThingYnum or 3  -- 每列物品数
+    local itemsPerPage = xnum * ynum
+    
+    -- 计算总页数
+    local totalPages = math.ceil(itemCount / itemsPerPage)
+    local currentPage = 1
+    local selectedIndex = 1  -- 当前选中的物品索引（1-based）
+    local scheduler = CoroutineScheduler.getInstance()
+    local InputAsync = require("input_async")
+    
+    -- 设置标志，阻止游戏主循环处理按键
+    ItemAsync.isSelectingItem = true
+    
+    while true do
+        -- 计算当前页显示的物品
+        local pageStart = (currentPage - 1) * itemsPerPage + 1
+        local pageEnd = math.min(pageStart + itemsPerPage - 1, itemCount)
+        local pageItemCount = pageEnd - pageStart + 1
+        
+        -- 确保选中索引在当前页范围内
+        if selectedIndex < pageStart then
+            selectedIndex = pageStart
+        elseif selectedIndex > pageEnd then
+            selectedIndex = pageEnd
         end
-        -- 显示名称和数量
-        local menuText = string.format("%-20s x%d", displayName, items[i].count)
-        itemMenu[i] = {menuText, nil, 1, items[i].id}
+        
+        -- 获取当前选中的物品
+        local selectedItem = items[selectedIndex]
+        
+        -- 设置当前显示状态（供draw函数使用）
+        currentItemSelect = {
+            items = items,
+            itemCount = itemCount,
+            currentPage = currentPage,
+            totalPages = totalPages,
+            selectedIndex = selectedIndex,
+            pageStart = pageStart,
+            pageEnd = pageEnd,
+            xnum = xnum,
+            ynum = ynum,
+            selectedItem = selectedItem
+        }
+        
+        -- 异步等待按键
+        local keypress = InputAsync.WaitKeyCoroutine()
+        
+        -- 清除显示状态
+        currentItemSelect = nil
+        
+        -- 处理按键
+        if keypress == VK_ESCAPE then
+            -- ESC取消选择
+            ItemAsync.isSelectingItem = false
+            return -1
+        elseif keypress == VK_RETURN or keypress == VK_SPACE then
+            -- 确认选择
+            if selectedItem then
+                ItemAsync.isSelectingItem = false
+                return selectedItem.id
+            end
+        elseif keypress == VK_UP then
+            -- 向上移动
+            local currentPos = selectedIndex - pageStart + 1
+            local currentRow = math.ceil(currentPos / xnum)
+            local currentCol = (currentPos - 1) % xnum + 1
+            
+            if currentRow > 1 then
+                -- 在同一页向上移动
+                selectedIndex = selectedIndex - xnum
+            elseif currentPage > 1 then
+                -- 翻到上一页，选中最后一行同列
+                currentPage = currentPage - 1
+                local newPageStart = (currentPage - 1) * itemsPerPage + 1
+                local newPageEnd = math.min(newPageStart + itemsPerPage - 1, itemCount)
+                local newPageCount = newPageEnd - newPageStart + 1
+                local lastRowStart = newPageStart + (math.ceil(newPageCount / xnum) - 1) * xnum
+                selectedIndex = math.min(lastRowStart + currentCol - 1, newPageEnd)
+            end
+        elseif keypress == VK_DOWN then
+            -- 向下移动
+            local currentPos = selectedIndex - pageStart + 1
+            local currentRow = math.ceil(currentPos / xnum)
+            local currentCol = (currentPos - 1) % xnum + 1
+            local maxRow = math.ceil(pageItemCount / xnum)
+            
+            if currentRow < maxRow then
+                -- 在同一页向下移动
+                selectedIndex = math.min(selectedIndex + xnum, pageEnd)
+            elseif currentPage < totalPages then
+                -- 翻到下一页，选中第一行同列
+                currentPage = currentPage + 1
+                local newPageStart = (currentPage - 1) * itemsPerPage + 1
+                selectedIndex = math.min(newPageStart + currentCol - 1, itemCount)
+            end
+        elseif keypress == VK_LEFT then
+            -- 向左移动
+            if selectedIndex > pageStart then
+                selectedIndex = selectedIndex - 1
+            elseif currentPage > 1 then
+                -- 翻到上一页最后一项
+                currentPage = currentPage - 1
+                local newPageEnd = math.min(currentPage * itemsPerPage, itemCount)
+                selectedIndex = newPageEnd
+            end
+        elseif keypress == VK_RIGHT then
+            -- 向右移动
+            if selectedIndex < pageEnd then
+                selectedIndex = selectedIndex + 1
+            elseif currentPage < totalPages then
+                -- 翻到下一页第一项
+                currentPage = currentPage + 1
+                selectedIndex = (currentPage - 1) * itemsPerPage + 1
+            end
+        end
+        
+        -- 小延迟防止按键过快
+        scheduler:waitForTime(0.05)
+    end
+end
+
+-- 绘制物品选择界面（在draw函数中调用）
+function ItemAsync.draw()
+    if not currentItemSelect then
+        return
     end
     
-    -- 显示物品列表菜单
-    local x1 = CC.MainSubMenuX
-    local y1 = CC.MainSubMenuY + CC.SingleLineHeight * 2
+    local select = currentItemSelect
+    local items = select.items
+    local xnum = select.xnum
+    local ynum = select.ynum
+    local pageStart = select.pageStart
+    local pageEnd = select.pageEnd
+    local selectedIndex = select.selectedIndex
+    local selectedItem = select.selectedItem
     
-    local selected = MenuAsync.ShowMenuCoroutine(itemMenu, itemCount, 0, x1, y1, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    -- 计算布局
+    local w = CC.ThingPicWidth * xnum + (xnum - 1) * CC.ThingGapIn + 2 * CC.ThingGapOut
+    local h = CC.ThingPicHeight * ynum + (ynum - 1) * CC.ThingGapIn + 2 * CC.ThingGapOut
+    local dx = (CC.ScreenW - w) / 2
+    local dy = (CC.ScreenH - h - 2 * (CC.ThingFontSize + 2 * CC.MenuBorderPixel + 5)) / 2
     
-    if selected > 0 then
-        return itemMenu[selected][4]  -- 返回物品ID
-    else
-        return -1  -- 取消选择
+    local y1_1 = dy
+    local y1_2 = y1_1 + CC.ThingFontSize + 2 * CC.MenuBorderPixel
+    local y2_1 = y1_2 + 5
+    local y2_2 = y2_1 + CC.ThingFontSize + 2 * CC.MenuBorderPixel
+    local y3_1 = y2_2 + 5
+    local y3_2 = y3_1 + h
+    
+    -- 绘制信息框（名称和说明）
+    DrawBox(dx, y1_1, dx + w, y1_2, C_WHITE)
+    DrawBox(dx, y2_1, dx + w, y2_2, C_WHITE)
+    DrawBox(dx, y3_1, dx + w, y3_2, C_WHITE)
+    
+    -- 显示选中物品的信息
+    if selectedItem then
+        local displayName = selectedItem.name
+        if (selectedItem.type == 1 or selectedItem.type == 2) and selectedItem.user >= 0 then
+            displayName = displayName .. "(" .. JY.Person[selectedItem.user]["姓名"] .. ")"
+        end
+        displayName = string.format("%s X %d", displayName, selectedItem.count)
+        DrawString(dx + CC.ThingGapOut, y1_1 + CC.MenuBorderPixel, displayName, C_GOLD, CC.ThingFontSize)
+        DrawString(dx + CC.ThingGapOut, y2_1 + CC.MenuBorderPixel, selectedItem.desc, C_ORANGE, CC.ThingFontSize)
     end
+    
+    -- 绘制物品Grid
+    for i = pageStart, pageEnd do
+        local localIndex = i - pageStart
+        local x = localIndex % xnum
+        local y = math.floor(localIndex / xnum)
+        
+        local boxx = dx + CC.ThingGapOut + x * (CC.ThingPicWidth + CC.ThingGapIn)
+        local boxy = y3_1 + CC.ThingGapOut + y * (CC.ThingPicHeight + CC.ThingGapIn)
+        
+        -- 判断是否选中
+        local isSelected = (i == selectedIndex)
+        local boxcolor = isSelected and C_WHITE or C_BLACK
+        
+        -- 绘制物品框
+        lib.DrawRect(boxx, boxy, boxx + CC.ThingPicWidth + 1, boxy + CC.ThingPicHeight + 1, boxcolor)
+        
+        -- 绘制物品图片
+        local item = items[i]
+        if item then
+            if CC.LoadThingPic == 1 then
+                lib.PicLoadCache(2, item.id * 2, boxx + 1, boxy + 1, 1)
+            else
+                lib.PicLoadCache(0, (item.id + CC.StartThingPic) * 2, boxx + 1, boxy + 1, 1)
+            end
+        end
+    end
+    
+    -- 显示页码
+    local pageStr = string.format("%d/%d", select.currentPage, select.totalPages)
+    DrawString(dx + w - 50, y3_2 + 5, pageStr, C_WHITE, CC.DefaultFont)
 end
 
 -- 减少物品数量的辅助函数
