@@ -200,6 +200,9 @@ end
 function InputManager:getKey()
     -- 如果输入被禁用，返回 -1
     if InputManager.disableInput then
+        if CONFIG and CONFIG.Debug == 1 then
+            Debug("InputManager:getKey: disabled, returning -1")
+        end
         return -1
     end
     
