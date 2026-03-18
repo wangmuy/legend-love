@@ -182,6 +182,10 @@ function EventBridge:draw()
     local PersonStatusAsync = require("person_status_async")
     PersonStatusAsync.draw()
     
+    -- 渲染物品选择界面（在场景之上）
+    local ItemAsync = require("item_async")
+    ItemAsync.draw()
+    
     -- 渲染对话（在场景之上，对话框之下）
     local TalkAsync = require("talk_async")
     TalkAsync.draw()
