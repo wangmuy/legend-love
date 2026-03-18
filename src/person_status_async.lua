@@ -10,6 +10,9 @@ local CoroutineScheduler = require("coroutine_scheduler")
 -- 当前显示的状态数据
 local currentStatus = nil
 
+-- 是否正在显示状态（用于阻止游戏主循环处理按键）
+PersonStatusAsync.isShowingStatus = false
+
 -- 异步显示人物状态
 -- teamid: 队伍位置（1-6）
 -- 返回: 无（直接显示，ESC退出）
@@ -17,6 +20,9 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
     if lib and lib.Debug then
         lib.Debug("PersonStatusAsync.ShowStatusCoroutine: started with teamid=" .. tostring(teamid))
     end
+    
+    -- 设置标志，阻止游戏主循环处理按键
+    PersonStatusAsync.isShowingStatus = true
     
     local page = 1
     local pagenum = 2
@@ -26,10 +32,6 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
     
     if lib and lib.Debug then
         lib.Debug("PersonStatusAsync.ShowStatusCoroutine: modules loaded")
-    end
-    
-    if lib and lib.Debug then
-        lib.Debug("PersonStatusAsync.ShowStatusCoroutine: teamnum=" .. tostring(teamnum))
     end
     
     while true do
@@ -66,6 +68,8 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
             if lib and lib.Debug then
                 lib.Debug("PersonStatusAsync.ShowStatusCoroutine: ESC pressed, exiting")
             end
+            -- 清除标志，恢复游戏主循环按键处理
+            PersonStatusAsync.isShowingStatus = false
             break
         elseif keypress == VK_UP then
             teamid = teamid - 1
