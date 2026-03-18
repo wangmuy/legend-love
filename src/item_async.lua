@@ -15,7 +15,7 @@ local InputAsync = require("input_async")
 local currentItemSelect = nil
 
 -- 是否正在显示物品选择（用于阻止游戏主循环处理按键）
-ItemAsync.isSelectingItem = false
+-- 注意：现在使用 InputManager.disableInput 替代
 
 -- 异步物品选择菜单（Grid形式，带缩略图和描述）
 -- 返回选择的物品ID，-1表示取消选择
@@ -98,7 +98,8 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
     local InputAsync = require("input_async")
     
     -- 设置标志，阻止游戏主循环处理按键
-    ItemAsync.isSelectingItem = true
+    local InputManager = require("input_manager")
+    InputManager.getInstance().disableInput = true
     
     while true do
         -- 计算当前页显示的物品
@@ -139,12 +140,14 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
         -- 处理按键
         if keypress == VK_ESCAPE then
             -- ESC取消选择
-            ItemAsync.isSelectingItem = false
+            local InputManager = require("input_manager")
+            InputManager.getInstance().disableInput = false
             return -1
         elseif keypress == VK_RETURN or keypress == VK_SPACE then
             -- 确认选择
             if selectedItem then
-                ItemAsync.isSelectingItem = false
+                local InputManager = require("input_manager")
+                InputManager.getInstance().disableInput = false
                 return selectedItem.id
             end
         elseif keypress == VK_UP then
