@@ -4,6 +4,9 @@
 
 local PersonStatusAsync = {}
 
+-- 导入必要的模块
+local CoroutineScheduler = require("coroutine_scheduler")
+
 -- 当前显示的状态数据
 local currentStatus = nil
 
@@ -20,6 +23,10 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
     local teamnum = GetTeamNum()
     local scheduler = CoroutineScheduler.getInstance()
     local InputAsync = require("input_async")
+    
+    if lib and lib.Debug then
+        lib.Debug("PersonStatusAsync.ShowStatusCoroutine: modules loaded")
+    end
     
     if lib and lib.Debug then
         lib.Debug("PersonStatusAsync.ShowStatusCoroutine: teamnum=" .. tostring(teamnum))
