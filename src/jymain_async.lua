@@ -128,15 +128,36 @@ end
 
 -- 状态子菜单
 function JyMainAsync.Menu_Status()
+    if lib and lib.Debug then
+        lib.Debug("JyMainAsync.Menu_Status: started")
+    end
+    
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
 
+    if lib and lib.Debug then
+        lib.Debug("JyMainAsync.Menu_Status: calling SelectTeamMenuAsync")
+    end
     local r = SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
+    if lib and lib.Debug then
+        lib.Debug("JyMainAsync.Menu_Status: SelectTeamMenuAsync returned r=" .. tostring(r))
+    end
+    
     if r > 0 then
+        if lib and lib.Debug then
+            lib.Debug("JyMainAsync.Menu_Status: calling PersonStatusAsync.ShowStatusCoroutine")
+        end
         -- 使用 PersonStatusAsync 显示状态
         PersonStatusAsync.ShowStatusCoroutine(r)
+        if lib and lib.Debug then
+            lib.Debug("JyMainAsync.Menu_Status: PersonStatusAsync.ShowStatusCoroutine returned")
+        end
     else
         Cls()
+    end
+    
+    if lib and lib.Debug then
+        lib.Debug("JyMainAsync.Menu_Status: ended")
     end
 end
 
