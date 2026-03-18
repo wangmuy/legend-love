@@ -252,17 +252,11 @@ handlers["GAME_SMAP"] = {
         local keypress = lib.GetKey()
         local direct = -1
         
-        -- 检查是否正在显示人物状态或物品选择，如果是则跳过按键处理
+        -- 检查是否正在显示人物状态，如果是则跳过按键处理
+        -- 注意：物品选择的按键阻止现在通过 InputManager.disableInput 实现
         local PersonStatusAsync = require("person_status_async")
-        local ItemAsync = require("item_async")
-        if lib and lib.Debug then
-            lib.Debug("GAME_SMAP update: keypress=" .. tostring(keypress) .. ", isShowingStatus=" .. tostring(PersonStatusAsync.isShowingStatus) .. ", isSelectingItem=" .. tostring(ItemAsync.isSelectingItem) .. ", ItemAsync=" .. tostring(ItemAsync))
-        end
-        if PersonStatusAsync.isShowingStatus or ItemAsync.isSelectingItem then
+        if PersonStatusAsync.isShowingStatus then
             keypress = -1  -- 忽略按键
-            if lib and lib.Debug then
-                lib.Debug("GAME_SMAP update: ignoring keypress due to status/item selection")
-            end
         end
         
         if keypress ~= -1 then

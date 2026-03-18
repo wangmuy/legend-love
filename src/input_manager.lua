@@ -17,6 +17,9 @@ local currentKey = -1
 local keyStates = {}
 local keyConsumed = false
 
+-- 输入禁用标志（用于阻止游戏主循环处理按键）
+InputManager.disableInput = false
+
 -- 按键重复配置
 local keyRepeatEnabled = false
 local keyRepeatDelay = 0.5  -- 首次重复延迟（秒）
@@ -195,6 +198,11 @@ end
 
 -- 获取当前按键
 function InputManager:getKey()
+    -- 如果输入被禁用，返回 -1
+    if InputManager.disableInput then
+        return -1
+    end
+    
     if keyConsumed then
         return -1
     end
