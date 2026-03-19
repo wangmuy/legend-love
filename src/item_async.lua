@@ -121,28 +121,31 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
         local selectedItem = items[selectedIndex]
         
         -- 设置当前显示状态（供draw函数使用）
-        currentItemSelect = {
-            items = items,
-            itemCount = itemCount,
-            currentPage = currentPage,
-            totalPages = totalPages,
-            selectedIndex = selectedIndex,
-            pageStart = pageStart,
-            pageEnd = pageEnd,
-            xnum = xnum,
-            ynum = ynum,
-            selectedItem = selectedItem
-        }
+        -- 只在第一次或页面/选中变化时更新，避免不必要的重绘
+        if not currentItemSelect or 
+           currentItemSelect.currentPage ~= currentPage or 
+           currentItemSelect.selectedIndex ~= selectedIndex then
+            currentItemSelect = {
+                items = items,
+                itemCount = itemCount,
+                currentPage = currentPage,
+                totalPages = totalPages,
+                selectedIndex = selectedIndex,
+                pageStart = pageStart,
+                pageEnd = pageEnd,
+                xnum = xnum,
+                ynum = ynum,
+                selectedItem = selectedItem
+            }
+        end
         
         -- 异步等待按键
         local keypress = InputAsync.WaitKeyCoroutine()
         
-        -- 清除显示状态
-        currentItemSelect = nil
-        
         -- 处理按键
         if keypress == VK_ESCAPE then
             -- ESC取消选择
+            currentItemSelect = nil  -- 清除显示状态
             local InputManager = require("input_manager")
             InputManager.disableInput = false
             if CONFIG and CONFIG.Debug == 1 then
@@ -152,6 +155,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
         elseif keypress == VK_RETURN or keypress == VK_SPACE then
             -- 确认选择
             if selectedItem then
+                currentItemSelect = nil  -- 清除显示状态
                 local InputManager = require("input_manager")
                 InputManager.disableInput = false
                 return selectedItem.id
