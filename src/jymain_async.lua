@@ -187,28 +187,61 @@ function JyMainAsync.Menu_PersonExit()
     Cls()
 end
 
--- 异步版本的选择队友菜单
-function JyMainAsync.SelectTeamMenuAsync(x, y)
+-- 异步版本的选择队友菜单（带能力值显示）
+-- title: 标题字符串
+-- abilityKey: 能力值字段名（如"医疗能力"），如果为nil则只显示姓名
+-- minAbility: 最小能力值要求，如果为nil则显示所有
+function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbility)
+    -- 显示标题
+    DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, title, C_WHITE, CC.DefaultFont)
+    local nexty = CC.MainSubMenuY + CC.SingleLineHeight
+    
+    -- 如果有过滤条件，显示能力标题
+    if abilityKey then
+        DrawStrBox(CC.MainSubMenuX, nexty, abilityKey, C_ORANGE, CC.DefaultFont)
+        nexty = nexty + CC.SingleLineHeight
+    end
+    
+    -- 构建菜单
     local menu = {}
     for i = 1, CC.TeamNum do
         menu[i] = {"", nil, 0}
         local id = JY.Base["队伍" .. i]
         if id >= 0 then
-            if JY.Person[id]["生命"] > 0 then
-                menu[i][1] = JY.Person[id]["姓名"]
+            local shouldShow = true
+            
+            -- 检查最小能力值要求
+            if minAbility and abilityKey then
+                if JY.Person[id][abilityKey] < minAbility then
+                    shouldShow = false
+                end
+            end
+            
+            -- 检查生命是否大于0
+            if JY.Person[id]["生命"] <= 0 then
+                shouldShow = false
+            end
+            
+            if shouldShow then
+                if abilityKey then
+                    -- 显示姓名和能力值
+                    menu[i][1] = string.format("%-10s%4d", JY.Person[id]["姓名"], JY.Person[id][abilityKey])
+                else
+                    -- 只显示姓名
+                    menu[i][1] = JY.Person[id]["姓名"]
+                end
                 menu[i][3] = 1
             end
         end
     end
-    return MenuAsync.ShowMenuCoroutine(menu, CC.TeamNum, 0, x, y, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    return MenuAsync.ShowMenuCoroutine(menu, CC.TeamNum, 0, CC.MainSubMenuX, nexty, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
 end
 
 -- 医疗子菜单
 function JyMainAsync.Menu_Doctor()
-    DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要医疗谁", C_WHITE, CC.DefaultFont)
-    local nexty = CC.MainSubMenuY + CC.SingleLineHeight
-    
-    local r = JyMainAsync.SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
+    -- 选择使用医术的人（显示医疗能力，只显示医疗能力>=20的人）
+    local r = JyMainAsync.SelectTeamMemberWithAbilityAsync("谁要使用医术", "医疗能力", 20)
     if r > 0 then
         local id = JY.Base["队伍" .. r]
         
