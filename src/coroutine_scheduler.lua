@@ -185,15 +185,20 @@ function CoroutineScheduler:update(dt)
     local keyPressed = false
     local pressedKey = -1
     if #keyWaitingCoroutines > 0 then
-        pressedKey = lib.GetKey()
-        if lib and lib.Debug then
-            lib.Debug("CoroutineScheduler.update: checking key, pressedKey=" .. tostring(pressedKey) .. ", keyWaitingCoroutines=" .. tostring(#keyWaitingCoroutines))
-        end
+        -- 对于协程调度器，直接检查 InputManager 的 currentKey，绕过 disableInput
+        local InputManager = require("input_manager")
+        local im = InputManager.getInstance()
+        pressedKey = im:peekKey()  -- 使用 peekKey 不消费按键
         if pressedKey ~= -1 then
+            -- 消费按键
+            im:getKey()
             keyPressed = true
             if lib and lib.Debug then
                 lib.Debug("CoroutineScheduler.update: key pressed=" .. tostring(pressedKey))
             end
+        end
+        if lib and lib.Debug then
+            lib.Debug("CoroutineScheduler.update: checking key, pressedKey=" .. tostring(pressedKey) .. ", keyWaitingCoroutines=" .. tostring(#keyWaitingCoroutines))
         end
     end
     
