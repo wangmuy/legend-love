@@ -211,6 +211,7 @@ end
 -- minAbility: 最小能力值要求，如果为nil则显示所有
 function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbility)
     -- 显示标题
+    Cls()  -- 清屏
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, title, C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
     
@@ -219,6 +220,9 @@ function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbil
         DrawStrBox(CC.MainSubMenuX, nexty, abilityKey, C_ORANGE, CC.DefaultFont)
         nexty = nexty + CC.SingleLineHeight
     end
+    
+    -- 立即刷新屏幕显示标题
+    ShowScreen()
     
     -- 构建菜单
     local menu = {}
