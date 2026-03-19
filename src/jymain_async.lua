@@ -187,6 +187,24 @@ function JyMainAsync.Menu_PersonExit()
     Cls()
 end
 
+-- 异步版本的选择队友菜单（简单版本，只显示人名）
+-- x, y: 菜单位置
+-- 返回选择的队伍位置（1-6），0表示取消
+function JyMainAsync.SelectTeamMenuAsync(x, y)
+    local menu = {}
+    for i = 1, CC.TeamNum do
+        menu[i] = {"", nil, 0}
+        local id = JY.Base["队伍" .. i]
+        if id >= 0 then
+            if JY.Person[id]["生命"] > 0 then
+                menu[i][1] = JY.Person[id]["姓名"]
+                menu[i][3] = 1
+            end
+        end
+    end
+    return MenuAsync.ShowMenuCoroutine(menu, CC.TeamNum, 0, x, y, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+end
+
 -- 异步版本的选择队友菜单（带能力值显示）
 -- title: 标题字符串
 -- abilityKey: 能力值字段名（如"医疗能力"），如果为nil则只显示姓名
