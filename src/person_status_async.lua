@@ -32,21 +32,30 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
         lib.Debug("PersonStatusAsync.ShowStatusCoroutine: modules loaded")
     end
     
-    while true do
-        local id = JY.Base["队伍" .. teamid]
+    -- 设置当前显示的状态数据（只在开始时设置一次）
+    local id = JY.Base["队伍" .. teamid]
+    if id >= 0 then
+        currentStatus = {
+            personId = id,
+            page = page,
+            teamid = teamid
+        }
         if lib and lib.Debug then
-            lib.Debug("PersonStatusAsync.ShowStatusCoroutine: teamid=" .. tostring(teamid) .. ", id=" .. tostring(id))
+            lib.Debug("PersonStatusAsync.ShowStatusCoroutine: set currentStatus, personId=" .. tostring(id))
         end
-        
-        if id >= 0 then
-            -- 设置当前显示的状态数据
+    end
+    
+    while true do
+        -- 更新当前显示的状态数据（如果人物或页面变化）
+        local newId = JY.Base["队伍" .. teamid]
+        if newId >= 0 and (not currentStatus or currentStatus.personId ~= newId or currentStatus.page ~= page) then
             currentStatus = {
-                personId = id,
+                personId = newId,
                 page = page,
                 teamid = teamid
             }
             if lib and lib.Debug then
-                lib.Debug("PersonStatusAsync.ShowStatusCoroutine: set currentStatus, personId=" .. tostring(id))
+                lib.Debug("PersonStatusAsync.ShowStatusCoroutine: updated currentStatus, personId=" .. tostring(newId) .. ", page=" .. tostring(page))
             end
         end
         
@@ -59,13 +68,12 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
             lib.Debug("PersonStatusAsync.ShowStatusCoroutine: key pressed=" .. tostring(keypress))
         end
         
-        -- 清除状态显示
-        currentStatus = nil
-        
         if keypress == VK_ESCAPE then
             if lib and lib.Debug then
                 lib.Debug("PersonStatusAsync.ShowStatusCoroutine: ESC pressed, exiting")
             end
+            -- 清除状态显示
+            currentStatus = nil
             -- 清除标志，恢复游戏主循环按键处理
             local InputManager = require("input_manager")
             InputManager.disableInput = false
