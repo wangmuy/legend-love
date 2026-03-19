@@ -210,24 +210,26 @@ end
 -- abilityKey: 能力值字段名（如"医疗能力"），如果为nil则只显示姓名
 -- minAbility: 最小能力值要求，如果为nil则显示所有
 function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbility)
-    -- 显示标题
-    Cls()  -- 清屏
-    DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, title, C_WHITE, CC.DefaultFont)
-    local nexty = CC.MainSubMenuY + CC.SingleLineHeight
+    -- 计算菜单起始位置（留出空间显示标题）
+    local startY = CC.MainSubMenuY
     
-    -- 如果有过滤条件，显示能力标题
+    -- 构建菜单（包含标题和能力标题作为不可选中的项）
+    local menu = {}
+    
+    -- 第1项：主标题（不可选中）
+    menu[1] = {title, nil, 0}  -- 0表示不可选中
+    
+    -- 第2项：能力标题（如果有，不可选中）
+    local menuStartIndex = 2
     if abilityKey then
-        DrawStrBox(CC.MainSubMenuX, nexty, abilityKey, C_ORANGE, CC.DefaultFont)
-        nexty = nexty + CC.SingleLineHeight
+        menu[2] = {abilityKey, nil, 0}  -- 0表示不可选中
+        menuStartIndex = 3
     end
     
-    -- 立即刷新屏幕显示标题
-    ShowScreen()
-    
-    -- 构建菜单
-    local menu = {}
+    -- 添加队友选项
     for i = 1, CC.TeamNum do
-        menu[i] = {"", nil, 0}
+        local menuIndex = menuStartIndex + i - 1
+        menu[menuIndex] = {"", nil, 0}
         local id = JY.Base["队伍" .. i]
         if id >= 0 then
             local shouldShow = true
@@ -247,17 +249,28 @@ function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbil
             if shouldShow then
                 if abilityKey then
                     -- 显示姓名和能力值
-                    menu[i][1] = string.format("%-10s%4d", JY.Person[id]["姓名"], JY.Person[id][abilityKey])
+                    menu[menuIndex][1] = string.format("%-10s%4d", JY.Person[id]["姓名"], JY.Person[id][abilityKey])
                 else
                     -- 只显示姓名
-                    menu[i][1] = JY.Person[id]["姓名"]
+                    menu[menuIndex][1] = JY.Person[id]["姓名"]
                 end
-                menu[i][3] = 1
+                menu[menuIndex][3] = 1  -- 1表示可选中
             end
         end
     end
     
-    return MenuAsync.ShowMenuCoroutine(menu, CC.TeamNum, 0, CC.MainSubMenuX, nexty, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    -- 计算实际的菜单项数
+    local numItem = menuStartIndex + CC.TeamNum - 1
+    
+    -- 显示菜单（从主菜单位置开始，包含标题）
+    local r = MenuAsync.ShowMenuCoroutine(menu, numItem, 0, CC.MainSubMenuX, startY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    -- 转换返回值（减去标题项）
+    if r >= menuStartIndex then
+        return r - menuStartIndex + 1  -- 转换为1-based的队伍索引
+    else
+        return 0  -- 取消或未选择有效项
+    end
 end
 
 -- 医疗子菜单
