@@ -186,6 +186,10 @@ function EventBridge:draw()
     local ItemAsync = require("item_async")
     ItemAsync.draw()
     
+    -- 渲染菜单标题（在场景之上）
+    local JyMainAsync = require("jymain_async")
+    JyMainAsync.drawMenuTitle()
+    
     -- 渲染对话（在场景之上，对话框之下）
     local TalkAsync = require("talk_async")
     TalkAsync.draw()

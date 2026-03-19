@@ -209,27 +209,28 @@ end
 -- title: 标题字符串
 -- abilityKey: 能力值字段名（如"医疗能力"），如果为nil则只显示姓名
 -- minAbility: 最小能力值要求，如果为nil则显示所有
+-- 当前菜单标题（用于draw函数绘制）
+local currentMenuTitle = nil
+
 function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbility)
+    -- 设置当前菜单标题
+    currentMenuTitle = {
+        title = title,
+        abilityKey = abilityKey,
+        x = CC.MainSubMenuX,
+        y = CC.MainSubMenuY
+    }
+    
     -- 计算菜单起始位置（留出空间显示标题）
-    local startY = CC.MainSubMenuY
-    
-    -- 构建菜单（包含标题和能力标题作为不可选中的项）
-    local menu = {}
-    
-    -- 第1项：主标题（不可选中）
-    menu[1] = {title, nil, 0}  -- 0表示不可选中
-    
-    -- 第2项：能力标题（如果有，不可选中）
-    local menuStartIndex = 2
+    local startY = CC.MainSubMenuY + CC.SingleLineHeight
     if abilityKey then
-        menu[2] = {abilityKey, nil, 0}  -- 0表示不可选中
-        menuStartIndex = 3
+        startY = startY + CC.SingleLineHeight  -- 再留出能力标题的空间
     end
     
-    -- 添加队友选项
+    -- 构建菜单
+    local menu = {}
     for i = 1, CC.TeamNum do
-        local menuIndex = menuStartIndex + i - 1
-        menu[menuIndex] = {"", nil, 0}
+        menu[i] = {"", nil, 0}
         local id = JY.Base["队伍" .. i]
         if id >= 0 then
             local shouldShow = true
@@ -249,27 +250,36 @@ function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbil
             if shouldShow then
                 if abilityKey then
                     -- 显示姓名和能力值
-                    menu[menuIndex][1] = string.format("%-10s%4d", JY.Person[id]["姓名"], JY.Person[id][abilityKey])
+                    menu[i][1] = string.format("%-10s%4d", JY.Person[id]["姓名"], JY.Person[id][abilityKey])
                 else
                     -- 只显示姓名
-                    menu[menuIndex][1] = JY.Person[id]["姓名"]
+                    menu[i][1] = JY.Person[id]["姓名"]
                 end
-                menu[menuIndex][3] = 1  -- 1表示可选中
+                menu[i][3] = 1
             end
         end
     end
     
-    -- 计算实际的菜单项数
-    local numItem = menuStartIndex + CC.TeamNum - 1
+    -- 显示菜单
+    local r = MenuAsync.ShowMenuCoroutine(menu, CC.TeamNum, 0, CC.MainSubMenuX, startY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
     
-    -- 显示菜单（从主菜单位置开始，包含标题）
-    local r = MenuAsync.ShowMenuCoroutine(menu, numItem, 0, CC.MainSubMenuX, startY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    -- 清除菜单标题
+    currentMenuTitle = nil
     
-    -- 转换返回值（减去标题项）
-    if r >= menuStartIndex then
-        return r - menuStartIndex + 1  -- 转换为1-based的队伍索引
-    else
-        return 0  -- 取消或未选择有效项
+    return r
+end
+
+-- 绘制菜单标题（在EventBridge.draw中调用）
+function JyMainAsync.drawMenuTitle()
+    if currentMenuTitle then
+        -- 绘制主标题
+        DrawStrBox(currentMenuTitle.x, currentMenuTitle.y, currentMenuTitle.title, C_WHITE, CC.DefaultFont)
+        
+        -- 如果有能力标题，绘制它
+        if currentMenuTitle.abilityKey then
+            local nexty = currentMenuTitle.y + CC.SingleLineHeight
+            DrawStrBox(currentMenuTitle.x, nexty, currentMenuTitle.abilityKey, C_ORANGE, CC.DefaultFont)
+        end
     end
 end
 
