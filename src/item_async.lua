@@ -99,7 +99,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
     
     -- 设置标志，阻止游戏主循环处理按键
     local InputManager = require("input_manager")
-    InputManager.getInstance().disableInput = true
+    InputManager.disableInput = true
     if CONFIG and CONFIG.Debug == 1 then
         Debug("ItemAsync.SelectThingGridAsync: disableInput set to true")
     end
@@ -144,7 +144,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
         if keypress == VK_ESCAPE then
             -- ESC取消选择
             local InputManager = require("input_manager")
-            InputManager.getInstance().disableInput = false
+            InputManager.disableInput = false
             if CONFIG and CONFIG.Debug == 1 then
                 Debug("ItemAsync.SelectThingGridAsync: ESC pressed, disableInput set to false")
             end
@@ -153,7 +153,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
             -- 确认选择
             if selectedItem then
                 local InputManager = require("input_manager")
-                InputManager.getInstance().disableInput = false
+                InputManager.disableInput = false
                 return selectedItem.id
             end
         elseif keypress == VK_UP then
