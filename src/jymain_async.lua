@@ -293,10 +293,8 @@ end
 
 -- 解毒子菜单
 function JyMainAsync.Menu_DecPoison()
-    DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要为谁解毒", C_WHITE, CC.DefaultFont)
-    local nexty = CC.MainSubMenuY + CC.SingleLineHeight
-    
-    local r = JyMainAsync.SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
+    -- 选择帮人解毒的人（显示解毒能力，只显示解毒能力>=20的人）
+    local r = JyMainAsync.SelectTeamMemberWithAbilityAsync("谁要帮人解毒", "解毒能力", 20)
     if r > 0 then
         local id = JY.Base["队伍" .. r]
         
