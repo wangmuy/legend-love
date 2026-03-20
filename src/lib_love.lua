@@ -760,7 +760,7 @@ end
 
 -- // 绘制主地图
 function DrawMMap(x, y, Mypic)
-    local oldScissor = {love.graphics.getScissor()}
+    local oldScissorX, oldScissorY, oldScissorW, oldScissorH = love.graphics.getScissor()
     
     local rect = {x=nil, y=nil, w=nil, h=nil}
     rect.x, rect.y, rect.w, rect.h = love.graphics.getScissor()
@@ -816,7 +816,11 @@ function DrawMMap(x, y, Mypic)
         end
     end
     
-    love.graphics.setScissor(oldScissor[1], oldScissor[2], oldScissor[3], oldScissor[4])
+    if oldScissorX then
+        love.graphics.setScissor(oldScissorX, oldScissorY, oldScissorW, oldScissorH)
+    else
+        love.graphics.setScissor()
+    end
 end
 
 function UnloadMMap()
