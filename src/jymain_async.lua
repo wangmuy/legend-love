@@ -387,24 +387,44 @@ end
 -- id1: 医疗者ID, id2: 被医疗者ID
 -- 返回增加的生命值
 function JyMainAsync.ExecDoctorAsync(id1, id2)
-    -- 计算医疗效果
-    local num = math.modf(JY.Person[id1]["医疗能力"] * JY.Person[id1]["生命上限"] / 100)
-    if num <= 0 then num = 1 end
+    -- 检查医疗者体力
+    if JY.Person[id1]["体力"] < 50 then
+        return 0
+    end
+    
+    local add = JY.Person[id1]["医疗能力"]
+    local value = JY.Person[id2]["受伤程度"]
+    
+    -- 检查受伤程度是否太高
+    if value > add + 20 then
+        return 0
+    end
+    
+    -- 根据受伤程度计算实际医疗能力
+    if value < 25 then
+        add = add * 4 / 5
+    elseif value < 50 then
+        add = add * 3 / 4
+    elseif value < 75 then
+        add = add * 2 / 3
+    else
+        add = add / 2
+    end
+    
+    add = math.modf(add) + Rnd(5)
     
     -- 减少受伤程度
-    JY.Person[id2]["受伤程度"] = JY.Person[id2]["受伤程度"] - num
-    if JY.Person[id2]["受伤程度"] < 0 then JY.Person[id2]["受伤程度"] = 0 end
+    AddPersonAttrib(id2, "受伤程度", -add)
     
-    -- 减少中毒程度
-    JY.Person[id2]["中毒程度"] = JY.Person[id2]["中毒程度"] - num
-    if JY.Person[id2]["中毒程度"] < 0 then JY.Person[id2]["中毒程度"] = 0 end
+    -- 增加生命（并返回增加的值）
+    local lifeAdded = AddPersonAttrib(id2, "生命", add)
     
     -- 医疗者消耗体力
-    if num > 0 then
+    if lifeAdded > 0 then
         JY.Person[id1]["体力"] = JY.Person[id1]["体力"] - 2
     end
     
-    return num
+    return lifeAdded
 end
 
 -- 解毒子菜单
@@ -495,17 +515,16 @@ function JyMainAsync.ExecDecPoisonAsync(id1, id2)
     local add = JY.Person[id1]["解毒能力"]
     local value = JY.Person[id2]["中毒程度"]
     
-    -- 计算减少的中毒程度
-    local num
+    -- 检查中毒程度是否太高
     if value > add + 20 then
-        num = add + 20
-    else
-        num = value
+        return 0
     end
     
-    -- 减少中毒程度
-    JY.Person[id2]["中毒程度"] = JY.Person[id2]["中毒程度"] - num
-    if JY.Person[id2]["中毒程度"] < 0 then JY.Person[id2]["中毒程度"] = 0 end
+    -- 计算解毒效果（使用Rnd随机数）
+    add = limitX(math.modf(add / 3) + Rnd(10) - Rnd(10), 0, value)
+    
+    -- 减少中毒程度（使用AddPersonAttrib）
+    local num = -AddPersonAttrib(id2, "中毒程度", -add)
     
     return num
 end
