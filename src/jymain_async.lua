@@ -328,22 +328,10 @@ function JyMainAsync.Menu_Doctor()
     -- 执行医疗
     local oldLife = JY.Person[id2]["生命"]
     local num = JyMainAsync.ExecDoctorAsync(id1, id2)
-    if CONFIG and CONFIG.Debug == 1 then
-        Debug(string.format("Menu_Doctor: ExecDoctorAsync returned num=%d, oldLife=%d", num, oldLife))
-    end
-    if num > 0 then
-        local newLife = JY.Person[id2]["生命"]
-        if CONFIG and CONFIG.Debug == 1 then
-            Debug(string.format("Menu_Doctor: showing message - %s 生命 %d -> %d (增加 %d)", 
-                JY.Person[id2]["姓名"], oldLife, newLife, num))
-        end
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 生命 %d -> %d (增加 %d)", 
-            JY.Person[id2]["姓名"], oldLife, newLife, num), C_ORANGE, CC.DefaultFont)
-    else
-        if CONFIG and CONFIG.Debug == 1 then
-            Debug(string.format("Menu_Doctor: num <= 0, not showing message"))
-        end
-    end
+    -- 强制显示结果（即使num为0也显示）
+    local newLife = JY.Person[id2]["生命"]
+    AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 生命 %d -> %d (增加 %d)", 
+        JY.Person[id2]["姓名"], oldLife, newLife, num), C_ORANGE, CC.DefaultFont)
     
     Cls()
 end
@@ -399,7 +387,15 @@ end
 -- 返回增加的生命值
 function JyMainAsync.ExecDoctorAsync(id1, id2)
     -- 检查医疗者体力
+    if CONFIG and CONFIG.Debug == 1 then
+        Debug(string.format("ExecDoctorAsync: id1=%d, 体力=%d, 医疗能力=%d", id1, JY.Person[id1]["体力"], JY.Person[id1]["医疗能力"]))
+        Debug(string.format("ExecDoctorAsync: id2=%d, 受伤程度=%d, 生命=%d", id2, JY.Person[id2]["受伤程度"], JY.Person[id2]["生命"]))
+    end
+    
     if JY.Person[id1]["体力"] < 50 then
+        if CONFIG and CONFIG.Debug == 1 then
+            Debug("ExecDoctorAsync: 体力不足，返回0")
+        end
         return 0
     end
     
@@ -408,6 +404,9 @@ function JyMainAsync.ExecDoctorAsync(id1, id2)
     
     -- 检查受伤程度是否太高
     if value > add + 20 then
+        if CONFIG and CONFIG.Debug == 1 then
+            Debug(string.format("ExecDoctorAsync: 受伤程度太高(%d > %d)，返回0", value, add + 20))
+        end
         return 0
     end
     
