@@ -260,13 +260,25 @@ function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbil
         end
     end
     
-    -- 显示菜单
-    local r = MenuAsync.ShowMenuCoroutine(menu, CC.TeamNum, 0, CC.MainSubMenuX, startY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    -- 显示菜单（使用回调确保标题和菜单一起清除）
+    local result = nil
+    local CoroutineScheduler = require("coroutine_scheduler")
+    local scheduler = CoroutineScheduler.getInstance()
+    local menuClosed = false
     
-    -- 清除菜单标题
-    currentMenuTitle = nil
+    MenuAsync.ShowMenu(menu, CC.TeamNum, 0, CC.MainSubMenuX, startY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE, function(returnValue)
+        result = returnValue
+        menuClosed = true
+        -- 菜单关闭时立即清除标题
+        currentMenuTitle = nil
+    end)
     
-    return r
+    -- 等待菜单关闭
+    while not menuClosed do
+        scheduler:yield("menu")
+    end
+    
+    return result
 end
 
 -- 绘制菜单标题（在EventBridge.draw中调用）
