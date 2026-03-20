@@ -328,10 +328,21 @@ function JyMainAsync.Menu_Doctor()
     -- 执行医疗
     local oldLife = JY.Person[id2]["生命"]
     local num = JyMainAsync.ExecDoctorAsync(id1, id2)
+    if CONFIG and CONFIG.Debug == 1 then
+        Debug(string.format("Menu_Doctor: ExecDoctorAsync returned num=%d, oldLife=%d", num, oldLife))
+    end
     if num > 0 then
         local newLife = JY.Person[id2]["生命"]
+        if CONFIG and CONFIG.Debug == 1 then
+            Debug(string.format("Menu_Doctor: showing message - %s 生命 %d -> %d (增加 %d)", 
+                JY.Person[id2]["姓名"], oldLife, newLife, num))
+        end
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 生命 %d -> %d (增加 %d)", 
             JY.Person[id2]["姓名"], oldLife, newLife, num), C_ORANGE, CC.DefaultFont)
+    else
+        if CONFIG and CONFIG.Debug == 1 then
+            Debug(string.format("Menu_Doctor: num <= 0, not showing message"))
+        end
     end
     
     Cls()
