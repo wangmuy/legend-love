@@ -326,9 +326,12 @@ function JyMainAsync.Menu_Doctor()
     local id2 = JY.Base["队伍" .. r2]
     
     -- 执行医疗
+    local oldLife = JY.Person[id2]["生命"]
     local num = JyMainAsync.ExecDoctorAsync(id1, id2)
     if num > 0 then
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 生命增加 %d", JY.Person[id2]["姓名"], num), C_ORANGE, CC.DefaultFont)
+        local newLife = JY.Person[id2]["生命"]
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 生命 %d -> %d (增加 %d)", 
+            JY.Person[id2]["姓名"], oldLife, newLife, num), C_ORANGE, CC.DefaultFont)
     end
     
     Cls()
@@ -428,9 +431,12 @@ function JyMainAsync.Menu_DecPoison()
     local id2 = JY.Base["队伍" .. r2]
     
     -- 执行解毒
+    local oldPoison = JY.Person[id2]["中毒程度"]
     local num = JyMainAsync.ExecDecPoisonAsync(id1, id2)
     if num > 0 then
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 中毒程度减少 %d", JY.Person[id2]["姓名"], num), C_ORANGE, CC.DefaultFont)
+        local newPoison = JY.Person[id2]["中毒程度"]
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 中毒 %d -> %d (减少 %d)", 
+            JY.Person[id2]["姓名"], oldPoison, newPoison, num), C_ORANGE, CC.DefaultFont)
     end
     
     Cls()
