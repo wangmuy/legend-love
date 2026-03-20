@@ -463,11 +463,10 @@ function JyMainAsync.Menu_DecPoison()
     -- 执行解毒
     local oldPoison = JY.Person[id2]["中毒程度"]
     local num = JyMainAsync.ExecDecPoisonAsync(id1, id2)
-    if num > 0 then
-        local newPoison = JY.Person[id2]["中毒程度"]
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 中毒 %d -> %d (减少 %d)", 
-            JY.Person[id2]["姓名"], oldPoison, newPoison, num), C_ORANGE, CC.DefaultFont)
-    end
+    -- 强制显示结果（即使num为0也显示）
+    local newPoison = JY.Person[id2]["中毒程度"]
+    AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 中毒 %d -> %d (减少 %d)", 
+        JY.Person[id2]["姓名"], oldPoison, newPoison, num), C_ORANGE, CC.DefaultFont)
     
     Cls()
 end
