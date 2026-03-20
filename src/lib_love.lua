@@ -804,6 +804,7 @@ function DrawMMap(x, y, Mypic)
         end
     end
 
+    -- 先绘制普通建筑（非主角）
     for i=0,buildNumber-1 do
         local idxi = i+1
         local i1=buildList[idxi].x -x
@@ -811,8 +812,28 @@ function DrawMMap(x, y, Mypic)
         local x1=CONFIG.XScale*(i1-j1)+math.floor(CONFIG.Width/2)
         local y1=CONFIG.YScale*(i1+j1)+math.floor(CONFIG.Height/2)
         local picnum=buildList[idxi].num
-        if picnum>0 then
+        -- 跳过主角和船贴图，最后单独绘制
+        if picnum>0 and not ((picnum >= 5002 and picnum <= 5096) or (picnum >= 7430 and picnum <= 7500)) then
             JY_LoadPic(0,picnum,x1,y1,0,0)
+        end
+    end
+    
+    -- 最后绘制主角和船，确保显示在最前面
+    for i=0,buildNumber-1 do
+        local idxi = i+1
+        local i1=buildList[idxi].x -x
+        local j1=buildList[idxi].y -y
+        local x1=CONFIG.XScale*(i1-j1)+math.floor(CONFIG.Width/2)
+        local y1=CONFIG.YScale*(i1+j1)+math.floor(CONFIG.Height/2)
+        local picnum=buildList[idxi].num
+        -- 只绘制主角和船贴图
+        if picnum>0 and ((picnum >= 5002 and picnum <= 5096) or (picnum >= 7430 and picnum <= 7500)) then
+            -- 主角和船贴图需要额外的Y轴偏移，因为它们的yoff值较大
+            -- 注意: picnum是Mypic*2，所以范围需要乘以2
+            -- 主角贴图范围: 5002-5096 (2501*2 - 2548*2)
+            -- 船贴图范围: 7430-7500 (3715*2 - 3750*2)
+            local y_adjust = -10  -- 调整值，使主角显示在正确的位置
+            JY_LoadPic(0,picnum,x1,y1+y_adjust,0,0)
         end
     end
     
