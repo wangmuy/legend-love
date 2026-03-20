@@ -297,37 +297,111 @@ end
 
 -- 医疗子菜单
 function JyMainAsync.Menu_Doctor()
-    -- 选择使用医术的人（显示医疗能力，只显示医疗能力>=20的人）
-    local r = JyMainAsync.SelectTeamMemberWithAbilityAsync("谁要使用医术", "医疗能力", 20)
-    if r > 0 then
-        local id = JY.Base["队伍" .. r]
-        
-        if JY.Person[id]["体力"] < 10 then
-            AsyncMessageBox.ShowMessageCoroutine(-1, -1, "体力不足，不能医疗", C_WHITE, CC.DefaultFont)
-            Cls()
-            return
-        end
-        
-        if JY.Person[id]["受伤程度"] <= 0 and JY.Person[id]["中毒程度"] <= 0 then
-            AsyncMessageBox.ShowMessageCoroutine(-1, -1, JY.Person[id]["姓名"] .. "生命正常，无需医疗", C_WHITE, CC.DefaultFont)
-            Cls()
-            return
-        end
-        
-        local num = math.modf(JY.Person[id]["医疗能力"] * JY.Person[id]["生命上限"] / 100)
-        if num <= 0 then num = 1 end
-        
-        JY.Person[id]["受伤程度"] = JY.Person[id]["受伤程度"] - num
-        if JY.Person[id]["受伤程度"] < 0 then JY.Person[id]["受伤程度"] = 0 end
-        
-        JY.Person[id]["中毒程度"] = JY.Person[id]["中毒程度"] - num
-        if JY.Person[id]["中毒程度"] < 0 then JY.Person[id]["中毒程度"] = 0 end
-        
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 生命增加 %d", JY.Person[id]["姓名"], num), C_ORANGE, CC.DefaultFont)
-        
-        JY.Person[id]["体力"] = JY.Person[id]["体力"] - 10
+    -- 第一级：选择使用医术的人（显示医疗能力，只显示医疗能力>=20的人）
+    local r1 = JyMainAsync.SelectTeamMemberWithAbilityAsync("谁要使用医术", "医疗能力", 20)
+    if r1 <= 0 then
+        Cls()
+        return
     end
+    
+    local id1 = JY.Base["队伍" .. r1]
+    
+    -- 检查体力
+    if JY.Person[id1]["体力"] < 50 then
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "体力不足，不能医疗", C_WHITE, CC.DefaultFont)
+        Cls()
+        return
+    end
+    
+    -- 清除屏幕区域
+    Cls(CC.MainSubMenuX, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+    
+    -- 第二级：选择要医治的人（显示生命值）
+    local r2 = JyMainAsync.SelectTeamMemberWithLifeAsync("要医治谁")
+    if r2 <= 0 then
+        Cls()
+        return
+    end
+    
+    local id2 = JY.Base["队伍" .. r2]
+    
+    -- 执行医疗
+    local num = JyMainAsync.ExecDoctorAsync(id1, id2)
+    if num > 0 then
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 生命增加 %d", JY.Person[id2]["姓名"], num), C_ORANGE, CC.DefaultFont)
+    end
+    
     Cls()
+end
+
+-- 异步版本的选择队友菜单（显示生命值）
+function JyMainAsync.SelectTeamMemberWithLifeAsync(title)
+    -- 设置当前菜单标题
+    currentMenuTitle = {
+        title = title,
+        abilityKey = nil,
+        x = CC.MainSubMenuX,
+        y = CC.MainSubMenuY
+    }
+    
+    -- 计算菜单起始位置
+    local startY = CC.MainSubMenuY + CC.SingleLineHeight
+    
+    -- 构建菜单（显示姓名和生命值）
+    local menu = {}
+    for i = 1, CC.TeamNum do
+        menu[i] = {"", nil, 0}
+        local id = JY.Base["队伍" .. i]
+        if id >= 0 then
+            -- 显示姓名和生命/生命最大值
+            menu[i][1] = string.format("%-10s%4d/%4d", JY.Person[id]["姓名"], JY.Person[id]["生命"], JY.Person[id]["生命最大值"])
+            menu[i][3] = 1
+        end
+    end
+    
+    -- 显示菜单（使用回调确保标题和菜单一起清除）
+    local result = nil
+    local CoroutineScheduler = require("coroutine_scheduler")
+    local scheduler = CoroutineScheduler.getInstance()
+    local menuClosed = false
+    
+    MenuAsync.ShowMenu(menu, CC.TeamNum, 0, CC.MainSubMenuX, startY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE, function(returnValue)
+        result = returnValue
+        menuClosed = true
+        -- 菜单关闭时立即清除标题
+        currentMenuTitle = nil
+    end)
+    
+    -- 等待菜单关闭
+    while not menuClosed do
+        scheduler:yield("menu")
+    end
+    
+    return result
+end
+
+-- 执行医疗（异步版本）
+-- id1: 医疗者ID, id2: 被医疗者ID
+-- 返回增加的生命值
+function JyMainAsync.ExecDoctorAsync(id1, id2)
+    -- 计算医疗效果
+    local num = math.modf(JY.Person[id1]["医疗能力"] * JY.Person[id1]["生命上限"] / 100)
+    if num <= 0 then num = 1 end
+    
+    -- 减少受伤程度
+    JY.Person[id2]["受伤程度"] = JY.Person[id2]["受伤程度"] - num
+    if JY.Person[id2]["受伤程度"] < 0 then JY.Person[id2]["受伤程度"] = 0 end
+    
+    -- 减少中毒程度
+    JY.Person[id2]["中毒程度"] = JY.Person[id2]["中毒程度"] - num
+    if JY.Person[id2]["中毒程度"] < 0 then JY.Person[id2]["中毒程度"] = 0 end
+    
+    -- 医疗者消耗体力
+    if num > 0 then
+        JY.Person[id1]["体力"] = JY.Person[id1]["体力"] - 2
+    end
+    
+    return num
 end
 
 -- 解毒子菜单
