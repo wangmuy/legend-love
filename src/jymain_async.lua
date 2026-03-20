@@ -406,26 +406,102 @@ end
 
 -- 解毒子菜单
 function JyMainAsync.Menu_DecPoison()
-    -- 选择帮人解毒的人（显示解毒能力，只显示解毒能力>=20的人）
-    local r = JyMainAsync.SelectTeamMemberWithAbilityAsync("谁要帮人解毒", "解毒能力", 20)
-    if r > 0 then
-        local id = JY.Base["队伍" .. r]
-        
-        if JY.Person[id]["中毒程度"] <= 0 then
-            AsyncMessageBox.ShowMessageCoroutine(-1, -1, JY.Person[id]["姓名"] .. "没有中毒", C_WHITE, CC.DefaultFont)
-            Cls()
-            return
-        end
-        
-        local num = math.modf(JY.Person[id]["解毒能力"] * JY.Person[id]["生命上限"] / 100)
-        if num <= 0 then num = 1 end
-        
-        JY.Person[id]["中毒程度"] = JY.Person[id]["中毒程度"] - num
-        if JY.Person[id]["中毒程度"] < 0 then JY.Person[id]["中毒程度"] = 0 end
-        
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 中毒程度减少 %d", JY.Person[id]["姓名"], num), C_ORANGE, CC.DefaultFont)
+    -- 第一级：选择帮人解毒的人（显示解毒能力，只显示解毒能力>=20的人）
+    local r1 = JyMainAsync.SelectTeamMemberWithAbilityAsync("谁要帮人解毒", "解毒能力", 20)
+    if r1 <= 0 then
+        Cls()
+        return
     end
+    
+    local id1 = JY.Base["队伍" .. r1]
+    
+    -- 清除屏幕区域
+    Cls(CC.MainSubMenuX, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+    
+    -- 第二级：选择要解毒的人（显示中毒程度）
+    local r2 = JyMainAsync.SelectTeamMemberWithPoisonAsync("替谁解毒")
+    if r2 <= 0 then
+        Cls()
+        return
+    end
+    
+    local id2 = JY.Base["队伍" .. r2]
+    
+    -- 执行解毒
+    local num = JyMainAsync.ExecDecPoisonAsync(id1, id2)
+    if num > 0 then
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 中毒程度减少 %d", JY.Person[id2]["姓名"], num), C_ORANGE, CC.DefaultFont)
+    end
+    
     Cls()
+end
+
+-- 异步版本的选择队友菜单（显示中毒程度）
+function JyMainAsync.SelectTeamMemberWithPoisonAsync(title)
+    -- 设置当前菜单标题
+    currentMenuTitle = {
+        title = title,
+        abilityKey = "中毒程度",
+        x = CC.MainSubMenuX,
+        y = CC.MainSubMenuY
+    }
+    
+    -- 计算菜单起始位置（留出空间显示标题和副标题）
+    local startY = CC.MainSubMenuY + CC.SingleLineHeight * 2
+    
+    -- 构建菜单（显示姓名和中毒程度）
+    local menu = {}
+    for i = 1, CC.TeamNum do
+        menu[i] = {"", nil, 0}
+        local id = JY.Base["队伍" .. i]
+        if id >= 0 then
+            -- 显示姓名和中毒程度
+            menu[i][1] = string.format("%-10s%5d", JY.Person[id]["姓名"], JY.Person[id]["中毒程度"])
+            menu[i][3] = 1
+        end
+    end
+    
+    -- 显示菜单（使用回调确保标题和菜单一起清除）
+    local result = nil
+    local CoroutineScheduler = require("coroutine_scheduler")
+    local scheduler = CoroutineScheduler.getInstance()
+    local menuClosed = false
+    
+    MenuAsync.ShowMenu(menu, CC.TeamNum, 0, CC.MainSubMenuX, startY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE, function(returnValue)
+        result = returnValue
+        menuClosed = true
+        -- 菜单关闭时立即清除标题
+        currentMenuTitle = nil
+    end)
+    
+    -- 等待菜单关闭
+    while not menuClosed do
+        scheduler:yield("menu")
+    end
+    
+    return result
+end
+
+-- 执行解毒（异步版本）
+-- id1: 解毒者ID, id2: 被解毒者ID
+-- 返回减少的中毒程度
+function JyMainAsync.ExecDecPoisonAsync(id1, id2)
+    local add = JY.Person[id1]["解毒能力"]
+    local value = JY.Person[id2]["中毒程度"]
+    
+    -- 计算减少的中毒程度
+    local num
+    if value > add + 20 then
+        num = add + 20
+    else
+        num = value
+    end
+    
+    -- 减少中毒程度
+    JY.Person[id2]["中毒程度"] = JY.Person[id2]["中毒程度"] - num
+    if JY.Person[id2]["中毒程度"] < 0 then JY.Person[id2]["中毒程度"] = 0 end
+    
+    return num
 end
 
 -- 导入物品异步模块
