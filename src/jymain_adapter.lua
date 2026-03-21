@@ -290,14 +290,24 @@ function JYMainAdapter.startNewGame(menux)
         }
         local fontsize = CC.NewGameFontSize
         local x1 = (CC.ScreenW - fontsize * 4 * 4) / 2
-        local ok = MenuAsync.ShowMenu2Coroutine(menu, 2, 0, x1 + 11 * fontsize, CC.NewGameY - CC.MenuBorderPixel, 0, 0, 0, 0, fontsize, C_RED, C_WHITE)
+        local ok = MenuAsync.ShowMenu2Coroutine(menu, 2, 0, x1 + 11 * fontsize, CC.NewGameY - CC.MenuBorderPixel, 0, 0, 0, 1, fontsize, C_RED, C_WHITE)
         
         -- 清除绘制回调
         EventBridge.clearGlobalDrawCallback()
         
         if ok == 1 then
+            -- 选择"是"，确认属性
             satisfied = true
+        elseif ok == 0 then
+            -- 按ESC键，返回到开始菜单
+            lib.Debug("startNewGame: ESC pressed, returning to start menu")
+            -- 切换回开始菜单状态
+            EventBridge.getInstance():switchState(getStateId("GAME_START"))
+            -- 重新显示开始菜单
+            JYMainAdapter.showStartMenuCoroutine()
+            return
         end
+        -- ok == 2 时（选择"否"），继续循环重新随机属性
     end
     
     -- 继续新游戏初始化
