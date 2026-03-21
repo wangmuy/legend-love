@@ -38,6 +38,8 @@ end
 
 -- 初始化桥接器
 function EventBridge:init()
+    lib.Debug("EventBridge:init() called")
+    
     -- 从全局CC表获取游戏状态常量
     if CC then
         GAME_STATES.GAME_START = GAME_START or 0
@@ -59,16 +61,23 @@ function EventBridge:init()
     InputManager.getInstance():setKeyRepeatParams(0.3, 0.1)  -- 首次延迟300ms，后续间隔100ms
     
     -- 注册Love2D事件回调
+    lib.Debug("EventBridge:init() calling registerLoveCallbacks")
     self:registerLoveCallbacks()
+    lib.Debug("EventBridge:init() completed")
 end
 
 -- 注册Love2D事件回调
 function EventBridge:registerLoveCallbacks()
+    lib.Debug("EventBridge:registerLoveCallbacks() called")
+    
     local originalKeyPressed = love.keypressed
     local originalKeyReleased = love.keyreleased
     
+    lib.Debug(string.format("EventBridge: originalKeyPressed=%s", tostring(originalKeyPressed)))
+    
     -- 重写keypressed
     love.keypressed = function(key, scancode, isrepeat)
+        lib.Debug(string.format("EventBridge: love.keypressed called: key=%s", tostring(key)))
         InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
         if originalKeyPressed then
             originalKeyPressed(key, scancode, isrepeat)
@@ -174,7 +183,23 @@ function EventBridge:update(dt)
 end
 
 -- 渲染 (在love.draw中调用)
+-- 全局绘制回调（用于特殊场景如属性选择）
+local globalDrawCallback = nil
+
+function EventBridge.setGlobalDrawCallback(callback)
+    globalDrawCallback = callback
+end
+
+function EventBridge.clearGlobalDrawCallback()
+    globalDrawCallback = nil
+end
+
 function EventBridge:draw()
+    -- 执行全局绘制回调（如果有）
+    if globalDrawCallback then
+        globalDrawCallback()
+    end
+    
     -- 渲染当前状态
     StateMachine.getInstance():draw()
     

@@ -299,7 +299,24 @@ function MenuStateMachine:handleInput()
         end
     elseif key == VK_SPACE or key == VK_RETURN then
         -- 选择菜单项
+        lib.Debug("MenuStateMachine:handleInput: SPACE/RETURN pressed, selecting menu item")
         self:selectMenuItem()
+    elseif key == VK_Y then
+        -- Y键：选择第一个菜单项（用于Y/N确认）
+        lib.Debug(string.format("MenuStateMachine:handleInput: Y pressed, newNumItem=%d", menu.newNumItem))
+        if menu.newNumItem >= 1 then
+            menu.current = 1
+            self:selectMenuItem()
+        end
+    elseif key == VK_N then
+        -- N键：选择第二个菜单项（用于Y/N确认）
+        lib.Debug(string.format("MenuStateMachine:handleInput: N pressed, newNumItem=%d", menu.newNumItem))
+        if menu.newNumItem >= 2 then
+            menu.current = 2
+            self:selectMenuItem()
+        end
+    else
+        lib.Debug(string.format("MenuStateMachine:handleInput: unhandled key=%d", key))
     end
     
     -- 标记按键已处理，防止重复触发
@@ -397,8 +414,18 @@ function MenuStateMachine:draw()
             drawColor = menu.selectColor
         end
         
-        local y = menu.y1 + CC.MenuBorderPixel + (i - menu.start) * (menu.size + CC.RowPixel)
-        DrawString(menu.x1 + CC.MenuBorderPixel, y, menu.newMenu[i][1], drawColor, menu.size)
+        -- 根据是否是横向菜单选择绘制方式
+        if menu.isHorizontal then
+            -- 横向布局：菜单项水平排列
+            local itemWidth = menu.w / menu.num
+            local x = menu.x1 + CC.MenuBorderPixel + (i - menu.start) * itemWidth
+            local y = menu.y1 + CC.MenuBorderPixel
+            DrawString(x, y, menu.newMenu[i][1], drawColor, menu.size)
+        else
+            -- 竖向布局：菜单项垂直排列（默认）
+            local y = menu.y1 + CC.MenuBorderPixel + (i - menu.start) * (menu.size + CC.RowPixel)
+            DrawString(menu.x1 + CC.MenuBorderPixel, y, menu.newMenu[i][1], drawColor, menu.size)
+        end
     end
 end
 

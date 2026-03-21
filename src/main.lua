@@ -69,6 +69,13 @@ end
 -- 按键事件由event_bridge在init()中注册
 -- 这里不需要定义love.keypressed/love.keyreleased
 
+-- 测试：直接定义love.keypressed来调试按键问题
+function love.keypressed(key, scancode, isrepeat)
+    if lib and lib.Debug then
+        lib.Debug(string.format("love.keypressed: key=%s, scancode=%s", tostring(key), tostring(scancode)))
+    end
+end
+
 function love.quit()
     -- 清理资源
     if EventBridge then
