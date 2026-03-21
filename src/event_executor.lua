@@ -60,7 +60,7 @@ function EventExecutor.oldEventExecuteCoroutine(flag)
 end
 
 -- 协程版本的调用旧事件
-function oldCallEventCoroutine(eventnum)
+function EventExecutor.oldCallEventCoroutine(eventnum)
     local eventfilename = string.format("oldevent_%d.lua", eventnum)
     lib.Debug(string.format("oldCallEventCoroutine: %s START", eventfilename))
     
