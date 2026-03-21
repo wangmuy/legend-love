@@ -30,31 +30,35 @@ local keyRepeatTimers = {}  -- 各按键的重复计时器
 -- 按键映射表（延迟初始化，等待VK常量定义）
 local keyMap = nil
 
--- 初始化按键映射
+-- 基础按键映射（不依赖VK常量）
+local baseKeyMap = {
+    ["escape"] = 27,
+    [" "] = 32,           -- Love2D 空格键的另一种表示
+    ["space"] = 32,        -- Love2D 空格键的标准表示
+    ["return"] = 13,
+    ["up"] = 1073741906,
+    ["down"] = 1073741905,
+    ["left"] = 1073741904,
+    ["right"] = 1073741903,
+}
+
+-- 初始化按键映射（每次调用都检查VK常量，确保Y/N键可用）
 local function initKeyMap()
-    if keyMap then
-        return keyMap
+    -- 复制基础映射
+    local km = {}
+    for k, v in pairs(baseKeyMap) do
+        km[k] = v
     end
-    
-    keyMap = {
-        ["escape"] = 27,
-        [" "] = 32,
-        ["return"] = 13,
-        ["up"] = 1073741906,
-        ["down"] = 1073741905,
-        ["left"] = 1073741904,
-        ["right"] = 1073741903,
-    }
     
     -- 如果VK常量已定义，添加Y/N键映射
     if VK_Y then
-        keyMap["y"] = VK_Y
+        km["y"] = VK_Y
     end
     if VK_N then
-        keyMap["n"] = VK_N
+        km["n"] = VK_N
     end
     
-    return keyMap
+    return km
 end
 
 -- 单例实例

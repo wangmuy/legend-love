@@ -325,22 +325,17 @@ function JYMainAdapter.startNewGame(menux)
     
     Init_SMap(0)
     
+    -- 切换到场景状态（在事件执行前切换，确保对话期间能正确绘制场景）
+    lib.Debug("startNewGame: switching to GAME_SMAP state")
+    EventBridge.getInstance():switchState(getStateId("GAME_SMAP"))
+    lib.Debug("startNewGame: switched to GAME_SMAP state, JY.Status=" .. tostring(JY.Status))
+    
     if CC.NewGameEvent > 0 then
         -- 在协程中执行新游戏事件
-        local AsyncGlobals = require("async_globals")
-        AsyncGlobals.install()
-        local success, err = pcall(function()
-            oldCallEvent(CC.NewGameEvent)
-        end)
-        AsyncGlobals.uninstall()
-        
-        if not success then
-            lib.Debug("startNewGame event error: " .. tostring(err))
-        end
+        -- 使用 event_executor 中的 oldCallEventCoroutine，避免 C-call boundary 问题
+        local EventExecutor = require("event_executor")
+        EventExecutor.oldCallEventCoroutine(CC.NewGameEvent)
     end
-    
-    -- 切换到场景状态
-    EventBridge.getInstance():switchState(getStateId("GAME_SMAP"))
 end
 
 -- 载入游戏
