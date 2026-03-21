@@ -27,15 +27,35 @@ local keyRepeatInterval = 0.1  -- 重复间隔（秒）
 local keyRepeatTimers = {}  -- 各按键的重复计时器
 
 -- 按键映射表
-local keyMap = {
-    ["escape"] = 27,
-    [" "] = 32,
-    ["return"] = 13,
-    ["up"] = 1073741906,
-    ["down"] = 1073741905,
-    ["left"] = 1073741904,
-    ["right"] = 1073741903,
-}
+-- 按键映射表（延迟初始化，等待VK常量定义）
+local keyMap = nil
+
+-- 初始化按键映射
+local function initKeyMap()
+    if keyMap then
+        return keyMap
+    end
+    
+    keyMap = {
+        ["escape"] = 27,
+        [" "] = 32,
+        ["return"] = 13,
+        ["up"] = 1073741906,
+        ["down"] = 1073741905,
+        ["left"] = 1073741904,
+        ["right"] = 1073741903,
+    }
+    
+    -- 如果VK常量已定义，添加Y/N键映射
+    if VK_Y then
+        keyMap["y"] = VK_Y
+    end
+    if VK_N then
+        keyMap["n"] = VK_N
+    end
+    
+    return keyMap
+end
 
 -- 单例实例
 local instance = nil
@@ -61,7 +81,8 @@ end
 
 -- 注册按键映射
 function InputManager:registerKey(loveKey, gameKey)
-    keyMap[loveKey] = gameKey
+    local km = initKeyMap()
+    km[loveKey] = gameKey
 end
 
 -- 添加事件到队列
@@ -102,7 +123,9 @@ end
 
 -- 处理love.keypressed事件
 function InputManager:onKeyPressed(key, scancode, isrepeat)
-    local gameKey = keyMap[key]
+    local km = initKeyMap()
+    local gameKey = km[key]
+    lib.Debug(string.format("InputManager:onKeyPressed: loveKey=%s, gameKey=%s", tostring(key), tostring(gameKey)))
     if gameKey then
         -- 添加到事件队列
         enqueueEvent({
@@ -125,12 +148,15 @@ function InputManager:onKeyPressed(key, scancode, isrepeat)
                 repeatCount = 0
             }
         end
+    else
+        lib.Debug(string.format("InputManager:onKeyPressed: key %s not in keyMap", tostring(key)))
     end
 end
 
 -- 处理love.keyreleased事件
 function InputManager:onKeyReleased(key, scancode)
-    local gameKey = keyMap[key]
+    local km = initKeyMap()
+    local gameKey = km[key]
     if gameKey then
         -- 添加到事件队列
         enqueueEvent({

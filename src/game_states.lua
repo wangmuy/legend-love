@@ -130,7 +130,7 @@ handlers["GAME_MMAP"] = {
             local newState = getStateId("GAME_SMAP")
             lib.Debug("Setting JY.Status to GAME_SMAP: " .. tostring(newState))
             JY.Status = newState
-            JY.MMAPMusic = -1
+            JY.MmapMusic = -1
             
             JY.MyPic = GetMyPic()
             JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
@@ -212,8 +212,8 @@ handlers["GAME_SMAP"] = {
             CleanMemory()
             lib.ShowSlow(50, 1)
             
-            if JY.MMAPMusic < 0 then
-                JY.MMAPMusic = JY.Scene[JY.SubScene]["出门音乐"]
+            if JY.MmapMusic < 0 then
+                JY.MmapMusic = JY.Scene[JY.SubScene]["出门音乐"]
             end
             
             Init_MMap()
