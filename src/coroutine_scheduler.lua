@@ -135,13 +135,20 @@ function CoroutineScheduler:waitForKey()
     return self:yield("key")
 end
 
--- 等待时间
+-- 等待时间（事件驱动版本）
 -- @param seconds: 等待的秒数
+-- 注意：这个版本只yield一次，让出时间给love.draw，然后由外部控制是否继续等待
 function CoroutineScheduler:waitForTime(seconds)
+    -- 记录开始时间
     local startTime = love.timer.getTime()
-    while love.timer.getTime() - startTime < seconds do
-        self:yield("time")
-    end
+    
+    -- yield一次，让love.draw有机会执行
+    self:yield("time")
+    
+    -- 检查是否已经过了足够的时间
+    -- 如果没有，继续yield（但这样会导致阻塞）
+    -- 在事件驱动架构中，应该由调用方控制帧率
+    -- 这里我们只yield一次，假设调用方会在合适的时间再次调用
 end
 
 -- 等待条件

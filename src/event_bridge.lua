@@ -195,6 +195,10 @@ function EventBridge.clearGlobalDrawCallback()
 end
 
 function EventBridge:draw()
+    if lib and lib.Debug then
+        lib.Debug("EventBridge:draw called")
+    end
+    
     -- 执行全局绘制回调（如果有）
     if globalDrawCallback then
         globalDrawCallback()

@@ -936,6 +936,7 @@ end
 
 -- 绘制场景地图
 function DrawSMap(sceneid, x,  y, xoff, yoff, Mypic)
+    lib.Debug(string.format("DrawSMap called: sceneid=%d, x=%d, y=%d, xoff=%d, yoff=%d, Mypic=%d", sceneid, x, y, xoff, yoff, Mypic))
     local oldScissor = {love.graphics.getScissor()}
     
     local rect = {x=nil, y=nil, w=nil, h=nil}
@@ -1006,6 +1007,7 @@ function DrawSMap(sceneid, x,  y, xoff, yoff, Mypic)
                 end
 
                 if (i1==-xoff) and (j1==-yoff) then -- 主角
+                       lib.Debug(string.format("DrawSMap: drawing hero at i1=%d, j1=%d, xoff=%d, yoff=%d, MyPic=%d, picid=%d", i1, j1, xoff, yoff, Mypic, Mypic*2));
                        JY_LoadPic(0,Mypic*2,x1,y1-d4,0,0);
                 end
             end

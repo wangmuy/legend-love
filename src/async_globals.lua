@@ -18,6 +18,7 @@ local _WaitKey
 local _ShowMenu
 local _ShowMenu2
 local _TalkEx
+local _ShowScreen
 local _libDelay
 
 -- 检查是否在协程中
@@ -90,6 +91,16 @@ function AsyncGlobals.lib_Delay_Async(millis)
     end
 end
 
+-- 替换的 ShowScreen
+-- 在事件驱动架构中，ShowScreen 不需要执行任何操作
+-- 因为 love.draw 每帧自动调用，画面会自动显示
+-- 这个函数只是为了兼容原版代码
+function AsyncGlobals.ShowScreen_Async(flag)
+    -- 在事件驱动架构中，love.draw 每帧自动调用
+    -- 不需要手动触发显示
+    -- 直接返回，让 lib.Delay 处理延迟
+end
+
 -- 安装替换
 function AsyncGlobals.install()
     -- 保存原始函数
@@ -99,6 +110,7 @@ function AsyncGlobals.install()
     _ShowMenu = _G.ShowMenu
     _ShowMenu2 = _G.ShowMenu2
     _TalkEx = _G.TalkEx
+    _ShowScreen = _G.ShowScreen
     _libDelay = lib and lib.Delay
     
     -- 替换全局函数
@@ -108,6 +120,7 @@ function AsyncGlobals.install()
     _G.ShowMenu = AsyncGlobals.ShowMenu_Async
     _G.ShowMenu2 = AsyncGlobals.ShowMenu2_Async
     _G.TalkEx = AsyncGlobals.TalkEx_Async
+    _G.ShowScreen = AsyncGlobals.ShowScreen_Async
     
     -- 替换 lib.Delay
     if lib then
@@ -137,6 +150,7 @@ function AsyncGlobals.uninstall()
     _G.ShowMenu = _ShowMenu
     _G.ShowMenu2 = _ShowMenu2
     _G.TalkEx = _TalkEx
+    _G.ShowScreen = _ShowScreen
     
     if lib and _libDelay then
         lib.Delay = _libDelay

@@ -336,6 +336,10 @@ function JYMainAdapter.startNewGame(menux)
         local EventExecutor = require("event_executor")
         EventExecutor.oldCallEventCoroutine(CC.NewGameEvent)
     end
+    
+    -- 事件执行完毕后，恢复主角贴图为默认值
+    JY.MyPic = CC.NewPersonPic
+    lib.Debug("startNewGame: restored MyPic to " .. tostring(JY.MyPic))
 end
 
 -- 载入游戏
