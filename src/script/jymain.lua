@@ -86,9 +86,20 @@ function SetGlobal()   --设置游戏内部使用的全程变量
    JY.EnableSound=1;        --是否播放音效 1 播放，0 不播放
 
    JY.ThingUseFunction={};          --物品使用时调用函数，SetModify函数使用，增加新类型的物品
-   JY.SceneNewEventFunction={};     --调用场景事件函数，SetModify函数使用，定义使用新场景事件触发的函数
+    JY.SceneNewEventFunction={};     --调用场景事件函数，SetModify函数使用，定义使用新场景事件触发的函数
 
-   WAR={};     --战斗使用的全程变量。。这里占个位置，因为程序后面不允许定义全局变量了。具体内容在WarSetGlobal函数中
+    -- 事件驱动架构下的动画状态
+    JY.AnimationState = {
+        active = false,      -- 是否正在播放动画
+        id = -1,             -- -1=主角, 其他=场景对象ID
+        currentFrame = 0,    -- 当前帧
+        startFrame = 0,      -- 起始帧
+        endFrame = 0,        -- 结束帧
+        startTime = 0,       -- 开始时间
+        frameDuration = 150, -- 每帧持续时间(ms)
+    }
+
+    WAR={};     --战斗使用的全程变量。。这里占个位置，因为程序后面不允许定义全局变量了。具体内容在WarSetGlobal函数中
 end
 
 function JY_Main()        --主程序入口
@@ -3356,7 +3367,10 @@ function instruct_26(sceneid,id,v1,v2,v3)           --增加D*编号
 end
 
 --显示动画 id=-1 主角位置动画
+-- 事件驱动架构版本：设置动画状态，由 GAME_SMAP.update 驱动
 function instruct_27(id,startpic,endpic)           --显示动画
+    local startTime = lib.GetTime()
+    lib.Debug(string.format("instruct_27: START id=%d, startpic=%d, endpic=%d, time=%d", id, startpic, endpic, startTime));
     local old1,old2,old3;
     if id ~=-1 then
         old1=GetD(JY.SubScene,id,5);
@@ -3364,30 +3378,71 @@ function instruct_27(id,startpic,endpic)           --显示动画
         old3=GetD(JY.SubScene,id,7);
     end
 
-    --Cls();
-    --ShowScreen();
-    for i =startpic,endpic,2 do
-        local t1=lib.GetTime();
-        if id==-1 then
-            JY.MyPic=i/2;
-        else
-            SetD(JY.SubScene,id,5,i);
-            SetD(JY.SubScene,id,6,i);
-            SetD(JY.SubScene,id,7,i);
+    -- 获取协程调度器
+    local scheduler = nil
+    if coroutine.running() then
+        scheduler = require("coroutine_scheduler").getInstance()
+    end
+    
+    if scheduler then
+        -- 事件驱动架构：设置动画状态，由 GAME_SMAP.update 驱动
+        JY.AnimationState = {
+            active = true,
+            id = id,
+            startFrame = startpic,
+            endFrame = endpic,
+            currentFrame = startpic,
+            startTime = lib.GetTime(),
+            frameDuration = CC.AnimationFrame,
+        }
+        lib.Debug(string.format("instruct_27: set AnimationState id=%d, startFrame=%d, endFrame=%d", id, startpic, endpic))
+        
+        -- 等待动画完成
+        while JY.AnimationState.active do
+            scheduler:yield("animation")
         end
-        DtoSMap();
-        DrawSMap();
-        ShowScreen();
-        local t2=lib.GetTime();
-        if t2-t1<CC.AnimationFrame then
-            lib.Delay(CC.AnimationFrame-(t2-t1));
+        
+        lib.Debug("instruct_27: animation finished")
+    else
+        -- 不在协程中，使用原版同步方式
+        for i = startpic, endpic, 2 do
+            local t1 = lib.GetTime();
+            
+            -- 设置当前帧
+            if id == -1 then
+                JY.MyPic = i / 2;
+                lib.Debug(string.format("instruct_27: frame id=-1, i=%d, MyPic=%d", i, JY.MyPic));
+            else
+                SetD(JY.SubScene, id, 5, i);
+                SetD(JY.SubScene, id, 6, i);
+                SetD(JY.SubScene, id, 7, i);
+                lib.Debug(string.format("instruct_27: frame id=%d, i=%d", id, i));
+            end
+            
+            -- 更新场景数据
+            DtoSMap();
+            
+            -- 原版方式：直接绘制和显示
+            DrawSMap();
+            ShowScreen();
+            local t2 = lib.GetTime();
+            if t2 - t1 < CC.AnimationFrame then
+                lib.Delay(CC.AnimationFrame - (t2 - t1));
+            end
         end
     end
+    
+    -- 注意：不恢复原始MyPic，让动画贴图保持到事件结束
+    -- 事件执行完毕后，由调用方恢复
+    -- JY.MyPic = originalMyPic
+    
     if id ~=-1 then
         SetD(JY.SubScene,id,5,old1);
         SetD(JY.SubScene,id,6,old2);
         SetD(JY.SubScene,id,7,old3);
     end
+    local endTime = lib.GetTime()
+    lib.Debug(string.format("instruct_27: END id=%d, final MyPic=%d, duration=%dms", id, JY.MyPic, endTime - startTime));
 end
 
 --判断品德

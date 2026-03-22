@@ -184,6 +184,33 @@ handlers["GAME_SMAP"] = {
             return
         end
         
+        -- 处理动画（事件驱动架构）
+        if JY.AnimationState.active then
+            local anim = JY.AnimationState
+            local now = lib.GetTime()
+            local elapsed = now - anim.startTime
+            local frameIndex = math.floor(elapsed / anim.frameDuration)
+            local i = anim.startFrame + frameIndex * 2
+            
+            if i > anim.endFrame then
+                -- 动画结束
+                anim.active = false
+                lib.Debug("GAME_SMAP.update: animation finished")
+            else
+                -- 设置当前帧贴图
+                if anim.id == -1 then
+                    JY.MyPic = i / 2
+                    lib.Debug(string.format("GAME_SMAP.update: animation frame id=-1, i=%d, MyPic=%d", i, JY.MyPic))
+                else
+                    SetD(JY.SubScene, anim.id, 5, i)
+                    SetD(JY.SubScene, anim.id, 6, i)
+                    SetD(JY.SubScene, anim.id, 7, i)
+                    lib.Debug(string.format("GAME_SMAP.update: animation frame id=%d, i=%d", anim.id, i))
+                end
+                DtoSMap()
+            end
+        end
+        
         -- 处理路过事件
         local d_pass = GetS(JY.SubScene, JY.Base["人X1"], JY.Base["人Y1"], 3)
         if d_pass >= 0 then
@@ -300,7 +327,10 @@ handlers["GAME_SMAP"] = {
             y = JY.Base["人Y1"]
         end
         
-        JY.MyPic = GetMyPic()
+        -- 在动画期间，不重置主角贴图
+        if not JY.AnimationState.active then
+            JY.MyPic = GetMyPic()
+        end
         DtoSMap()
         
         if SceneCanPass(x, y) == true then
