@@ -315,13 +315,23 @@ function JYMainAdapter.startNewGame(menux)
     JY.Scene[JY.SubScene]["名称"] = JY.Person[0]["姓名"] .. "居"
     JY.Base["人X1"] = CC.NewGameSceneX
     JY.Base["人Y1"] = CC.NewGameSceneY
-    JY.MyPic = CC.NewPersonPic
+    -- 注意：不设置 JY.MyPic，让动画从第一帧开始
+    -- JY.MyPic 将在动画开始时由 GAME_SMAP.update 设置
     
     lib.ShowSlow(50, 1)
     
     JY.MmapMusic = -1
     
     CleanMemory()
+    
+    -- 设置主角初始贴图为躺着（6890/2=3445）
+    -- 必须在 Init_SMap 之前设置，因为 Init_SMap 会调用 DrawSMap
+    JY.MyPic = 3445  -- 躺着
+    lib.Debug("startNewGame: set initial MyPic to lying pose (3445)")
+    
+    -- 注意：不设置动画状态，让主角保持躺着姿势
+    -- 动画将在事件脚本中的 instruct_27 中播放
+    JY.AnimationState.active = false
     
     Init_SMap(0)
     
