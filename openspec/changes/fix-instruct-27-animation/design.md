@@ -51,9 +51,32 @@ end
 **核心问题分析**:
 - 原版：`instruct_27` 直接调用 `DrawSMap()` 和 `ShowScreen()`，阻塞式动画
 - 事件驱动版：`DrawSMap()` 在 `love.draw` 中调用，与 `instruct_27` 执行时机不同步
-- 当前问题：`waitForTime` 的 `while` 循环阻塞协程，或 `yield` 后 `love.draw` 来不及执行
+- 当前问题：
+  1. `startNewGame` 设置初始贴图后，`GAME_SMAP.update` 或 `GetMyPic()` 会重置贴图
+  2. 动画和对话的时序关系：`instruct_27` 设置动画状态后立即返回，导致动画在对话期间播放
+  3. 正确的时序应该是：对话A -> 动画 -> 对话B，动画在对话之间播放
 
-**新方案**: 动画状态由 `GAME_SMAP.update` 驱动，`instruct_27` 只设置目标状态并等待完成
+**正确的时序流程**（以新游戏事件为例）：
+1. 初始状态：主角躺着（`JY.MyPic=3445`）
+2. 对话"非第一个破关不可"（主角躺着说）
+3. `instruct_27` 播放动画：躺着到站起（阻塞直到完成）
+4. 对话"咦！我的电脑呢？"（主角站起后说）
+5. 后续事件...
+
+**关键问题**：事件驱动架构中，`instruct_27` 如何阻塞等待动画完成？
+- 方案A：`instruct_27` 使用 `scheduler:yield("animation")` 等待，但动画由 `GAME_SMAP.update` 播放
+- 方案B：`instruct_27` 直接调用 `DrawSMap` 和 `lib.Delay`（同步方式），但不符合事件驱动架构
+- 方案C：使用状态机控制整个事件流程，动画作为状态转换
+
+**选择方案A**：`instruct_27` 使用 `yield("animation")` 等待动画完成
+- 优点：符合事件驱动架构
+- 缺点：需要确保 `GAME_SMAP.update` 和 `CoroutineScheduler:update` 协调工作
+- 实现要点：
+  1. `instruct_27` 设置 `JY.AnimationState.active = true`
+  2. `GAME_SMAP.update` 每帧检查并更新动画贴图
+  3. 动画完成后，`JY.AnimationState.active = false`
+  4. `CoroutineScheduler:update` 恢复 `instruct_27` 协程
+  5. `instruct_27` 继续执行后续对话
 
 **实现步骤**:
 

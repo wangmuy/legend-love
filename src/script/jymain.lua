@@ -3386,6 +3386,7 @@ function instruct_27(id,startpic,endpic)           --显示动画
     
     if scheduler then
         -- 事件驱动架构：设置动画状态，由 GAME_SMAP.update 驱动
+        -- 注意：不等待动画完成，让动画在后台播放
         JY.AnimationState = {
             active = true,
             id = id,
@@ -3397,12 +3398,9 @@ function instruct_27(id,startpic,endpic)           --显示动画
         }
         lib.Debug(string.format("instruct_27: set AnimationState id=%d, startFrame=%d, endFrame=%d", id, startpic, endpic))
         
-        -- 等待动画完成
-        while JY.AnimationState.active do
-            scheduler:yield("animation")
-        end
-        
-        lib.Debug("instruct_27: animation finished")
+        -- 不等待动画完成，立即返回
+        -- 动画将在后台由 GAME_SMAP.update 播放
+        lib.Debug("instruct_27: animation started in background")
     else
         -- 不在协程中，使用原版同步方式
         for i = startpic, endpic, 2 do
