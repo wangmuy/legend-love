@@ -327,8 +327,10 @@ handlers["GAME_SMAP"] = {
             y = JY.Base["人Y1"]
         end
         
-        -- 在动画期间，不重置主角贴图
-        if not JY.AnimationState.active then
+        -- 在动画期间或初始状态，不重置主角贴图
+        -- 初始状态：AnimationState.active=false 且 currentFrame=0（未开始动画）
+        local isInitialState = not JY.AnimationState.active and JY.AnimationState.currentFrame == 0
+        if not JY.AnimationState.active and not isInitialState then
             JY.MyPic = GetMyPic()
         end
         DtoSMap()

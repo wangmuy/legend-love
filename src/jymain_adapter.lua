@@ -331,7 +331,9 @@ function JYMainAdapter.startNewGame(menux)
     
     -- 注意：不设置动画状态，让主角保持躺着姿势
     -- 动画将在事件脚本中的 instruct_27 中播放
+    -- 设置 currentFrame=0 表示初始状态，GAME_SMAP.update 不会重置 JY.MyPic
     JY.AnimationState.active = false
+    JY.AnimationState.currentFrame = 0
     
     Init_SMap(0)
     
