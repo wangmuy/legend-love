@@ -301,14 +301,23 @@ handlers["GAME_SMAP"] = {
             elseif keypress == VK_RIGHT then
                 direct = 1
             elseif keypress == VK_SPACE or keypress == VK_RETURN then
+                lib.Debug("GAME_SMAP.update: SPACE/RETURN pressed")
                 if JY.Base["人方向"] >= 0 then
-                    local d_num = GetS(JY.SubScene, JY.Base["人X1"] + CC.DirectX[JY.Base["人方向"] + 1], JY.Base["人Y1"] + CC.DirectY[JY.Base["人方向"] + 1], 3)
+                    local targetX = JY.Base["人X1"] + CC.DirectX[JY.Base["人方向"] + 1]
+                    local targetY = JY.Base["人Y1"] + CC.DirectY[JY.Base["人方向"] + 1]
+                    local d_num = GetS(JY.SubScene, targetX, targetY, 3)
+                    lib.Debug(string.format("GAME_SMAP.update: checking target (%d,%d), d_num=%d", targetX, targetY, d_num))
                     if d_num >= 0 then
+                        lib.Debug(string.format("GAME_SMAP.update: executing event d_num=%d", d_num))
                         EventExecuteSync(d_num, 1)
                         JY.oldSMapX = -1
                         JY.oldSMapY = -1
                         JY.D_Valid = nil
+                    else
+                        lib.Debug("GAME_SMAP.update: no event at target position")
                     end
+                else
+                    lib.Debug("GAME_SMAP.update: no direction set")
                 end
             end
         end
