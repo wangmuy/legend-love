@@ -31,7 +31,7 @@ function EventExecuteCoroutine(id, flag)
     lib.Debug(string.format("EventExecuteCoroutine: id=%d, flag=%d", id, flag))
     
     if JY.SceneNewEventFunction[JY.SubScene] == nil then
-        oldEventExecuteCoroutine(flag)
+        EventExecutor.oldEventExecuteCoroutine(flag)
     else
         JY.SceneNewEventFunction[JY.SubScene](flag)
     end
@@ -55,7 +55,7 @@ function EventExecutor.oldEventExecuteCoroutine(flag)
     lib.Debug(string.format("oldEventExecuteCoroutine: eventnum=%d", eventnum or -1))
     
     if eventnum and eventnum > 0 then
-        oldCallEventCoroutine(eventnum)
+        EventExecutor.oldCallEventCoroutine(eventnum)
     end
 end
 
