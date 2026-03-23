@@ -184,6 +184,14 @@ handlers["GAME_SMAP"] = {
             return
         end
         
+        -- 检查是否正在播放动画，如果是则禁用输入
+        local InputManager = require("input_manager")
+        if JY.AnimationState.active then
+            InputManager.disableInput = true
+        else
+            InputManager.disableInput = false
+        end
+        
         -- 处理动画（事件驱动架构）
         if JY.AnimationState.active then
             local anim = JY.AnimationState
