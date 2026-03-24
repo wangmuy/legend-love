@@ -42,7 +42,11 @@ function EnableKeyRepeat(delay, interval)
     -- 使用事件驱动的输入管理器
     local InputManager = package.loaded["input_manager"]
     if InputManager then
-        InputManager.getInstance():setKeyRepeat(delay > 0)
+        local inst = InputManager.getInstance()
+        inst:setKeyRepeat(delay > 0)
+        if delay > 0 and interval > 0 then
+            inst:setKeyRepeatParams(delay / 1000.0, interval / 1000.0)  -- 转换为秒
+        end
     else
         -- 回退到原始实现
         if delay > 0 and interval > 0 then
@@ -482,7 +486,6 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
     fileid = fileid+1 -- lua starts with 1
     picid = picid+1 -- lua starts with 1
     picfile = picFileCache[fileid]
-    Debug("PicLoadCache: fileid=%d, original_picid=%d, calculated_picid=%d, idx_count=%d", fileid, original_picid, picid, picfile and #(picfile.idx) or -1)
     if picfile == nil or fileid < 1 or picid < 1 or picid > #(picfile.idx) then
         Debug("PicLoadCache: invalid picfile or picid out of range")
         return
@@ -499,13 +502,10 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
         ynew = y - piccache.yoff
     end
 
-    -- 使用 regular alpha 模式绘制图片
+    -- 跳过屏幕外的贴图
     if xnew < -1000 or xnew > CONFIG.Width + 1000 or ynew < -1000 or ynew > CONFIG.Height + 1000 then
-        Debug("PicLoadCache: SKIPPING image outside screen: x=%d, y=%d, xoff=%d, yoff=%d, xnew=%d, ynew=%d, picid=%d", 
-              x, y, piccache.xoff, piccache.yoff, xnew, ynew, original_picid)
         return
     end
-    Debug("PicLoadCache: drawing image at xnew=%d, ynew=%d", xnew, ynew)
     love.graphics.draw(piccache.img, xnew, ynew)
 end
 
@@ -780,9 +780,6 @@ function DrawMMap(x, y, Mypic)
 
     local jstart=math.floor((rect.y-math.floor(CONFIG.Height/2))/(2*CONFIG.YScale))-1;
     local jend=math.floor((rect.y+rect.h -math.floor(CONFIG.Height/2))/(2*CONFIG.YScale))+1;
-    
-    Debug("DrawMMap: x=%d, y=%d, istart=%d, iend=%d, jstart=%d, jend=%d, MMapAddX=%d, MMapAddY=%d", 
-          x, y, istart, iend, jstart, jend, CONFIG.MMapAddX, CONFIG.MMapAddY)
 
     buildNumber=0
 

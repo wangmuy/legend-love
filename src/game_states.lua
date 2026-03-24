@@ -142,7 +142,6 @@ handlers["GAME_MMAP"] = {
     
     -- 每帧渲染
     draw = function()
-        lib.Debug("GAME_MMAP.draw called")
         local pic = GetMyPic()
         
         -- 在 Love2D 中，每一帧都需要重新绘制整个屏幕
@@ -204,17 +203,14 @@ handlers["GAME_SMAP"] = {
                 -- 动画结束
                 anim.active = false
                 anim.currentFrame = 0  -- 重置为初始状态
-                lib.Debug("GAME_SMAP.update: animation finished, currentFrame reset to 0")
             else
                 -- 设置当前帧贴图
                 if anim.id == -1 then
                     JY.MyPic = i / 2
-                    lib.Debug(string.format("GAME_SMAP.update: animation frame id=-1, i=%d, MyPic=%d", i, JY.MyPic))
                 else
                     SetD(JY.SubScene, anim.id, 5, i)
                     SetD(JY.SubScene, anim.id, 6, i)
                     SetD(JY.SubScene, anim.id, 7, i)
-                    lib.Debug(string.format("GAME_SMAP.update: animation frame id=%d, i=%d", anim.id, i))
                 end
                 DtoSMap()
             end
@@ -336,7 +332,6 @@ handlers["GAME_SMAP"] = {
         end
         
         if direct ~= -1 then
-            lib.Debug(string.format("GAME_SMAP.update: direct=%d, old direction=%d", direct, JY.Base["人方向"]))
             AddMyCurrentPic()
             x = JY.Base["人X1"] + CC.DirectX[direct + 1]
             y = JY.Base["人Y1"] + CC.DirectY[direct + 1]
@@ -349,10 +344,7 @@ handlers["GAME_SMAP"] = {
         -- 更新主角贴图（根据方向和走路帧）
         -- 只有在动画播放期间才跳过更新
         if not JY.AnimationState.active then
-            local oldMyPic = JY.MyPic
             JY.MyPic = GetMyPic()
-            lib.Debug(string.format("GAME_SMAP.update: SetMyPic from %d to %d, MyCurrentPic=%d, 人方向=%d", 
-                oldMyPic, JY.MyPic, JY.MyCurrentPic, JY.Base["人方向"]))
         end
         DtoSMap()
         
@@ -366,7 +358,6 @@ handlers["GAME_SMAP"] = {
     end,
     
     draw = function()
-        lib.Debug("GAME_SMAP.draw called, SubScene=" .. tostring(JY.SubScene))
         -- 在 Love2D 中，每一帧都需要重新绘制
         -- 禁用 FastShowScreen 优化以避免黑屏
         DrawSMap(0)
