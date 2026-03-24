@@ -203,7 +203,8 @@ handlers["GAME_SMAP"] = {
             if i > anim.endFrame then
                 -- 动画结束
                 anim.active = false
-                lib.Debug("GAME_SMAP.update: animation finished")
+                anim.currentFrame = 0  -- 重置为初始状态
+                lib.Debug("GAME_SMAP.update: animation finished, currentFrame reset to 0")
             else
                 -- 设置当前帧贴图
                 if anim.id == -1 then
@@ -335,6 +336,7 @@ handlers["GAME_SMAP"] = {
         end
         
         if direct ~= -1 then
+            lib.Debug(string.format("GAME_SMAP.update: direct=%d, old direction=%d", direct, JY.Base["人方向"]))
             AddMyCurrentPic()
             x = JY.Base["人X1"] + CC.DirectX[direct + 1]
             y = JY.Base["人Y1"] + CC.DirectY[direct + 1]
@@ -344,11 +346,13 @@ handlers["GAME_SMAP"] = {
             y = JY.Base["人Y1"]
         end
         
-        -- 在动画期间或初始状态，不重置主角贴图
-        -- 初始状态：AnimationState.active=false 且 currentFrame=0（未开始动画）
-        local isInitialState = not JY.AnimationState.active and JY.AnimationState.currentFrame == 0
-        if not JY.AnimationState.active and not isInitialState then
+        -- 更新主角贴图（根据方向和走路帧）
+        -- 只有在动画播放期间才跳过更新
+        if not JY.AnimationState.active then
+            local oldMyPic = JY.MyPic
             JY.MyPic = GetMyPic()
+            lib.Debug(string.format("GAME_SMAP.update: SetMyPic from %d to %d, MyCurrentPic=%d, 人方向=%d", 
+                oldMyPic, JY.MyPic, JY.MyCurrentPic, JY.Base["人方向"]))
         end
         DtoSMap()
         
