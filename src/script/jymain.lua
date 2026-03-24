@@ -3403,7 +3403,9 @@ function instruct_27(id,startpic,endpic)           --显示动画
             scheduler:yield("animation")
         end
         
-        lib.Debug("instruct_27: animation finished")
+        -- 动画结束后重置 currentFrame
+        JY.AnimationState.currentFrame = 0
+        lib.Debug("instruct_27: animation finished, currentFrame reset to 0")
     else
         -- 不在协程中，使用原版同步方式
         for i = startpic, endpic, 2 do
