@@ -11,7 +11,8 @@ local InputAsync = require("input_async")
 local talkConfig = {
     picw = 100,       -- 最大头像图片宽
     pich = 100,       -- 最大头像图片高
-    talkxnum = 12,    -- 对话一行字数
+    talkxnum = 12,    -- 对话框宽度（中文字符数）
+    charsPerLine = 13, -- 每行实际可容纳的中文字符数
     talkynum = 3,     -- 对话行数
     dx = 2,
     dy = 2,
@@ -73,19 +74,56 @@ local function getTalkPosition(flag)
     return xy[flag], boxtalkw, boxtalkh
 end
 
--- 生成分行字符串
-local function GenTalkString(s, linelen)
+-- 生成分行字符串（按像素宽度分行）
+local function GenTalkString(s, lineWidth)
     local newstr = ""
-    local len = string.len(s)
     local start = 1
+    local len = #s
+    local maxPixelWidth = lineWidth * CC.DefaultFont
     
     while start <= len do
-        local endp = start + linelen - 1
-        if endp > len then
-            endp = len
+        local endPos = start
+        local currentWidth = 0
+        local lastValidEnd = start
+        
+        while endPos <= len do
+            local byte = string.byte(s, endPos)
+            local charPixelWidth
+            local charLen
+            
+            if byte >= 240 then
+                charPixelWidth = CC.DefaultFont
+                charLen = 4
+            elseif byte >= 224 then
+                charPixelWidth = CC.DefaultFont
+                charLen = 3
+            elseif byte >= 128 then
+                charPixelWidth = CC.DefaultFont
+                charLen = 2
+            else
+                charPixelWidth = CC.DefaultFont / 2
+                charLen = 1
+            end
+            
+            if endPos + charLen - 1 > len then
+                break
+            end
+            
+            if currentWidth + charPixelWidth <= maxPixelWidth then
+                currentWidth = currentWidth + charPixelWidth
+                lastValidEnd = endPos + charLen - 1
+                endPos = endPos + charLen
+            else
+                break
+            end
         end
-        newstr = newstr .. string.sub(s, start, endp) .. "*"
-        start = endp + 1
+        
+        if lastValidEnd >= start then
+            newstr = newstr .. string.sub(s, start, lastValidEnd) .. "*"
+            start = lastValidEnd + 1
+        else
+            break
+        end
     end
     
     return newstr
@@ -117,9 +155,9 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
         headid = -1
     end
     
-    -- 自动分行
+    -- 自动分行（仅对没有 * 分隔符的对话）
     if string.find(s, "*") == nil then
-        s = GenTalkString(s, 12)
+        s = GenTalkString(s, talkConfig.charsPerLine)
     end
     
     lib.GetKey()
