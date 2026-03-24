@@ -52,8 +52,8 @@ CONFIG.JYMain_Lua=CONFIG.ScriptPath .. "jymain.lua";   --lua主程序名
 CONFIG.FontName="simsun.ttf";
 
 --显示主地图x和y方向增加的贴图数，以保证所有贴图能全部显示
-CONFIG.MMapAddX=2;
-CONFIG.MMapAddY=2;
+CONFIG.MMapAddX=4;
+CONFIG.MMapAddY=4;
 CONFIG.SMapAddX=2;
 CONFIG.SMapAddY=16;
 CONFIG.WMapAddX=2;

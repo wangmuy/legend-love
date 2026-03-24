@@ -336,8 +336,8 @@ function LoadPic(openfile, idx1, idx2)
     local data4 = header:sub(7, 8)
     local w = Byte.byte2ushortl(data1:byte(1,2))
     local h = Byte.byte2ushortl(data2:byte(1,2))
-    local xoff = Byte.byte2ushortl(data3:byte(1,2))
-    local yoff = Byte.byte2ushortl(data4:byte(1,2))
+    local xoff = Byte.byte2sshortl(data3:byte(1,2))
+    local yoff = Byte.byte2sshortl(data4:byte(1,2))
     Debug("LoadPic: idx1=%d, idx2=%d, w=%d, h=%d, off: %d, %d" , idx1, idx2, w, h, xoff, yoff)
 
     -- 根据grp读入图像
@@ -500,6 +500,11 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
     end
 
     -- 使用 regular alpha 模式绘制图片
+    if xnew < -1000 or xnew > CONFIG.Width + 1000 or ynew < -1000 or ynew > CONFIG.Height + 1000 then
+        Debug("PicLoadCache: SKIPPING image outside screen: x=%d, y=%d, xoff=%d, yoff=%d, xnew=%d, ynew=%d, picid=%d", 
+              x, y, piccache.xoff, piccache.yoff, xnew, ynew, original_picid)
+        return
+    end
     Debug("PicLoadCache: drawing image at xnew=%d, ynew=%d", xnew, ynew)
     love.graphics.draw(piccache.img, xnew, ynew)
 end
@@ -775,6 +780,9 @@ function DrawMMap(x, y, Mypic)
 
     local jstart=math.floor((rect.y-math.floor(CONFIG.Height/2))/(2*CONFIG.YScale))-1;
     local jend=math.floor((rect.y+rect.h -math.floor(CONFIG.Height/2))/(2*CONFIG.YScale))+1;
+    
+    Debug("DrawMMap: x=%d, y=%d, istart=%d, iend=%d, jstart=%d, jend=%d, MMapAddX=%d, MMapAddY=%d", 
+          x, y, istart, iend, jstart, jend, CONFIG.MMapAddX, CONFIG.MMapAddY)
 
     buildNumber=0
 
