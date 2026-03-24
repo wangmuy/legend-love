@@ -43,10 +43,9 @@ end
 
 -- 初始化
 function MenuStateMachine:init()
-    self.activeMenu = nil       -- 当前活动的菜单
-    self.menuStack = {}         -- 菜单堆栈（支持嵌套）
-    self.callback = nil         -- 菜单关闭时的回调
-    self.keyProcessed = false   -- 标记当前按键是否已处理（防止按键重复导致菜单快速移动）
+    self.activeMenu = nil
+    self.menuStack = {}
+    self.callback = nil
 end
 
 -- 创建菜单数据
@@ -219,24 +218,14 @@ function MenuStateMachine:handleInput()
     
     local menu = self.activeMenu
     
-    -- 在打开或正在打开状态都处理输入
     if menu.animationState ~= "open" and menu.animationState ~= "opening" then
         return
     end
     
     local key = lib.GetKey()
-    if lib and lib.Debug then
-        lib.Debug("MenuStateMachine:handleInput: key=" .. tostring(key))
-    end
+    lib.Debug(string.format("MenuStateMachine:handleInput: key=%d", key))
     
-    -- 如果没有按键，重置处理标志
     if key == -1 then
-        self.keyProcessed = false
-        return
-    end
-    
-    -- 如果当前按键已处理，等待按键释放
-    if self.keyProcessed then
         return
     end
     
@@ -250,6 +239,7 @@ function MenuStateMachine:handleInput()
     
     -- 处理方向键
     if key == VK_DOWN then
+        lib.Debug(string.format("MenuStateMachine: VK_DOWN, current=%d -> %d", menu.current, menu.current + 1))
         menu.prevCurrent = menu.current
         menu.current = menu.current + 1
         if menu.current > (menu.start + menu.num - 1) then
@@ -259,12 +249,8 @@ function MenuStateMachine:handleInput()
             menu.start = 1
             menu.current = 1
         end
-        -- 启动选项切换动画
-        if ANIMATION_CONFIG.enableSelect then
-            menu.selectAnimationTime = 0
-            menu.selectAnimationProgress = 0
-        end
     elseif key == VK_UP then
+        lib.Debug(string.format("MenuStateMachine: VK_UP, current=%d -> %d", menu.current, menu.current - 1))
         menu.prevCurrent = menu.current
         menu.current = menu.current - 1
         if menu.current < menu.start then
@@ -274,13 +260,7 @@ function MenuStateMachine:handleInput()
             menu.current = menu.newNumItem
             menu.start = menu.current - menu.num + 1
         end
-        -- 启动选项切换动画
-        if ANIMATION_CONFIG.enableSelect then
-            menu.selectAnimationTime = 0
-            menu.selectAnimationProgress = 0
-        end
     elseif key == VK_LEFT then
-        -- ShowMenu2使用左右键
         menu.current = menu.current - 1
         if menu.current < 1 then
             menu.current = menu.newNumItem
@@ -289,7 +269,6 @@ function MenuStateMachine:handleInput()
             menu.start = menu.current
         end
     elseif key == VK_RIGHT then
-        -- ShowMenu2使用左右键
         menu.current = menu.current + 1
         if menu.current > menu.newNumItem then
             menu.current = 1
@@ -298,29 +277,18 @@ function MenuStateMachine:handleInput()
             menu.start = menu.current - menu.num + 1
         end
     elseif key == VK_SPACE or key == VK_RETURN then
-        -- 选择菜单项
-        lib.Debug("MenuStateMachine:handleInput: SPACE/RETURN pressed, selecting menu item")
         self:selectMenuItem()
     elseif key == VK_Y then
-        -- Y键：选择第一个菜单项（用于Y/N确认）
-        lib.Debug(string.format("MenuStateMachine:handleInput: Y pressed, newNumItem=%d", menu.newNumItem))
         if menu.newNumItem >= 1 then
             menu.current = 1
             self:selectMenuItem()
         end
     elseif key == VK_N then
-        -- N键：选择第二个菜单项（用于Y/N确认）
-        lib.Debug(string.format("MenuStateMachine:handleInput: N pressed, newNumItem=%d", menu.newNumItem))
         if menu.newNumItem >= 2 then
             menu.current = 2
             self:selectMenuItem()
         end
-    else
-        lib.Debug(string.format("MenuStateMachine:handleInput: unhandled key=%d", key))
     end
-    
-    -- 标记按键已处理，防止重复触发
-    self.keyProcessed = true
 end
 
 -- 选择菜单项

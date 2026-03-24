@@ -1,7 +1,7 @@
 -- input_manager.lua
 -- 输入管理模块
 -- 提供事件驱动的输入处理，替代阻塞式GetKey
--- 支持输入缓冲和按键重复
+-- 纯事件驱动架构：按键事件进入队列，getKey从队列消费
 
 local InputManager = {}
 InputManager.__index = InputManager
@@ -10,31 +10,25 @@ InputManager.__index = InputManager
 local eventQueue = {}
 local queueHead = 1
 local queueTail = 1
-local maxQueueSize = 32
+local maxQueueSize = 64
 
--- 当前按键状态
-local currentKey = -1
+-- 按键状态（用于判断是否按住）
 local keyStates = {}
-local keyConsumed = false
 
--- 输入禁用标志（用于阻止游戏主循环处理按键）
+-- 输入禁用标志
 InputManager.disableInput = false
 
 -- 按键重复配置
 local keyRepeatEnabled = false
-local keyRepeatDelay = 0.5  -- 首次重复延迟（秒）
-local keyRepeatInterval = 0.1  -- 重复间隔（秒）
-local keyRepeatTimers = {}  -- 各按键的重复计时器
+local keyRepeatDelay = 0.3   -- 首次重复延迟（秒）
+local keyRepeatInterval = 0.04  -- 重复间隔（秒）
+local keyRepeatTimers = {}
 
 -- 按键映射表
--- 按键映射表（延迟初始化，等待VK常量定义）
-local keyMap = nil
-
--- 基础按键映射（不依赖VK常量）
 local baseKeyMap = {
     ["escape"] = 27,
-    [" "] = 32,           -- Love2D 空格键的另一种表示
-    ["space"] = 32,        -- Love2D 空格键的标准表示
+    [" "] = 32,
+    ["space"] = 32,
     ["return"] = 13,
     ["up"] = 1073741906,
     ["down"] = 1073741905,
@@ -42,29 +36,18 @@ local baseKeyMap = {
     ["right"] = 1073741903,
 }
 
--- 初始化按键映射（每次调用都检查VK常量，确保Y/N键可用）
 local function initKeyMap()
-    -- 复制基础映射
     local km = {}
     for k, v in pairs(baseKeyMap) do
         km[k] = v
     end
-    
-    -- 如果VK常量已定义，添加Y/N键映射
-    if VK_Y then
-        km["y"] = VK_Y
-    end
-    if VK_N then
-        km["n"] = VK_N
-    end
-    
+    if VK_Y then km["y"] = VK_Y end
+    if VK_N then km["n"] = VK_N end
     return km
 end
 
--- 单例实例
 local instance = nil
 
--- 获取单例
 function InputManager.getInstance()
     if not instance then
         instance = setmetatable({}, InputManager)
@@ -72,33 +55,25 @@ function InputManager.getInstance()
     return instance
 end
 
--- 初始化输入管理器
 function InputManager:init()
     eventQueue = {}
     queueHead = 1
     queueTail = 1
-    currentKey = -1
     keyStates = {}
-    keyConsumed = false
     keyRepeatTimers = {}
-end
-
--- 注册按键映射
-function InputManager:registerKey(loveKey, gameKey)
-    local km = initKeyMap()
-    km[loveKey] = gameKey
 end
 
 -- 添加事件到队列
 local function enqueueEvent(event)
+    local info = debug.getinfo(2, "nSl")
+    lib.Debug(string.format("enqueueEvent: key=%d, queueHead=%d, queueTail=%d, caller=%s:%d", 
+        event.key, queueHead, queueTail, tostring(info.short_src), info.currentline))
     local nextTail = queueTail + 1
     if nextTail > maxQueueSize then
         nextTail = 1
     end
     
-    -- 检查队列是否已满
     if nextTail == queueHead then
-        -- 队列满，丢弃最旧的事件
         queueHead = queueHead + 1
         if queueHead > maxQueueSize then
             queueHead = 1
@@ -107,53 +82,68 @@ local function enqueueEvent(event)
     
     eventQueue[queueTail] = event
     queueTail = nextTail
+    lib.Debug(string.format("enqueueEvent: done, new queueTail=%d", queueTail))
 end
 
 -- 从队列取出事件
 local function dequeueEvent()
     if queueHead == queueTail then
-        return nil  -- 队列空
+        return nil
     end
     
     local event = eventQueue[queueHead]
     eventQueue[queueHead] = nil
+    local oldHead = queueHead
     queueHead = queueHead + 1
     if queueHead > maxQueueSize then
         queueHead = 1
     end
     
+    lib.Debug(string.format("dequeueEvent: key=%d, oldHead=%d, new queueHead=%d, queueTail=%d", event.key, oldHead, queueHead, queueTail))
     return event
+end
+
+-- 查看队列头部事件但不移除
+local function peekEvent()
+    if queueHead == queueTail then
+        return nil
+    end
+    return eventQueue[queueHead]
 end
 
 -- 处理love.keypressed事件
 function InputManager:onKeyPressed(key, scancode, isrepeat)
     local km = initKeyMap()
     local gameKey = km[key]
-    lib.Debug(string.format("InputManager:onKeyPressed: loveKey=%s, gameKey=%s", tostring(key), tostring(gameKey)))
-    if gameKey then
-        -- 添加到事件队列
-        enqueueEvent({
-            type = "pressed",
-            key = gameKey,
-            isRepeat = isrepeat,
-            time = love.timer.getTime()
-        })
-        
-        -- 更新按键状态
-        currentKey = gameKey
-        keyStates[gameKey] = true
-        keyConsumed = false
-        
-        -- 初始化重复计时器
-        if keyRepeatEnabled then
-            keyRepeatTimers[gameKey] = {
-                pressedTime = love.timer.getTime(),
-                lastRepeatTime = love.timer.getTime(),
-                repeatCount = 0
-            }
-        end
-    else
-        lib.Debug(string.format("InputManager:onKeyPressed: key %s not in keyMap", tostring(key)))
+    
+    if not gameKey then
+        return
+    end
+    
+    -- 忽略 love.keyboard 的 repeat 事件，使用自己的定时器
+    if isrepeat then
+        return
+    end
+    
+    lib.Debug(string.format("InputManager:onKeyPressed: key=%s, gameKey=%d", key, gameKey))
+    
+    -- 添加按键按下事件到队列
+    enqueueEvent({
+        type = "pressed",
+        key = gameKey,
+        time = love.timer.getTime()
+    })
+    
+    -- 更新按键状态
+    keyStates[gameKey] = true
+    
+    -- 初始化重复计时器
+    if keyRepeatEnabled then
+        keyRepeatTimers[gameKey] = {
+            pressedTime = love.timer.getTime(),
+            lastRepeatTime = love.timer.getTime(),
+            repeatCount = 0
+        }
     end
 end
 
@@ -161,27 +151,20 @@ end
 function InputManager:onKeyReleased(key, scancode)
     local km = initKeyMap()
     local gameKey = km[key]
-    if gameKey then
-        -- 添加到事件队列
-        enqueueEvent({
-            type = "released",
-            key = gameKey,
-            time = love.timer.getTime()
-        })
-        
-        -- 更新按键状态
-        keyStates[gameKey] = false
-        keyRepeatTimers[gameKey] = nil
-        
-        -- 如果释放的是当前按键，重置currentKey
-        if currentKey == gameKey then
-            currentKey = -1
-        end
+    
+    if not gameKey then
+        return
     end
+    
+    -- 不在队列中添加释放事件，因为游戏不需要处理释放事件
+    -- 只有按下和重复事件才需要处理
+    
+    -- 更新按键状态
+    keyStates[gameKey] = false
+    keyRepeatTimers[gameKey] = nil
 end
 
 -- 更新按键重复
--- @param dt: delta time
 function InputManager:update(dt)
     if not keyRepeatEnabled then
         return
@@ -194,157 +177,107 @@ function InputManager:update(dt)
             local elapsed = currentTime - timer.pressedTime
             local timeSinceLastRepeat = currentTime - timer.lastRepeatTime
             
-            -- 检查是否应该重复
             local shouldRepeat = false
             if timer.repeatCount == 0 then
-                -- 首次重复
                 shouldRepeat = elapsed >= keyRepeatDelay
             else
-                -- 后续重复
                 shouldRepeat = timeSinceLastRepeat >= keyRepeatInterval
             end
             
             if shouldRepeat then
+                lib.Debug(string.format("InputManager:update: generating repeat event for key=%d", gameKey))
                 -- 添加重复事件到队列
                 enqueueEvent({
                     type = "repeat",
                     key = gameKey,
-                    isRepeat = true,
                     time = currentTime
                 })
                 
                 timer.repeatCount = timer.repeatCount + 1
                 timer.lastRepeatTime = currentTime
-                
-                -- 更新currentKey以允许重复按键被获取
-                if currentKey == -1 then
-                    currentKey = gameKey
-                    keyConsumed = false
-                end
             end
         end
     end
 end
 
--- 获取当前按键
+-- 获取当前按键（消费队列中的事件）
 function InputManager:getKey()
-    -- 如果输入被禁用，返回 -1
-    -- 检查实例级别的 disableInput（通过 self 访问）和模块级别的 disableInput
-    if (self and self.disableInput) or InputManager.disableInput then
-        if CONFIG and CONFIG.Debug == 1 then
-            Debug("InputManager:getKey: disabled, returning -1")
-        end
+    if InputManager.disableInput then
         return -1
     end
     
-    if keyConsumed then
+    -- 从队列中获取事件
+    local event = dequeueEvent()
+    if event then
+        lib.Debug(string.format("InputManager:getKey: returning key=%d", event.key))
+        return event.key
+    end
+    
+    return -1
+end
+
+-- 查看队列中的下一个按键但不消费
+function InputManager:peekKey()
+    if InputManager.disableInput then
         return -1
     end
-    local key = currentKey
-    if key ~= -1 then
-        keyConsumed = true
-        -- 不要在这里清空 currentKey，让 keyStates 和 keyReleased 来处理
-        -- currentKey = -1
+    
+    local event = peekEvent()
+    if event then
+        return event.key
     end
-    return key
+    
+    return -1
 end
 
--- 查看当前按键但不消费
-function InputManager:peekKey()
-    return currentKey
-end
-
--- 重置消费状态
-function InputManager:resetKeyConsumed()
-    keyConsumed = false
-end
-
--- 清除当前按键（用于防止同一按键连续触发）
+-- 清除当前按键状态和队列
 function InputManager:clearCurrentKey()
-    if lib and lib.Debug then
-        lib.Debug("InputManager.clearCurrentKey: currentKey=" .. tostring(currentKey) .. ", keyStates=" .. tostring(#keyStates))
-    end
-    currentKey = -1
-    keyConsumed = false
-    -- 同时清除 keyStates，防止 InputManager.update() 重新设置 currentKey
+    eventQueue = {}
+    queueHead = 1
+    queueTail = 1
     keyStates = {}
     keyRepeatTimers = {}
-    if lib and lib.Debug then
-        lib.Debug("InputManager.clearCurrentKey: cleared")
-    end
 end
 
--- 查询按键是否被按下
+-- 查询按键是否被按住
 function InputManager:isKeyDown(gameKey)
     return keyStates[gameKey] == true
 end
 
--- 获取并清空事件队列
-function InputManager:pollEvents()
-    local events = {}
-    local event = dequeueEvent()
-    while event do
-        table.insert(events, event)
-        event = dequeueEvent()
-    end
-    return events
-end
-
--- 处理所有待处理的事件
+-- 处理所有待处理的事件（兼容接口）
 function InputManager:processEvents()
-    return self:pollEvents()
+    -- 在事件驱动架构中，事件已经在队列中
+    -- 此方法不需要做任何事情
 end
 
 -- 设置按键重复
 function InputManager:setKeyRepeat(enabled)
+    lib.Debug(string.format("InputManager:setKeyRepeat: enabled=%s", tostring(enabled)))
     keyRepeatEnabled = enabled
-    if love.keyboard then
-        love.keyboard.setKeyRepeat(enabled)
-    end
+    -- 不使用 love.keyboard 的重复，使用我们自己的定时器机制
 end
 
--- 设置按键重复参数
+-- 设置按键重复参数（毫秒）
 function InputManager:setKeyRepeatParams(delay, interval)
-    keyRepeatDelay = delay or 0.5
-    keyRepeatInterval = interval or 0.1
+    keyRepeatDelay = delay or 0.3
+    keyRepeatInterval = interval or 0.04
 end
 
--- 是否启用了按键重复
-function InputManager:isKeyRepeatEnabled()
-    return keyRepeatEnabled
-end
-
--- 清空所有按键状态
+-- 清空所有状态
 function InputManager:clear()
     eventQueue = {}
     queueHead = 1
     queueTail = 1
-    currentKey = -1
     keyStates = {}
     keyRepeatTimers = {}
 end
 
--- 重置输入管理器
+-- 重置
 function InputManager:reset()
     self:clear()
-    keyMap = {
-        ["escape"] = 27,
-        [" "] = 32,
-        ["return"] = 13,
-        ["up"] = 1073741906,
-        ["down"] = 1073741905,
-        ["left"] = 1073741904,
-        ["right"] = 1073741903,
-    }
     instance = nil
 end
 
--- 获取按键映射表
-function InputManager:getKeyMap()
-    return keyMap
-end
-
--- 获取队列大小
 function InputManager:getQueueSize()
     if queueTail >= queueHead then
         return queueTail - queueHead
