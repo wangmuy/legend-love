@@ -887,8 +887,6 @@ end
 -- 保存S*D*
 function SaveSMap(Sfilename, Dfilename)
     lib.Debug("SaveSMap: start")
-    lib.Debug(string.format("SaveSMap: S_XMax=%d, S_YMax=%d, S_Num=%d", S_XMax, S_YMax, S_Num))
-    lib.Debug(string.format("SaveSMap: smap=%s, #smap=%d", tostring(smap), smap and #smap or 0))
     
     if smap == nil then 
         lib.Debug("SaveSMap: smap is nil, returning")
@@ -896,19 +894,10 @@ function SaveSMap(Sfilename, Dfilename)
     end
     
     local s_size = S_XMax*S_YMax*6*S_Num
-    lib.Debug(string.format("SaveSMap: s_size=%d, Sfilename=%s", s_size, tostring(Sfilename)))
+    lib.Debug(string.format("SaveSMap: saving %d elements to %s", s_size, Sfilename))
     
-    lib.Debug("SaveSMap: calling Byte.SaveFromTable16 for S file")
-    local success, err = pcall(function()
-        Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
-    end)
-    if not success then
-        lib.Debug("SaveSMap: ERROR saving S file: " .. tostring(err))
-        return
-    end
-    lib.Debug("SaveSMap: S file saved successfully")
-    
-    lib.Debug(string.format("SaveSMap: dmap=%s, #dmap=%d", tostring(dmap), dmap and #dmap or 0))
+    Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
+    lib.Debug("SaveSMap: S file done")
     
     if dmap == nil then 
         lib.Debug("SaveSMap: dmap is nil, returning")
@@ -916,18 +905,11 @@ function SaveSMap(Sfilename, Dfilename)
     end
     
     local d_size = D_Num1*D_Num2*S_Num
-    lib.Debug(string.format("SaveSMap: d_size=%d, Dfilename=%s", d_size, tostring(Dfilename)))
+    lib.Debug(string.format("SaveSMap: saving %d elements to %s", d_size, Dfilename))
     
-    lib.Debug("SaveSMap: calling Byte.SaveFromTable16 for D file")
-    local success2, err2 = pcall(function()
-        Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
-    end)
-    if not success2 then
-        lib.Debug("SaveSMap: ERROR saving D file: " .. tostring(err2))
-        return
-    end
-    lib.Debug("SaveSMap: D file saved successfully")
-    lib.Debug("SaveSMap: done")
+    Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
+    lib.Debug("SaveSMap: D file done")
+    lib.Debug("SaveSMap: complete")
 end
 
 function GetS(id, x, y, level)
