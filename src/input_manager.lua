@@ -304,8 +304,7 @@ end
 
 -- 注册自定义按键映射
 function InputManager:registerKey(key, gameKey)
-    local km = initKeyMap()
-    km[key] = gameKey
+    baseKeyMap[key] = gameKey
 end
 
 function InputManager:getQueueSize()
