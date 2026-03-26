@@ -20,6 +20,8 @@ local PersonStatusAsync = require("person_status_async")
 
 -- 主菜单（协程版本）
 function JyMainAsync.MMenuCoroutine()
+    if lib and lib.Debug then lib.Debug("MMenuCoroutine: started") end
+    
     local menu = {
         {"医疗", nil, 1},
         {"解毒", nil, 1},
@@ -36,6 +38,8 @@ function JyMainAsync.MMenuCoroutine()
     
     local r = MenuAsync.ShowMenuCoroutine(menu, 6, 0, CC.MainMenuX, CC.MainMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
     
+    if lib and lib.Debug then lib.Debug("MMenuCoroutine: selected r=" .. tostring(r)) end
+    
     -- 根据选择执行对应功能
     if r == 1 then
         JyMainAsync.Menu_Doctor()
@@ -49,12 +53,17 @@ function JyMainAsync.MMenuCoroutine()
         JyMainAsync.Menu_PersonExit()
     elseif r == 6 then
         JyMainAsync.Menu_System()
+        if lib and lib.Debug then lib.Debug("MMenuCoroutine: Menu_System returned") end
     end
     -- r == 0 表示 ESC 退出，不执行任何操作
+    
+    if lib and lib.Debug then lib.Debug("MMenuCoroutine: ended") end
 end
 
 -- 系统子菜单
 function JyMainAsync.Menu_System()
+    if lib and lib.Debug then lib.Debug("Menu_System: started") end
+    
     local menu = {
         {"读取进度", nil, 1},
         {"保存进度", nil, 1},
@@ -62,6 +71,8 @@ function JyMainAsync.Menu_System()
     }
     
     local r = MenuAsync.ShowMenuCoroutine(menu, 3, 0, CC.MainSubMenuX, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    if lib and lib.Debug then lib.Debug("Menu_System: selected r=" .. tostring(r)) end
     
     if r == 0 then
         return 0
@@ -72,6 +83,7 @@ function JyMainAsync.Menu_System()
         return 1
     elseif r == 2 then
         JyMainAsync.Menu_SaveRecord()
+        if lib and lib.Debug then lib.Debug("Menu_System: Menu_SaveRecord returned") end
         return 0
     elseif r == 3 then
         JyMainAsync.Menu_Exit()
@@ -90,6 +102,8 @@ end
 
 -- 保存进度
 function JyMainAsync.Menu_SaveRecord()
+    if lib and lib.Debug then lib.Debug("Menu_SaveRecord: started") end
+    
     local menu = {
         {"进度一", nil, 1},
         {"进度二", nil, 1},
@@ -98,13 +112,16 @@ function JyMainAsync.Menu_SaveRecord()
     
     local r = MenuAsync.ShowMenuCoroutine(menu, 3, 0, CC.MainSubMenuX2, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
     
+    if lib and lib.Debug then lib.Debug("Menu_SaveRecord: selected r=" .. tostring(r)) end
+    
     if r > 0 then
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
-        -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
-        -- ShowScreen()
         SaveRecord(r)
+        if lib and lib.Debug then lib.Debug("Menu_SaveRecord: SaveRecord done") end
         Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
     end
+    
+    if lib and lib.Debug then lib.Debug("Menu_SaveRecord: ended") end
 end
 
 -- 读取进度
