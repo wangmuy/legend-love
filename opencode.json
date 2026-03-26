@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "aliyuncoding/kimi-k2.5",
+  "model": "aliyuncoding/glm-5",
   "provider": {
     "poe": {
       "options": {
