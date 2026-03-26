@@ -66,10 +66,19 @@ function LoadToTable16Inner(t, filename, size, seekPos, isLittleEndian)
     local oldsize = t and #t or 0
     local tbl = t or {}
     local f = io.open(filename, "rb")
+    if not f then
+        for i=1,size do tbl[i]=0 end
+        return tbl
+    end
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
     for i=1,size do
-        local b1,b2 = f:read(2):byte(1,2)
-        tbl[i] = isLittleEndian and byte2sshortl(b1,b2) or byte2ushortb(b1,b2)
+        local bytes = f:read(2)
+        if not bytes then
+            tbl[i] = 0
+        else
+            local b1,b2 = bytes:byte(1,2)
+            tbl[i] = isLittleEndian and byte2sshortl(b1,b2) or byte2ushortb(b1,b2)
+        end
     end
     f:close()
     if oldsize > size then
