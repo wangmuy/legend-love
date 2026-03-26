@@ -102,24 +102,15 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     local b = begIdx or 1
     local s = size or #t
     
-    -- 分批写入
-    local batchSize = 32768  -- 每批 32K 元素 (64KB)
-    local numBatches = math.ceil(s / batchSize)
-    
-    for batch = 0, numBatches - 1 do
-        local start = b + batch * batchSize
-        local endIdx = math.min(start + batchSize - 1, b + s - 1)
-        local chunk = {}
-        for i = start, endIdx do
-            local v = t[i] or 0
-            local us = v>=0 and v or 65536+v
-            if isLittleEndian then
-                chunk[#chunk+1] = string.char(bit32.band(us, 0xFF), bit32.rshift(us, 8))
-            else
-                chunk[#chunk+1] = string.char(bit32.rshift(us, 8), bit32.band(us, 0xFF))
-            end
+    -- 直接写入，不构建临时表
+    for i = b, b + s - 1 do
+        local v = t[i] or 0
+        local us = v>=0 and v or 65536+v
+        if isLittleEndian then
+            f:write(string.char(bit32.band(us, 0xFF), bit32.rshift(us, 8)))
+        else
+            f:write(string.char(bit32.rshift(us, 8), bit32.band(us, 0xFF)))
         end
-        f:write(table.concat(chunk))
     end
     f:close()
 end
