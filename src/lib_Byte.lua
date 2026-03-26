@@ -93,7 +93,11 @@ end
 
 function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     if t==nil or #t<=0 then return end
-    local f = io.open(filename, "wb")
+    local f = io.open(filename, "r+b")
+    if not f then
+        f = io.open(filename, "wb")
+    end
+    if not f then return end
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
     local b = begIdx or 1
     local s = size or #t
@@ -120,7 +124,12 @@ end
 
 function SaveFromTable8(t, filename, size, begIdx, seekPos)
     if t==nil or #t<=0 then return end
-    local f = io.open(filename, "wb")
+    local mode = "r+b"
+    local f = io.open(filename, mode)
+    if not f then
+        f = io.open(filename, "wb")
+    end
+    if not f then return end
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
     local b = begIdx or 1
     local s = size or #t
