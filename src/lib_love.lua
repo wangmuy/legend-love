@@ -886,23 +886,36 @@ end
 
 -- 保存S*D*
 function SaveSMap(Sfilename, Dfilename)
-    lib.Debug(string.format("SaveSMap: S_XMax=%d, S_YMax=%d, S_Num=%d, smap size=%d", S_XMax, S_YMax, S_Num, smap and #smap or 0))
+    lib.Debug("SaveSMap: start")
+    lib.Debug(string.format("SaveSMap: S_XMax=%d, S_YMax=%d, S_Num=%d", S_XMax, S_YMax, S_Num))
+    lib.Debug(string.format("SaveSMap: smap=%s, #smap=%d", tostring(smap), smap and #smap or 0))
+    
     if smap == nil then 
         lib.Debug("SaveSMap: smap is nil, returning")
         return 
     end
+    
     local s_size = S_XMax*S_YMax*6*S_Num
-    lib.Debug(string.format("SaveSMap: s_size=%d, calling SaveFromTable16", s_size))
+    lib.Debug(string.format("SaveSMap: s_size=%d, Sfilename=%s", s_size, tostring(Sfilename)))
+    
+    lib.Debug("SaveSMap: calling Byte.SaveFromTable16 for S file")
     Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
-    lib.Debug("SaveSMap: S file saved")
+    lib.Debug("SaveSMap: S file saved successfully")
+    
+    lib.Debug(string.format("SaveSMap: dmap=%s, #dmap=%d", tostring(dmap), dmap and #dmap or 0))
+    
     if dmap == nil then 
         lib.Debug("SaveSMap: dmap is nil, returning")
         return 
     end
+    
     local d_size = D_Num1*D_Num2*S_Num
-    lib.Debug(string.format("SaveSMap: d_size=%d, calling SaveFromTable16", d_size))
+    lib.Debug(string.format("SaveSMap: d_size=%d, Dfilename=%s", d_size, tostring(Dfilename)))
+    
+    lib.Debug("SaveSMap: calling Byte.SaveFromTable16 for D file")
     Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
-    lib.Debug("SaveSMap: D file saved")
+    lib.Debug("SaveSMap: D file saved successfully")
+    lib.Debug("SaveSMap: done")
 end
 
 function GetS(id, x, y, level)
