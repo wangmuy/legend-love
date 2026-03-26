@@ -230,6 +230,24 @@ function InputManager:peekKey()
     return -1
 end
 
+-- 内部方法：查看队列中的下一个按键但不消费（绕过 disableInput）
+function InputManager:_peekKeyInternal()
+    local event = peekEvent()
+    if event then
+        return event.key
+    end
+    return -1
+end
+
+-- 内部方法：获取按键并消费（绕过 disableInput）
+function InputManager:_getKeyInternal()
+    local event = dequeueEvent()
+    if event then
+        return event.key
+    end
+    return -1
+end
+
 -- 清除当前按键状态和队列
 function InputManager:clearCurrentKey()
     eventQueue = {}

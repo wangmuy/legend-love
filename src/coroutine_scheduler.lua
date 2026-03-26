@@ -191,12 +191,11 @@ function CoroutineScheduler:update(dt)
     local keyPressed = false
     local pressedKey = -1
     if #keyWaitingCoroutines > 0 then
-        -- 对于协程调度器，直接检查 InputManager 的 currentKey，绕过 disableInput
+        -- 使用内部方法绕过 disableInput 标志
         local im = InputManager.getInstance()
-        pressedKey = im:peekKey()  -- 使用 peekKey 不消费按键
+        pressedKey = im:_peekKeyInternal()
         if pressedKey ~= -1 then
-            -- 消费按键
-            im:getKey()
+            im:_getKeyInternal()
             keyPressed = true
             self:_debug("CoroutineScheduler.update: key pressed=" .. tostring(pressedKey))
         end
