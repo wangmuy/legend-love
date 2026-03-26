@@ -12,7 +12,8 @@ tests/
 └── unit/                    # 单元测试
     ├── test_state_machine.lua
     ├── test_input_manager.lua
-    └── test_event_bridge.lua
+    ├── test_event_bridge.lua
+    └── test_coroutine_scheduler.lua
 ```
 
 ## 运行测试
@@ -38,7 +39,7 @@ cd src
 lua tests/test_runner.lua state_machine
 ```
 
-可用模块：`state_machine`, `input_manager`, `event_bridge`
+可用模块：`state_machine`, `input_manager`, `event_bridge`, `coroutine_scheduler`
 
 ## 测试工具 (test_helper.lua)
 
@@ -229,10 +230,10 @@ elseif moduleName == "new_module" then
 - ✅ state_machine.lua
 - ✅ input_manager.lua
 - ✅ event_bridge.lua
+- ✅ coroutine_scheduler.lua
 
-待添加测试的模块（阶段 4）：
+待添加测试的模块：
 
-- coroutine_scheduler.lua
 - menu_state_machine.lua
 - menu_async.lua
 - async_message_box.lua
