@@ -888,10 +888,10 @@ end
 function SaveSMap(Sfilename, Dfilename)
     if smap == nil then return end
     local s_size = S_XMax*S_YMax*6*S_Num
-    Byte.SaveFromTable16(smap, Sfilename, s_size, 0, true)
+    Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
     if dmap == nil then return end
     local d_size = D_Num1*D_Num2*S_Num
-    Byte.SaveFromTable16(dmap, Dfilename, d_size, 0, true)
+    Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
 end
 
 function GetS(id, x, y, level)

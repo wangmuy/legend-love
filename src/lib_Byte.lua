@@ -52,13 +52,13 @@ end
 
 -- convert 16bit signed short to bytes(little endian)
 function sshort2bytel(s)
-    local us = s>=0 and s or 65536+n
+    local us = s>=0 and s or 65536+s
     return bit32.band(us,0xFF), bit32.rshift(us,8)
 end
 
 -- convert 16bit signed short to bytes(big endian)
 function sshort2byteb(s)
-    local us = s>=0 and s or 65536+n
+    local us = s>=0 and s or 65536+s
     return bit32.rshift(us,8), bit32.band(us,0xFF)
 end
 
