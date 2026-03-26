@@ -1,32 +1,14 @@
 -- test_event_bridge.lua
 -- 事件桥接模块单元测试
 
+local TestHelper = require("tests.test_helper")
 local EventBridge = require("event_bridge")
 
 local TestEventBridge = {}
 
--- 测试计数
-local testCount = 0
-local passCount = 0
-local failCount = 0
-
--- 断言函数
-local function assertEquals(expected, actual, message)
-    testCount = testCount + 1
-    if expected == actual then
-        passCount = passCount + 1
-        print(string.format("[PASS] %s", message or "Test"))
-        return true
-    else
-        failCount = failCount + 1
-        print(string.format("[FAIL] %s: expected %s, got %s", 
-            message or "Test", tostring(expected), tostring(actual)))
-        return false
-    end
-end
-
 -- 测试前重置
 local function setup()
+    TestHelper.setup()
     if EventBridge then
         EventBridge.getInstance():reset()
     end
@@ -40,7 +22,7 @@ function TestEventBridge.testSingleton()
     local eb1 = EventBridge.getInstance()
     local eb2 = EventBridge.getInstance()
     
-    assertEquals(true, eb1 == eb2, "Should return same instance")
+    TestHelper.assertEquals(true, eb1 == eb2, "Should return same instance")
 end
 
 -- 测试2: 状态注册
@@ -65,12 +47,12 @@ function TestEventBridge.testStateRegistration()
     })
     
     local handlers = eb:getStateHandlers()
-    assertEquals(true, handlers["TEST_STATE"] ~= nil, "State should be registered")
+    TestHelper.assertEquals(true, handlers["TEST_STATE"] ~= nil, "State should be registered")
     
     -- 切换状态触发enter
     eb:switchState("TEST_STATE")
-    assertEquals(true, enterCalled, "Enter should be called")
-    assertEquals("TEST_STATE", eb:getCurrentState(), "Current state should be TEST_STATE")
+    TestHelper.assertEquals(true, enterCalled, "Enter should be called")
+    TestHelper.assertEquals("TEST_STATE", eb:getCurrentState(), "Current state should be TEST_STATE")
 end
 
 -- 测试3: 状态切换
@@ -101,9 +83,9 @@ function TestEventBridge.testStateSwitch()
     eb:switchState("STATE_A")
     eb:switchState("STATE_B")
     
-    assertEquals(true, stateAExit, "Previous state exit should be called")
-    assertEquals(true, stateBEnter, "New state enter should be called")
-    assertEquals("STATE_B", eb:getCurrentState(), "Current state should be STATE_B")
+    TestHelper.assertEquals(true, stateAExit, "Previous state exit should be called")
+    TestHelper.assertEquals(true, stateBEnter, "New state enter should be called")
+    TestHelper.assertEquals("STATE_B", eb:getCurrentState(), "Current state should be STATE_B")
 end
 
 -- 测试4: 输入管理器集成
@@ -115,18 +97,18 @@ function TestEventBridge.testInputManager()
     eb:init()
     
     local im = eb:getInputManager()
-    assertEquals(true, im ~= nil, "Should have input manager")
+    TestHelper.assertEquals(true, im ~= nil, "Should have input manager")
     
     -- 测试getKey API
     local key = eb:getKey()
-    assertEquals(-1, key, "Initial key should be -1")
+    TestHelper.assertEquals(-1, key, "Initial key should be -1")
     
     -- 测试EnableKeyRepeat API
     eb:enableKeyRepeat(500, 100)
-    assertEquals(true, im:isKeyRepeatEnabled(), "Key repeat should be enabled")
+    TestHelper.assertEquals(true, im:isKeyRepeatEnabled(), "Key repeat should be enabled")
     
     eb:enableKeyRepeat(0, 0)
-    assertEquals(false, im:isKeyRepeatEnabled(), "Key repeat should be disabled")
+    TestHelper.assertEquals(false, im:isKeyRepeatEnabled(), "Key repeat should be disabled")
 end
 
 -- 测试5: 状态机集成
@@ -138,7 +120,7 @@ function TestEventBridge.testStateMachine()
     eb:init()
     
     local sm = eb:getStateMachine()
-    assertEquals(true, sm ~= nil, "Should have state machine")
+    TestHelper.assertEquals(true, sm ~= nil, "Should have state machine")
     
     -- 注册并切换状态
     eb:registerState("SM_TEST", {
@@ -149,7 +131,7 @@ function TestEventBridge.testStateMachine()
     })
     
     eb:switchState("SM_TEST")
-    assertEquals("SM_TEST", sm:getCurrentState(), "State machine should have correct state")
+    TestHelper.assertEquals("SM_TEST", sm:getCurrentState(), "State machine should have correct state")
 end
 
 -- 测试6: 向后兼容API
@@ -164,7 +146,7 @@ function TestEventBridge.testBackwardCompatibility()
     local im = eb:getInputManager()
     im:onKeyPressed("escape", nil, false)
     
-    assertEquals(true, eb:isKeyDown(VK_ESCAPE), "isKeyDown should work")
+    TestHelper.assertEquals(true, eb:isKeyDown(VK_ESCAPE), "isKeyDown should work")
 end
 
 -- 测试7: update和draw调用
@@ -189,11 +171,11 @@ function TestEventBridge.testUpdateDraw()
     
     -- 调用update
     eb:update(0.016)
-    assertEquals(true, updateCalled, "Update should be called")
+    TestHelper.assertEquals(true, updateCalled, "Update should be called")
     
     -- 调用draw
     eb:draw()
-    assertEquals(true, drawCalled, "Draw should be called")
+    TestHelper.assertEquals(true, drawCalled, "Draw should be called")
 end
 
 -- 测试8: 重置功能
@@ -212,14 +194,14 @@ function TestEventBridge.testReset()
     })
     
     eb:switchState("RESET_TEST")
-    assertEquals("RESET_TEST", eb:getCurrentState(), "Should have state")
+    TestHelper.assertEquals("RESET_TEST", eb:getCurrentState(), "Should have state")
     
     -- 重置
     eb:reset()
     
     -- 获取新实例
     local eb2 = EventBridge.getInstance()
-    assertEquals(true, eb ~= eb2, "Should be new instance after reset")
+    TestHelper.assertEquals(true, eb ~= eb2, "Should be new instance after reset")
 end
 
 -- 运行所有测试
@@ -228,9 +210,7 @@ function TestEventBridge.runAll()
     print("Event Bridge Unit Tests")
     print("========================================")
     
-    testCount = 0
-    passCount = 0
-    failCount = 0
+    TestHelper.resetCounts()
     
     TestEventBridge.testSingleton()
     TestEventBridge.testStateRegistration()
@@ -241,12 +221,7 @@ function TestEventBridge.runAll()
     TestEventBridge.testUpdateDraw()
     TestEventBridge.testReset()
     
-    print("\n========================================")
-    print(string.format("Results: %d tests, %d passed, %d failed", 
-        testCount, passCount, failCount))
-    print("========================================")
-    
-    return failCount == 0
+    return TestHelper.printSummary()
 end
 
 -- 如果直接运行此文件

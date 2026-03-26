@@ -1,32 +1,14 @@
 -- test_state_machine.lua
 -- 状态机模块单元测试
 
+local TestHelper = require("tests.test_helper")
 local StateMachine = require("state_machine")
 
 local TestStateMachine = {}
 
--- 测试计数
-local testCount = 0
-local passCount = 0
-local failCount = 0
-
--- 断言函数
-local function assertEquals(expected, actual, message)
-    testCount = testCount + 1
-    if expected == actual then
-        passCount = passCount + 1
-        print(string.format("[PASS] %s", message or "Test"))
-        return true
-    else
-        failCount = failCount + 1
-        print(string.format("[FAIL] %s: expected %s, got %s", 
-            message or "Test", tostring(expected), tostring(actual)))
-        return false
-    end
-end
-
 -- 测试前重置
 local function setup()
+    TestHelper.setup()
     StateMachine.getInstance():reset()
 end
 
@@ -45,11 +27,11 @@ function TestStateMachine.testRegister()
         exit = function() end
     })
     
-    assertEquals(true, sm:isRegistered("TEST_STATE"), "State should be registered")
-    assertEquals(false, sm:isRegistered("NON_EXISTENT"), "Non-existent state should not be registered")
+    TestHelper.assertEquals(true, sm:isRegistered("TEST_STATE"), "State should be registered")
+    TestHelper.assertEquals(false, sm:isRegistered("NON_EXISTENT"), "Non-existent state should not be registered")
     
     local states = sm:getRegisteredStates()
-    assertEquals(1, #states, "Should have 1 registered state")
+    TestHelper.assertEquals(1, #states, "Should have 1 registered state")
 end
 
 -- 测试2: 状态切换
@@ -79,15 +61,15 @@ function TestStateMachine.testStateSwitch()
     
     -- 切换到状态A
     sm:switchTo("STATE_A")
-    assertEquals("STATE_A", sm:getCurrentState(), "Current state should be STATE_A")
-    assertEquals(true, enterCalled, "Enter callback should be called")
+    TestHelper.assertEquals("STATE_A", sm:getCurrentState(), "Current state should be STATE_A")
+    TestHelper.assertEquals(true, enterCalled, "Enter callback should be called")
     
     -- 切换到状态B
     enterCalled = false
     sm:switchTo("STATE_B")
-    assertEquals("STATE_B", sm:getCurrentState(), "Current state should be STATE_B")
-    assertEquals(true, exitCalled, "Exit callback of previous state should be called")
-    assertEquals("STATE_A", sm:getPreviousState(), "Previous state should be STATE_A")
+    TestHelper.assertEquals("STATE_B", sm:getCurrentState(), "Current state should be STATE_B")
+    TestHelper.assertEquals(true, exitCalled, "Exit callback of previous state should be called")
+    TestHelper.assertEquals("STATE_A", sm:getPreviousState(), "Previous state should be STATE_A")
 end
 
 -- 测试3: update和draw调用
@@ -116,12 +98,12 @@ function TestStateMachine.testUpdateDraw()
     
     -- 调用update
     sm:update(0.016)
-    assertEquals(true, updateCalled, "Update should be called")
-    assertEquals(0.016, updateDt, "Update should receive correct dt")
+    TestHelper.assertEquals(true, updateCalled, "Update should be called")
+    TestHelper.assertEquals(0.016, updateDt, "Update should receive correct dt")
     
     -- 调用draw
     sm:draw()
-    assertEquals(true, drawCalled, "Draw should be called")
+    TestHelper.assertEquals(true, drawCalled, "Draw should be called")
 end
 
 -- 测试4: 未注册状态切换
@@ -137,7 +119,7 @@ function TestStateMachine.testUnregisteredState()
         sm:switchTo("UNREGISTERED")
     end)
     
-    assertEquals(false, status, "Should throw error for unregistered state")
+    TestHelper.assertEquals(false, status, "Should throw error for unregistered state")
 end
 
 -- 测试5: 多状态管理
@@ -158,11 +140,11 @@ function TestStateMachine.testMultipleStates()
     end
     
     local states = sm:getRegisteredStates()
-    assertEquals(5, #states, "Should have 5 registered states")
+    TestHelper.assertEquals(5, #states, "Should have 5 registered states")
     
     -- 验证所有状态都已注册
     for i = 1, 5 do
-        assertEquals(true, sm:isRegistered("STATE_" .. i), "STATE_" .. i .. " should be registered")
+        TestHelper.assertEquals(true, sm:isRegistered("STATE_" .. i), "STATE_" .. i .. " should be registered")
     end
 end
 
@@ -182,12 +164,7 @@ function TestStateMachine.runAll()
     TestStateMachine.testUnregisteredState()
     TestStateMachine.testMultipleStates()
     
-    print("\n========================================")
-    print(string.format("Results: %d tests, %d passed, %d failed", 
-        testCount, passCount, failCount))
-    print("========================================")
-    
-    return failCount == 0
+    return TestHelper.printSummary()
 end
 
 -- 如果直接运行此文件

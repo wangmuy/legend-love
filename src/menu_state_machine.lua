@@ -31,14 +31,17 @@ function MenuStateMachine.getInstance()
     if not instance then
         instance = setmetatable({}, MenuStateMachine)
         instance:init()
-        if lib and lib.Debug then
-            lib.Debug("MenuStateMachine: created new instance, id=" .. tostring(instance))
-        end
+        instance:_debug("MenuStateMachine: created new instance, id=" .. tostring(instance))
     end
-    if lib and lib.Debug then
-        lib.Debug("MenuStateMachine.getInstance: returning instance id=" .. tostring(instance))
-    end
+    instance:_debug("MenuStateMachine.getInstance: returning instance id=" .. tostring(instance))
     return instance
+end
+
+-- 内部调试方法
+function MenuStateMachine:_debug(msg)
+    if lib and lib.Debug then
+        lib.Debug(msg)
+    end
 end
 
 -- 初始化
@@ -122,9 +125,7 @@ end
 
 -- 打开菜单
 function MenuStateMachine:openMenu(menuData, callback)
-    if lib and lib.Debug then
-        lib.Debug("MenuStateMachine:openMenu called, self=" .. tostring(self) .. ", activeMenu before=" .. tostring(self.activeMenu))
-    end
+    self:_debug("MenuStateMachine:openMenu called, self=" .. tostring(self) .. ", activeMenu before=" .. tostring(self.activeMenu))
     
     -- 如果有活动的菜单，先暂停
     if self.activeMenu then
@@ -144,9 +145,7 @@ function MenuStateMachine:openMenu(menuData, callback)
         self.activeMenu.animationTime = ANIMATION_CONFIG.openDuration
     end
     
-    if lib and lib.Debug then
-        lib.Debug("MenuStateMachine:openMenu: activeMenu after=" .. tostring(self.activeMenu))
-    end
+    self:_debug("MenuStateMachine:openMenu: activeMenu after=" .. tostring(self.activeMenu))
 end
 
 -- 关闭菜单
@@ -155,9 +154,7 @@ function MenuStateMachine:closeMenu(returnValue)
         return
     end
     
-    if lib and lib.Debug then
-        lib.Debug("MenuStateMachine:closeMenu called, returnValue=" .. tostring(returnValue))
-    end
+    self:_debug("MenuStateMachine:closeMenu called, returnValue=" .. tostring(returnValue))
     
     self.activeMenu.returnValue = returnValue or 0
     self.activeMenu.state = MENU_STATE.CLOSING
@@ -223,7 +220,7 @@ function MenuStateMachine:handleInput()
     end
     
     local key = lib.GetKey()
-    lib.Debug(string.format("MenuStateMachine:handleInput: key=%d", key))
+    self:_debug(string.format("MenuStateMachine:handleInput: key=%d", key))
     
     if key == -1 then
         return
@@ -239,7 +236,7 @@ function MenuStateMachine:handleInput()
     
     -- 处理方向键
     if key == VK_DOWN then
-        lib.Debug(string.format("MenuStateMachine: VK_DOWN, current=%d -> %d", menu.current, menu.current + 1))
+        self:_debug(string.format("MenuStateMachine: VK_DOWN, current=%d -> %d", menu.current, menu.current + 1))
         menu.prevCurrent = menu.current
         menu.current = menu.current + 1
         if menu.current > (menu.start + menu.num - 1) then
@@ -250,7 +247,7 @@ function MenuStateMachine:handleInput()
             menu.current = 1
         end
     elseif key == VK_UP then
-        lib.Debug(string.format("MenuStateMachine: VK_UP, current=%d -> %d", menu.current, menu.current - 1))
+        self:_debug(string.format("MenuStateMachine: VK_UP, current=%d -> %d", menu.current, menu.current - 1))
         menu.prevCurrent = menu.current
         menu.current = menu.current - 1
         if menu.current < menu.start then
@@ -329,9 +326,7 @@ function MenuStateMachine:doCloseMenu()
         return
     end
     
-    if lib and lib.Debug then
-        lib.Debug("MenuStateMachine:doCloseMenu called, returnValue=" .. tostring(self.activeMenu.returnValue))
-    end
+    self:_debug("MenuStateMachine:doCloseMenu called, returnValue=" .. tostring(self.activeMenu.returnValue))
     
     local returnValue = self.activeMenu.returnValue
     
