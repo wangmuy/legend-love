@@ -168,6 +168,58 @@ function TestInputManager.testClear()
     TestHelper.assertEquals(0, #events, "Event queue should be empty after clear")
 end
 
+-- 测试9: disableInput 阻止普通 getKey/peekKey
+function TestInputManager.testDisableInput()
+    setup()
+    print("\n=== Test: Disable Input ===")
+    
+    local im = InputManager.getInstance()
+    
+    -- 添加按键事件
+    im:onKeyPressed("escape", nil, false)
+    
+    -- 正常情况下应该能获取
+    TestHelper.assertEquals(VK_ESCAPE, im:peekKey(), "peekKey should return VK_ESCAPE normally")
+    
+    -- 启用 disableInput
+    InputManager.disableInput = true
+    
+    -- 现在 peekKey 和 getKey 应该返回 -1
+    TestHelper.assertEquals(-1, im:peekKey(), "peekKey should return -1 when disabled")
+    TestHelper.assertEquals(-1, im:getKey(), "getKey should return -1 when disabled")
+    
+    -- 恢复
+    InputManager.disableInput = false
+end
+
+-- 测试10: 内部方法绕过 disableInput
+function TestInputManager.testInternalMethodsBypassDisableInput()
+    setup()
+    print("\n=== Test: Internal Methods Bypass DisableInput ===")
+    
+    local im = InputManager.getInstance()
+    
+    -- 添加按键事件
+    im:onKeyPressed("left", nil, false)
+    im:onKeyPressed("right", nil, false)
+    
+    -- 启用 disableInput
+    InputManager.disableInput = true
+    
+    -- 普通方法应该返回 -1
+    TestHelper.assertEquals(-1, im:peekKey(), "peekKey should return -1 when disabled")
+    
+    -- 内部方法应该能正常工作
+    TestHelper.assertEquals(VK_LEFT, im:_peekKeyInternal(), "_peekKeyInternal should bypass disableInput")
+    TestHelper.assertEquals(VK_LEFT, im:_getKeyInternal(), "_getKeyInternal should bypass disableInput")
+    
+    -- 消费了第一个按键，应该能获取第二个
+    TestHelper.assertEquals(VK_RIGHT, im:_peekKeyInternal(), "_peekKeyInternal should see next key")
+    
+    -- 恢复
+    InputManager.disableInput = false
+end
+
 -- 运行所有测试
 function TestInputManager.runAll()
     print("\n========================================")
@@ -184,6 +236,8 @@ function TestInputManager.runAll()
     TestInputManager.testKeyMapping()
     TestInputManager.testCustomKeyMapping()
     TestInputManager.testClear()
+    TestInputManager.testDisableInput()
+    TestInputManager.testInternalMethodsBypassDisableInput()
     
     return TestHelper.printSummary()
 end
