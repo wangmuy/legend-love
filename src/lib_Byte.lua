@@ -101,10 +101,24 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
     local b = begIdx or 1
     local s = size or #t
+    
+    -- 使用 table.concat 批量写入，提高性能
+    local chunks = {}
     for i=b,b+s-1 do
         local v = t[i] or 0
-        f:write( string.char( isLittleEndian and sshort2bytel(v) or sshort2byteb(v) ) )
+        local b1, b2
+        if isLittleEndian then
+            local us = v>=0 and v or 65536+v
+            b1 = bit32.band(us, 0xFF)
+            b2 = bit32.rshift(us, 8)
+        else
+            local us = v>=0 and v or 65536+v
+            b1 = bit32.rshift(us, 8)
+            b2 = bit32.band(us, 0xFF)
+        end
+        chunks[i-b+1] = string.char(b1, b2)
     end
+    f:write(table.concat(chunks))
     f:close()
 end
 
