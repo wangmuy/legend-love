@@ -115,7 +115,9 @@ function JyMainAsync.Menu_SaveRecord()
     if lib and lib.Debug then lib.Debug("Menu_SaveRecord: selected r=" .. tostring(r)) end
     
     if r > 0 then
+        if lib and lib.Debug then lib.Debug("Menu_SaveRecord: calling DrawStrBox") end
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
+        if lib and lib.Debug then lib.Debug("Menu_SaveRecord: calling SaveRecord") end
         SaveRecord(r)
         if lib and lib.Debug then lib.Debug("Menu_SaveRecord: SaveRecord done") end
         Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
