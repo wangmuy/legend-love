@@ -892,7 +892,7 @@ function SaveSMap(Sfilename, Dfilename)
         return 
     end
     local s_size = S_XMax*S_YMax*6*S_Num
-    lib.Debug(string.format("SaveSMap: s_size=%d", s_size))
+    lib.Debug(string.format("SaveSMap: s_size=%d, calling SaveFromTable16", s_size))
     Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
     lib.Debug("SaveSMap: S file saved")
     if dmap == nil then 
@@ -900,7 +900,7 @@ function SaveSMap(Sfilename, Dfilename)
         return 
     end
     local d_size = D_Num1*D_Num2*S_Num
-    lib.Debug(string.format("SaveSMap: d_size=%d", d_size))
+    lib.Debug(string.format("SaveSMap: d_size=%d, calling SaveFromTable16", d_size))
     Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
     lib.Debug("SaveSMap: D file saved")
 end
