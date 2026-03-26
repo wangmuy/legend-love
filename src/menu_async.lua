@@ -107,6 +107,7 @@ end
 
 -- 清空所有菜单
 function MenuAsync.clear()
+    _debug("MenuAsync.clear called")
     local msm = MenuStateMachine.getInstance()
     msm:clear()
     currentCallback = nil
@@ -117,21 +118,25 @@ function MenuAsync.ShowMenuCoroutine(menuItem, numItem, numShow, x1, y1, x2, y2,
     local CoroutineScheduler = require("coroutine_scheduler")
     local scheduler = CoroutineScheduler.getInstance()
     
-    -- 创建等待菜单关闭的协程
     local result = nil
     local menuClosed = false
     
-    -- 显示菜单
+    _debug("ShowMenuCoroutine: creating menu with callback")
+    
     MenuAsync.ShowMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor, function(returnValue)
+        _debug("ShowMenuCoroutine: callback called with returnValue=" .. tostring(returnValue))
         result = returnValue
         menuClosed = true
+        _debug("ShowMenuCoroutine: set menuClosed=true, result=" .. tostring(result))
     end)
     
-    -- 等待菜单关闭
+    _debug("ShowMenuCoroutine: waiting for menu to close")
+    
     while not menuClosed do
         scheduler:yield("menu")
     end
     
+    _debug("ShowMenuCoroutine: menu closed, returning result=" .. tostring(result))
     return result
 end
 

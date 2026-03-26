@@ -404,6 +404,7 @@ end
 
 -- 清空所有菜单
 function MenuStateMachine:clear()
+    self:_debug("MenuStateMachine:clear called, activeMenu before=" .. tostring(self.activeMenu))
     self.activeMenu = nil
     self.menuStack = {}
     self.callback = nil
