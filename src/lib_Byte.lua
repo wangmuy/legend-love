@@ -102,7 +102,8 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     local b = begIdx or 1
     local s = size or #t
     for i=b,b+s-1 do
-        f:write( string.char( isLittleEndian and sshort2bytel(t[i]) or sshort2byteb(t[i]) ) )
+        local v = t[i] or 0
+        f:write( string.char( isLittleEndian and sshort2bytel(v) or sshort2byteb(v) ) )
     end
     f:close()
 end

@@ -886,12 +886,23 @@ end
 
 -- 保存S*D*
 function SaveSMap(Sfilename, Dfilename)
-    if smap == nil then return end
+    lib.Debug(string.format("SaveSMap: S_XMax=%d, S_YMax=%d, S_Num=%d, smap size=%d", S_XMax, S_YMax, S_Num, smap and #smap or 0))
+    if smap == nil then 
+        lib.Debug("SaveSMap: smap is nil, returning")
+        return 
+    end
     local s_size = S_XMax*S_YMax*6*S_Num
+    lib.Debug(string.format("SaveSMap: s_size=%d", s_size))
     Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
-    if dmap == nil then return end
+    lib.Debug("SaveSMap: S file saved")
+    if dmap == nil then 
+        lib.Debug("SaveSMap: dmap is nil, returning")
+        return 
+    end
     local d_size = D_Num1*D_Num2*S_Num
+    lib.Debug(string.format("SaveSMap: d_size=%d", d_size))
     Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
+    lib.Debug("SaveSMap: D file saved")
 end
 
 function GetS(id, x, y, level)
