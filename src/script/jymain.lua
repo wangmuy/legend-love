@@ -1709,9 +1709,11 @@ end
 -- 写游戏进度
 -- id=0 新进度，=1/2/3 进度
 function SaveRecord(id)         -- 写游戏进度
+    lib.Debug("SaveRecord: start id=" .. tostring(id))
     --读取R*.idx文件
     local t1=lib.GetTime();
 
+    lib.Debug("SaveRecord: reading idx file")
     local data=Byte.create(6*4);
     Byte.loadfile(data,CC.R_IDXFilename[id],0,6*4);
 
@@ -1721,6 +1723,7 @@ function SaveRecord(id)         -- 写游戏进度
         idx[i]=Byte.get32(data,4*(i-1));
     end
 
+    lib.Debug("SaveRecord: writing grp files")
     --写R*.grp文件
     Byte.savefile(JY.Data_Base,CC.R_GRPFilename[id],idx[0],idx[1]-idx[0]);
 
@@ -1734,8 +1737,10 @@ function SaveRecord(id)         -- 写游戏进度
 
     Byte.savefile(JY.Data_Shop,CC.R_GRPFilename[id],idx[5],CC.ShopSize*JY.ShopNum);
 
+    lib.Debug("SaveRecord: calling SaveSMap")
     lib.SaveSMap(CC.S_Filename[id],CC.D_Filename[id]);
     lib.Debug(string.format("SaveRecord time=%d",lib.GetTime()-t1));
+    lib.Debug("SaveRecord: done")
 
 end
 -------------------------------------------------------------------------------------
