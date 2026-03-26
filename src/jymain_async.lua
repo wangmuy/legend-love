@@ -102,6 +102,7 @@ end
 
 -- 保存进度
 function JyMainAsync.Menu_SaveRecord()
+    local startTime = os.clock()
     if lib and lib.Debug then lib.Debug("Menu_SaveRecord: started") end
     
     local menu = {
@@ -119,11 +120,11 @@ function JyMainAsync.Menu_SaveRecord()
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
         if lib and lib.Debug then lib.Debug("Menu_SaveRecord: calling SaveRecord") end
         SaveRecord(r)
-        if lib and lib.Debug then lib.Debug("Menu_SaveRecord: SaveRecord done") end
+        if lib and lib.Debug then lib.Debug(string.format("Menu_SaveRecord: SaveRecord done (%.2fs)", os.clock() - startTime)) end
         Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
     end
     
-    if lib and lib.Debug then lib.Debug("Menu_SaveRecord: ended") end
+    if lib and lib.Debug then lib.Debug(string.format("Menu_SaveRecord: ended (%.2fs total)", os.clock() - startTime)) end
 end
 
 -- 读取进度
