@@ -102,28 +102,25 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     local b = begIdx or 1
     local s = size or #t
     
-    -- 分批写入，避免内存问题
-    local batchSize = 65536  -- 每批 64K 元素
-    local batches = math.ceil(s / batchSize)
-    
-    for batch = 1, batches do
-        local startIdx = b + (batch - 1) * batchSize
-        local endIdx = math.min(b + batch * batchSize - 1, b + s - 1)
-        local chunks = {}
-        local count = 0
-        for i = startIdx, endIdx do
-            count = count + 1
-            local v = t[i] or 0
-            local us = v>=0 and v or 65536+v
-            if isLittleEndian then
-                chunks[count] = string.char(bit32.band(us, 0xFF), bit32.rshift(us, 8))
-            else
-                chunks[count] = string.char(bit32.rshift(us, 8), bit32.band(us, 0xFF))
-            end
+    -- 直接写入，使用 file:write 的缓冲
+    local buf = {}
+    for i=b,b+s-1 do
+        local v = t[i] or 0
+        local us = v>=0 and v or 65536+v
+        if isLittleEndian then
+            buf[#buf+1] = string.char(bit32.band(us, 0xFF), bit32.rshift(us, 8))
+        else
+            buf[#buf+1] = string.char(bit32.rshift(us, 8), bit32.band(us, 0xFF))
         end
-        f:write(table.concat(chunks))
-        chunks = nil  -- 释放内存
-        collectgarbage("step")  -- 手动 GC
+        -- 每 8K 写入一次
+        if #buf >= 8192 then
+            f:write(table.concat(buf))
+            buf = {}
+        end
+    end
+    -- 写入剩余
+    if #buf > 0 then
+        f:write(table.concat(buf))
     end
     f:close()
 end
