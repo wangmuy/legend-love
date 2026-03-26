@@ -886,6 +886,7 @@ end
 
 -- 保存S*D*
 function SaveSMap(Sfilename, Dfilename)
+    local startTime = os.clock()
     lib.Debug("SaveSMap: start")
     
     if smap == nil then 
@@ -897,7 +898,7 @@ function SaveSMap(Sfilename, Dfilename)
     lib.Debug(string.format("SaveSMap: saving %d elements to %s", s_size, Sfilename))
     
     Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
-    lib.Debug("SaveSMap: S file done")
+    lib.Debug(string.format("SaveSMap: S file done (%.2fs)", os.clock() - startTime))
     
     if dmap == nil then 
         lib.Debug("SaveSMap: dmap is nil, returning")
@@ -908,8 +909,7 @@ function SaveSMap(Sfilename, Dfilename)
     lib.Debug(string.format("SaveSMap: saving %d elements to %s", d_size, Dfilename))
     
     Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
-    lib.Debug("SaveSMap: D file done")
-    lib.Debug("SaveSMap: complete")
+    lib.Debug(string.format("SaveSMap: complete (%.2fs total)", os.clock() - startTime))
 end
 
 function GetS(id, x, y, level)
