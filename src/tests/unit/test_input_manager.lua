@@ -6,6 +6,15 @@ local InputManager = require("input_manager")
 
 local TestInputManager = {}
 
+-- 定义按键常量（用于测试）
+local VK_ESCAPE = 27
+local VK_SPACE = 32
+local VK_RETURN = 13
+local VK_UP = 1073741906
+local VK_DOWN = 1073741905
+local VK_LEFT = 1073741904
+local VK_RIGHT = 1073741903
+
 -- 测试前重置
 local function setup()
     TestHelper.setup()
@@ -107,14 +116,15 @@ function TestInputManager.testKeyMapping()
     local im = InputManager.getInstance()
     local keyMap = im:getKeyMap()
     
-    -- 验证默认映射
-    TestHelper.assertEquals(VK_ESCAPE, keyMap["escape"], "escape should map to VK_ESCAPE")
-    TestHelper.assertEquals(VK_SPACE, keyMap[" "], "space should map to VK_SPACE")
-    TestHelper.assertEquals(VK_RETURN, keyMap["return"], "return should map to VK_RETURN")
-    TestHelper.assertEquals(VK_UP, keyMap["up"], "up should map to VK_UP")
-    TestHelper.assertEquals(VK_DOWN, keyMap["down"], "down should map to VK_DOWN")
-    TestHelper.assertEquals(VK_LEFT, keyMap["left"], "left should map to VK_LEFT")
-    TestHelper.assertEquals(VK_RIGHT, keyMap["right"], "right should map to VK_RIGHT")
+    -- 验证默认映射（使用实际数值）
+    TestHelper.assertEquals(27, keyMap["escape"], "escape should map to 27")
+    TestHelper.assertEquals(32, keyMap[" "], "space should map to 32")
+    TestHelper.assertEquals(32, keyMap["space"], "space should map to 32")
+    TestHelper.assertEquals(13, keyMap["return"], "return should map to 13")
+    TestHelper.assertEquals(1073741906, keyMap["up"], "up should map to 1073741906")
+    TestHelper.assertEquals(1073741905, keyMap["down"], "down should map to 1073741905")
+    TestHelper.assertEquals(1073741904, keyMap["left"], "left should map to 1073741904")
+    TestHelper.assertEquals(1073741903, keyMap["right"], "right should map to 1073741903")
 end
 
 -- 测试7: 自定义按键映射
