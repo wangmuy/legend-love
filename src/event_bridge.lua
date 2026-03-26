@@ -36,9 +36,16 @@ function EventBridge.getInstance()
     return instance
 end
 
+-- 内部调试方法
+function EventBridge:_debug(msg)
+    if lib and lib.Debug then
+        lib.Debug(msg)
+    end
+end
+
 -- 初始化桥接器
 function EventBridge:init()
-    lib.Debug("EventBridge:init() called")
+    self:_debug("EventBridge:init() called")
     
     -- 从全局CC表获取游戏状态常量
     if CC then
@@ -61,23 +68,23 @@ function EventBridge:init()
     InputManager.getInstance():setKeyRepeatParams(0.3, 0.1)  -- 首次延迟300ms，后续间隔100ms
     
     -- 注册Love2D事件回调
-    lib.Debug("EventBridge:init() calling registerLoveCallbacks")
+    self:_debug("EventBridge:init() calling registerLoveCallbacks")
     self:registerLoveCallbacks()
-    lib.Debug("EventBridge:init() completed")
+    self:_debug("EventBridge:init() completed")
 end
 
 -- 注册Love2D事件回调
 function EventBridge:registerLoveCallbacks()
-    lib.Debug("EventBridge:registerLoveCallbacks() called")
+    self:_debug("EventBridge:registerLoveCallbacks() called")
     
     local originalKeyPressed = love.keypressed
     local originalKeyReleased = love.keyreleased
     
-    lib.Debug(string.format("EventBridge: originalKeyPressed=%s", tostring(originalKeyPressed)))
+    self:_debug(string.format("EventBridge: originalKeyPressed=%s", tostring(originalKeyPressed)))
     
     -- 重写keypressed
     love.keypressed = function(key, scancode, isrepeat)
-        lib.Debug(string.format("EventBridge: love.keypressed called: key=%s", tostring(key)))
+        self:_debug(string.format("EventBridge: love.keypressed called: key=%s", tostring(key)))
         InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
         if originalKeyPressed then
             originalKeyPressed(key, scancode, isrepeat)
@@ -145,19 +152,13 @@ function EventBridge:update(dt)
     
     -- 更新对话框
     AsyncDialog.getInstance():update(dt)
-    if lib and lib.Debug then
-        lib.Debug("EventBridge.update: AsyncDialog.update done")
-    end
+    self:_debug("EventBridge.update: AsyncDialog.update done")
     
     -- 更新当前状态
     StateMachine.getInstance():update(dt)
-    if lib and lib.Debug then
-        lib.Debug("EventBridge.update: StateMachine.update done")
-    end
+    self:_debug("EventBridge.update: StateMachine.update done")
     
-    if lib and lib.Debug then
-        lib.Debug("EventBridge.update: end")
-    end
+    self:_debug("EventBridge.update: end")
 end
 
 -- 渲染 (在love.draw中调用)
@@ -173,9 +174,7 @@ function EventBridge.clearGlobalDrawCallback()
 end
 
 function EventBridge:draw()
-    if lib and lib.Debug then
-        lib.Debug("EventBridge:draw called")
-    end
+    self:_debug("EventBridge:draw called")
     
     -- 执行全局绘制回调（如果有）
     if globalDrawCallback then

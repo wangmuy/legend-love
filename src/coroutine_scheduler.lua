@@ -5,6 +5,9 @@
 local CoroutineScheduler = {}
 CoroutineScheduler.__index = CoroutineScheduler
 
+-- 导入依赖模块
+local InputManager = require("input_manager")
+
 -- 协程列表
 local coroutines = {}
 local currentCoroutine = nil
@@ -22,10 +25,20 @@ function CoroutineScheduler.getInstance()
 end
 
 -- 初始化调度器
-function CoroutineScheduler:init()
+function CoroutineScheduler:init(deps)
+    deps = deps or {}
     coroutines = {}
     currentCoroutine = nil
     coroutineIdCounter = 0
+    -- 注入时间源，默认为 love.timer.getTime
+    self.timeSource = deps.timeSource or (love and love.timer and love.timer.getTime)
+end
+
+-- 内部调试方法，便于测试时 mock
+function CoroutineScheduler:_debug(msg)
+    if lib and lib.Debug then
+        lib.Debug(msg)
+    end
 end
 
 -- 创建新协程
@@ -70,18 +83,14 @@ function CoroutineScheduler:start(id, ...)
     if not success then
         info.status = "error"
         info.error = result
-        if lib and lib.Debug then
-            lib.Debug("CoroutineScheduler.start: ERROR in coroutine " .. tostring(id) .. ": " .. tostring(result))
-        end
+        self:_debug("CoroutineScheduler.start: ERROR in coroutine " .. tostring(id) .. ": " .. tostring(result))
         -- 清理出错的协程，防止阻塞后续事件
         coroutines[id] = nil
         return false, result
     end
     
     local actualStatus = coroutine.status(info.co)
-    if lib and lib.Debug then
-        lib.Debug("CoroutineScheduler.start: info.status before=" .. tostring(info.status) .. ", coroutine.status=" .. tostring(actualStatus) .. ", result=" .. tostring(result))
-    end
+    self:_debug("CoroutineScheduler.start: info.status before=" .. tostring(info.status) .. ", coroutine.status=" .. tostring(actualStatus) .. ", result=" .. tostring(result))
     -- 修复：如果 coroutine.status 返回 "running"，将其视为 "suspended"
     -- 因为协程已经调用了 yield，只是 coroutine.status 返回了错误的状态
     if actualStatus == "running" then
@@ -92,9 +101,7 @@ function CoroutineScheduler:start(id, ...)
     if info.status == "dead" then
         info.result = result
         coroutines[id] = nil  -- 清理已完成的协程
-        if lib and lib.Debug then
-            lib.Debug("CoroutineScheduler.start: coroutine " .. tostring(id) .. " cleaned up")
-        end
+        self:_debug("CoroutineScheduler.start: coroutine " .. tostring(id) .. " cleaned up")
     end
     
     return true, result
@@ -116,9 +123,7 @@ function CoroutineScheduler:yield(waitingFor)
         error("Cannot yield from outside a coroutine")
     end
     
-    if lib and lib.Debug then
-        lib.Debug("CoroutineScheduler.yield: currentCoroutine=" .. tostring(currentCoroutine) .. ", waitingFor=" .. tostring(waitingFor))
-    end
+    self:_debug("CoroutineScheduler.yield: currentCoroutine=" .. tostring(currentCoroutine) .. ", waitingFor=" .. tostring(waitingFor))
     
     local info = coroutines[currentCoroutine]
     if info then
@@ -140,7 +145,7 @@ end
 -- 注意：这个版本只yield一次，让出时间给love.draw，然后由外部控制是否继续等待
 function CoroutineScheduler:waitForTime(seconds)
     -- 记录开始时间
-    local startTime = love.timer.getTime()
+    local startTime = self.timeSource and self.timeSource() or 0
     
     -- yield一次，让love.draw有机会执行
     self:yield("time")
@@ -162,18 +167,14 @@ end
 -- 更新所有协程
 -- @param dt: delta time
 function CoroutineScheduler:update(dt)
-    if lib and lib.Debug then
-        lib.Debug("CoroutineScheduler.update called, coroutines count=" .. tostring(#coroutines))
-    end
+    self:_debug("CoroutineScheduler.update called, coroutines count=" .. tostring(#coroutines))
     
     local activeCoroutines = {}
     local keyWaitingCoroutines = {}
     
     -- 收集所有需要更新的协程
     for id, info in pairs(coroutines) do
-        if lib and lib.Debug then
-            lib.Debug("CoroutineScheduler.update: checking coroutine id=" .. tostring(id) .. ", status=" .. tostring(info.status) .. ", waitingFor=" .. tostring(info.waitingFor) .. ", name=" .. tostring(info.name))
-        end
+        self:_debug("CoroutineScheduler.update: checking coroutine id=" .. tostring(id) .. ", status=" .. tostring(info.status) .. ", waitingFor=" .. tostring(info.waitingFor) .. ", name=" .. tostring(info.name))
         if info.status == "suspended" then
             if info.waitingFor == "key" then
                 -- 等待按键的协程单独处理
@@ -184,29 +185,22 @@ function CoroutineScheduler:update(dt)
         end
     end
     
-    if lib and lib.Debug then
-        lib.Debug("CoroutineScheduler.update: active coroutines=" .. tostring(#activeCoroutines) .. ", key waiting=" .. tostring(#keyWaitingCoroutines))
-    end
+    self:_debug("CoroutineScheduler.update: active coroutines=" .. tostring(#activeCoroutines) .. ", key waiting=" .. tostring(#keyWaitingCoroutines))
     
     -- 检查是否有按键按下
     local keyPressed = false
     local pressedKey = -1
     if #keyWaitingCoroutines > 0 then
         -- 对于协程调度器，直接检查 InputManager 的 currentKey，绕过 disableInput
-        local InputManager = require("input_manager")
         local im = InputManager.getInstance()
         pressedKey = im:peekKey()  -- 使用 peekKey 不消费按键
         if pressedKey ~= -1 then
             -- 消费按键
             im:getKey()
             keyPressed = true
-            if lib and lib.Debug then
-                lib.Debug("CoroutineScheduler.update: key pressed=" .. tostring(pressedKey))
-            end
+            self:_debug("CoroutineScheduler.update: key pressed=" .. tostring(pressedKey))
         end
-        if lib and lib.Debug then
-            lib.Debug("CoroutineScheduler.update: checking key, pressedKey=" .. tostring(pressedKey) .. ", keyWaitingCoroutines=" .. tostring(#keyWaitingCoroutines))
-        end
+        self:_debug("CoroutineScheduler.update: checking key, pressedKey=" .. tostring(pressedKey) .. ", keyWaitingCoroutines=" .. tostring(#keyWaitingCoroutines))
     end
     
     -- 恢复等待按键的协程（如果有按键按下）
@@ -214,9 +208,7 @@ function CoroutineScheduler:update(dt)
         for _, id in ipairs(keyWaitingCoroutines) do
             local info = coroutines[id]
             if info and info.status == "suspended" and info.waitingFor == "key" then
-                if lib and lib.Debug then
-                    lib.Debug("CoroutineScheduler.update: resuming key-waiting coroutine id=" .. tostring(id) .. " with key=" .. tostring(pressedKey))
-                end
+                self:_debug("CoroutineScheduler.update: resuming key-waiting coroutine id=" .. tostring(id) .. " with key=" .. tostring(pressedKey))
                 self:resume(id, pressedKey)  -- 传递按键值给协程
             end
         end
@@ -226,9 +218,7 @@ function CoroutineScheduler:update(dt)
     for _, id in ipairs(activeCoroutines) do
         local info = coroutines[id]
         if info and info.status == "suspended" then
-            if lib and lib.Debug then
-                lib.Debug("CoroutineScheduler.update: resuming coroutine id=" .. tostring(id))
-            end
+            self:_debug("CoroutineScheduler.update: resuming coroutine id=" .. tostring(id))
             self:resume(id)
         end
     end

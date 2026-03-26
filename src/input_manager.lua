@@ -250,6 +250,20 @@ function InputManager:processEvents()
     -- 此方法不需要做任何事情
 end
 
+-- 获取所有事件（用于测试）
+function InputManager:pollEvents()
+    local events = {}
+    while queueHead ~= queueTail do
+        local event = dequeueEvent()
+        if event then
+            table.insert(events, event)
+        else
+            break
+        end
+    end
+    return events
+end
+
 -- 设置按键重复
 function InputManager:setKeyRepeat(enabled)
     lib.Debug(string.format("InputManager:setKeyRepeat: enabled=%s", tostring(enabled)))
@@ -276,6 +290,22 @@ end
 function InputManager:reset()
     self:clear()
     instance = nil
+end
+
+-- 获取按键重复是否启用
+function InputManager:isKeyRepeatEnabled()
+    return keyRepeatEnabled
+end
+
+-- 获取按键映射表（用于测试）
+function InputManager:getKeyMap()
+    return initKeyMap()
+end
+
+-- 注册自定义按键映射
+function InputManager:registerKey(key, gameKey)
+    local km = initKeyMap()
+    km[key] = gameKey
 end
 
 function InputManager:getQueueSize()
