@@ -121,56 +121,16 @@ end
 - **修改游戏数据**: 编辑 `script/jyconst.lua`
 - **调试**: 检查 `src/debug.txt`
 - **运行测试**: `cd src && lua tests/test_runner.lua`
-- **运行单个测试**: `cd src && lua tests/unit/test_state_machine.lua`
 
 ## 单元测试
 
-### 测试结构
+详见 [TESTING.md](TESTING.md)。
 
-```
-src/tests/
-├── test_runner.lua          # 测试运行器
-├── test_helper.lua          # 测试工具集
-├── README.md                # 测试文档
-└── unit/                    # 单元测试
-    ├── test_state_machine.lua
-    ├── test_input_manager.lua
-    └── test_event_bridge.lua
-```
-
-### 运行测试
-
+快速命令：
 ```bash
-# 运行所有测试
-cd src && lua tests/test_runner.lua
-
-# 运行单个模块
-cd src && lua tests/unit/test_state_machine.lua
-
-# 从 test_runner 运行特定模块
-cd src && lua tests/test_runner.lua state_machine
+cd src && lua tests/test_runner.lua              # 运行所有测试
+cd src && lua tests/test_runner.lua input_manager # 运行指定模块
 ```
-
-### 编写测试
-
-使用 `test_helper.lua` 提供的工具：
-
-```lua
-local TestHelper = require("tests.test_helper")
-
--- Mock 全局依赖
-TestHelper.mockGlobals()
-
--- 断言
-TestHelper.assertEquals(expected, actual, "message")
-
--- Spy/Stub
-local spy = TestHelper.spy(object, "method")
-spy.wasCalled()
-spy.restore()
-```
-
-详见 `src/tests/README.md`
 
 ## Spec 驱动开发
 
