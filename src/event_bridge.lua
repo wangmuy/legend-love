@@ -15,11 +15,13 @@ local AsyncDialog = require("async_dialog")
 -- 游戏状态常量
 local GAME_STATES = {
     GAME_START = 0,
-    GAME_MMAP = 1,
-    GAME_SMAP = 2,
-    GAME_WMAP = 3,
-    GAME_FIRSTMMAP = 4,
-    GAME_END = 5,
+    GAME_FIRSTMMAP = 1,
+    GAME_MMAP = 2,
+    GAME_FIRSTSMAP = 3,
+    GAME_SMAP = 4,
+    GAME_WMAP = 5,
+    GAME_DEAD = 6,
+    GAME_END = 7,
 }
 
 -- 状态处理器注册表
@@ -50,11 +52,13 @@ function EventBridge:init()
     -- 从全局CC表获取游戏状态常量
     if CC then
         GAME_STATES.GAME_START = GAME_START or 0
-        GAME_STATES.GAME_MMAP = GAME_MMAP or 1
-        GAME_STATES.GAME_SMAP = GAME_SMAP or 2
-        GAME_STATES.GAME_WMAP = GAME_WMAP or 3
-        GAME_STATES.GAME_FIRSTMMAP = GAME_FIRSTMMAP or 4
-        GAME_STATES.GAME_END = GAME_END or 5
+        GAME_STATES.GAME_FIRSTMMAP = GAME_FIRSTMMAP or 1
+        GAME_STATES.GAME_MMAP = GAME_MMAP or 2
+        GAME_STATES.GAME_FIRSTSMAP = GAME_FIRSTSMAP or 3
+        GAME_STATES.GAME_SMAP = GAME_SMAP or 4
+        GAME_STATES.GAME_WMAP = GAME_WMAP or 5
+        GAME_STATES.GAME_DEAD = GAME_DEAD or 6
+        GAME_STATES.GAME_END = GAME_END or 7
     end
     
     -- 初始化各模块

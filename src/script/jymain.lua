@@ -1784,7 +1784,8 @@ end
 function GetDataFromStruct(data,offset,t_struct,key)  --从数据的结构中翻译数据，用来取数据
     local t=t_struct[key];
     if t == nil then
-        JY_Error("GetDataFromStruct: key '" .. tostring(key) .. "' not found in struct")
+        JY_Error(string.format("GetDataFromStruct: key '%s' not found in struct, available keys: %s", 
+            tostring(key), table.concat(getTableKeys(t_struct), ", ")))
         return nil
     end
     local r;
@@ -1796,6 +1797,15 @@ function GetDataFromStruct(data,offset,t_struct,key)  --从数据的结构中翻
         r=Byte.getstr(data,t[1]+offset,t[3]);
     end
     return r;
+end
+
+-- 辅助函数：获取表的所有键
+function getTableKeys(t)
+    local keys = {}
+    for k, _ in pairs(t) do
+        table.insert(keys, tostring(k))
+    end
+    return keys
 end
 
 function SetDataFromStruct(data,offset,t_struct,key,v)  --从数据的结构中翻译数据，保存数据

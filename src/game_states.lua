@@ -44,6 +44,10 @@ local function getStateId(stateName)
         return GAME_WMAP or 5
     elseif stateName == "GAME_END" then
         return GAME_END or 7
+    elseif stateName == "GAME_FIRSTSMAP" then
+        return GAME_FIRSTSMAP or 3
+    elseif stateName == "GAME_DEAD" then
+        return GAME_DEAD or 6
     end
     return nil
 end
