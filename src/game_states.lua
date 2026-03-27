@@ -23,7 +23,8 @@ local function startMenuCoroutine()
         lib.Debug("MMenuCoroutine: ended, calling MenuAsync.clear()")
         -- 菜单关闭后清理状态
         MenuAsync.clear()
-        lib.Debug("MMenuCoroutine: MenuAsync.clear() done")
+        local InputManager = require("input_manager")
+        lib.Debug("MMenuCoroutine: MenuAsync.clear() done, disableInput=" .. tostring(InputManager.disableInput))
     end, "main_menu")
     scheduler:start(co)
 end

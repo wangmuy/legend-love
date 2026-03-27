@@ -111,6 +111,11 @@ function MenuAsync.clear()
     local msm = MenuStateMachine.getInstance()
     msm:clear()
     currentCallback = nil
+    
+    -- 确保恢复键盘输入
+    local InputManager = require("input_manager")
+    InputManager.disableInput = false
+    _debug("MenuAsync.clear: disableInput set to false")
 end
 
 -- 包装为协程版本（用于在协程中同步调用）
