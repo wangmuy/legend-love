@@ -263,11 +263,11 @@ War_AutoCoroutine = function()
         return 0
     end
     
-    -- 选择第一个武功
-    local wugongnum = 0
+    -- 选择第一个武功（武功编号从 1 开始）
+    local wugongnum = 1
     for i = 1, 10 do
         if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
-            wugongnum = i - 1
+            wugongnum = i
             break
         end
     end
