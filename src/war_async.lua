@@ -65,10 +65,13 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     lib.Debug("WarMainCoroutine: calling WarSelectEnemy")
     WarSelectEnemy()
     
+    lib.Debug("WarMainCoroutine: WarSelectEnemy done, WAR.PersonNum=" .. tostring(WAR.PersonNum))
+    
     CleanMemory()
     lib.PicInit()
     lib.ShowSlow(50, 1)
     
+    lib.Debug("WarMainCoroutine: calling WarLoadMap")
     WarLoadMap(WAR.Data["地图"])
     
     -- 设置状态为战斗
