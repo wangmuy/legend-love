@@ -138,12 +138,58 @@ function TestHelper.mockLoveKeyboard()
     }
 end
 
+-- Mock love.data
+function TestHelper.mockLoveData()
+    -- 确保 bit32 可用（标准 Lua 5.1 需要加载 luabit）
+    if not bit32 then
+        require("luabit")
+        bit32 = bit
+        bit32.rshift = bit.brshift
+    end
+    
+    local ByteData = {}
+    ByteData.__index = ByteData
+    
+    function ByteData.new(size)
+        local self = setmetatable({}, ByteData)
+        self._size = size
+        self._data = {}
+        for i = 0, size - 1 do
+            self._data[i] = 0
+        end
+        return self
+    end
+    
+    function ByteData:setByte(offset, value)
+        self._data[offset] = value
+    end
+    
+    function ByteData:getByte(offset)
+        return self._data[offset] or 0
+    end
+    
+    function ByteData:getString()
+        local chars = {}
+        for i = 0, self._size - 1 do
+            chars[i + 1] = string.char(self._data[i] or 0)
+        end
+        return table.concat(chars)
+    end
+    
+    return {
+        newByteData = function(size)
+            return ByteData.new(size)
+        end
+    }
+end
+
 -- 完整 Love2D Mock
 function TestHelper.mockLove()
     local mock = {
         timer = TestHelper.mockLoveTimer(),
         graphics = TestHelper.mockLoveGraphics(),
-        keyboard = TestHelper.mockLoveKeyboard()
+        keyboard = TestHelper.mockLoveKeyboard(),
+        data = TestHelper.mockLoveData()
     }
     _G.love = mock
     return mock
