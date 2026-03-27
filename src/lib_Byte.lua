@@ -97,70 +97,38 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     
     local b = begIdx or 1
     local s = size or #t
+    local totalBytes = s * 2
     
-    -- 检查是否在协程中
-    local scheduler = nil
-    local co = coroutine.running()
-    if co then
-        local ok, sched = pcall(function()
-            return require("coroutine_scheduler").getInstance()
-        end)
-        if ok and sched then
-            scheduler = sched
+    -- 使用 Love2D ByteData（C 实现，更快）
+    local data = love.data.newByteData(totalBytes)
+    
+    local band = bit32.band
+    local rshift = bit32.rshift
+    
+    -- 填充数据（同步，不 yield）
+    if isLittleEndian then
+        for i = 0, s - 1 do
+            local v = t[b + i] or 0
+            local us = v>=0 and v or 65536+v
+            data:setByte(i * 2, band(us, 0xFF))
+            data:setByte(i * 2 + 1, rshift(us, 8))
+        end
+    else
+        for i = 0, s - 1 do
+            local v = t[b + i] or 0
+            local us = v>=0 and v or 65536+v
+            data:setByte(i * 2, rshift(us, 8))
+            data:setByte(i * 2 + 1, band(us, 0xFF))
         end
     end
     
-    -- 时间片调度
-    local timeSlice = 0.016
-    local lastYieldTime = os.clock()
-    local checkInterval = 100000
-    
-    -- 分批处理，减少内存峰值
-    local batchSize = 500000  -- 50 万元素 = 1MB
-    local band = bit32.band
-    local rshift = bit32.rshift
-    local char = string.char
-    
+    -- 写入文件
     local f = io.open(filename, "r+b")
     if not f then f = io.open(filename, "wb") end
     if not f then return end
-    if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
-    
-    -- 分批序列化和写入
-    for batch = 0, math.ceil(s / batchSize) - 1 do
-        local startIdx = b + batch * batchSize
-        local endIdx = math.min(startIdx + batchSize - 1, b + s - 1)
-        local buf = {}
-        
-        if isLittleEndian then
-            for i = startIdx, endIdx do
-                local v = t[i] or 0
-                local us = v>=0 and v or 65536+v
-                buf[i - startIdx + 1] = char(band(us, 0xFF), rshift(us, 8))
-            end
-        else
-            for i = startIdx, endIdx do
-                local v = t[i] or 0
-                local us = v>=0 and v or 65536+v
-                buf[i - startIdx + 1] = char(rshift(us, 8), band(us, 0xFF))
-            end
-        end
-        
-        -- 写入当前批次
-        f:write(table.concat(buf))
-        buf = nil
-        
-        -- 检查是否需要 yield
-        if scheduler and os.clock() - lastYieldTime > timeSlice then
-            scheduler:yield("io")
-            lastYieldTime = os.clock()
-        end
-    end
-    
+    if seekPos and seekPos > 0 then f:seek("set", seekPos) end
+    f:write(data:getString())
     f:close()
-    
-    -- 手动 GC 清理
-    collectgarbage("step")
     
     local elapsed = os.clock() - startTime
     if lib and lib.Debug then
