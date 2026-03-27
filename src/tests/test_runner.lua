@@ -6,6 +6,7 @@ local TestStateMachine = require("tests.unit.test_state_machine")
 local TestInputManager = require("tests.unit.test_input_manager")
 local TestEventBridge = require("tests.unit.test_event_bridge")
 local TestCoroutineScheduler = require("tests.unit.test_coroutine_scheduler")
+local TestByteIO = require("tests.unit.test_byte_io")
 
 local TestRunner = {}
 
@@ -66,6 +67,18 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + csStats.failed
     allPassed = allPassed and csResult
     
+    -- 运行 Byte I/O 测试
+    print("\n" .. string.rep("-", 60))
+    print("运行 Byte I/O 测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local bioResult = TestByteIO.runAll()
+    local bioStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + bioStats.total
+    totalStats.passed = totalStats.passed + bioStats.passed
+    totalStats.failed = totalStats.failed + bioStats.failed
+    allPassed = allPassed and bioResult
+    
     -- 最终结果
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
@@ -97,9 +110,11 @@ function TestRunner.runModule(moduleName)
         return TestEventBridge.runAll()
     elseif moduleName == "coroutine_scheduler" then
         return TestCoroutineScheduler.runAll()
+    elseif moduleName == "byte_io" then
+        return TestByteIO.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io")
         return false
     end
 end

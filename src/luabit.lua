@@ -18,6 +18,10 @@ How to use:
 Please note that bit.brshift and bit.blshift only support number within
 32 bits.
 
+-- Lua 5.2+ compatibility
+if not table.getn then table.getn = function(t) return #t end end
+if not math.mod then math.mod = math.fmod end
+
 2 utility functions are provided too:
  bit.tobits(n) -- convert n into a bit table(which is a 1/0 sequence)
                -- high bits first
@@ -47,11 +51,11 @@ local function to_bits(n)
   -- negative
   return to_bits(bit.bnot(math.abs(n)) + 1)
  end
- -- to bits table
+ table.getn = table.getn or function(t) return #t end
  local tbl = {}
  local cnt = 1
  while (n > 0) do
-  local last = math.mod(n,2)
+  local last = n % 2
   if(last == 1) then
    tbl[cnt] = 1
   else
