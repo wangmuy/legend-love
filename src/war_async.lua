@@ -250,7 +250,19 @@ War_AutoCoroutine = function()
     local id = WAR.CurID
     local pid = WAR.Person[id]["人物编号"]
     
-    -- 简单AI：选择第一个敌人攻击
+    -- 简单AI：先移动再攻击
+    local wugongnum = 1
+    for i = 1, 10 do
+        if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
+            wugongnum = i
+            break
+        end
+    end
+    
+    -- 自动移动
+    local moveResult = War_AutoMoveCoroutine(wugongnum)
+    
+    -- 选择目标
     local targetId = -1
     for i = 0, WAR.PersonNum - 1 do
         if WAR.Person[i]["死亡"] == false and WAR.Person[i]["我方"] == false then
@@ -263,16 +275,120 @@ War_AutoCoroutine = function()
         return 0
     end
     
-    -- 选择第一个武功（武功编号从 1 开始）
-    local wugongnum = 1
-    for i = 1, 10 do
-        if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
-            wugongnum = i
+    -- 执行攻击（异步版本）
+    War_Fight_SubCoroutine(id, wugongnum, targetId, targetId)
+    
+    return 0
+end
+
+-- 自动移动（协程版本）
+-- 替换阻塞式的 War_AutoMove 函数
+local War_AutoMoveCoroutine
+War_AutoMoveCoroutine = function(wugongnum)
+    local pid = WAR.Person[WAR.CurID]["人物编号"]
+    local wugongid = JY.Person[pid]["武功" .. wugongnum]
+    local level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+    
+    local wugongtype = JY.Wugong[wugongid]["攻击范围"]
+    local movescope = JY.Wugong[wugongid]["移动范围" .. level]
+    local fightscope = JY.Wugong[wugongid]["杀伤范围" .. level]
+    local scope = movescope + fightscope
+    
+    local x, y
+    local maxenemy = 0
+    
+    local movestep = War_CalMoveStep(WAR.CurID, WAR.Person[WAR.CurID]["移动步数"], 0)
+    
+    War_AutoCalMaxEnemyMap(wugongid, level)
+    
+    for i = 0, WAR.Person[WAR.CurID]["移动步数"] do
+        local step_num = movestep[i].num
+        if step_num == 0 then
             break
+        end
+        for j = 1, step_num do
+            local xx = movestep[i].x[j]
+            local yy = movestep[i].y[j]
+            
+            local num = 0
+            if wugongtype == 0 or wugongtype == 2 or wugongtype == 3 then
+                num = GetWarMap(xx, yy, 4)
+            elseif wugongtype == 1 then
+                local v = GetWarMap(xx, yy, 4)
+                if v > 0 then
+                    num = War_AutoCalMaxEnemy(xx, yy, wugongid, level)
+                end
+            end
+            
+            if num > maxenemy then
+                maxenemy = num
+                x = xx
+                y = yy
+            elseif num == maxenemy and num > 0 then
+                if Rnd(3) == 0 then
+                    maxenemy = num
+                    x = xx
+                    y = yy
+                end
+            end
         end
     end
     
-    War_Fight_Sub(id, wugongnum, targetId, targetId)
+    if maxenemy > 0 then
+        War_CalMoveStep(WAR.CurID, WAR.Person[WAR.CurID]["移动步数"], 0)
+        War_MovePersonCoroutine(x, y)
+        return 1
+    else
+        x, y = War_GetCanFightEnemyXY(scope)
+        
+        if x == nil then
+            local enemyid = War_AutoSelectEnemy()
+            War_CalMoveStep(WAR.CurID, 100, 0)
+            
+            local minDest = math.huge
+            for i = 0, (CC.WarWidth or 10) - 1 do
+                for j = 0, (CC.WarHeight or 10) - 1 do
+                    local dest = GetWarMap(i, j, 3)
+                    if dest < 128 then
+                        local dx = math.abs(i - WAR.Person[enemyid]["坐标X"])
+                        local dy = math.abs(j - WAR.Person[enemyid]["坐标Y"])
+                        if minDest > (dx + dy) then
+                            minDest = dx + dy
+                            x = i
+                            y = j
+                        elseif minDest == (dx + dy) then
+                            if Rnd(2) == 0 then
+                                x = i
+                                y = j
+                            end
+                        end
+                    end
+                end
+            end
+        else
+            local minDest = 0
+        end
+        
+        if x and y then
+            while true do
+                local i = GetWarMap(x, y, 3)
+                if i <= WAR.Person[WAR.CurID]["移动步数"] then
+                    break
+                end
+                
+                if GetWarMap(x - 1, y, 3) == i - 1 then
+                    x = x - 1
+                elseif GetWarMap(x + 1, y, 3) == i - 1 then
+                    x = x + 1
+                elseif GetWarMap(x, y - 1, 3) == i - 1 then
+                    y = y - 1
+                elseif GetWarMap(x, y + 1, 3) == i - 1 then
+                    y = y + 1
+                end
+            end
+            War_MovePersonCoroutine(x, y)
+        end
+    end
     
     return 0
 end
@@ -349,10 +465,91 @@ War_AttackCoroutine = function()
         return 7
     end
     
-    -- 执行攻击
-    War_Fight_Sub(WAR.CurID, r - 1, targetId, targetId)
+    -- 执行攻击（异步版本）
+    War_Fight_SubCoroutine(WAR.CurID, r - 1, targetId, targetId)
     
     return 0
+end
+
+-- 执行战斗（协程版本）
+-- 替换阻塞式的 War_Fight_Sub 函数
+local War_Fight_SubCoroutine
+War_Fight_SubCoroutine = function(id, wugongnum, x, y)
+    local scheduler = CoroutineScheduler.getInstance()
+    local pid = WAR.Person[id]["人物编号"]
+    local wugong = JY.Person[pid]["武功" .. wugongnum]
+    local level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+    
+    CleanWarMap(4, 0)
+    
+    local fightscope = JY.Wugong[wugong]["攻击范围"]
+    
+    if fightscope == 0 then
+        if War_FightSelectType0(wugong, level, x, y) == false then
+            return 0
+        end
+    elseif fightscope == 1 then
+        War_FightSelectType1(wugong, level, x, y)
+    elseif fightscope == 2 then
+        War_FightSelectType2(wugong, level, x, y)
+    elseif fightscope == 3 then
+        if War_FightSelectType3(wugong, level, x, y) == false then
+            return 0
+        end
+    end
+    
+    local fightnum = 1
+    if JY.Person[pid]["左右互搏"] == 1 then
+        fightnum = 2
+    end
+    
+    for k = 1, fightnum do
+        for i = 0, (CC.WarWidth or 10) - 1 do
+            for j = 0, (CC.WarHeight or 10) - 1 do
+                local effect = GetWarMap(i, j, 4)
+                if effect > 0 then
+                    local emeny = GetWarMap(i, j, 2)
+                    if emeny >= 0 then
+                        if WAR.Person[WAR.CurID]["我方"] ~= WAR.Person[emeny]["我方"] then
+                            if JY.Wugong[wugong]["伤害类型"] == 1 and (fightscope == 0 or fightscope == 3) then
+                                WAR.Person[emeny]["点数"] = -War_WugongHurtNeili(emeny, wugong, level)
+                                SetWarMap(i, j, 4, 3)
+                                WAR.Effect = 3
+                            else
+                                WAR.Person[emeny]["点数"] = -War_WugongHurtLife(emeny, wugong, level)
+                                WAR.Effect = 2
+                                SetWarMap(i, j, 4, 2)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        War_ShowFightCoroutine(pid, wugong, JY.Wugong[wugong]["类型"], level, x, y, JY.Wugong[wugong]["武功动画&音效"])
+        
+        for i = 0, WAR.PersonNum - 1 do
+            WAR.Person[i]["点数"] = 0
+        end
+        
+        WAR.Person[WAR.CurID]["经验"] = WAR.Person[WAR.CurID]["经验"] + 2
+        
+        if JY.Person[pid]["武功等级" .. wugongnum] < 900 then
+            JY.Person[pid]["武功等级" .. wugongnum] = JY.Person[pid]["武功等级" .. wugongnum] + Rnd(2) + 1
+        end
+        
+        if math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1 ~= level then
+            level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+            AsyncMessageBox.ShowMessageCoroutine(-1, -1, 
+                JY.Wugong[wugong]["名称"] .. " 升为 " .. level .. " 级", C_ORANGE, CC.DefaultFont)
+        end
+        
+        AddPersonAttrib(pid, "内力", -math.modf((level + 1) / 2) * JY.Wugong[wugong]["消耗内力点数"])
+    end
+    
+    AddPersonAttrib(pid, "体力", -3)
+    
+    return 1
 end
 
 -- 选择目标（协程版本）
@@ -391,9 +588,12 @@ War_MoveCoroutine = function()
         return 7
     end
     
+    -- 计算移动范围
+    War_CalMoveStep(WAR.CurID, move, 0)
+    
     -- 简化实现：显示移动范围，等待用户选择位置
-    local x = WAR.Person[WAR.CurID]["x"]
-    local y = WAR.Person[WAR.CurID]["y"]
+    local x = WAR.Person[WAR.CurID]["坐标X"]
+    local y = WAR.Person[WAR.CurID]["坐标Y"]
     
     -- 方向选择菜单
     local menu = {
@@ -422,33 +622,138 @@ War_MoveCoroutine = function()
     
     -- 检查是否可以移动
     if GetWarMap(newX, newY, 2) == 0 then
-        SetWarMap(x, y, 2, 0)
-        SetWarMap(newX, newY, 2, WAR.CurID)
-        WAR.Person[WAR.CurID]["x"] = newX
-        WAR.Person[WAR.CurID]["y"] = newY
+        -- 使用异步移动函数，带动画效果
+        War_MovePersonCoroutine(newX, newY)
+    else
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "无法移动到该位置", C_WHITE, CC.DefaultFont)
     end
     
     return 0
+end
+
+-- 异步移动人物（协程版本）
+-- 替换阻塞式的 War_MovePerson 函数
+local War_MovePersonCoroutine
+War_MovePersonCoroutine = function(x, y)
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    local movenum = GetWarMap(x, y, 3)
+    WAR.Person[WAR.CurID]["移动步数"] = WAR.Person[WAR.CurID]["移动步数"] - movenum
+    
+    local movetable = {}
+    local cx, cy = x, y
+    
+    for i = movenum, 1, -1 do
+        movetable[i] = {}
+        movetable[i].x = cx
+        movetable[i].y = cy
+        
+        if GetWarMap(cx - 1, cy, 3) == i - 1 then
+            cx = cx - 1
+            movetable[i].direct = 1
+        elseif GetWarMap(cx + 1, cy, 3) == i - 1 then
+            cx = cx + 1
+            movetable[i].direct = 2
+        elseif GetWarMap(cx, cy - 1, 3) == i - 1 then
+            cy = cy - 1
+            movetable[i].direct = 3
+        elseif GetWarMap(cx, cy + 1, 3) == i - 1 then
+            cy = cy + 1
+            movetable[i].direct = 0
+        end
+    end
+    
+    local frameTime = (CC.Frame or 50) / 1000
+    
+    for i = 1, movenum do
+        SetWarMap(WAR.Person[WAR.CurID]["坐标X"], WAR.Person[WAR.CurID]["坐标Y"], 2, -1)
+        SetWarMap(WAR.Person[WAR.CurID]["坐标X"], WAR.Person[WAR.CurID]["坐标Y"], 5, -1)
+        
+        WAR.Person[WAR.CurID]["坐标X"] = movetable[i].x
+        WAR.Person[WAR.CurID]["坐标Y"] = movetable[i].y
+        WAR.Person[WAR.CurID]["人方向"] = movetable[i].direct
+        WAR.Person[WAR.CurID]["贴图"] = WarCalPersonPic(WAR.CurID)
+        
+        SetWarMap(WAR.Person[WAR.CurID]["坐标X"], WAR.Person[WAR.CurID]["坐标Y"], 2, WAR.CurID)
+        SetWarMap(WAR.Person[WAR.CurID]["坐标X"], WAR.Person[WAR.CurID]["坐标Y"], 5, WAR.Person[WAR.CurID]["贴图"])
+        
+        WarDrawMap(0)
+        
+        if i < movenum then
+            scheduler:waitForTime(frameTime)
+        end
+    end
 end
 
 -- 显示战斗动画（协程版本）
 War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
     local scheduler = CoroutineScheduler.getInstance()
     
-    -- 播放武功动画
-    local animFrames = 5
-    for i = 1, animFrames do
-        WarDrawMap(0)
-        scheduler:waitForTime(0.05)
+    local x0 = WAR.Person[WAR.CurID]["坐标X"]
+    local y0 = WAR.Person[WAR.CurID]["坐标Y"]
+    
+    local fightdelay, fightframe, sounddelay
+    if wugongtype >= 0 then
+        fightdelay = JY.Person[pid]["出招动画延迟" .. wugongtype + 1] or 0
+        fightframe = JY.Person[pid]["出招动画帧数" .. wugongtype + 1] or 0
+        sounddelay = JY.Person[pid]["武功音效延迟" .. wugongtype + 1] or 0
+    else
+        fightdelay = 0
+        fightframe = -1
+        sounddelay = -1
     end
     
-    -- 显示效果
-    if eft >= 0 then
-        for i = 1, 3 do
-            WarDrawMap(0)
-            scheduler:waitForTime(0.03)
+    local framenum = fightdelay + (CC.Effect and CC.Effect[eft] or 10) or 10
+    
+    local startframe = 0
+    if wugongtype >= 0 then
+        for i = 0, wugongtype - 1 do
+            startframe = startframe + 4 * (JY.Person[pid]["出招动画帧数" .. i + 1] or 0)
         end
     end
+    
+    local starteft = 0
+    if CC.Effect then
+        for i = 0, eft - 1 do
+            starteft = starteft + (CC.Effect[i] or 0)
+        end
+    end
+    
+    WAR.Person[WAR.CurID]["贴图类型"] = 0
+    WAR.Person[WAR.CurID]["贴图"] = WarCalPersonPic(WAR.CurID)
+    
+    WarSetPerson()
+    WarDrawMap(0)
+    
+    local frameTime = (CC.Frame or 50) / 1000
+    
+    for i = 0, framenum - 1 do
+        local mytype
+        if fightframe > 0 then
+            WAR.Person[WAR.CurID]["贴图类型"] = 1
+            mytype = 4 + WAR.CurID
+            if i < fightframe then
+                WAR.Person[WAR.CurID]["贴图"] = (startframe + WAR.Person[WAR.CurID]["人方向"] * fightframe + i) * 2
+            end
+        else
+            WAR.Person[WAR.CurID]["贴图类型"] = 0
+            WAR.Person[WAR.CurID]["贴图"] = WarCalPersonPic(WAR.CurID)
+            mytype = 0
+        end
+        
+        if i == sounddelay and JY.Wugong[wugong] then
+            PlayWavAtk(JY.Wugong[wugong]["出招音效"])
+        end
+        if i == fightdelay then
+            PlayWavE(eft)
+        end
+        
+        WarDrawMap(0)
+        scheduler:waitForTime(frameTime)
+    end
+    
+    WAR.Person[WAR.CurID]["贴图类型"] = 0
+    WAR.Person[WAR.CurID]["贴图"] = WarCalPersonPic(WAR.CurID)
 end
 
 -- 导出函数
@@ -460,6 +765,9 @@ WarAsync.SelectTargetCoroutine = SelectTargetCoroutine
 WarAsync.War_MoveCoroutine = War_MoveCoroutine
 WarAsync.War_ShowFightCoroutine = War_ShowFightCoroutine
 WarAsync.War_Manual_SubCoroutine = War_Manual_SubCoroutine
+WarAsync.War_MovePersonCoroutine = War_MovePersonCoroutine
+WarAsync.War_Fight_SubCoroutine = War_Fight_SubCoroutine
+WarAsync.War_AutoMoveCoroutine = War_AutoMoveCoroutine
 
 -- 获取战斗状态
 function WarAsync.getWarState()
