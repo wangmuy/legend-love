@@ -41,6 +41,14 @@ local War_ShowFightCoroutine
 function WarAsync.WarMainCoroutine(warid, isexp)
     lib.Debug(string.format("WarMainCoroutine: warid=%d, isexp=%d", warid, isexp or 1))
     
+    -- 检查 CC 模块是否加载
+    if not CC or not CC.WarData_S then
+        lib.Debug("WarMainCoroutine: ERROR - CC.WarData_S not loaded")
+        return false
+    end
+    
+    lib.Debug("WarMainCoroutine: CC.WarDataSize=" .. tostring(CC.WarDataSize))
+    
     warState.warId = warid
     warState.isExp = isexp or 1
     warState.status = "running"
@@ -49,11 +57,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     
     -- 初始化战斗
     lib.Debug("WarMainCoroutine: calling WarLoad")
-    local ok, err = pcall(function() WarLoad(warid) end)
-    if not ok then
-        lib.Debug("WarMainCoroutine: WarLoad failed: " .. tostring(err))
-        return false
-    end
+    WarLoad(warid)
     
     lib.Debug("WarMainCoroutine: calling WarSelectTeam")
     WarSelectTeam()
