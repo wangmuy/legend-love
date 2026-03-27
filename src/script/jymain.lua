@@ -1783,6 +1783,10 @@ end
 --key  访问的key
 function GetDataFromStruct(data,offset,t_struct,key)  --从数据的结构中翻译数据，用来取数据
     local t=t_struct[key];
+    if t == nil then
+        JY_Error("GetDataFromStruct: key '" .. tostring(key) .. "' not found in struct")
+        return nil
+    end
     local r;
     if t[2]==0 then
         r=Byte.get16(data,t[1]+offset);
