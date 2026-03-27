@@ -102,11 +102,10 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     local b = begIdx or 1
     local s = size or #t
     
-    -- 检查是否在协程中，以及是否可以通过调度器 yield
+    -- 检查是否在协程中
     local co = coroutine.running()
     local scheduler = nil
     if co then
-        -- 尝试获取调度器
         local ok, sched = pcall(function()
             return require("coroutine_scheduler").getInstance()
         end)
@@ -115,16 +114,17 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
         end
     end
     
-    -- 批量构建字符串再写入，提高性能
-    local batchSize = 32768  -- 32K 个元素
+    -- 优化：更大的批次，减少函数调用次数
+    local batchSize = 65536  -- 64K 个元素 = 128KB
+    local yieldInterval = 8  -- 每 8 批次 yield 一次（512KB）
     local chunks = {}
     local chunkCount = 0
-    local yieldInterval = 4  -- 每 4 批次 yield 一次
     local batchNum = 0
     
     for i = b, b + s - 1 do
         local v = t[i] or 0
         local us = v>=0 and v or 65536+v
+        -- 直接构建字节字符串
         if isLittleEndian then
             chunkCount = chunkCount + 1
             chunks[chunkCount] = string.char(bit32.band(us, 0xFF), bit32.rshift(us, 8))
@@ -132,7 +132,7 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
             chunkCount = chunkCount + 1
             chunks[chunkCount] = string.char(bit32.rshift(us, 8), bit32.band(us, 0xFF))
         end
-        -- 每 batchSize 个元素写入一次
+        -- 批量写入
         if chunkCount >= batchSize then
             f:write(table.concat(chunks))
             chunks = {}
@@ -144,7 +144,7 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
             end
         end
     end
-    -- 写入剩余
+    -- 写入剩余数据
     if chunkCount > 0 then
         f:write(table.concat(chunks))
     end
