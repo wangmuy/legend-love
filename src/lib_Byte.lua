@@ -113,51 +113,54 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     -- 时间片调度
     local timeSlice = 0.016
     local lastYieldTime = os.clock()
-    local checkInterval = 100000  -- 每 10 万元素检查时间
+    local checkInterval = 100000
     
-    -- 预分配缓冲区
-    local buf = {}
+    -- 分批处理，减少内存峰值
+    local batchSize = 500000  -- 50 万元素 = 1MB
     local band = bit32.band
     local rshift = bit32.rshift
     local char = string.char
-    
-    if isLittleEndian then
-        for i = b, b + s - 1 do
-            local v = t[i] or 0
-            local us = v>=0 and v or 65536+v
-            buf[i-b+1] = char(band(us, 0xFF), rshift(us, 8))
-            -- 定期检查是否需要 yield
-            if scheduler and (i - b + 1) % checkInterval == 0 then
-                if os.clock() - lastYieldTime > timeSlice then
-                    scheduler:yield("io")
-                    lastYieldTime = os.clock()
-                end
-            end
-        end
-    else
-        for i = b, b + s - 1 do
-            local v = t[i] or 0
-            local us = v>=0 and v or 65536+v
-            buf[i-b+1] = char(rshift(us, 8), band(us, 0xFF))
-            -- 定期检查是否需要 yield
-            if scheduler and (i - b + 1) % checkInterval == 0 then
-                if os.clock() - lastYieldTime > timeSlice then
-                    scheduler:yield("io")
-                    lastYieldTime = os.clock()
-                end
-            end
-        end
-    end
-    
-    -- 合并并写入
-    local data = table.concat(buf)
     
     local f = io.open(filename, "r+b")
     if not f then f = io.open(filename, "wb") end
     if not f then return end
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
-    f:write(data)
+    
+    -- 分批序列化和写入
+    for batch = 0, math.ceil(s / batchSize) - 1 do
+        local startIdx = b + batch * batchSize
+        local endIdx = math.min(startIdx + batchSize - 1, b + s - 1)
+        local buf = {}
+        
+        if isLittleEndian then
+            for i = startIdx, endIdx do
+                local v = t[i] or 0
+                local us = v>=0 and v or 65536+v
+                buf[i - startIdx + 1] = char(band(us, 0xFF), rshift(us, 8))
+            end
+        else
+            for i = startIdx, endIdx do
+                local v = t[i] or 0
+                local us = v>=0 and v or 65536+v
+                buf[i - startIdx + 1] = char(rshift(us, 8), band(us, 0xFF))
+            end
+        end
+        
+        -- 写入当前批次
+        f:write(table.concat(buf))
+        buf = nil
+        
+        -- 检查是否需要 yield
+        if scheduler and os.clock() - lastYieldTime > timeSlice then
+            scheduler:yield("io")
+            lastYieldTime = os.clock()
+        end
+    end
+    
     f:close()
+    
+    -- 手动 GC 清理
+    collectgarbage("step")
     
     local elapsed = os.clock() - startTime
     if lib and lib.Debug then
