@@ -116,12 +116,24 @@ function JyMainAsync.Menu_SaveRecord()
     if lib and lib.Debug then lib.Debug("Menu_SaveRecord: selected r=" .. tostring(r)) end
     
     if r > 0 then
-        if lib and lib.Debug then lib.Debug("Menu_SaveRecord: calling DrawStrBox") end
-        DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
+        -- 显示保存提示
+        DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "保存中......", C_WHITE, CC.DefaultFont)
+        ShowScreen()  -- 强制刷新画面
+        
         if lib and lib.Debug then lib.Debug("Menu_SaveRecord: calling SaveRecord") end
         SaveRecord(r)
-        if lib and lib.Debug then lib.Debug(string.format("Menu_SaveRecord: SaveRecord done (%.2fs)", os.clock() - startTime)) end
+        
+        -- 显示完成提示
         Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+        local elapsed = os.clock() - startTime
+        DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, string.format("保存完成 (%.1f秒)", elapsed), C_WHITE, CC.DefaultFont)
+        ShowScreen()
+        
+        -- 短暂显示后清除
+        lib.Delay(500)
+        Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+        
+        if lib and lib.Debug then lib.Debug(string.format("Menu_SaveRecord: SaveRecord done (%.2fs)", elapsed)) end
     end
     
     if lib and lib.Debug then lib.Debug(string.format("Menu_SaveRecord: ended (%.2fs total)", os.clock() - startTime)) end
