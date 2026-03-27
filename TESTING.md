@@ -31,7 +31,8 @@ src/tests/
     ├── test_state_machine.lua   # 状态机测试
     ├── test_input_manager.lua   # 输入管理器测试
     ├── test_event_bridge.lua    # 事件桥接测试
-    └── test_coroutine_scheduler.lua  # 协程调度器测试
+    ├── test_coroutine_scheduler.lua  # 协程调度器测试
+    └── test_byte_io.lua         # Byte I/O 测试
 ```
 
 ### 测试文件命名规范
@@ -104,6 +105,7 @@ cd src && lua tests/unit/test_input_manager.lua
 | `input_manager` | 输入管理器测试 |
 | `event_bridge` | 事件桥接测试 |
 | `coroutine_scheduler` | 协程调度器测试 |
+| `byte_io` | Byte I/O 测试 |
 
 ## 测试覆盖范围
 
@@ -114,6 +116,7 @@ cd src && lua tests/unit/test_input_manager.lua
 | `state_machine` | 状态注册、切换、update/draw 回调 |
 | `input_manager` | 按键事件队列、按键映射、disableInput 绕过 |
 | `event_bridge` | 单例模式、状态注册、集成测试 |
+| `byte_io` | SaveFromTable16/LoadToTable16、字节序、数据一致性 |
 | `coroutine_scheduler` | 协程创建、yield/resume、waitForKey 绕过 disableInput |
 
 ### 关键测试场景
