@@ -24,6 +24,16 @@ local function getScheduler()
     return CoroutineScheduler.getInstance()
 end
 
+-- 前向声明内部函数
+local War_ManualCoroutine
+local War_AutoCoroutine
+local War_SettlementCoroutine
+local War_AttackCoroutine
+local War_MoveCoroutine
+local SelectTargetCoroutine
+local War_Manual_SubCoroutine
+local War_ShowFightCoroutine
+
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
 -- @param isexp: 输后是否有经验
@@ -117,12 +127,12 @@ function WarAsync.WarMainCoroutine(warid, isexp)
                 local r
                 if WAR.Person[p]["我方"] == true then
                     if WAR.AutoFight == 0 then
-                        r = WarAsync.War_ManualCoroutine()
+                        r = War_ManualCoroutine()
                     else
-                        r = WarAsync.War_AutoCoroutine()
+                        r = War_AutoCoroutine()
                     end
                 else
-                    r = WarAsync.War_AutoCoroutine()
+                    r = War_AutoCoroutine()
                 end
                 
                 warStatus = War_isEnd()
@@ -142,7 +152,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     end
     
     -- 战斗结束
-    WarAsync.War_SettlementCoroutine(warStatus)
+    War_SettlementCoroutine(warStatus)
     
     War_EndPersonData(warState.isExp, warStatus)
     
@@ -155,10 +165,10 @@ function WarAsync.WarMainCoroutine(warid, isexp)
 end
 
 -- 手动战斗（协程版本）
-function WarAsync.War_ManualCoroutine()
+War_ManualCoroutine = function()
     local r
     while true do
-        r = WarAsync.War_Manual_SubCoroutine()
+        r = War_Manual_SubCoroutine()
         if math.abs(r) ~= 7 then
             break
         end
@@ -167,7 +177,7 @@ function WarAsync.War_ManualCoroutine()
 end
 
 -- 手动战斗菜单（协程版本）
-function WarAsync.War_Manual_SubCoroutine()
+War_Manual_SubCoroutine = function()
     local menu = {
         {"攻击", nil, 1},
         {"移动", nil, 1},
@@ -196,10 +206,10 @@ function WarAsync.War_Manual_SubCoroutine()
     -- 处理菜单选择
     if r == 1 then
         -- 攻击
-        return WarAsync.War_AttackCoroutine()
+        return War_AttackCoroutine()
     elseif r == 2 then
         -- 移动
-        return WarAsync.War_MoveCoroutine()
+        return War_MoveCoroutine()
     elseif r == 6 then
         -- 物品
         War_ThingMenu()
@@ -215,131 +225,12 @@ function WarAsync.War_Manual_SubCoroutine()
     elseif r == 9 then
         -- 自动
         War_AutoMenu()
-return 0
-end
-
--- 战斗物品菜单（协程版本）
-function WarAsync.War_ThingMenuCoroutine()
-    local things = {}
-    local count = 0
-    
-    for i = 0, JY.ThingNum - 1 do
-        if JY.Thing[i]["数量"] > 0 then
-            local canUse = false
-            -- 检查物品是否可以在战斗中使用
-            local thingType = JY.Thing[i]["类型"]
-            if thingType == 0 or thingType == 1 or thingType == 2 then
-                canUse = true
-            end
-            
-            if canUse then
-                table.insert(things, {JY.Thing[i]["名称"], nil, 1, i})
-                count = count + 1
-            end
-        end
-    end
-    
-    if count == 0 then
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "没有可用的物品", C_WHITE, CC.DefaultFont)
         return 0
-    end
-    
-    local r = MenuAsync.ShowMenuCoroutine(things, count, count,
-        0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
-    
-    if r > 0 then
-        local thingid = things[r][4]
-        -- 使用物品
-        UseThing(WAR.Person[WAR.CurID]["人物编号"], thingid)
-    end
-    
-    return 0
-end
-
--- 战斗状态显示（协程版本）
-function WarAsync.War_StatusMenuCoroutine()
-    local menu = {}
-    
-    for i = 0, JY.PersonNum - 1 do
-        local id = JY.Base["队伍" .. (i + 1)]
-        if id and id >= 0 then
-            table.insert(menu, {JY.Person[id]["姓名"], nil, 1, id})
-        end
-    end
-    
-    if #menu == 0 then
-        return 0
-    end
-    
-    local r = MenuAsync.ShowMenuCoroutine(menu, #menu, #menu,
-        0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
-    
-    if r > 0 then
-        ShowPersonStatus(menu[r][4])
-    end
-    
-    return 0
-end
-
--- 自动战斗设置（协程版本）
-function WarAsync.War_AutoMenuCoroutine()
-    WAR.AutoFight = 1
-    AsyncMessageBox.ShowMessageCoroutine(-1, -1, "已切换为自动战斗", C_WHITE, CC.DefaultFont)
-    return 0
-end
-
--- 等待菜单（协程版本）
-function WarAsync.War_WaitMenuCoroutine()
-    -- 将当前人物移到队尾
-    local cur = WAR.Person[WAR.CurID]
-    table.insert(WAR.Person, cur)
-    WAR.Person[WAR.CurID] = nil
-    table.remove(WAR.Person, WAR.CurID)
-    
-    return 7
-end
-
--- 执行战斗（协程版本）
-function WarAsync.War_Fight_SubCoroutine(id, wugongnum, x, y)
-    local pid = WAR.Person[id]["人物编号"]
-    local wugongid = JY.Person[pid]["武功" .. (wugongnum + 1)]
-    local wugongtype = JY.Wugong[wugongid]["类型"]
-    local level = math.modf(JY.Person[pid]["武功等级" .. (wugongnum + 1)] / 100) + 1
-    
-    -- 显示战斗动画
-    WarAsync.War_ShowFightCoroutine(id, wugongid, wugongtype, level, x, y, -1)
-    
-    -- 计算伤害
-    -- 原始逻辑保留
-    War_Fight_Sub(id, wugongnum, x, y)
-end
-
--- 显示战斗动画（协程版本）
-function WarAsync.War_ShowFightCoroutine(pid, wugong, wugongtype, level, x, y, eft)
-    local scheduler = CoroutineScheduler.getInstance()
-    
-    -- 播放武功动画
-    local animFrames = 5
-    for i = 1, animFrames do
-        WarDrawMap(0)
-        -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
-        -- ShowScreen()
-        scheduler:waitForTime(0.05)
-    end
-    
-    -- 显示效果
-    if eft >= 0 then
-        for i = 1, 3 do
-            WarDrawMap(0)
-            -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
-            -- ShowScreen()
-            scheduler:waitForTime(0.03)
-        end
     end
 end
 
 -- 自动战斗（协程版本）
-function WarAsync.War_AutoCoroutine()
+War_AutoCoroutine = function()
     local id = WAR.CurID
     local pid = WAR.Person[id]["人物编号"]
     
@@ -371,7 +262,7 @@ function WarAsync.War_AutoCoroutine()
 end
 
 -- 战斗结算（协程版本）
-function WarAsync.War_SettlementCoroutine(warStatus)
+War_SettlementCoroutine = function(warStatus)
     local scheduler = CoroutineScheduler.getInstance()
     
     if warStatus == 1 then
@@ -403,12 +294,9 @@ function WarAsync.War_SettlementCoroutine(warStatus)
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗失败", C_WHITE, CC.DefaultFont)
     end
 end
-    
-    return 0
-end
 
 -- 攻击选择（协程版本）
-function WarAsync.War_AttackCoroutine()
+War_AttackCoroutine = function()
     local pid = WAR.Person[WAR.CurID]["人物编号"]
     
     -- 获取可用的武功列表
@@ -439,8 +327,8 @@ function WarAsync.War_AttackCoroutine()
     local wugongid = menu[r][4]
     local wugongtype = JY.Wugong[wugongid]["类型"]
     
-    -- 选择目标（简化实现）
-    local targetId = WarAsync.SelectTargetCoroutine()
+    -- 选择目标
+    local targetId = SelectTargetCoroutine()
     if targetId < 0 then
         return 7
     end
@@ -452,7 +340,7 @@ function WarAsync.War_AttackCoroutine()
 end
 
 -- 选择目标（协程版本）
-function WarAsync.SelectTargetCoroutine()
+SelectTargetCoroutine = function()
     -- 获取敌方列表
     local targets = {}
     for i = 0, WAR.PersonNum - 1 do
@@ -480,7 +368,7 @@ function WarAsync.SelectTargetCoroutine()
 end
 
 -- 移动选择（协程版本）
-function WarAsync.War_MoveCoroutine()
+War_MoveCoroutine = function()
     local move = WAR.Person[WAR.CurID]["移动步数"]
     if move <= 0 then
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "不能移动", C_WHITE, CC.DefaultFont)
@@ -488,8 +376,6 @@ function WarAsync.War_MoveCoroutine()
     end
     
     -- 简化实现：显示移动范围，等待用户选择位置
-    -- 实际游戏需要更复杂的交互
-    
     local x = WAR.Person[WAR.CurID]["x"]
     local y = WAR.Person[WAR.CurID]["y"]
     
@@ -529,21 +415,32 @@ function WarAsync.War_MoveCoroutine()
     return 0
 end
 
--- 获取战斗状态
-function WarAsync.getWarState()
-    return warState
+-- 显示战斗动画（协程版本）
+War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    -- 播放武功动画
+    local animFrames = 5
+    for i = 1, animFrames do
+        WarDrawMap(0)
+        scheduler:waitForTime(0.05)
+    end
+    
+    -- 显示效果
+    if eft >= 0 then
+        for i = 1, 3 do
+            WarDrawMap(0)
+            scheduler:waitForTime(0.03)
+        end
+    end
 end
 
--- 重置战斗状态
-function WarAsync.reset()
-    warState = {
-        warId = nil,
-        isExp = 1,
-        status = "idle",
-        result = nil,
-        round = 0,
-        currentPerson = 0,
-    }
-end
-
-return WarAsync
+-- 导出函数
+WarAsync.War_ManualCoroutine = War_ManualCoroutine
+WarAsync.War_AutoCoroutine = War_AutoCoroutine
+WarAsync.War_SettlementCoroutine = War_SettlementCoroutine
+WarAsync.War_AttackCoroutine = War_AttackCoroutine
+WarAsync.SelectTargetCoroutine = SelectTargetCoroutine
+WarAsync.War_MoveCoroutine = War_MoveCoroutine
+WarAsync.War_ShowFightCoroutine = War_ShowFightCoroutine
+WarAsync.War_Manual_SubCoroutine = War_Manual_SubCoroutine
