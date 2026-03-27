@@ -93,18 +93,14 @@ end
 
 function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     if t==nil or #t<=0 then return end
-    local f = io.open(filename, "r+b")
-    if not f then
-        f = io.open(filename, "wb")
-    end
-    if not f then return end
-    if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
+    local startTime = os.clock()
+    
     local b = begIdx or 1
     local s = size or #t
     
     -- 检查是否在协程中
-    local co = coroutine.running()
     local scheduler = nil
+    local co = coroutine.running()
     if co then
         local ok, sched = pcall(function()
             return require("coroutine_scheduler").getInstance()
@@ -114,36 +110,59 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
         end
     end
     
-    -- 1MB 缓存 = 524288 个 16位元素
-    local cacheSize = 524288
-    local cache = {}
-    local cacheCount = 0
+    -- 时间片调度
+    local timeSlice = 0.016
+    local lastYieldTime = os.clock()
+    local checkInterval = 100000  -- 每 10 万元素检查时间
     
-    for i = b, b + s - 1 do
-        local v = t[i] or 0
-        local us = v>=0 and v or 65536+v
-        cacheCount = cacheCount + 1
-        if isLittleEndian then
-            cache[cacheCount] = string.char(bit32.band(us, 0xFF), bit32.rshift(us, 8))
-        else
-            cache[cacheCount] = string.char(bit32.rshift(us, 8), bit32.band(us, 0xFF))
+    -- 预分配缓冲区
+    local buf = {}
+    local band = bit32.band
+    local rshift = bit32.rshift
+    local char = string.char
+    
+    if isLittleEndian then
+        for i = b, b + s - 1 do
+            local v = t[i] or 0
+            local us = v>=0 and v or 65536+v
+            buf[i-b+1] = char(band(us, 0xFF), rshift(us, 8))
+            -- 定期检查是否需要 yield
+            if scheduler and (i - b + 1) % checkInterval == 0 then
+                if os.clock() - lastYieldTime > timeSlice then
+                    scheduler:yield("io")
+                    lastYieldTime = os.clock()
+                end
+            end
         end
-        -- 缓存满 1MB 后写入
-        if cacheCount >= cacheSize then
-            f:write(table.concat(cache))
-            cache = {}
-            cacheCount = 0
-            -- 写入后 yield 让主循环处理事件
-            if scheduler then
-                scheduler:yield("io")
+    else
+        for i = b, b + s - 1 do
+            local v = t[i] or 0
+            local us = v>=0 and v or 65536+v
+            buf[i-b+1] = char(rshift(us, 8), band(us, 0xFF))
+            -- 定期检查是否需要 yield
+            if scheduler and (i - b + 1) % checkInterval == 0 then
+                if os.clock() - lastYieldTime > timeSlice then
+                    scheduler:yield("io")
+                    lastYieldTime = os.clock()
+                end
             end
         end
     end
-    -- 写入剩余数据
-    if cacheCount > 0 then
-        f:write(table.concat(cache))
-    end
+    
+    -- 合并并写入
+    local data = table.concat(buf)
+    
+    local f = io.open(filename, "r+b")
+    if not f then f = io.open(filename, "wb") end
+    if not f then return end
+    if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
+    f:write(data)
     f:close()
+    
+    local elapsed = os.clock() - startTime
+    if lib and lib.Debug then
+        lib.Debug(string.format("SaveFromTable16: %d elements, %.3fs", s, elapsed))
+    end
 end
 
 function LoadToTable8(t, filename, size, seekPos)
