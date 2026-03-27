@@ -102,10 +102,25 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     local b = begIdx or 1
     local s = size or #t
     
+    -- 检查是否在协程中，以及是否可以通过调度器 yield
+    local co = coroutine.running()
+    local scheduler = nil
+    if co then
+        -- 尝试获取调度器
+        local ok, sched = pcall(function()
+            return require("coroutine_scheduler").getInstance()
+        end)
+        if ok and sched then
+            scheduler = sched
+        end
+    end
+    
     -- 批量构建字符串再写入，提高性能
-    local batchSize = 65536  -- 64K 个元素 = 128KB
+    local batchSize = 32768  -- 32K 个元素
     local chunks = {}
     local chunkCount = 0
+    local yieldInterval = 4  -- 每 4 批次 yield 一次
+    local batchNum = 0
     
     for i = b, b + s - 1 do
         local v = t[i] or 0
@@ -122,6 +137,11 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
             f:write(table.concat(chunks))
             chunks = {}
             chunkCount = 0
+            batchNum = batchNum + 1
+            -- 定期 yield 让主循环处理事件
+            if scheduler and batchNum % yieldInterval == 0 then
+                scheduler:yield("io")
+            end
         end
     end
     -- 写入剩余
