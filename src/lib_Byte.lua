@@ -114,39 +114,34 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
         end
     end
     
-    -- 优化：更大的批次，减少函数调用次数
-    local batchSize = 65536  -- 64K 个元素 = 128KB
-    local yieldInterval = 8  -- 每 8 批次 yield 一次（512KB）
-    local chunks = {}
-    local chunkCount = 0
-    local batchNum = 0
+    -- 1MB 缓存 = 524288 个 16位元素
+    local cacheSize = 524288
+    local cache = {}
+    local cacheCount = 0
     
     for i = b, b + s - 1 do
         local v = t[i] or 0
         local us = v>=0 and v or 65536+v
-        -- 直接构建字节字符串
+        cacheCount = cacheCount + 1
         if isLittleEndian then
-            chunkCount = chunkCount + 1
-            chunks[chunkCount] = string.char(bit32.band(us, 0xFF), bit32.rshift(us, 8))
+            cache[cacheCount] = string.char(bit32.band(us, 0xFF), bit32.rshift(us, 8))
         else
-            chunkCount = chunkCount + 1
-            chunks[chunkCount] = string.char(bit32.rshift(us, 8), bit32.band(us, 0xFF))
+            cache[cacheCount] = string.char(bit32.rshift(us, 8), bit32.band(us, 0xFF))
         end
-        -- 批量写入
-        if chunkCount >= batchSize then
-            f:write(table.concat(chunks))
-            chunks = {}
-            chunkCount = 0
-            batchNum = batchNum + 1
-            -- 定期 yield 让主循环处理事件
-            if scheduler and batchNum % yieldInterval == 0 then
+        -- 缓存满 1MB 后写入
+        if cacheCount >= cacheSize then
+            f:write(table.concat(cache))
+            cache = {}
+            cacheCount = 0
+            -- 写入后 yield 让主循环处理事件
+            if scheduler then
                 scheduler:yield("io")
             end
         end
     end
     -- 写入剩余数据
-    if chunkCount > 0 then
-        f:write(table.concat(chunks))
+    if cacheCount > 0 then
+        f:write(table.concat(cache))
     end
     f:close()
 end
