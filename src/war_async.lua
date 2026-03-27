@@ -444,3 +444,22 @@ WarAsync.SelectTargetCoroutine = SelectTargetCoroutine
 WarAsync.War_MoveCoroutine = War_MoveCoroutine
 WarAsync.War_ShowFightCoroutine = War_ShowFightCoroutine
 WarAsync.War_Manual_SubCoroutine = War_Manual_SubCoroutine
+
+-- 获取战斗状态
+function WarAsync.getWarState()
+    return warState
+end
+
+-- 重置战斗状态
+function WarAsync.reset()
+    warState = {
+        warId = nil,
+        isExp = 1,
+        status = "idle",
+        result = nil,
+        round = 0,
+        currentPerson = 0,
+    }
+end
+
+return WarAsync
