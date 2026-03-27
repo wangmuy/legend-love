@@ -48,8 +48,17 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     warState.round = 0
     
     -- 初始化战斗
-    WarLoad(warid)
+    lib.Debug("WarMainCoroutine: calling WarLoad")
+    local ok, err = pcall(function() WarLoad(warid) end)
+    if not ok then
+        lib.Debug("WarMainCoroutine: WarLoad failed: " .. tostring(err))
+        return false
+    end
+    
+    lib.Debug("WarMainCoroutine: calling WarSelectTeam")
     WarSelectTeam()
+    
+    lib.Debug("WarMainCoroutine: calling WarSelectEnemy")
     WarSelectEnemy()
     
     CleanMemory()
