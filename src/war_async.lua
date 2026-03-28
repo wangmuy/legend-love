@@ -24,19 +24,6 @@ local function getScheduler()
     return CoroutineScheduler.getInstance()
 end
 
--- 前向声明所有内部函数（避免全局变量检查错误）
-local War_ManualCoroutine
-local War_AutoCoroutine
-local War_SettlementCoroutine
-local War_AttackCoroutine
-local War_MoveCoroutine
-local SelectTargetCoroutine
-local War_Manual_SubCoroutine
-local War_ShowFightCoroutine
-local War_Fight_SubCoroutine
-local War_MovePersonCoroutine
-local War_AutoMoveCoroutine
-
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
 -- @param isexp: 输后是否有经验
@@ -486,7 +473,6 @@ end
 
 -- 执行战斗（协程版本）
 -- 替换阻塞式的 War_Fight_Sub 函数
-local War_Fight_SubCoroutine
 War_Fight_SubCoroutine = function(id, wugongnum, x, y)
     local scheduler = CoroutineScheduler.getInstance()
     local pid = WAR.Person[id]["人物编号"]
