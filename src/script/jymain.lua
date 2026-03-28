@@ -3104,9 +3104,18 @@ end
 function instruct_6(warid,tmp,tmp2,flag)      --战斗
     local co = coroutine.running()
     if co then
+        lib.Debug("instruct_6: running in coroutine, warid=" .. warid)
+        local scheduler = require("coroutine_scheduler")
         local WarAsync = require("war_async")
-        return WarAsync.WarMainCoroutine(warid, flag or 1)
+        
+        local warCo = scheduler:create(function()
+            return WarAsync.WarMainCoroutine(warid, flag or 1)
+        end, "battle")
+        
+        scheduler:start(warCo)
+        return true
     else
+        lib.Debug("instruct_6: NOT in coroutine, warid=" .. warid .. ", using blocking WarMain")
         return WarMain(warid, flag or 1)
     end
 end
