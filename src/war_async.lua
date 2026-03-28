@@ -257,39 +257,6 @@ War_Manual_SubCoroutine = function()
     end
 end
 
--- 自动战斗（协程版本）
-War_AutoCoroutine = function()
-    local id = WAR.CurID
-    local pid = WAR.Person[id]["人物编号"]
-    
-    -- 简单AI：直接攻击，不移动
-    local wugongnum = 1
-    for i = 1, 10 do
-        if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
-            wugongnum = i
-            break
-        end
-    end
-    
-    -- 选择目标
-    local targetId = -1
-    for i = 0, WAR.PersonNum - 1 do
-        if WAR.Person[i]["死亡"] == false and WAR.Person[i]["我方"] == false then
-            targetId = i
-            break
-        end
-    end
-    
-    if targetId < 0 then
-        return 0
-    end
-    
-    -- 执行攻击（异步版本）
-    War_Fight_SubCoroutine(id, wugongnum, targetId, targetId)
-    
-    return 0
-end
-
 -- 自动移动（协程版本）
 -- 替换阻塞式的 War_AutoMove 函数
 local War_AutoMoveCoroutine
@@ -398,6 +365,42 @@ War_AutoMoveCoroutine = function(wugongnum)
             War_MovePersonCoroutine(x, y)
         end
     end
+    
+    return 0
+end
+
+-- 自动战斗（协程版本）
+War_AutoCoroutine = function()
+    local id = WAR.CurID
+    local pid = WAR.Person[id]["人物编号"]
+    
+    -- 简单AI：先移动再攻击
+    local wugongnum = 1
+    for i = 1, 10 do
+        if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
+            wugongnum = i
+            break
+        end
+    end
+    
+    -- 自动移动
+    local moveResult = War_AutoMoveCoroutine(wugongnum)
+    
+    -- 选择目标
+    local targetId = -1
+    for i = 0, WAR.PersonNum - 1 do
+        if WAR.Person[i]["死亡"] == false and WAR.Person[i]["我方"] == false then
+            targetId = i
+            break
+        end
+    end
+    
+    if targetId < 0 then
+        return 0
+    end
+    
+    -- 执行攻击（异步版本）
+    War_Fight_SubCoroutine(id, wugongnum, targetId, targetId)
     
     return 0
 end
