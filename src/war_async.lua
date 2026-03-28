@@ -259,7 +259,6 @@ end
 
 -- 自动移动（协程版本）
 -- 替换阻塞式的 War_AutoMove 函数
-local War_AutoMoveCoroutine
 War_AutoMoveCoroutine = function(wugongnum)
     local pid = WAR.Person[WAR.CurID]["人物编号"]
     local wugongid = JY.Person[pid]["武功" .. wugongnum]
@@ -645,7 +644,6 @@ end
 
 -- 异步移动人物（协程版本）
 -- 替换阻塞式的 War_MovePerson 函数
-local War_MovePersonCoroutine
 War_MovePersonCoroutine = function(x, y)
     local scheduler = CoroutineScheduler.getInstance()
     
