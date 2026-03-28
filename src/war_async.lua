@@ -118,10 +118,16 @@ function WarAsync.WarMainCoroutine(warid, isexp)
         
         WarSetPerson()
         
+        -- 让出控制权
+        CoroutineScheduler.getInstance():yield("battle_round_start")
+        
         -- 每回合战斗循环
         local p = 0
         while p < WAR.PersonNum do
             WAR.Effect = 0
+            
+            -- 让出控制权，让渲染有机会执行
+            CoroutineScheduler.getInstance():yield("battle_round")
             
             -- 处理自动战斗取消
             if WAR.AutoFight == 1 then
@@ -159,6 +165,9 @@ function WarAsync.WarMainCoroutine(warid, isexp)
             end
             
             p = p + 1
+            
+            -- 每次人物行动后都让出控制权
+            CoroutineScheduler.getInstance():yield("battle_person_done")
         end
         
         -- 回合结束处理
