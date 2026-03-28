@@ -459,6 +459,8 @@ handlers["GAME_WMAP"] = {
     draw = function()
         -- 战斗渲染在战斗协程中处理
         -- 绘制战斗地图和人物
+        lib.Debug(string.format("GAME_WMAP draw: JY.Status=%d, GAME_WMAP=%d, WAR=%s, WAR.Person=%s, WAR.CurID=%s", 
+            JY.Status, getStateId("GAME_WMAP"), tostring(WAR), tostring(WAR and WAR.Person), tostring(WAR and WAR.CurID)))
         if JY.Status == getStateId("GAME_WMAP") and WAR and WAR.Person and WAR.CurID then
             WarDrawMap(0)
         end
