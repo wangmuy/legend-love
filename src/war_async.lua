@@ -24,20 +24,6 @@ local function getScheduler()
     return CoroutineScheduler.getInstance()
 end
 
--- 前向声明内部函数
-local War_ManualCoroutine
-local War_AutoCoroutine
-local War_SettlementCoroutine
-local War_AttackCoroutine
-local War_MoveCoroutine
-local SelectTargetCoroutine
-local War_Manual_SubCoroutine
-local War_ShowFightCoroutine
-local War_MovePersonCoroutine
-local War_Fight_SubCoroutine
-local War_AutoMoveCoroutine
-local War_Fight_Sub
-
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
 -- @param isexp: 输后是否有经验
