@@ -36,6 +36,13 @@ local War_ShowFightCoroutine
 local War_MovePersonCoroutine
 local War_Fight_SubCoroutine
 local War_AutoMoveCoroutine
+local War_Fight_Sub
+local War_CalMoveStep
+local War_AutoCalMaxEnemyMap
+local War_AutoSelectEnemy
+local War_GetCanFightEnemyXY
+local GetWarMap
+local SetWarMap
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
