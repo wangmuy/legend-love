@@ -459,7 +459,7 @@ handlers["GAME_WMAP"] = {
     draw = function()
         -- 战斗渲染在战斗协程中处理
         -- 绘制战斗地图和人物
-        if JY.Status == getStateId("GAME_WMAP") then
+        if JY.Status == getStateId("GAME_WMAP") and WAR and WAR.CurID then
             WarDrawMap(0)
         end
     end
