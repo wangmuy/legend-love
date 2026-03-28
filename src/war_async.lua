@@ -696,6 +696,7 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
     local x0 = WAR.Person[WAR.CurID]["坐标X"]
     local y0 = WAR.Person[WAR.CurID]["坐标Y"]
     
+    local wugongtype = wugongtype or 0
     local fightdelay, fightframe, sounddelay
     if wugongtype >= 0 then
         fightdelay = JY.Person[pid]["出招动画延迟" .. wugongtype + 1] or 0
