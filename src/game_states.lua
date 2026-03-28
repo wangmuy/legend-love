@@ -457,9 +457,15 @@ handlers["GAME_WMAP"] = {
     end,
     
     draw = function()
-        -- 战斗渲染在战斗协程中处理
-        -- 绘制战斗地图和人物
-        -- 暂时禁用，避免报错
+        -- 战斗渲染：每帧调用 WarDrawMap 渲染战斗场景
+        if JY.Status == GAME_WMAP and WAR and WAR.Person then
+            local curId = WAR.CurID or 0
+            local x = WAR.Person[curId] and WAR.Person[curId]["坐标X"] or 0
+            local y = WAR.Person[curId] and WAR.Person[curId]["坐标Y"] or 0
+            if x and y then
+                lib.DrawWarMap(0, x, y, 0, 0, -1)
+            end
+        end
     end
 }
 
