@@ -262,7 +262,7 @@ War_AutoCoroutine = function()
     local id = WAR.CurID
     local pid = WAR.Person[id]["人物编号"]
     
-    -- 简单AI：先移动再攻击
+    -- 简单AI：直接攻击，不移动
     local wugongnum = 1
     for i = 1, 10 do
         if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
@@ -270,9 +270,6 @@ War_AutoCoroutine = function()
             break
         end
     end
-    
-    -- 自动移动
-    local moveResult = War_AutoMoveCoroutine(wugongnum)
     
     -- 选择目标
     local targetId = -1
