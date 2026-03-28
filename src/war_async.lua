@@ -33,6 +33,9 @@ local War_MoveCoroutine
 local SelectTargetCoroutine
 local War_Manual_SubCoroutine
 local War_ShowFightCoroutine
+local War_MovePersonCoroutine
+local War_Fight_SubCoroutine
+local War_AutoMoveCoroutine
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
