@@ -168,9 +168,11 @@ function WarAsync.WarMainCoroutine(warid, isexp)
             end
             
             p = p + 1
+            lib.Debug("battle: person " .. p .. " next, WAR.CurID=" .. WAR.CurID)
             
             -- 每次人物行动后都让出控制权
             CoroutineScheduler.getInstance():yield("battle_person_done")
+            lib.Debug("battle: after yield, p=" .. p)
         end
         
         -- 回合结束处理
