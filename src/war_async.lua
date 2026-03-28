@@ -37,12 +37,6 @@ local War_MovePersonCoroutine
 local War_Fight_SubCoroutine
 local War_AutoMoveCoroutine
 local War_Fight_Sub
-local War_CalMoveStep
-local War_AutoCalMaxEnemyMap
-local War_AutoSelectEnemy
-local War_GetCanFightEnemyXY
-local GetWarMap
-local SetWarMap
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
@@ -381,7 +375,7 @@ War_AutoCoroutine = function()
     local id = WAR.CurID
     local pid = WAR.Person[id]["人物编号"]
     
-    -- 简单AI：直接攻击，不移动（避免调用未定义的AI函数）
+    -- 简单AI：先移动再攻击
     local wugongnum = 1
     for i = 1, 10 do
         if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
@@ -389,6 +383,9 @@ War_AutoCoroutine = function()
             break
         end
     end
+    
+    -- 自动移动
+    local moveResult = War_AutoMoveCoroutine(wugongnum)
     
     -- 选择目标
     local targetId = -1
