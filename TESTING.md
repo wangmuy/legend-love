@@ -32,7 +32,8 @@ src/tests/
     ├── test_input_manager.lua   # 输入管理器测试
     ├── test_event_bridge.lua    # 事件桥接测试
     ├── test_coroutine_scheduler.lua  # 协程调度器测试
-    └── test_byte_io.lua         # Byte I/O 测试
+    ├── test_byte_io.lua         # Byte I/O 测试
+    └── test_war_async.lua       # 战斗系统测试
 ```
 
 ### 测试文件命名规范
@@ -106,6 +107,7 @@ cd src && lua tests/unit/test_input_manager.lua
 | `event_bridge` | 事件桥接测试 |
 | `coroutine_scheduler` | 协程调度器测试 |
 | `byte_io` | Byte I/O 测试 |
+| `war_async` | 战斗系统测试 |
 
 ## 测试覆盖范围
 
@@ -118,6 +120,7 @@ cd src && lua tests/unit/test_input_manager.lua
 | `event_bridge` | 单例模式、状态注册、集成测试 |
 | `byte_io` | SaveFromTable16/LoadToTable16、字节序、数据一致性 |
 | `coroutine_scheduler` | 协程创建、yield/resume、waitForKey 绕过 disableInput |
+| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作 |
 
 ### 关键测试场景
 
@@ -158,6 +161,40 @@ function TestCoroutineScheduler.testWaitForKeyWithDisableInput()
 end
 ```
 
+#### 战斗系统测试场景
+
+战斗系统测试覆盖以下关键场景：
+
+1. **战斗状态管理**：`warState` 的初始化、重置、状态流转
+2. **移动范围计算**：`GetWarMap`/`SetWarMap` 操作、边界检查
+3. **武功类型匹配**：刀、剑、掌等武功类型的智能匹配
+4. **动画帧数**：人物出招动画帧数获取和验证
+5. **战斗地图操作**：地图层读写、清理操作
+
+```lua
+-- test_war_async.lua
+function TestWarAsync.testMoveRangeCalculation()
+    setup()
+    createSimpleWarScenario()
+    
+    -- 验证移动步数
+    local moveSteps = WAR.Person[0]["移动步数"]
+    TestHelper.assertEquals(3, moveSteps, "Move steps should be 3")
+    
+    -- 验证边界检查
+    local outOfBounds = GetWarMap(20, 20, 3)
+    TestHelper.assertEquals(255, outOfBounds, "Out of bounds should return 255")
+end
+
+function TestWarAsync.testWugongTypeMatching()
+    -- 验证武功类型匹配
+    local knifeWugong = TestHelper.createTestWugong({ID = 10})
+    knifeWugong["名称"] = "金刀刀法"
+    knifeWugong["武功类型"] = 2
+    TestHelper.assertEquals(2, knifeWugong["武功类型"], "Knife type should be 2")
+end
+```
+
 ## Mock 工具使用
 
 ### Love2D API Mock
@@ -181,7 +218,31 @@ TestHelper.mockGlobals()
 -- 或单独 Mock
 TestHelper.mockCC()    -- CC 配置常量
 TestHelper.mockJY()    -- JY 游戏数据
+TestHelper.mockWAR()   -- WAR 战斗数据
 TestHelper.mockLib()   -- lib 工具模块
+TestHelper.mockWarFunctions()  -- 战斗辅助函数
+```
+
+### 战斗数据工厂
+
+```lua
+-- 创建测试人物
+local person = TestHelper.createTestPerson({ID = 1})
+person["姓名"] = "测试人物"
+person["武功1"] = 1
+
+-- 创建测试战斗人物
+local warPerson = TestHelper.createTestWarPerson({
+    ["人物编号"] = 1,
+    ["坐标X"] = 5,
+    ["坐标Y"] = 5,
+    ["我方"] = true,
+})
+
+-- 创建测试武功
+local wugong = TestHelper.createTestWugong({ID = 1})
+wugong["名称"] = "太祖长拳"
+wugong["武功类型"] = 0
 ```
 
 ### Spy/Stub 示例

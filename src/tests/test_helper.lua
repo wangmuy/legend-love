@@ -222,8 +222,26 @@ function TestHelper.mockJY()
         Person = {},
         Thing = {},
         Scene = {},
+        Wugong = {},
     }
     return _G.JY
+end
+
+function TestHelper.mockWAR()
+    _G.WAR = {
+        PersonNum = 0,
+        Person = {},
+        CurID = 0,
+        AutoFight = 0,
+        Effect = 0,
+        DrawMode = nil,
+        MoveCursorX = nil,
+        MoveCursorY = nil,
+        ShowHead = 1,
+        Data = {},
+        EffectXY = {},
+    }
+    return _G.WAR
 end
 
 -- Mock lib 模块
@@ -242,7 +260,173 @@ function TestHelper.mockGlobals()
     TestHelper.mockLove()
     TestHelper.mockCC()
     TestHelper.mockJY()
+    TestHelper.mockWAR()
     TestHelper.mockLib()
+    TestHelper.mockWarFunctions()
+end
+
+function TestHelper.mockWarFunctions()
+    local warMapData = {}
+    for i = 0, 19 do
+        warMapData[i] = {}
+        for j = 0, 19 do
+            warMapData[i][j] = {}
+            for k = 0, 5 do
+                warMapData[i][j][k] = 255
+            end
+        end
+    end
+    
+    _G.GetWarMap = function(x, y, layer)
+        if x < 0 or x >= 20 or y < 0 or y >= 20 then
+            return 255
+        end
+        return warMapData[x][y][layer] or 255
+    end
+    
+    _G.SetWarMap = function(x, y, layer, value)
+        if x >= 0 and x < 20 and y >= 0 and y < 20 then
+            warMapData[x][y][layer] = value
+        end
+    end
+    
+    _G.CleanWarMap = function(layer, value)
+        for i = 0, 19 do
+            for j = 0, 19 do
+                warMapData[i][j][layer] = value
+            end
+        end
+    end
+    
+    _G.WarCalPersonPic = function(id)
+        return 0
+    end
+    
+    _G.WarSetPerson = function()
+    end
+    
+    _G.WarDrawMap = function(flag)
+    end
+    
+    _G.War_isEnd = function()
+        return 0
+    end
+    
+    _G.War_CalMoveStep = function(id, steps, mode)
+        local result = {}
+        for i = 0, steps do
+            result[i] = { num = 0, x = {}, y = {} }
+        end
+        return result
+    end
+    
+    _G.War_GetMinNeiLi = function(pid)
+        return 0
+    end
+    
+    _G.War_WugongHurtLife = function(enemy, wugong, level)
+        return 10
+    end
+    
+    _G.War_WugongHurtNeili = function(enemy, wugong, level)
+        return 5
+    end
+    
+    _G.War_AutoCalMaxEnemyMap = function(wugong, level)
+    end
+    
+    _G.War_AutoCalMaxEnemy = function(x, y, wugong, level)
+        return 0, nil, nil
+    end
+    
+    _G.War_GetCanFightEnemyXY = function(scope)
+        return nil, nil
+    end
+    
+    _G.War_AutoSelectEnemy = function()
+        return 0
+    end
+    
+    _G.War_FightSelectType0 = function(wugong, level, x, y)
+        return true
+    end
+    
+    _G.War_FightSelectType1 = function(wugong, level, x, y)
+    end
+    
+    _G.War_FightSelectType2 = function(wugong, level)
+    end
+    
+    _G.War_FightSelectType3 = function(wugong, level, x, y)
+        return true
+    end
+    
+    _G.War_PersonLostLife = function()
+    end
+    
+    _G.War_EndPersonData = function(isExp, warStatus)
+    end
+    
+    _G.WarLoad = function(warid)
+    end
+    
+    _G.WarSelectTeam = function()
+    end
+    
+    _G.WarSelectEnemy = function()
+    end
+    
+    _G.WarLoadMap = function(mapid)
+    end
+    
+    _G.WarPersonSort = function()
+    end
+    
+    _G.CleanMemory = function()
+    end
+    
+    _G.PlayMIDI = function(music)
+    end
+    
+    _G.PlayWavAtk = function(sound)
+    end
+    
+    _G.AddPersonAttrib = function(pid, attr, value)
+        if _G.JY and _G.JY.Person and _G.JY.Person[pid] then
+            _G.JY.Person[pid][attr] = (_G.JY.Person[pid][attr] or 0) + value
+        end
+    end
+    
+    _G.Rnd = function(n)
+        return 0
+    end
+    
+    _G.War_ThingMenu = function()
+    end
+    
+    _G.War_WaitMenu = function()
+    end
+    
+    _G.War_StatusMenu = function()
+    end
+    
+    _G.War_RestMenu = function()
+    end
+    
+    _G.War_AutoMenu = function()
+        _G.WAR.AutoFight = 1
+    end
+    
+    _G.GAME_WMAP = 3
+    _G.VK_SPACE = 32
+    _G.VK_RETURN = 13
+    _G.VK_ESCAPE = 27
+    _G.VK_UP = 1073741906
+    _G.VK_DOWN = 1073741905
+    _G.VK_LEFT = 1073741904
+    _G.VK_RIGHT = 1073741903
+    _G.C_ORANGE = {255, 165, 0}
+    _G.C_WHITE = {255, 255, 255}
 end
 
 -- ============================================
@@ -265,6 +449,8 @@ function TestHelper.resetAllModules()
         "menu_async",
         "async_dialog",
         "async_message_box",
+        "input_async",
+        "war_async",
     }
     for _, name in ipairs(modulesToReset) do
         package.loaded[name] = nil
@@ -366,10 +552,66 @@ function TestHelper.createTestPerson(overrides)
         exp = overrides.exp or 0,
         level = overrides.level or 1,
     }
+    person["姓名"] = overrides["姓名"] or "测试人物"
+    person["体力"] = overrides["体力"] or 100
+    person["内力"] = overrides["内力"] or 100
+    person["经验值"] = overrides["经验值"] or 0
+    person["等级"] = overrides["等级"] or 1
+    person["受伤程度"] = overrides["受伤程度"] or 0
+    person["用毒能力"] = overrides["用毒能力"] or 0
+    person["解毒能力"] = overrides["解毒能力"] or 0
+    person["医疗能力"] = overrides["医疗能力"] or 0
+    person["轻功"] = overrides["轻功"] or 50
+    person["头像代号"] = overrides["头像代号"] or 1
+    person["武功1"] = overrides["武功1"] or 1
+    person["武功等级1"] = overrides["武功等级1"] or 100
+    person["左右互搏"] = overrides["左右互搏"] or 0
     for k, v in pairs(overrides) do
         person[k] = v
     end
     return person
+end
+
+function TestHelper.createTestWarPerson(overrides)
+    overrides = overrides or {}
+    local warPerson = {
+        ["人物编号"] = overrides["人物编号"] or 0,
+        ["坐标X"] = overrides["坐标X"] or 5,
+        ["坐标Y"] = overrides["坐标Y"] or 5,
+        ["移动步数"] = overrides["移动步数"] or 3,
+        ["贴图"] = overrides["贴图"] or 0,
+        ["贴图类型"] = overrides["贴图类型"] or 0,
+        ["人方向"] = overrides["人方向"] or 0,
+        ["我方"] = overrides["我方"] or true,
+        ["死亡"] = overrides["死亡"] or false,
+        ["轻功"] = overrides["轻功"] or 50,
+        ["点数"] = overrides["点数"] or 0,
+        ["经验"] = overrides["经验"] or 0,
+    }
+    for k, v in pairs(overrides) do
+        warPerson[k] = v
+    end
+    return warPerson
+end
+
+function TestHelper.createTestWugong(overrides)
+    overrides = overrides or {}
+    local wugong = {
+        ID = overrides.ID or 1,
+    }
+    wugong["名称"] = overrides["名称"] or "测试武功"
+    wugong["攻击范围"] = overrides["攻击范围"] or 0
+    wugong["移动范围1"] = overrides["移动范围1"] or 3
+    wugong["杀伤范围1"] = overrides["杀伤范围1"] or 1
+    wugong["消耗内力点数"] = overrides["消耗内力点数"] or 10
+    wugong["伤害类型"] = overrides["伤害类型"] or 0
+    wugong["武功类型"] = overrides["武功类型"] or 0
+    wugong["武功动画&音效"] = overrides["武功动画&音效"] or 0
+    wugong["出招音效"] = overrides["出招音效"] or ""
+    for k, v in pairs(overrides) do
+        wugong[k] = v
+    end
+    return wugong
 end
 
 -- 创建测试物品数据
@@ -414,11 +656,57 @@ end
 
 -- 测试后的清理
 function TestHelper.teardown()
-    -- 清理全局 Mock
     _G.love = nil
     _G.CC = nil
     _G.JY = nil
+    _G.WAR = nil
     _G.lib = nil
+    _G.GetWarMap = nil
+    _G.SetWarMap = nil
+    _G.CleanWarMap = nil
+    _G.WarCalPersonPic = nil
+    _G.WarSetPerson = nil
+    _G.WarDrawMap = nil
+    _G.War_isEnd = nil
+    _G.War_CalMoveStep = nil
+    _G.War_GetMinNeiLi = nil
+    _G.War_WugongHurtLife = nil
+    _G.War_WugongHurtNeili = nil
+    _G.War_AutoCalMaxEnemyMap = nil
+    _G.War_AutoCalMaxEnemy = nil
+    _G.War_GetCanFightEnemyXY = nil
+    _G.War_AutoSelectEnemy = nil
+    _G.War_FightSelectType0 = nil
+    _G.War_FightSelectType1 = nil
+    _G.War_FightSelectType2 = nil
+    _G.War_FightSelectType3 = nil
+    _G.War_PersonLostLife = nil
+    _G.War_EndPersonData = nil
+    _G.WarLoad = nil
+    _G.WarSelectTeam = nil
+    _G.WarSelectEnemy = nil
+    _G.WarLoadMap = nil
+    _G.WarPersonSort = nil
+    _G.CleanMemory = nil
+    _G.PlayMIDI = nil
+    _G.PlayWavAtk = nil
+    _G.AddPersonAttrib = nil
+    _G.Rnd = nil
+    _G.War_ThingMenu = nil
+    _G.War_WaitMenu = nil
+    _G.War_StatusMenu = nil
+    _G.War_RestMenu = nil
+    _G.War_AutoMenu = nil
+    _G.GAME_WMAP = nil
+    _G.VK_SPACE = nil
+    _G.VK_RETURN = nil
+    _G.VK_ESCAPE = nil
+    _G.VK_UP = nil
+    _G.VK_DOWN = nil
+    _G.VK_LEFT = nil
+    _G.VK_RIGHT = nil
+    _G.C_ORANGE = nil
+    _G.C_WHITE = nil
 end
 
 return TestHelper
