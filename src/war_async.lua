@@ -30,7 +30,7 @@ local War_AttackCoroutine, War_MoveCoroutine, SelectTargetCoroutine
 local War_Manual_SubCoroutine, War_ShowFightCoroutine
 local War_Fight_SubCoroutine, War_MovePersonCoroutine, War_AutoMoveCoroutine
 local War_PoisonCoroutine, War_DecPoisonCoroutine, War_DoctorCoroutine
-local War_ExecuteMenuCoroutine
+local War_ExecuteMenuCoroutine, War_Fight_ExecuteCoroutine, SelectAttackTargetCoroutine
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
@@ -473,48 +473,266 @@ War_SettlementCoroutine = function(warStatus)
     end
 end
 
+-- 选择攻击目标（在地图上选择，协程版本）
+-- 返回 x, y 或 "line", direct 或 nil（取消）
+local SelectAttackTargetCoroutine = function(wugong, level)
+    local scheduler = CoroutineScheduler.getInstance()
+    local pid = WAR.Person[WAR.CurID]["人物编号"]
+    local fightscope = JY.Wugong[wugong]["攻击范围"]
+    local moverange = JY.Wugong[wugong]["移动范围" .. level]
+    
+    local x0 = WAR.Person[WAR.CurID]["坐标X"]
+    local y0 = WAR.Person[WAR.CurID]["坐标Y"]
+    
+    if fightscope == 0 or fightscope == 3 then
+        War_CalMoveStep(WAR.CurID, moverange, 1)
+    elseif fightscope == 1 then
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "请选择攻击方向", C_ORANGE, CC.DefaultFont)
+    end
+    
+    local x, y = x0, y0
+    
+    WAR.DrawMode = 3
+    WAR.MoveCursorX = x
+    WAR.MoveCursorY = y
+    
+    while true do
+        WAR.MoveCursorX = x
+        WAR.MoveCursorY = y
+        
+        local key = InputAsync.WaitKeyCoroutine()
+        
+        local x2, y2 = x, y
+        
+        if key == VK_UP then
+            if fightscope == 1 then
+                WAR.DrawMode = nil
+                WAR.MoveCursorX = nil
+                WAR.MoveCursorY = nil
+                return "line", 0
+            else
+                y2 = y - 1
+            end
+        elseif key == VK_DOWN then
+            if fightscope == 1 then
+                WAR.DrawMode = nil
+                WAR.MoveCursorX = nil
+                WAR.MoveCursorY = nil
+                return "line", 3
+            else
+                y2 = y + 1
+            end
+        elseif key == VK_LEFT then
+            if fightscope == 1 then
+                WAR.DrawMode = nil
+                WAR.MoveCursorX = nil
+                WAR.MoveCursorY = nil
+                return "line", 2
+            else
+                x2 = x - 1
+            end
+        elseif key == VK_RIGHT then
+            if fightscope == 1 then
+                WAR.DrawMode = nil
+                WAR.MoveCursorX = nil
+                WAR.MoveCursorY = nil
+                return "line", 1
+            else
+                x2 = x + 1
+            end
+        elseif key == VK_SPACE or key == VK_RETURN then
+            if fightscope == 2 then
+                WAR.DrawMode = nil
+                WAR.MoveCursorX = nil
+                WAR.MoveCursorY = nil
+                return x0, y0
+            elseif x ~= x0 or y ~= y0 then
+                WAR.DrawMode = nil
+                WAR.MoveCursorX = nil
+                WAR.MoveCursorY = nil
+                return x, y
+            end
+        elseif key == VK_ESCAPE then
+            WAR.DrawMode = nil
+            WAR.MoveCursorX = nil
+            WAR.MoveCursorY = nil
+            return nil
+        end
+        
+        if fightscope == 0 or fightscope == 3 then
+            if GetWarMap(x2, y2, 3) < 128 then
+                x, y = x2, y2
+            end
+        end
+    end
+end
+
 -- 攻击选择（协程版本）
 War_AttackCoroutine = function()
     local pid = WAR.Person[WAR.CurID]["人物编号"]
     
-    -- 获取可用的武功列表
     local menu = {}
     local wugongCount = 0
     
     for i = 1, 10 do
         local wugongid = JY.Person[pid]["武功" .. i]
         if wugongid and wugongid > 0 then
-            local level = JY.Person[pid]["武功等级" .. i] or 0
-            table.insert(menu, {JY.Wugong[wugongid]["名称"], nil, 1, wugongid})
+            local enabled = 1
+            if JY.Wugong[wugongid]["消耗内力点数"] > JY.Person[pid]["内力"] then
+                enabled = 0
+            end
+            table.insert(menu, {JY.Wugong[wugongid]["名称"], nil, enabled, wugongid, i})
             wugongCount = wugongCount + 1
         end
     end
     
     if wugongCount == 0 then
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "没有可用的武功", C_WHITE, CC.DefaultFont)
         return 7
     end
     
-    local r = MenuAsync.ShowMenuCoroutine(menu, wugongCount, wugongCount, 
-        0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
+    local r
+    if wugongCount == 1 then
+        r = 1
+    else
+        r = MenuAsync.ShowMenuCoroutine(menu, wugongCount, wugongCount, 
+            CC.MainSubMenuX, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    end
     
     if r == 0 then
         return 7
     end
     
     local wugongid = menu[r][4]
-    local wugongtype = JY.Wugong[wugongid]["类型"]
+    local wugongnum = menu[r][5]
+    local level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+    local fightscope = JY.Wugong[wugongid]["攻击范围"]
+    local x0 = WAR.Person[WAR.CurID]["坐标X"]
+    local y0 = WAR.Person[WAR.CurID]["坐标Y"]
     
-    -- 选择目标
-    local targetId = SelectTargetCoroutine()
-    if targetId < 0 then
+    WAR.ShowHead = 0
+    
+    local tx, ty = SelectAttackTargetCoroutine(wugongid, level)
+    
+    if tx == nil then
+        WAR.ShowHead = 1
         return 7
     end
     
-    -- 执行攻击（异步版本）
-    War_Fight_SubCoroutine(WAR.CurID, r - 1, targetId, targetId)
+    CleanWarMap(4, 0)
     
+    local attackX, attackY = nil, nil
+    
+    if fightscope == 0 then
+        if War_FightSelectType0(wugongid, level, tx, ty) == false then
+            WAR.ShowHead = 1
+            return 7
+        end
+        attackX, attackY = tx, ty
+    elseif fightscope == 1 then
+        local direct = ty
+        WAR.Person[WAR.CurID]["人方向"] = direct
+        local move = JY.Wugong[wugongid]["移动范围" .. level]
+        WAR.EffectXY = {}
+        for i = 1, move do
+            if direct == 0 then
+                SetWarMap(x0, y0 - i, 4, 1)
+            elseif direct == 3 then
+                SetWarMap(x0, y0 + i, 4, 1)
+            elseif direct == 2 then
+                SetWarMap(x0 - i, y0, 4, 1)
+            elseif direct == 1 then
+                SetWarMap(x0 + i, y0, 4, 1)
+            end
+        end
+        if direct == 0 then
+            WAR.EffectXY[1] = {x0, y0 - 1}
+            WAR.EffectXY[2] = {x0, y0 - move}
+        elseif direct == 3 then
+            WAR.EffectXY[1] = {x0, y0 + 1}
+            WAR.EffectXY[2] = {x0, y0 + move}
+        elseif direct == 2 then
+            WAR.EffectXY[1] = {x0 - 1, y0}
+            WAR.EffectXY[2] = {x0 - move, y0}
+        elseif direct == 1 then
+            WAR.EffectXY[1] = {x0 + 1, y0}
+            WAR.EffectXY[2] = {x0 + move, y0}
+        end
+        attackX, attackY = x0, y0
+    elseif fightscope == 2 then
+        War_FightSelectType2(wugongid, level)
+        attackX, attackY = tx, ty
+    elseif fightscope == 3 then
+        if War_FightSelectType3(wugongid, level, tx, ty) == false then
+            WAR.ShowHead = 1
+            return 7
+        end
+        attackX, attackY = tx, ty
+    end
+    
+    War_Fight_ExecuteCoroutine(wugongnum, wugongid, level, attackX, attackY)
+    
+    WAR.ShowHead = 1
     return 0
+end
+
+-- 执行攻击伤害计算和动画（协程版本）
+War_Fight_ExecuteCoroutine = function(wugongnum, wugong, level, x, y)
+    local scheduler = CoroutineScheduler.getInstance()
+    local pid = WAR.Person[WAR.CurID]["人物编号"]
+    local fightscope = JY.Wugong[wugong]["攻击范围"]
+    
+    local fightnum = 1
+    if JY.Person[pid]["左右互搏"] == 1 then
+        fightnum = 2
+    end
+    
+    for k = 1, fightnum do
+        for i = 0, (CC.WarWidth or 10) - 1 do
+            for j = 0, (CC.WarHeight or 10) - 1 do
+                local effect = GetWarMap(i, j, 4)
+                if effect > 0 then
+                    local emeny = GetWarMap(i, j, 2)
+                    if emeny >= 0 then
+                        if WAR.Person[WAR.CurID]["我方"] ~= WAR.Person[emeny]["我方"] then
+                            if JY.Wugong[wugong]["伤害类型"] == 1 and (fightscope == 0 or fightscope == 3) then
+                                WAR.Person[emeny]["点数"] = -War_WugongHurtNeili(emeny, wugong, level)
+                                SetWarMap(i, j, 4, 3)
+                                WAR.Effect = 3
+                            else
+                                WAR.Person[emeny]["点数"] = -War_WugongHurtLife(emeny, wugong, level)
+                                WAR.Effect = 2
+                                SetWarMap(i, j, 4, 2)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        
+        War_ShowFightCoroutine(pid, wugong, JY.Wugong[wugong]["武功类型"], level, x, y, JY.Wugong[wugong]["武功动画&音效"])
+        
+        for i = 0, WAR.PersonNum - 1 do
+            WAR.Person[i]["点数"] = 0
+        end
+        
+        WAR.Person[WAR.CurID]["经验"] = WAR.Person[WAR.CurID]["经验"] + 2
+        
+        if JY.Person[pid]["武功等级" .. wugongnum] < 900 then
+            JY.Person[pid]["武功等级" .. wugongnum] = JY.Person[pid]["武功等级" .. wugongnum] + Rnd(2) + 1
+        end
+        
+        if math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1 ~= level then
+            level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+            AsyncMessageBox.ShowMessageCoroutine(-1, -1, 
+                JY.Wugong[wugong]["名称"] .. " 升为 " .. level .. " 级", C_ORANGE, CC.DefaultFont)
+        end
+        
+        AddPersonAttrib(pid, "内力", -math.modf((level + 1) / 2) * JY.Wugong[wugong]["消耗内力点数"])
+    end
+    
+    AddPersonAttrib(pid, "体力", -3)
+    
+    return 1
 end
 
 -- 执行战斗（协程版本）
