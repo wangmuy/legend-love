@@ -905,7 +905,7 @@ War_MoveCoroutine = function()
             WAR.MoveCursorX = nil
             WAR.MoveCursorY = nil
             War_MovePersonCoroutine(x, y)
-            return 0
+            return 7
         elseif key == VK_ESCAPE then
             -- 取消
             lib.Debug("War_MoveCoroutine: cancelled")
