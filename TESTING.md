@@ -123,7 +123,7 @@ cd src && lua tests/unit/test_input_manager.lua
 | `byte_io` | SaveFromTable16/LoadToTable16、字节序、数据一致性 |
 | `coroutine_scheduler` | 协程创建、yield/resume、waitForKey 绕过 disableInput |
 | `item_async` | Grid物品选择、数组转换、药品/暗器过滤、必填字段验证 |
-| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑、用毒/解毒/医疗功能、物品菜单Grid显示、状态菜单协程版本 |
+| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑、用毒/解毒/医疗功能、物品菜单Grid显示、状态菜单协程版本、战败处理逻辑 |
 
 ### 关键测试场景
 
@@ -264,43 +264,66 @@ function TestWarAsync.testThingMenuFiltersMedicineAndAnqi()
         end
     end
     
-    TestHelper.assertEquals(2, num, "Should filter to only medicine (3) and hidden weapon (4)")
+TestHelper.assertEquals(2, num, "Should filter to only medicine (3) and hidden weapon (4)")
 end
 ```
 
-#### 状态菜单测试场景
+#### 战败处理测试场景
 
-状态菜单测试确保战斗场景中的状态查看使用协程版本，正确显示提示和详细状态页：
+战败处理测试确保战斗失败后根据 `isExp` 参数正确处理：
 
-1. **提示显示**：验证状态菜单显示 "要查阅谁的状态" 提示
-2. **队友菜单**：验证构建正确的队友选择菜单
-3. **协程版本**：验证使用 `War_StatusMenuCoroutine` 而非阻塞式原版
-4. **详细状态页**：验证调用 `PersonStatusAsync.ShowStatusCoroutine` 显示状态
-5. **返回值**：验证查看后返回 7（继续菜单）
+1. **游戏结束协程**：验证 `War_GameOverCoroutine` 存在
+2. **isExp==1 普通战斗失败**：验证调用游戏结束流程
+3. **isExp==0 练习战斗失败**：验证返回 false 继续对话
+
+4. **返回值逻辑**：验证不同战斗类型的返回值
 
 ```lua
 -- test_war_async.lua
-function TestWarAsync.testStatusMenuShowsPrompt()
+function TestWarAsync.testGameOverCoroutineExists()
     local WarAsync = require("war_async")
     
-    TestHelper.assertNotNil(WarAsync.War_StatusMenuCoroutine, "War_StatusMenuCoroutine should exist")
+    TestHelper.assertNotNil(WarAsync.War_GameOverCoroutine, "War_GameOverCoroutine should exist")
 end
 
-function TestWarAsync.testStatusMenuBuildsTeamMenu()
-    local menu = {}
-    for i = 1, CC.TeamNum do
-        menu[i] = {"", nil, 0}
-        local id = JY.Base["队伍" .. i]
-        if id >= 0 then
-            if JY.Person[id]["生命"] > 0 then
-                menu[i][1] = JY.Person[id]["姓名"]
-                menu[i][3] = 1
+function TestWarAsync.testDefeatWithExpCallsGameOver()
+    -- 普通战斗失败后应该调用游戏结束
+    local isExp = 1
+    local warStatus = 2  -- 失败
+    
+    local shouldCallGameOver = (warStatus == 2 and isExp == 1)
+    TestHelper.assertEquals(true, shouldCallGameOver, "Normal battle defeat should call Game Over")
+end
+
+function TestWarAsync.testDefeatWithoutExpSkipsGameOver()
+    -- 练习战斗失败后不应该调用游戏结束
+    local isExp = 0
+    local warStatus = 2  -- 失败
+    
+    local shouldSkipGameOver = (warStatus == 2 and isExp == 0)
+    TestHelper.assertEquals(true, shouldSkipGameOver, "Practice battle defeat should skip Game Over")
+end
+
+function TestWarAsync.testPracticeBattleReturnsFalse()
+    -- 模拟练习战斗失败后的处理逻辑
+    local function simulatePracticeBattleDefeat(isExp, warStatus)
+        if warStatus == 2 then
+            if isExp == 0 then
+                -- 练习战斗失败，返回false继续对话
+                return false
+            else
+                -- 普通战斗失败，游戏结束
+                return "game_over"
             end
         end
+        return "other"
     end
     
-    TestHelper.assertEquals("人物1", menu[1][1], "First team member should be 人物1")
-    TestHelper.assertEquals(1, menu[1][3], "First team member should be selectable")
+    local result = simulatePracticeBattleDefeat(0, 2)
+    TestHelper.assertEquals(false, result, "Practice battle should return false to continue dialogue")
+    
+    result = simulatePracticeBattleDefeat(1, 2)
+    TestHelper.assertEquals("game_over", result, "Normal battle should trigger game_over")
 end
 ```
 

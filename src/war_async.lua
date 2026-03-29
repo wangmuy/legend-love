@@ -33,6 +33,7 @@ local War_Fight_SubCoroutine, War_MovePersonCoroutine, War_AutoMoveCoroutine
 local War_PoisonCoroutine, War_DecPoisonCoroutine, War_DoctorCoroutine
 local War_ExecuteMenuCoroutine, War_Fight_ExecuteCoroutine, SelectTargetCoroutine
 local War_ExecuteMenu_SubCoroutine, War_ThingMenuCoroutine, War_StatusMenuCoroutine
+local War_GameOverCoroutine
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
@@ -461,9 +462,45 @@ War_SettlementCoroutine = function(warStatus)
                 end
             end
         end
-    else
+    elseif warStatus == 2 then
         -- 失败
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗失败", C_WHITE, CC.DefaultFont)
+    end
+end
+
+-- 游戏结束处理（协程版本）
+War_GameOverCoroutine = function()
+    local scheduler = CoroutineScheduler.getInstance()
+    local MenuAsync = require("menu_async")
+    
+    Cls()
+    
+    DrawString(CC.GameOverX, CC.GameOverY, JY.Person[0]["姓名"], C_WHITE, CC.DefaultFont)
+    
+    local x = CC.ScreenW - 9 * CC.DefaultFont
+    DrawString(x, 10, os.date("%Y-%m-%d %H:%M"), C_WHITE, CC.DefaultFont)
+    DrawString(x, 10 + CC.DefaultFont + CC.RowPixel, "在地球的某处", C_WHITE, CC.DefaultFont)
+    DrawString(x, 10 + (CC.DefaultFont + CC.RowPixel) * 2, "当地人口的失踪数", C_WHITE, CC.DefaultFont)
+    DrawString(x, 10 + (CC.DefaultFont + CC.RowPixel) * 3, "又多了一笔。。。", C_WHITE, CC.DefaultFont)
+    
+    local loadMenu = {
+        {"载入进度一", nil, 1},
+        {"载入进度二", nil, 1},
+        {"载入进度三", nil, 1},
+        {"回家睡觉去", nil, 1}
+    }
+    
+    local y = CC.ScreenH - 4 * (CC.DefaultFont + CC.RowPixel) - 10
+    local r = MenuAsync.ShowMenuCoroutine(loadMenu, 4, 0, x, y, 0, 0, 0, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    Cls()
+    
+    if r < 4 then
+        LoadRecord(r)
+        JY.Status = GAME_FIRSTMMAP
+    else
+        JY.Status = GAME_END
+        love.event.quit()
     end
 end
 
@@ -1468,6 +1505,7 @@ WarAsync.War_Fight_SubCoroutine = War_Fight_SubCoroutine
 WarAsync.War_AutoMoveCoroutine = War_AutoMoveCoroutine
 WarAsync.War_ThingMenuCoroutine = War_ThingMenuCoroutine
 WarAsync.War_StatusMenuCoroutine = War_StatusMenuCoroutine
+WarAsync.War_GameOverCoroutine = War_GameOverCoroutine
 
 -- 获取战斗状态
 function WarAsync.getWarState()
