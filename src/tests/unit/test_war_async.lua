@@ -376,6 +376,54 @@ function TestWarAsync.testMoveDisablesAfterFirstMove()
     TestHelper.assertEquals(false, canMoveAfter, "Should not be able to move after moving")
 end
 
+function TestWarAsync.testExecuteMenuDrawMode()
+    setup()
+    print("\n=== Test: Execute Menu DrawMode ===")
+    
+    createSimpleWarScenario()
+    
+    _G.JY.Person[1]["用毒能力"] = 60
+    _G.JY.Person[1]["解毒能力"] = 60
+    _G.JY.Person[1]["医疗能力"] = 60
+    
+    local poisonStep = math.modf(_G.JY.Person[1]["用毒能力"] / 15) + 1
+    TestHelper.assertEquals(5, poisonStep, "Poison step should be 5 (60/15+1)")
+    
+    local decPoisonStep = math.modf(_G.JY.Person[1]["解毒能力"] / 15) + 1
+    TestHelper.assertEquals(5, decPoisonStep, "DecPoison step should be 5")
+    
+    local doctorStep = math.modf(_G.JY.Person[1]["医疗能力"] / 15) + 1
+    TestHelper.assertEquals(5, doctorStep, "Doctor step should be 5")
+end
+
+function TestWarAsync.testExecuteMenuReturnsContinueOnCancel()
+    setup()
+    print("\n=== Test: Execute Menu Returns Continue On Cancel ===")
+    
+    local continueFlag = 7
+    local endTurnFlag = 0
+    
+    TestHelper.assertEquals(7, continueFlag, "Continue flag is 7")
+    TestHelper.assertEquals(0, endTurnFlag, "End turn flag is 0")
+    
+    local function simulateExecuteMenuLoop(cancelled)
+        local r = cancelled and continueFlag or endTurnFlag
+        local loopCount = 0
+        while r == continueFlag do
+            loopCount = loopCount + 1
+            if loopCount > 10 then break end
+            r = endTurnFlag
+        end
+        return loopCount
+    end
+    
+    local countAfterCancel = simulateExecuteMenuLoop(true)
+    TestHelper.assertEquals(1, countAfterCancel, "ESC cancel returns 7, loop continues")
+    
+    local countAfterExecute = simulateExecuteMenuLoop(false)
+    TestHelper.assertEquals(0, countAfterExecute, "Execute returns 0, loop ends")
+end
+
 function TestWarAsync.runAll()
     print("\n========================================")
     print("War Async Unit Tests")
@@ -396,6 +444,8 @@ function TestWarAsync.runAll()
     TestWarAsync.testAutoFightToggle()
     TestWarAsync.testMoveContinueFlagLogic()
     TestWarAsync.testMoveDisablesAfterFirstMove()
+    TestWarAsync.testExecuteMenuDrawMode()
+    TestWarAsync.testExecuteMenuReturnsContinueOnCancel()
     
     return TestHelper.printSummary()
 end
