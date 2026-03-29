@@ -30,8 +30,8 @@ local War_AttackCoroutine, War_MoveCoroutine, SelectTargetCoroutine
 local War_Manual_SubCoroutine, War_ShowFightCoroutine
 local War_Fight_SubCoroutine, War_MovePersonCoroutine, War_AutoMoveCoroutine
 local War_PoisonCoroutine, War_DecPoisonCoroutine, War_DoctorCoroutine
-local War_ExecuteMenuCoroutine, War_Fight_ExecuteCoroutine, SelectAttackTargetCoroutine
-local War_ExecuteMenu_SubCoroutine
+local War_ExecuteMenuCoroutine, War_Fight_ExecuteCoroutine, SelectTargetCoroutine
+local War_ExecuteMenu_SubCoroutine, War_ThingMenuCoroutine
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
@@ -270,12 +270,7 @@ War_Manual_SubCoroutine = function()
         return War_DoctorCoroutine()
     elseif r == 6 then
         -- 物品
-        local thingResult = War_ThingMenu()
-        if thingResult == 1 then
-            return 0  -- 使用物品成功，结束回合
-        else
-            return 7  -- ESC取消或使用失败，继续显示菜单
-        end
+        return War_ThingMenuCoroutine()
     elseif r == 7 then
         -- 等待（把当前人物调到队尾，稍后行动）
         War_WaitMenu()
@@ -1358,6 +1353,79 @@ War_ExecuteMenuCoroutine = function(flag, thingid)
     end
 end
 
+-- 战斗物品菜单（协程版本）
+War_ThingMenuCoroutine = function()
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    WAR.ShowHead = 0
+    
+    -- 收集可用的战斗物品（药品和暗器）
+    local thing = {}
+    local thingnum = {}
+    local num = 0
+    
+    for i = 0, CC.MyThingNum - 1 do
+        local id = JY.Base["物品" .. i + 1]
+        if id >= 0 then
+            local thingType = JY.Thing[id]["类型"]
+            if thingType == 3 or thingType == 4 then  -- 药品或暗器
+                thing[num] = id
+                thingnum[num] = JY.Base["物品数量" .. i + 1]
+                num = num + 1
+            end
+        end
+    end
+    
+    if num == 0 then
+        WAR.ShowHead = 1
+        return 7  -- 没有物品，继续菜单
+    end
+    
+    -- 构建物品菜单
+    local menu = {}
+    for i = 0, num - 1 do
+        local name = JY.Thing[thing[i]]["名称"]
+        menu[i + 1] = {string.format("%s X%d", name, thingnum[i]), nil, 1, thing[i]}
+    end
+    
+    local r = MenuAsync.ShowMenuCoroutine(menu, num, 0, CC.MainSubMenuX, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    Cls()
+    
+    if r <= 0 then
+        WAR.ShowHead = 1
+        return 7  -- ESC取消，继续菜单
+    end
+    
+    local thingId = menu[r][4]
+    local thingType = JY.Thing[thingId]["类型"]
+    local useResult = 0
+    
+    if thingType == 3 then
+        -- 药品：直接对当前战斗人物使用
+        local pid = WAR.Person[WAR.CurID]["人物编号"]
+        
+        -- 调用原版的 UseThingEffect
+        if UseThingEffect(thingId, pid) == 1 then
+            instruct_32(thingId, -1)  -- 减少物品数量
+            useResult = 1
+            WaitKey()
+        end
+    elseif thingType == 4 then
+        -- 暗器：调用战斗暗器协程
+        useResult = War_ExecuteMenuCoroutine(4, thingId)
+    end
+    
+    WAR.ShowHead = 1
+    Cls()
+    
+    if useResult == 1 then
+        return 0  -- 使用成功，结束回合
+    else
+        return 7  -- 使用失败或无效果，继续菜单
+    end
+end
+
 -- 导出函数
 WarAsync.War_ManualCoroutine = War_ManualCoroutine
 WarAsync.War_AutoCoroutine = War_AutoCoroutine
@@ -1370,6 +1438,7 @@ WarAsync.War_Manual_SubCoroutine = War_Manual_SubCoroutine
 WarAsync.War_MovePersonCoroutine = War_MovePersonCoroutine
 WarAsync.War_Fight_SubCoroutine = War_Fight_SubCoroutine
 WarAsync.War_AutoMoveCoroutine = War_AutoMoveCoroutine
+WarAsync.War_ThingMenuCoroutine = War_ThingMenuCoroutine
 
 -- 获取战斗状态
 function WarAsync.getWarState()
