@@ -586,7 +586,10 @@ SelectTargetCoroutine = function()
 end
 
 -- 移动选择（协程版本）
+-- 按照原版 War_SelectMove 实现
 War_MoveCoroutine = function()
+    local scheduler = CoroutineScheduler.getInstance()
+    
     local move = WAR.Person[WAR.CurID]["移动步数"]
     if move <= 0 then
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "不能移动", C_WHITE, CC.DefaultFont)
@@ -596,44 +599,55 @@ War_MoveCoroutine = function()
     -- 计算移动范围
     War_CalMoveStep(WAR.CurID, move, 0)
     
-    -- 简化实现：显示移动范围，等待用户选择位置
-    local x = WAR.Person[WAR.CurID]["坐标X"]
-    local y = WAR.Person[WAR.CurID]["坐标Y"]
+    -- 获取当前位置
+    local x0 = WAR.Person[WAR.CurID]["坐标X"]
+    local y0 = WAR.Person[WAR.CurID]["坐标Y"]
+    local x, y = x0, y0
     
-    -- 方向选择菜单
-    local menu = {
-        {"上", nil, 1},
-        {"下", nil, 1},
-        {"左", nil, 1},
-        {"右", nil, 1},
-        {"取消", nil, 1},
-    }
+    lib.Debug("War_MoveCoroutine: start at (" .. x .. "," .. y .. "), move=" .. move)
     
-    local r = MenuAsync.ShowMenuCoroutine(menu, 5, 5, 0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
-    
-    if r == 0 or r == 5 then
-        return 7
+    -- 循环等待用户选择移动位置
+    while true do
+        local x2, y2 = x, y
+        
+        -- 显示移动范围（WarDrawMap(1,x,y) 会高亮显示可移动位置）
+        WarDrawMap(1, x, y)
+        
+        -- 等待按键
+        local key = InputAsync.waitKeyCoroutine()
+        
+        lib.Debug("War_MoveCoroutine: key=" .. key .. " at (" .. x .. "," .. y .. ")")
+        
+        if key == VK_UP then
+            y2 = y - 1
+        elseif key == VK_DOWN then
+            y2 = y + 1
+        elseif key == VK_LEFT then
+            x2 = x - 1
+        elseif key == VK_RIGHT then
+            x2 = x + 1
+        elseif key == VK_SPACE or key == VK_RETURN then
+            -- 确认移动
+            if x == x0 and y == y0 then
+                -- 没有移动，返回取消
+                return 7
+            end
+            
+            lib.Debug("War_MoveCoroutine: confirm move to (" .. x .. "," .. y .. ")")
+            War_MovePersonCoroutine(x, y)
+            return 0
+        elseif key == VK_ESCAPE then
+            -- 取消
+            lib.Debug("War_MoveCoroutine: cancelled")
+            return 7
+        end
+        
+        -- 检查新位置是否可移动（地图层3小于128表示可达）
+        if GetWarMap(x2, y2, 3) < 128 then
+            x, y = x2, y2
+            lib.Debug("War_MoveCoroutine: move cursor to (" .. x .. "," .. y .. ")")
+        end
     end
-    
-    local dx, dy = 0, 0
-    if r == 1 then dy = -1
-    elseif r == 2 then dy = 1
-    elseif r == 3 then dx = -1
-    elseif r == 4 then dx = 1
-    end
-    
-    local newX = x + dx
-    local newY = y + dy
-    
-    -- 检查是否可以移动
-    if GetWarMap(newX, newY, 2) == 0 then
-        -- 使用异步移动函数，带动画效果
-        War_MovePersonCoroutine(newX, newY)
-    else
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "无法移动到该位置", C_WHITE, CC.DefaultFont)
-    end
-    
-    return 0
 end
 
 -- 异步移动人物（协程版本）
