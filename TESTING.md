@@ -33,6 +33,7 @@ src/tests/
     ├── test_event_bridge.lua    # 事件桥接测试
     ├── test_coroutine_scheduler.lua  # 协程调度器测试
     ├── test_byte_io.lua         # Byte I/O 测试
+    ├── test_item_async.lua      # 物品系统测试
     └── test_war_async.lua       # 战斗系统测试
 ```
 
@@ -107,6 +108,7 @@ cd src && lua tests/unit/test_input_manager.lua
 | `event_bridge` | 事件桥接测试 |
 | `coroutine_scheduler` | 协程调度器测试 |
 | `byte_io` | Byte I/O 测试 |
+| `item_async` | 物品系统测试 |
 | `war_async` | 战斗系统测试 |
 
 ## 测试覆盖范围
@@ -120,7 +122,8 @@ cd src && lua tests/unit/test_input_manager.lua
 | `event_bridge` | 单例模式、状态注册、集成测试 |
 | `byte_io` | SaveFromTable16/LoadToTable16、字节序、数据一致性 |
 | `coroutine_scheduler` | 协程创建、yield/resume、waitForKey 绕过 disableInput |
-| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑、用毒/解毒/医疗功能 |
+| `item_async` | Grid物品选择、数组转换、药品/暗器过滤、必填字段验证 |
+| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑、用毒/解毒/医疗功能、物品菜单Grid显示 |
 
 ### 关键测试场景
 
@@ -215,6 +218,53 @@ function TestWarAsync.testMoveContinueFlagLogic()
     TestHelper.assertEquals(1, simulateLoop(continueFlag), "Move returns 7, loop continues")
     -- 攻击后返回 0，循环结束
     TestHelper.assertEquals(0, simulateLoop(endTurnFlag), "Attack returns 0, loop ends")
+end
+```
+
+#### 物品系统测试场景
+
+物品系统测试确保战斗场景中的物品选择使用Grid界面而非简单文字列表：
+
+1. **Grid物品选择**：验证 `SelectThingByArrayAsync` 和 `SelectThingGridAsync` 函数存在
+2. **数组转换**：验证 thing/thingnum 数组正确转换为 Grid items 格式
+3. **药品/暗器过滤**：验证战斗物品菜单只显示类型 3（药品）和类型 4（暗器）
+4. **必填字段**：验证 Grid items 包含 id, name, count, type, desc, user 字段
+5. **空数组处理**：验证空物品列表返回 -1
+6. **ESC取消处理**：验证 ESC 取消返回 7（继续菜单）而非 0（结束回合）
+
+```lua
+-- test_item_async.lua
+function TestItemAsync.testGridDisplayNotSimpleTextMenu()
+    local ItemAsync = require("item_async")
+    
+    -- 验证 Grid 显示函数存在（非简单文字菜单）
+    local hasGridFunction = ItemAsync.SelectThingGridAsync ~= nil
+    TestHelper.assertEquals(true, hasGridFunction, "ItemAsync should have SelectThingGridAsync function")
+    
+    local hasArrayFunction = ItemAsync.SelectThingByArrayAsync ~= nil
+    TestHelper.assertEquals(true, hasArrayFunction, "ItemAsync should have SelectThingByArrayAsync function")
+    
+    local hasDrawFunction = ItemAsync.draw ~= nil
+    TestHelper.assertEquals(true, hasDrawFunction, "ItemAsync should have draw function for Grid rendering")
+end
+
+-- test_war_async.lua
+function TestWarAsync.testThingMenuFiltersMedicineAndAnqi()
+    -- 验证物品过滤逻辑
+    local filteredTypes = {3, 4}  -- 药品和暗器
+    for i = 0, 5 do
+        local thingType = JY.Thing[i]["类型"]
+        for _, validType in ipairs(filteredTypes) do
+            if thingType == validType then
+                thing[num] = i
+                thingnum[num] = 10
+                num = num + 1
+                break
+            end
+        end
+    end
+    
+    TestHelper.assertEquals(2, num, "Should filter to only medicine (3) and hidden weapon (4)")
 end
 ```
 

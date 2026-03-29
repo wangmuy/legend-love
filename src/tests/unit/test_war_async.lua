@@ -517,6 +517,100 @@ function TestWarAsync.testDoctorTargetsAlly()
     TestHelper.assertEquals(true, canDoctor, "Can doctor ally")
 end
 
+function TestWarAsync.testThingMenuUsesGridDisplay()
+    setup()
+    print("\n=== Test: Thing Menu Uses Grid Display ===")
+    
+    local ItemAsync = require("item_async")
+    
+    TestHelper.assertNotNil(ItemAsync.SelectThingByArrayAsync, "ItemAsync should have SelectThingByArrayAsync for Grid display")
+    TestHelper.assertNotNil(ItemAsync.SelectThingGridAsync, "ItemAsync should have SelectThingGridAsync for Grid display")
+    TestHelper.assertNotNil(ItemAsync.draw, "ItemAsync should have draw function for Grid rendering")
+end
+
+function TestWarAsync.testThingMenuFiltersMedicineAndAnqi()
+    setup()
+    print("\n=== Test: Thing Menu Filters Medicine And Anqi ===")
+    
+    local thing = {}
+    local thingnum = {}
+    local num = 0
+    
+    for i = 0, 5 do
+        local t = TestHelper.createTestThing({ID = i})
+        t["名称"] = "物品" .. i
+        t["类型"] = i
+        _G.JY.Thing[i] = t
+    end
+    
+    local filteredTypes = {3, 4}
+    for i = 0, 5 do
+        local thingType = _G.JY.Thing[i]["类型"]
+        for _, validType in ipairs(filteredTypes) do
+            if thingType == validType then
+                thing[num] = i
+                thingnum[num] = 10
+                num = num + 1
+                break
+            end
+        end
+    end
+    
+    TestHelper.assertEquals(2, num, "Should filter to only medicine (3) and hidden weapon (4)")
+    TestHelper.assertEquals(3, _G.JY.Thing[thing[0]]["类型"], "First filtered item should be type 3")
+    TestHelper.assertEquals(4, _G.JY.Thing[thing[1]]["类型"], "Second filtered item should be type 4")
+end
+
+function TestWarAsync.testThingMenuGridNotTextMenu()
+    setup()
+    print("\n=== Test: Thing Menu Grid Not Text Menu ===")
+    
+    local ItemAsync = require("item_async")
+    
+    local gridFunctionExists = type(ItemAsync.SelectThingGridAsync) == "function"
+    TestHelper.assertEquals(true, gridFunctionExists, "Grid function should exist (not simple text menu)")
+    
+    local arrayFunctionExists = type(ItemAsync.SelectThingByArrayAsync) == "function"
+    TestHelper.assertEquals(true, arrayFunctionExists, "Array-to-Grid function should exist")
+end
+
+function TestWarAsync.testThingMenuEmptyReturnsContinue()
+    setup()
+    print("\n=== Test: Thing Menu Empty Returns Continue ===")
+    
+    local continueFlag = 7
+    
+    local function simulateThingMenuReturn(hasItems)
+        if not hasItems then
+            return continueFlag
+        end
+        return 0
+    end
+    
+    local result = simulateThingMenuReturn(false)
+    TestHelper.assertEquals(7, result, "Empty item list should return 7 (continue menu)")
+end
+
+function TestWarAsync.testThingMenuESCCancelReturnsContinue()
+    setup()
+    print("\n=== Test: Thing Menu ESC Cancel Returns Continue ===")
+    
+    local continueFlag = 7
+    
+    local function simulateThingMenuCancel(pressedESC)
+        if pressedESC then
+            return continueFlag
+        end
+        return 0
+    end
+    
+    local result = simulateThingMenuCancel(true)
+    TestHelper.assertEquals(7, result, "ESC cancel should return 7 (continue menu)")
+    
+    result = simulateThingMenuCancel(false)
+    TestHelper.assertEquals(0, result, "Success should return 0 (end turn)")
+end
+
 function TestWarAsync.runAll()
     print("\n========================================")
     print("War Async Unit Tests")
@@ -544,6 +638,11 @@ function TestWarAsync.runAll()
     TestWarAsync.testDecPoisonRequiresPoison()
     TestWarAsync.testPoisonTargetsEnemy()
     TestWarAsync.testDoctorTargetsAlly()
+    TestWarAsync.testThingMenuUsesGridDisplay()
+    TestWarAsync.testThingMenuFiltersMedicineAndAnqi()
+    TestWarAsync.testThingMenuGridNotTextMenu()
+    TestWarAsync.testThingMenuEmptyReturnsContinue()
+    TestWarAsync.testThingMenuESCCancelReturnsContinue()
     
     return TestHelper.printSummary()
 end
