@@ -499,12 +499,17 @@ end
 -- 药品物品使用（类型3）
 function ItemAsync.UseThing_Type3Async(thingId)
     local thingName = JY.Thing[thingId]["名称"]
+    local personId
     
-    -- 选择使用目标
-    local personId = SelectTeamMemberAsync("要给谁使用" .. thingName .. "?")
-    
-    if personId < 0 then
-        return false
+    -- 战斗场景：直接使用当前战斗人物
+    if JY.Status == GAME_WMAP then
+        personId = WAR.Person[WAR.CurID]["人物编号"]
+    else
+        -- 非战斗场景：选择使用目标
+        personId = SelectTeamMemberAsync("要给谁使用" .. thingName .. "?")
+        if personId < 0 then
+            return false
+        end
     end
     
     local personName = JY.Person[personId]["姓名"]
