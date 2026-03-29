@@ -120,7 +120,7 @@ cd src && lua tests/unit/test_input_manager.lua
 | `event_bridge` | 单例模式、状态注册、集成测试 |
 | `byte_io` | SaveFromTable16/LoadToTable16、字节序、数据一致性 |
 | `coroutine_scheduler` | 协程创建、yield/resume、waitForKey 绕过 disableInput |
-| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑 |
+| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑、用毒/解毒/医疗功能 |
 
 ### 关键测试场景
 
