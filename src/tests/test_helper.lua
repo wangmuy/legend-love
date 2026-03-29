@@ -417,6 +417,38 @@ function TestHelper.mockWarFunctions()
         _G.WAR.AutoFight = 1
     end
     
+    _G.War_Direct = function(x1, y1, x2, y2)
+        local x = x2 - x1
+        local y = y2 - y1
+        if math.abs(y) > math.abs(x) then
+            if y > 0 then return 3 else return 0 end
+        else
+            if x > 0 then return 1 else return 2 end
+        end
+    end
+    
+    _G.War_PoisonHurt = function(pid, targetId)
+        return 10
+    end
+    
+    _G.ExecDecPoison = function(pid, targetId)
+        return 20
+    end
+    
+    _G.ExecDoctor = function(pid, targetId)
+        return 30
+    end
+    
+    _G.War_AnqiHurt = function(pid, targetId, thingid)
+        return 15
+    end
+    
+    _G.instruct_32 = function(thingid, count)
+    end
+    
+    _G.WarSetPerson = function()
+    end
+    
     _G.GAME_WMAP = 3
     _G.VK_SPACE = 32
     _G.VK_RETURN = 13
@@ -697,6 +729,12 @@ function TestHelper.teardown()
     _G.War_StatusMenu = nil
     _G.War_RestMenu = nil
     _G.War_AutoMenu = nil
+    _G.War_Direct = nil
+    _G.War_PoisonHurt = nil
+    _G.ExecDecPoison = nil
+    _G.ExecDoctor = nil
+    _G.War_AnqiHurt = nil
+    _G.instruct_32 = nil
     _G.GAME_WMAP = nil
     _G.VK_SPACE = nil
     _G.VK_RETURN = nil
