@@ -29,6 +29,8 @@ local War_ManualCoroutine, War_AutoCoroutine, War_SettlementCoroutine
 local War_AttackCoroutine, War_MoveCoroutine, SelectTargetCoroutine
 local War_Manual_SubCoroutine, War_ShowFightCoroutine
 local War_Fight_SubCoroutine, War_MovePersonCoroutine, War_AutoMoveCoroutine
+local War_PoisonCoroutine, War_DecPoisonCoroutine, War_DoctorCoroutine
+local War_ExecuteMenuCoroutine
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
@@ -201,26 +203,49 @@ end
 
 -- 手动战斗菜单（协程版本）
 War_Manual_SubCoroutine = function()
+    local pid = WAR.Person[WAR.CurID]["人物编号"]
+    
+    -- 菜单项：与原版顺序一致
     local menu = {
-        {"攻击", nil, 1},
         {"移动", nil, 1},
+        {"攻击", nil, 1},
         {"用毒", nil, 1},
         {"解毒", nil, 1},
         {"医疗", nil, 1},
         {"物品", nil, 1},
         {"等待", nil, 1},
         {"状态", nil, 1},
+        {"休息", nil, 1},
         {"自动", nil, 1},
     }
     
-    local pid = WAR.Person[WAR.CurID]["人物编号"]
-    
-    if JY.Person[pid]["内力"] < 0 or JY.Person[pid]["体力"] < 10 then
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "不能战斗", C_WHITE, CC.DefaultFont)
-        return 7
+    -- 检查是否可以移动
+    if JY.Person[pid]["体力"] <= 5 or WAR.Person[WAR.CurID]["移动步数"] <= 0 then
+        menu[1][3] = 0
     end
     
-    local r = MenuAsync.ShowMenuCoroutine(menu, 9, 9, 0, 0, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
+    -- 检查是否可以攻击
+    local minv = War_GetMinNeiLi(pid)
+    if JY.Person[pid]["内力"] < minv or JY.Person[pid]["体力"] < 10 then
+        menu[2][3] = 0
+    end
+    
+    -- 检查是否可以用毒
+    if JY.Person[pid]["体力"] < 10 or JY.Person[pid]["用毒能力"] < 20 then
+        menu[3][3] = 0
+    end
+    
+    -- 检查是否可以解毒
+    if JY.Person[pid]["体力"] < 10 or JY.Person[pid]["解毒能力"] < 20 then
+        menu[4][3] = 0
+    end
+    
+    -- 检查是否可以医疗
+    if JY.Person[pid]["体力"] < 50 or JY.Person[pid]["医疗能力"] < 20 then
+        menu[5][3] = 0
+    end
+    
+    local r = MenuAsync.ShowMenuCoroutine(menu, 10, 0, CC.MainMenuX, CC.MainMenuY, 0, 0, 1, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
     
     if r == 0 then
         return 7
@@ -228,11 +253,20 @@ War_Manual_SubCoroutine = function()
     
     -- 处理菜单选择
     if r == 1 then
-        -- 攻击
-        return War_AttackCoroutine()
-    elseif r == 2 then
         -- 移动
         return War_MoveCoroutine()
+    elseif r == 2 then
+        -- 攻击
+        return War_AttackCoroutine()
+    elseif r == 3 then
+        -- 用毒
+        return War_PoisonCoroutine()
+    elseif r == 4 then
+        -- 解毒
+        return War_DecPoisonCoroutine()
+    elseif r == 5 then
+        -- 医疗
+        return War_DoctorCoroutine()
     elseif r == 6 then
         -- 物品
         War_ThingMenu()
@@ -246,10 +280,16 @@ War_Manual_SubCoroutine = function()
         War_StatusMenu()
         return 7
     elseif r == 9 then
+        -- 休息
+        War_RestMenu()
+        return 7
+    elseif r == 10 then
         -- 自动
         War_AutoMenu()
         return 0
     end
+    
+    return 7
 end
 
 -- 自动移动（协程版本）
@@ -591,10 +631,14 @@ War_MoveCoroutine = function()
     local scheduler = CoroutineScheduler.getInstance()
     
     local move = WAR.Person[WAR.CurID]["移动步数"]
-    if move <= 0 then
+    lib.Debug("War_MoveCoroutine: move=" .. tostring(move))
+    
+    if move == nil or move <= 0 then
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "不能移动", C_WHITE, CC.DefaultFont)
         return 7
     end
+    
+    WAR.ShowHead = 0
     
     -- 计算移动范围
     War_CalMoveStep(WAR.CurID, move, 0)
@@ -604,19 +648,25 @@ War_MoveCoroutine = function()
     local y0 = WAR.Person[WAR.CurID]["坐标Y"]
     local x, y = x0, y0
     
-    lib.Debug("War_MoveCoroutine: start at (" .. x .. "," .. y .. "), move=" .. move)
+    -- 设置移动选择模式（供 draw 函数使用）
+    WAR.DrawMode = 1
+    WAR.MoveCursorX = x
+    WAR.MoveCursorY = y
+    
+    lib.Debug("War_MoveCoroutine: start at (" .. x .. "," .. y .. ")")
     
     -- 循环等待用户选择移动位置
     while true do
-        local x2, y2 = x, y
+        -- 更新光标位置
+        WAR.MoveCursorX = x
+        WAR.MoveCursorY = y
         
-        -- 显示移动范围（WarDrawMap(1,x,y) 会高亮显示可移动位置）
-        WarDrawMap(1, x, y)
-        
-        -- 等待按键
+        -- 等待按键（绘制由 game_states.lua 的 draw 函数处理）
         local key = InputAsync.WaitKeyCoroutine()
         
         lib.Debug("War_MoveCoroutine: key=" .. key .. " at (" .. x .. "," .. y .. ")")
+        
+        local x2, y2 = x, y
         
         if key == VK_UP then
             y2 = y - 1
@@ -630,15 +680,24 @@ War_MoveCoroutine = function()
             -- 确认移动
             if x == x0 and y == y0 then
                 -- 没有移动，返回取消
+                WAR.DrawMode = nil
+                WAR.MoveCursorX = nil
+                WAR.MoveCursorY = nil
                 return 7
             end
             
             lib.Debug("War_MoveCoroutine: confirm move to (" .. x .. "," .. y .. ")")
+            WAR.DrawMode = nil
+            WAR.MoveCursorX = nil
+            WAR.MoveCursorY = nil
             War_MovePersonCoroutine(x, y)
             return 0
         elseif key == VK_ESCAPE then
             -- 取消
             lib.Debug("War_MoveCoroutine: cancelled")
+            WAR.DrawMode = nil
+            WAR.MoveCursorX = nil
+            WAR.MoveCursorY = nil
             return 7
         end
         
@@ -773,6 +832,96 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
     
     WAR.Person[WAR.CurID]["贴图类型"] = 0
     WAR.Person[WAR.CurID]["贴图"] = WarCalPersonPic(WAR.CurID)
+end
+
+-- 用毒（协程版本）
+War_PoisonCoroutine = function()
+    WAR.ShowHead = 0
+    local r = War_ExecuteMenuCoroutine(1)
+    WAR.ShowHead = 1
+    return r
+end
+
+-- 解毒（协程版本）
+War_DecPoisonCoroutine = function()
+    WAR.ShowHead = 0
+    local r = War_ExecuteMenuCoroutine(2)
+    WAR.ShowHead = 1
+    return r
+end
+
+-- 医疗（协程版本）
+War_DoctorCoroutine = function()
+    WAR.ShowHead = 0
+    local r = War_ExecuteMenuCoroutine(3)
+    WAR.ShowHead = 1
+    return r
+end
+
+-- 执行医疗、解毒、用毒（协程版本）
+War_ExecuteMenuCoroutine = function(flag, thingid)
+    local scheduler = CoroutineScheduler.getInstance()
+    local pid = WAR.Person[WAR.CurID]["人物编号"]
+    local step
+    
+    if flag == 1 then
+        step = math.modf(JY.Person[pid]["用毒能力"] / 15) + 1
+    elseif flag == 2 then
+        step = math.modf(JY.Person[pid]["解毒能力"] / 15) + 1
+    elseif flag == 3 then
+        step = math.modf(JY.Person[pid]["医疗能力"] / 15) + 1
+    elseif flag == 4 then
+        step = math.modf(JY.Person[pid]["暗器技巧"] / 15) + 1
+    end
+    
+    War_CalMoveStep(WAR.CurID, step, 1)
+    
+    -- 选择目标
+    local x0 = WAR.Person[WAR.CurID]["坐标X"]
+    local y0 = WAR.Person[WAR.CurID]["坐标Y"]
+    local x, y = x0, y0
+    
+    -- 设置移动选择模式
+    WAR.DrawMode = 2  -- 使用不同颜色
+    WAR.MoveCursorX = x
+    WAR.MoveCursorY = y
+    
+    while true do
+        WAR.MoveCursorX = x
+        WAR.MoveCursorY = y
+        
+        local key = InputAsync.WaitKeyCoroutine()
+        
+        local x2, y2 = x, y
+        
+        if key == VK_UP then
+            y2 = y - 1
+        elseif key == VK_DOWN then
+            y2 = y + 1
+        elseif key == VK_LEFT then
+            x2 = x - 1
+        elseif key == VK_RIGHT then
+            x2 = x + 1
+        elseif key == VK_SPACE or key == VK_RETURN then
+            -- 确认
+            if x ~= x0 or y ~= y0 then
+                WAR.DrawMode = nil
+                WAR.MoveCursorX = nil
+                WAR.MoveCursorY = nil
+                return War_ExecuteMenu_Sub(x, y, flag, thingid)
+            end
+        elseif key == VK_ESCAPE then
+            -- 取消
+            WAR.DrawMode = nil
+            WAR.MoveCursorX = nil
+            WAR.MoveCursorY = nil
+            return 0
+        end
+        
+        if GetWarMap(x2, y2, 3) < 128 then
+            x, y = x2, y2
+        end
+    end
 end
 
 -- 导出函数
