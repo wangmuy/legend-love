@@ -15,6 +15,8 @@
 
 **任务进度**: 参考 `openspec/changes/` 目录下的活动变更，以及 `openspec/changes/archive/` 下的已归档变更。
 
+**架构文档**: 详见 [ARCHITECTURE.md](ARCHITECTURE.md) 和 [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)。
+
 ## 事件驱动架构
 
 ### 核心数据流
