@@ -283,7 +283,8 @@ end
 
 -- 获取协程的结果
 -- @param id: 协程ID
--- @return: 协程的结果，function CoroutineScheduler:getResult(id)
+-- @return: 协程的结果，如果协程未完成或不存在则返回nil
+function CoroutineScheduler:getResult(id)
     local info = coroutines[id]
     if not info then
         return nil
