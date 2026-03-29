@@ -100,8 +100,9 @@ function CoroutineScheduler:start(id, ...)
     end
     if info.status == "dead" then
         info.result = result
-        coroutines[id] = nil  -- 清理已完成的协程
-        self:_debug("CoroutineScheduler.start: coroutine " .. tostring(id) .. " cleaned up")
+        info.status = "completed"
+        self:_debug("CoroutineScheduler.start: coroutine " .. tostring(id) .. " completed with result=" .. tostring(result))
+        -- 不立即清理，让调用者可以获取结果
     end
     
     return true, result
@@ -269,12 +270,53 @@ function CoroutineScheduler:clear()
     currentCoroutine = nil
 end
 
+-- 检查协程是否活跃
+-- @param id: 协程ID
+-- @return: true 如果协程活跃，false 如果不活跃或不存在
+function CoroutineScheduler:isActive(id)
+    local info = coroutines[id]
+    if not info then
+        return false
+    end
+    return info.status == "suspended" or info.status == "running"
+end
+
+-- 获取协程的结果
+-- @param id: 协程ID
+-- @return: 协程的结果，function CoroutineScheduler:getResult(id)
+    local info = coroutines[id]
+    if not info then
+        return nil
+    end
+    return info.result
+end
+
 -- 重置调度器
 function CoroutineScheduler:reset()
     self:clear()
     coroutineIdCounter = 0
     instance = nil
 end
+
+-- 检查协程是否活跃
+-- @param id: 协程ID
+-- @return: true 如果协程正在运行或挂起
+function CoroutineScheduler:isActive(id)
+    local info = coroutines[id]
+    return info ~= nil and (info.status == "suspended" or info.status == "running" or info.status == "completed")
+end
+
+-- 获取协程结果
+-- @param id: 协程ID
+-- @return: 协程的结果，function CoroutineScheduler:getResult(id)
+    local info = coroutines[id]
+    if info and info.result ~= nil then
+        return info.result
+    end
+    return nil
+end
+
+
 
 -- 包装函数为协程
 -- @param fn: 要包装的函数
