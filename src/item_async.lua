@@ -80,6 +80,30 @@ function ItemAsync.SelectThingAsync()
     return ItemAsync.SelectThingGridAsync(items, itemCount)
 end
 
+function ItemAsync.SelectThingByArrayAsync(thing, thingnum, itemCount)
+    local items = {}
+    local count = itemCount or 0
+    
+    for i = 0, count - 1 do
+        if thing[i] and thing[i] >= 0 then
+            items[i + 1] = {
+                id = thing[i],
+                name = JY.Thing[thing[i]]["名称"],
+                count = thingnum[i] or 0,
+                type = JY.Thing[thing[i]]["类型"],
+                desc = JY.Thing[thing[i]]["物品说明"],
+                user = JY.Thing[thing[i]]["使用人"]
+            }
+        end
+    end
+    
+    if count == 0 then
+        return -1
+    end
+    
+    return ItemAsync.SelectThingGridAsync(items, count)
+end
+
 -- Grid形式物品选择（带缩略图和描述）
 -- items: 物品列表，每个元素包含 id, name, count, type, desc, user
 -- itemCount: 物品数量
