@@ -411,8 +411,17 @@ end
 
 -- 自动战斗（协程版本）
 War_AutoCoroutine = function()
+    local scheduler = CoroutineScheduler.getInstance()
     local id = WAR.CurID
     local pid = WAR.Person[id]["人物编号"]
+    
+    WAR.ShowHead = 1
+    WarDrawMap(0)
+    scheduler:waitForTime(CC.WarAutoDelay / 1000)
+    
+    if CC.AutoWarShowHead ~= 1 then
+        WAR.ShowHead = 0
+    end
     
     local wugongnum = 1
     for i = 1, 10 do
