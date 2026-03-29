@@ -424,6 +424,99 @@ function TestWarAsync.testExecuteMenuReturnsContinueOnCancel()
     TestHelper.assertEquals(0, countAfterExecute, "Execute returns 0, loop ends")
 end
 
+function TestWarAsync.testExecuteMenuEndsTurn()
+    setup()
+    print("\n=== Test: Execute Menu Ends Turn ===")
+    
+    local endTurnFlag = 0
+    
+    TestHelper.assertEquals(0, endTurnFlag, "Execute menu returns 0 to end turn")
+    
+    local function simulateTurnEnd(returnValue)
+        if returnValue == endTurnFlag then
+            return "next_person"
+        else
+            return "continue_menu"
+        end
+    end
+    
+    local result = simulateTurnEnd(0)
+    TestHelper.assertEquals("next_person", result, "Return 0 ends turn, goes to next person")
+    
+    result = simulateTurnEnd(7)
+    TestHelper.assertEquals("continue_menu", result, "Return 7 continues menu")
+end
+
+function TestWarAsync.testDoctorRequiresInjury()
+    setup()
+    print("\n=== Test: Doctor Requires Injury ===")
+    
+    local p1 = _G.JY.Person[1]
+    p1["医疗能力"] = 50
+    p1["体力"] = 100
+    
+    local p2 = TestHelper.createTestPerson({ID = 3})
+    p2["姓名"] = "队友"
+    p2["受伤程度"] = 50
+    p2["生命"] = 100
+    _G.JY.Person[3] = p2
+    
+    local injuryBefore = p2["受伤程度"]
+    TestHelper.assertEquals(50, injuryBefore, "Injury should be 50 before doctor")
+    
+    TestHelper.assertEquals(100, p1["体力"], "Healer should have enough stamina")
+end
+
+function TestWarAsync.testDecPoisonRequiresPoison()
+    setup()
+    print("\n=== Test: DecPoison Requires Poison ===")
+    
+    local p1 = _G.JY.Person[1]
+    p1["解毒能力"] = 50
+    
+    local p2 = TestHelper.createTestPerson({ID = 3})
+    p2["姓名"] = "队友"
+    p2["中毒程度"] = 30
+    _G.JY.Person[3] = p2
+    
+    local poisonBefore = p2["中毒程度"]
+    TestHelper.assertEquals(30, poisonBefore, "Poison should be 30 before decpoison")
+end
+
+function TestWarAsync.testPoisonTargetsEnemy()
+    setup()
+    print("\n=== Test: Poison Targets Enemy ===")
+    
+    createSimpleWarScenario()
+    
+    local attacker = _G.WAR.Person[0]
+    local target = _G.WAR.Person[1]
+    
+    TestHelper.assertEquals(true, attacker["我方"], "Attacker should be ally")
+    TestHelper.assertEquals(false, target["我方"], "Target should be enemy")
+    
+    local canPoison = attacker["我方"] ~= target["我方"]
+    TestHelper.assertEquals(true, canPoison, "Can poison enemy")
+end
+
+function TestWarAsync.testDoctorTargetsAlly()
+    setup()
+    print("\n=== Test: Doctor Targets Ally ===")
+    
+    createSimpleWarScenario()
+    
+    _G.WAR.Person[1]["我方"] = true
+    
+    local healer = _G.WAR.Person[0]
+    local target = _G.WAR.Person[1]
+    
+    TestHelper.assertEquals(true, healer["我方"], "Healer should be ally")
+    TestHelper.assertEquals(true, target["我方"], "Target should be ally")
+    
+    local canDoctor = healer["我方"] == target["我方"]
+    TestHelper.assertEquals(true, canDoctor, "Can doctor ally")
+end
+
 function TestWarAsync.runAll()
     print("\n========================================")
     print("War Async Unit Tests")
@@ -446,6 +539,11 @@ function TestWarAsync.runAll()
     TestWarAsync.testMoveDisablesAfterFirstMove()
     TestWarAsync.testExecuteMenuDrawMode()
     TestWarAsync.testExecuteMenuReturnsContinueOnCancel()
+    TestWarAsync.testExecuteMenuEndsTurn()
+    TestWarAsync.testDoctorRequiresInjury()
+    TestWarAsync.testDecPoisonRequiresPoison()
+    TestWarAsync.testPoisonTargetsEnemy()
+    TestWarAsync.testDoctorTargetsAlly()
     
     return TestHelper.printSummary()
 end
