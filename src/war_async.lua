@@ -1282,12 +1282,10 @@ War_ExecuteMenuCoroutine = function(flag, thingid)
         elseif key == VK_RIGHT then
             x2 = x + 1
         elseif key == VK_SPACE or key == VK_RETURN then
-            if x ~= x0 or y ~= y0 then
-                WAR.DrawMode = nil
-                WAR.MoveCursorX = nil
-                WAR.MoveCursorY = nil
-                return War_ExecuteMenu_SubCoroutine(x, y, flag, thingid)
-            end
+            WAR.DrawMode = nil
+            WAR.MoveCursorX = nil
+            WAR.MoveCursorY = nil
+            return War_ExecuteMenu_SubCoroutine(x, y, flag, thingid)
         elseif key == VK_ESCAPE then
             WAR.DrawMode = nil
             WAR.MoveCursorX = nil
