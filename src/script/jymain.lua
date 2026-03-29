@@ -5024,8 +5024,9 @@ function WarShowHead()               --显示战斗人头像
     local pid=WAR.Person[WAR.CurID]["人物编号"];
     local p=JY.Person[pid];
 
-    local h=16+2;
-    local width=112+2*CC.MenuBorderPixel;
+    local fontsize = CC.DefaultFont
+    local h=fontsize+2;
+    local width=fontsize*7+2*CC.MenuBorderPixel;  -- 足够显示 "生命 9999/9999"
     local height=100+2*CC.MenuBorderPixel+4*h;
     local x1,y1;
     local i=1;
@@ -5046,7 +5047,7 @@ function WarShowHead()               --显示战斗人头像
     x1=x1+5
     y1=y1+5+100;
 
-    DrawString(x1,y1,p["姓名"],C_WHITE,16);
+    DrawString(x1,y1,p["姓名"],C_WHITE,fontsize);
 
     local color;              --显示生命和最大值，根据受伤和中毒显示不同颜色
     if p["受伤程度"]<33 then
@@ -5056,9 +5057,9 @@ function WarShowHead()               --显示战斗人头像
     else
         color=RGB(232,32,44);
     end
-    DrawString(x1,y1+h,"生命",C_ORANGE,16);
-    DrawString(x1+40,y1+h,string.format("%4d",p["生命"]),color,16);
-    DrawString(x1+40+32,y1+h,"/",C_GOLD,16);
+    DrawString(x1,y1+h,"生命",C_ORANGE,fontsize);
+    DrawString(x1+fontsize*2.5,y1+h,string.format("%4d",p["生命"]),color,fontsize);
+    DrawString(x1+fontsize*4.5,y1+h,"/",C_GOLD,fontsize);
     if p["中毒程度"]==0 then
         color =RGB(252,148,16);
     elseif p["中毒程度"]<50 then
@@ -5066,7 +5067,7 @@ function WarShowHead()               --显示战斗人头像
     else
         color=RGB(56,136,36);
     end
-    DrawString(x1+40+40,y1+h,string.format("%4d",p["生命最大值"]),color,16);
+    DrawString(x1+fontsize*5,y1+h,string.format("%4d",p["生命最大值"]),color,fontsize);
 
                   --显示内力和最大值，根据内力性质显示不同颜色
     if p["内力性质"]==0 then
@@ -5076,11 +5077,11 @@ function WarShowHead()               --显示战斗人头像
     else
         color=RGB(236,236,236);
     end
-    DrawString(x1,y1+h*2,"内力",C_ORANGE,16);
-    DrawString(x1+40,y1+h*2,string.format("%4d/%4d",p["内力"],p["内力最大值"]),color,16);
+    DrawString(x1,y1+h*2,"内力",C_ORANGE,fontsize);
+    DrawString(x1+fontsize*2.5,y1+h*2,string.format("%4d/%4d",p["内力"],p["内力最大值"]),color,fontsize);
 
-    DrawString(x1,y1+h*3,"体力",C_ORANGE,16);
-    DrawString(x1+40,y1+h*3,string.format("%4d",p["体力"]),C_GOLD,16);
+    DrawString(x1,y1+h*3,"体力",C_ORANGE,fontsize);
+    DrawString(x1+fontsize*2.5,y1+h*3,string.format("%4d",p["体力"]),C_GOLD,fontsize);
 end
 
 

@@ -194,6 +194,8 @@ end
 
 -- 手动战斗（协程版本）
 War_ManualCoroutine = function()
+    WAR.ShowHead = 1
+    
     local r
     while true do
         r = War_Manual_SubCoroutine()
@@ -201,6 +203,8 @@ War_ManualCoroutine = function()
             break
         end
     end
+    
+    WAR.ShowHead = 0
     return r
 end
 
