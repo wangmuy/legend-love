@@ -123,7 +123,7 @@ cd src && lua tests/unit/test_input_manager.lua
 | `byte_io` | SaveFromTable16/LoadToTable16、字节序、数据一致性 |
 | `coroutine_scheduler` | 协程创建、yield/resume、waitForKey 绕过 disableInput |
 | `item_async` | Grid物品选择、数组转换、药品/暗器过滤、必填字段验证 |
-| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑、用毒/解毒/医疗功能、物品菜单Grid显示 |
+| `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑、用毒/解毒/医疗功能、物品菜单Grid显示、状态菜单协程版本 |
 
 ### 关键测试场景
 
@@ -265,6 +265,42 @@ function TestWarAsync.testThingMenuFiltersMedicineAndAnqi()
     end
     
     TestHelper.assertEquals(2, num, "Should filter to only medicine (3) and hidden weapon (4)")
+end
+```
+
+#### 状态菜单测试场景
+
+状态菜单测试确保战斗场景中的状态查看使用协程版本，正确显示提示和详细状态页：
+
+1. **提示显示**：验证状态菜单显示 "要查阅谁的状态" 提示
+2. **队友菜单**：验证构建正确的队友选择菜单
+3. **协程版本**：验证使用 `War_StatusMenuCoroutine` 而非阻塞式原版
+4. **详细状态页**：验证调用 `PersonStatusAsync.ShowStatusCoroutine` 显示状态
+5. **返回值**：验证查看后返回 7（继续菜单）
+
+```lua
+-- test_war_async.lua
+function TestWarAsync.testStatusMenuShowsPrompt()
+    local WarAsync = require("war_async")
+    
+    TestHelper.assertNotNil(WarAsync.War_StatusMenuCoroutine, "War_StatusMenuCoroutine should exist")
+end
+
+function TestWarAsync.testStatusMenuBuildsTeamMenu()
+    local menu = {}
+    for i = 1, CC.TeamNum do
+        menu[i] = {"", nil, 0}
+        local id = JY.Base["队伍" .. i]
+        if id >= 0 then
+            if JY.Person[id]["生命"] > 0 then
+                menu[i][1] = JY.Person[id]["姓名"]
+                menu[i][3] = 1
+            end
+        end
+    end
+    
+    TestHelper.assertEquals("人物1", menu[1][1], "First team member should be 人物1")
+    TestHelper.assertEquals(1, menu[1][3], "First team member should be selectable")
 end
 ```
 

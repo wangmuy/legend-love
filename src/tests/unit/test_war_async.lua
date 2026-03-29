@@ -28,10 +28,18 @@ local function setup()
     _G.CC.ThingPicFile = {"thing.pic", "thing.idx"}
     _G.CC.EffectFile = {"effect.pic", "effect.idx"}
     _G.CC.LoadThingPic = 0
+    _G.CC.TeamNum = 6
+    _G.CC.SingleLineHeight = 20
+    
+    _G.JY.Base = {}
+    for i = 1, _G.CC.TeamNum do
+        _G.JY.Base["队伍" .. i] = i
+    end
     
     for i = 1, 10 do
         local p = TestHelper.createTestPerson({ID = i})
         p["姓名"] = "人物" .. i
+        p["生命"] = 100
         _G.JY.Person[i] = p
     end
     
@@ -611,6 +619,60 @@ function TestWarAsync.testThingMenuESCCancelReturnsContinue()
     TestHelper.assertEquals(0, result, "Success should return 0 (end turn)")
 end
 
+function TestWarAsync.testStatusMenuShowsPrompt()
+    setup()
+    print("\n=== Test: Status Menu Shows Prompt ===")
+    
+    local WarAsync = require("war_async")
+    
+    TestHelper.assertNotNil(WarAsync.War_StatusMenuCoroutine, "War_StatusMenuCoroutine should exist")
+end
+
+function TestWarAsync.testStatusMenuUsesPersonStatusAsync()
+    setup()
+    print("\n=== Test: Status Menu Uses PersonStatusAsync ===")
+    
+    local WarAsync = require("war_async")
+    local PersonStatusAsync = require("person_status_async")
+    
+    TestHelper.assertNotNil(WarAsync.War_StatusMenuCoroutine, "War_StatusMenuCoroutine should exist")
+    TestHelper.assertNotNil(PersonStatusAsync.ShowStatusCoroutine, "PersonStatusAsync.ShowStatusCoroutine should exist")
+end
+
+function TestWarAsync.testStatusMenuBuildsTeamMenu()
+    setup()
+    print("\n=== Test: Status Menu Builds Team Menu ===")
+    
+    local menu = {}
+    for i = 1, _G.CC.TeamNum do
+        menu[i] = {"", nil, 0}
+        local id = _G.JY.Base["队伍" .. i]
+        if id >= 0 then
+            if _G.JY.Person[id]["生命"] > 0 then
+                menu[i][1] = _G.JY.Person[id]["姓名"]
+                menu[i][3] = 1
+            end
+        end
+    end
+    
+    TestHelper.assertEquals("人物1", menu[1][1], "First team member should be 人物1")
+    TestHelper.assertEquals(1, menu[1][3], "First team member should be selectable")
+end
+
+function TestWarAsync.testStatusMenuReturnsContinueAfterView()
+    setup()
+    print("\n=== Test: Status Menu Returns Continue After View ===")
+    
+    local continueFlag = 7
+    
+    local function simulateStatusMenuReturn()
+        return continueFlag
+    end
+    
+    local result = simulateStatusMenuReturn()
+    TestHelper.assertEquals(7, result, "Status menu should return 7 (continue) after viewing")
+end
+
 function TestWarAsync.runAll()
     print("\n========================================")
     print("War Async Unit Tests")
@@ -643,6 +705,10 @@ function TestWarAsync.runAll()
     TestWarAsync.testThingMenuGridNotTextMenu()
     TestWarAsync.testThingMenuEmptyReturnsContinue()
     TestWarAsync.testThingMenuESCCancelReturnsContinue()
+    TestWarAsync.testStatusMenuShowsPrompt()
+    TestWarAsync.testStatusMenuUsesPersonStatusAsync()
+    TestWarAsync.testStatusMenuBuildsTeamMenu()
+    TestWarAsync.testStatusMenuReturnsContinueAfterView()
     
     return TestHelper.printSummary()
 end

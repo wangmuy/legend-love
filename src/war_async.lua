@@ -8,6 +8,7 @@ local CoroutineScheduler = require("coroutine_scheduler")
 local MenuAsync = require("menu_async")
 local AsyncMessageBox = require("async_message_box")
 local InputAsync = require("input_async")
+local PersonStatusAsync = require("person_status_async")
 
 -- 战斗状态
 local warState = {
@@ -31,7 +32,7 @@ local War_Manual_SubCoroutine, War_ShowFightCoroutine
 local War_Fight_SubCoroutine, War_MovePersonCoroutine, War_AutoMoveCoroutine
 local War_PoisonCoroutine, War_DecPoisonCoroutine, War_DoctorCoroutine
 local War_ExecuteMenuCoroutine, War_Fight_ExecuteCoroutine, SelectTargetCoroutine
-local War_ExecuteMenu_SubCoroutine, War_ThingMenuCoroutine
+local War_ExecuteMenu_SubCoroutine, War_ThingMenuCoroutine, War_StatusMenuCoroutine
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
@@ -277,7 +278,7 @@ War_Manual_SubCoroutine = function()
         return 7
     elseif r == 8 then
         -- 状态
-        War_StatusMenu()
+        War_StatusMenuCoroutine()
         return 7
     elseif r == 9 then
         -- 休息（结束当前人物行动）
@@ -1420,6 +1421,39 @@ War_ThingMenuCoroutine = function()
     end
 end
 
+-- 战斗状态菜单（协程版本）
+War_StatusMenuCoroutine = function()
+    local scheduler = CoroutineScheduler.getInstance()
+    
+    WAR.ShowHead = 0
+    
+    -- 显示提示
+    DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
+    local nexty = CC.MainSubMenuY + CC.SingleLineHeight
+    
+    -- 构建队友菜单
+    local menu = {}
+    for i = 1, CC.TeamNum do
+        menu[i] = {"", nil, 0}
+        local id = JY.Base["队伍" .. i]
+        if id >= 0 then
+            if JY.Person[id]["生命"] > 0 then
+                menu[i][1] = JY.Person[id]["姓名"]
+                menu[i][3] = 1
+            end
+        end
+    end
+    
+    local r = MenuAsync.ShowMenuCoroutine(menu, CC.TeamNum, 0, CC.MainSubMenuX, nexty, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    
+    if r > 0 then
+        PersonStatusAsync.ShowStatusCoroutine(r)
+    end
+    
+    WAR.ShowHead = 1
+    Cls()
+end
+
 -- 导出函数
 WarAsync.War_ManualCoroutine = War_ManualCoroutine
 WarAsync.War_AutoCoroutine = War_AutoCoroutine
@@ -1433,6 +1467,7 @@ WarAsync.War_MovePersonCoroutine = War_MovePersonCoroutine
 WarAsync.War_Fight_SubCoroutine = War_Fight_SubCoroutine
 WarAsync.War_AutoMoveCoroutine = War_AutoMoveCoroutine
 WarAsync.War_ThingMenuCoroutine = War_ThingMenuCoroutine
+WarAsync.War_StatusMenuCoroutine = War_StatusMenuCoroutine
 
 -- 获取战斗状态
 function WarAsync.getWarState()
