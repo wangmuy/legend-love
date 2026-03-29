@@ -1015,7 +1015,6 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
     WAR.Person[WAR.CurID]["贴图"] = WarCalPersonPic(WAR.CurID)
     
     WarSetPerson()
-    WarDrawMap(0)
     
     local frameTime = (CC.Frame or 50) / 1000
     
@@ -1043,26 +1042,38 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
         local pic = WAR.Person[WAR.CurID]["贴图"] / 2
         
         if i < fightdelay then
-            WarDrawMap(4, pic * 2, mytype, -1)
+            WAR.DrawMode = 4
+            WAR.AnimPic = pic * 2
+            WAR.AnimType = mytype
+            WAR.AnimEffect = -1
         else
             starteft = starteft + 1
-            WarDrawMap(4, pic * 2, mytype, starteft * 2)
+            WAR.DrawMode = 4
+            WAR.AnimPic = pic * 2
+            WAR.AnimType = mytype
+            WAR.AnimEffect = starteft * 2
         end
         
+        WarSetPerson()
         scheduler:waitForTime(frameTime)
     end
+    
+    WAR.DrawMode = nil
+    WAR.AnimPic = nil
+    WAR.AnimType = nil
+    WAR.AnimEffect = nil
     
     WAR.Person[WAR.CurID]["贴图类型"] = 0
     WAR.Person[WAR.CurID]["贴图"] = WarCalPersonPic(WAR.CurID)
     WarSetPerson()
-    WarDrawMap(0)
     
+    WAR.DrawMode = 0
     scheduler:waitForTime(0.2)
     
-    WarDrawMap(2)
+    WAR.DrawMode = 2
     scheduler:waitForTime(0.2)
     
-    WarDrawMap(0)
+    WAR.DrawMode = nil
 end
 
 -- 用毒（协程版本）

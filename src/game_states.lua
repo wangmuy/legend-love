@@ -457,7 +457,6 @@ handlers["GAME_WMAP"] = {
     end,
     
     draw = function()
-        -- 战斗渲染：每帧调用 WarDrawMap 渲染战斗场景
         if JY.Status == GAME_WMAP and WAR and WAR.Person and WAR.CurID and WAR.Person[WAR.CurID] then
             lib.Debug(string.format("GAME_WMAP draw: DrawMode=%s, MoveCursorX=%s, MoveCursorY=%s", 
                 tostring(WAR.DrawMode), tostring(WAR.MoveCursorX), tostring(WAR.MoveCursorY)))
@@ -471,6 +470,10 @@ handlers["GAME_WMAP"] = {
                 else
                     WarDrawMap(0)
                 end
+            elseif WAR.DrawMode == 4 and WAR.AnimPic then
+                WarDrawMap(4, WAR.AnimPic, WAR.AnimType or 0, WAR.AnimEffect or -1)
+            elseif WAR.DrawMode == 2 then
+                WarDrawMap(2)
             else
                 WarDrawMap(0)
             end
