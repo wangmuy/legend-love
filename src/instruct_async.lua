@@ -123,15 +123,9 @@ function InstructAsync.instruct_15(param)
     local MenuAsync = require("menu_async")
     
     JY.Status = GAME_DEAD
-    Cls()
-    
-    DrawString(CC.GameOverX, CC.GameOverY, JY.Person[0]["姓名"], RGB(216, 20, 24), CC.DefaultFont)
     
     local x = CC.ScreenW - 9 * CC.DefaultFont
-    DrawString(x, 10, os.date("%Y-%m-%d %H:%M"), RGB(216, 20, 24), CC.DefaultFont)
-    DrawString(x, 10 + CC.DefaultFont + CC.RowPixel, "在地球的某处", RGB(216, 20, 24), CC.DefaultFont)
-    DrawString(x, 10 + (CC.DefaultFont + CC.RowPixel) * 2, "当地人口的失踪数", RGB(216, 20, 24), CC.DefaultFont)
-    DrawString(x, 10 + (CC.DefaultFont + CC.RowPixel) * 3, "又多了一笔。。。", RGB(216, 20, 24), CC.DefaultFont)
+    local y = CC.ScreenH - 4 * (CC.DefaultFont + CC.RowPixel) - 10
     
     local loadMenu = {
         {"载入进度一", nil, 1},
@@ -140,10 +134,9 @@ function InstructAsync.instruct_15(param)
         {"回家睡觉去", nil, 1}
     }
     
-    local y = CC.ScreenH - 4 * (CC.DefaultFont + CC.RowPixel) - 10
     local r = MenuAsync.ShowMenuCoroutine(loadMenu, 4, 0, x, y, 0, 0, 0, 0, CC.DefaultFont, C_ORANGE, C_WHITE)
     
-    Cls()
+    JY.DeadScreen = nil
     
     if r < 4 then
         LoadRecord(r)

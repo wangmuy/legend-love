@@ -517,20 +517,33 @@ handlers["GAME_END"] = {
 handlers["GAME_DEAD"] = {
     enter = function()
         lib.Debug("Enter GAME_DEAD state")
-        lib.PlayMIDI("")
+        JY.DeadScreen = {
+            name = JY.Person[0]["姓名"],
+            datetime = os.date("%Y-%m-%d %H:%M")
+        }
     end,
     
     exit = function()
         lib.Debug("Exit GAME_DEAD state")
+        JY.DeadScreen = nil
     end,
     
     update = function(dt)
-        -- 界面由协程(instruct_15或War_GameOverCoroutine)处理
     end,
     
     draw = function()
-        -- 界面由协程(instruct_15或War_GameOverCoroutine)绘制
-        -- 这里不做任何绘制，避免覆盖协程绘制的内容
+        lib.FillColor(0, 0, 0, 0, 0)
+        lib.LoadPicture(CC.DeadFile, -1, -1)
+        
+        if JY.DeadScreen then
+            DrawString(CC.GameOverX, CC.GameOverY, JY.DeadScreen.name, RGB(216, 20, 24), CC.DefaultFont)
+            
+            local x = CC.ScreenW - 9 * CC.DefaultFont
+            DrawString(x, 10, JY.DeadScreen.datetime, RGB(216, 20, 24), CC.DefaultFont)
+            DrawString(x, 10 + CC.DefaultFont + CC.RowPixel, "在地球的某处", RGB(216, 20, 24), CC.DefaultFont)
+            DrawString(x, 10 + (CC.DefaultFont + CC.RowPixel) * 2, "当地人口的失踪数", RGB(216, 20, 24), CC.DefaultFont)
+            DrawString(x, 10 + (CC.DefaultFont + CC.RowPixel) * 3, "又多了一笔。。。", RGB(216, 20, 24), CC.DefaultFont)
+        end
     end
 }
 
