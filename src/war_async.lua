@@ -273,15 +273,15 @@ War_Manual_SubCoroutine = function()
         War_ThingMenu()
         return 0
     elseif r == 7 then
-        -- 等待
+        -- 等待（把当前人物调到队尾，稍后行动）
         War_WaitMenu()
-        return 0
+        return 7
     elseif r == 8 then
         -- 状态
         War_StatusMenu()
         return 7
     elseif r == 9 then
-        -- 休息
+        -- 休息（结束当前人物行动）
         War_RestMenu()
         return 0
     elseif r == 10 then
