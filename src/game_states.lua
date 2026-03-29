@@ -458,22 +458,21 @@ handlers["GAME_WMAP"] = {
     
     draw = function()
         if JY.Status == GAME_WMAP and WAR and WAR.Person and WAR.CurID and WAR.Person[WAR.CurID] then
-            lib.Debug(string.format("GAME_WMAP draw: DrawMode=%s, MoveCursorX=%s, MoveCursorY=%s", 
-                tostring(WAR.DrawMode), tostring(WAR.MoveCursorX), tostring(WAR.MoveCursorY)))
-            if WAR.DrawMode and WAR.MoveCursorX and WAR.MoveCursorY then
-                if WAR.DrawMode == 1 then
-                    WarDrawMap(1, WAR.MoveCursorX, WAR.MoveCursorY)
-                elseif WAR.DrawMode == 2 then
+            local drawMode = WAR.DrawMode or 0
+            
+            if drawMode == 1 and WAR.MoveCursorX and WAR.MoveCursorY then
+                WarDrawMap(1, WAR.MoveCursorX, WAR.MoveCursorY)
+            elseif drawMode == 2 then
+                if WAR.MoveCursorX and WAR.MoveCursorY then
                     WarDrawMap(2, WAR.MoveCursorX, WAR.MoveCursorY)
-                elseif WAR.DrawMode == 3 then
-                    WarDrawMap(1, WAR.MoveCursorX, WAR.MoveCursorY)
                 else
-                    WarDrawMap(0)
+                    WarDrawMap(2)
                 end
-            elseif WAR.DrawMode == 4 and WAR.AnimPic then
+            elseif drawMode == 3 and WAR.MoveCursorX and WAR.MoveCursorY then
+                WarDrawMap(1, WAR.MoveCursorX, WAR.MoveCursorY)
+            elseif drawMode == 4 and WAR.AnimPic then
                 WarDrawMap(4, WAR.AnimPic, WAR.AnimType or 0, WAR.AnimEffect or -1)
-            elseif WAR.DrawMode == 5 and WAR.HitNumbers then
-                -- 显示伤害数字
+            elseif drawMode == 5 and WAR.HitNumbers then
                 WarDrawMap(0)
                 local y_off = WAR.HitYOffset or 0
                 local effectColor = WAR.EffectColor and WAR.EffectColor[WAR.HitEffect] or C_WHITE
@@ -483,8 +482,6 @@ handlers["GAME_WMAP"] = {
                             WAR.HitNumbers[j][3], effectColor, CC.DefaultFont)
                     end
                 end
-            elseif WAR.DrawMode == 2 then
-                WarDrawMap(2)
             else
                 WarDrawMap(0)
             end
