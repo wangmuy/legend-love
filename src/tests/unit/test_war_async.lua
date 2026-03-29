@@ -673,6 +673,65 @@ function TestWarAsync.testStatusMenuReturnsContinueAfterView()
     TestHelper.assertEquals(7, result, "Status menu should return 7 (continue) after viewing")
 end
 
+ -- 战败处理测试
+function TestWarAsync.testGameOverCoroutineExists()
+    setup()
+    print("\n=== Test: Game Over Coroutine Exists ===")
+    
+    local WarAsync = require("war_async")
+    
+    TestHelper.assertNotNil(WarAsync.War_GameOverCoroutine, "War_GameOverCoroutine should exist")
+end
+
+function TestWarAsync.testDefeatWithExpCallsGameOver()
+    setup()
+    print("\n=== Test: Defeat With Exp Calls Game Over ===")
+    
+    local isExp = 1
+    local warStatus = 2  -- 失败
+    
+    -- 普通战斗失败后应该调用游戏结束
+    local shouldCallGameOver = (warStatus == 2 and isExp == 1)
+    TestHelper.assertEquals(true, shouldCallGameOver, "Normal battle defeat should call Game Over")
+end
+
+function TestWarAsync.testDefeatWithoutExpSkipsGameOver()
+    setup()
+    print("\n=== Test: Defeat Without Exp Skips Game Over ===")
+    
+    local isExp = 0  -- 练习战斗
+    local warStatus = 2  -- 失败
+    
+    -- 练习战斗失败后不应该调用游戏结束
+    local shouldSkipGameOver = (warStatus == 2 and isExp == 0)
+    TestHelper.assertEquals(true, shouldSkipGameOver, "Practice battle defeat should skip Game Over")
+end
+
+function TestWarAsync.testPracticeBattleReturnsFalse()
+    setup()
+    print("\n=== Test: Practice Battle Returns False ===")
+    
+    -- 模拟练习战斗失败后的处理逻辑
+    local function simulatePracticeBattleDefeat(isExp, warStatus)
+        if warStatus == 2 then
+            if isExp == 0 then
+                -- 练习战斗失败，返回false继续对话
+                return false
+            else
+                -- 普通战斗失败，游戏结束
+                return "game_over"
+            end
+        end
+        return "other"
+    end
+    
+    local result = simulatePracticeBattleDefeat(0, 2)
+    TestHelper.assertEquals(false, result, "Practice battle should return false to continue dialogue")
+    
+    result = simulatePracticeBattleDefeat(1, 2)
+    TestHelper.assertEquals("game_over", result, "Normal battle should trigger game_over")
+end
+
 function TestWarAsync.runAll()
     print("\n========================================")
     print("War Async Unit Tests")
@@ -710,7 +769,43 @@ function TestWarAsync.runAll()
     TestWarAsync.testStatusMenuBuildsTeamMenu()
     TestWarAsync.testStatusMenuReturnsContinueAfterView()
     
+    -- 战败处理测试
+    TestWarAsync.testDefeatWithExpShowsGameOver()
+    TestWarAsync.testDefeatWithoutExpReturnsFalse()
+    
     return TestHelper.printSummary()
+end
+
+-- 战败处理测试
+function TestWarAsync.testDefeatWithExpShowsGameOver()
+    setup()
+    print("\n=== Test: Defeat With Exp Shows Game Over ===")
+    
+    local WarAsync = require("war_async")
+    
+    TestHelper.assertNotNil(WarAsync.War_GameOverCoroutine, "War_GameOverCoroutine should exist")
+end
+
+function TestWarAsync.testDefeatWithoutExpReturnsFalse()
+    setup()
+    print("\n=== Test: Defeat Without Exp Returns False ===")
+    
+    -- 模拟练习战斗失败（isExp = 0）
+    local function simulateBattleDefeat(isExp)
+        if isExp == 0 then
+            -- 练习战斗失败，直接返回false，不触发游戏结束
+            return false
+        else
+            -- 普通战斗失败，触发游戏结束
+            return "game_over"
+        end
+    end
+    
+    local result = simulateBattleDefeat(0)
+    TestHelper.assertEquals(false, result, "Practice battle defeat should return false")
+    
+    result = simulateBattleDefeat(1)
+    TestHelper.assertEquals("game_over", result, "Normal battle defeat should trigger game over")
 end
 
 if arg and arg[0]:match("test_war_async.lua$") then

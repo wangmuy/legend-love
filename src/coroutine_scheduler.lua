@@ -59,6 +59,8 @@ function CoroutineScheduler:create(fn, name)
         error = nil        -- 错误信息
     }
     
+    self:_debug("CoroutineScheduler.create: created coroutine id=" .. tostring(id) .. ", name=" .. tostring(name or "coroutine_" .. id))
+    
     return id
 end
 
@@ -76,9 +78,10 @@ function CoroutineScheduler:start(id, ...)
         return false, "Coroutine is not suspended: " .. info.status
     end
     
+    local previousCoroutine = currentCoroutine
     currentCoroutine = id
     local success, result = coroutine.resume(info.co, ...)
-    currentCoroutine = nil
+    currentCoroutine = previousCoroutine
     
     if not success then
         info.status = "error"
@@ -270,28 +273,6 @@ function CoroutineScheduler:clear()
     currentCoroutine = nil
 end
 
--- 检查协程是否活跃
--- @param id: 协程ID
--- @return: true 如果协程活跃，false 如果不活跃或不存在
-function CoroutineScheduler:isActive(id)
-    local info = coroutines[id]
-    if not info then
-        return false
-    end
-    return info.status == "suspended" or info.status == "running"
-end
-
--- 获取协程的结果
--- @param id: 协程ID
--- @return: 协程的结果，如果协程未完成或不存在则返回nil
-function CoroutineScheduler:getResult(id)
-    local info = coroutines[id]
-    if not info then
-        return nil
-    end
-    return info.result
-end
-
 -- 重置调度器
 function CoroutineScheduler:reset()
     self:clear()
@@ -304,7 +285,7 @@ end
 -- @return: true 如果协程正在运行或挂起
 function CoroutineScheduler:isActive(id)
     local info = coroutines[id]
-    return info ~= nil and (info.status == "suspended" or info.status == "running" or info.status == "completed")
+    return info ~= nil and (info.status == "suspended" or info.status == "running")
 end
 
 -- 获取协程的结果

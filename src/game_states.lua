@@ -513,6 +513,27 @@ handlers["GAME_END"] = {
     end
 }
 
+-- GAME_DEAD 状态处理器(死亡/游戏结束界面)
+handlers["GAME_DEAD"] = {
+    enter = function()
+        lib.Debug("Enter GAME_DEAD state")
+        lib.PlayMIDI("")
+    end,
+    
+    exit = function()
+        lib.Debug("Exit GAME_DEAD state")
+    end,
+    
+    update = function(dt)
+        -- 界面由协程(instruct_15或War_GameOverCoroutine)处理
+    end,
+    
+    draw = function()
+        -- 界面由协程(instruct_15或War_GameOverCoroutine)绘制
+        -- 这里不做任何绘制，避免覆盖协程绘制的内容
+    end
+}
+
 -- 注册所有状态到状态机
 function GameStates.registerAll()
     local eb = EventBridge.getInstance()

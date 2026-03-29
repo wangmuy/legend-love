@@ -3103,19 +3103,29 @@ end
 
 function instruct_6(warid,tmp,tmp2,flag)      --战斗
     local co = coroutine.running()
+    local isexp = (flag == 0) and 0 or (flag or 1)
     if co then
-        lib.Debug("instruct_6: running in coroutine, warid=" .. warid)
+        lib.Debug("instruct_6: running in coroutine, warid=" .. warid .. ", flag=" .. tostring(flag) .. ", isexp=" .. tostring(isexp))
         local scheduler = require("coroutine_scheduler")
         local WarAsync = require("war_async")
         
+        lib.Debug("instruct_6: creating battle sub-coroutine")
         local warCo = scheduler:create(function()
-            return WarAsync.WarMainCoroutine(warid, flag or 1)
-        end, "battle")
+            return WarAsync.WarMainCoroutine(warid, isexp)
+        end, "battle_sub")
+        
+        lib.Debug("instruct_6: created sub-coroutine id=" .. tostring(warCo))
         
         scheduler:start(warCo)
+        lib.Debug("instruct_6: started sub-coroutine, now waiting")
         
         -- 等待战斗协程结束
+        local waitCount = 0
         while scheduler:isActive(warCo) do
+            waitCount = waitCount + 1
+            if waitCount % 100 == 0 then
+                lib.Debug("instruct_6: waiting for battle, count=" .. waitCount .. ", isActive=" .. tostring(scheduler:isActive(warCo)))
+            end
             scheduler:yield("battle_person_done")
         end
         
@@ -3124,7 +3134,7 @@ function instruct_6(warid,tmp,tmp2,flag)      --战斗
         return result
     else
         lib.Debug("instruct_6: NOT in coroutine, warid=" .. warid .. ", using blocking WarMain")
-        return WarMain(warid, flag or 1)
+        return WarMain(warid, isexp)
     end
 end
 
