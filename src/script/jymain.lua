@@ -3113,7 +3113,15 @@ function instruct_6(warid,tmp,tmp2,flag)      --战斗
         end, "battle")
         
         scheduler:start(warCo)
-        return true
+        
+        -- 等待战斗协程结束
+        while scheduler:isActive(warCo) do
+            scheduler:yield("battle_person_done")
+        end
+        
+        local result = scheduler:getResult(warCo)
+        lib.Debug("instruct_6: battle ended, result=" .. tostring(result))
+        return result
     else
         lib.Debug("instruct_6: NOT in coroutine, warid=" .. warid .. ", using blocking WarMain")
         return WarMain(warid, flag or 1)
