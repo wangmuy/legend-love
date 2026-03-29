@@ -275,7 +275,7 @@ War_Manual_SubCoroutine = function()
     elseif r == 7 then
         -- 等待
         War_WaitMenu()
-        return 7
+        return 0
     elseif r == 8 then
         -- 状态
         War_StatusMenu()
@@ -283,7 +283,7 @@ War_Manual_SubCoroutine = function()
     elseif r == 9 then
         -- 休息
         War_RestMenu()
-        return 7
+        return 0
     elseif r == 10 then
         -- 自动
         War_AutoMenu()
