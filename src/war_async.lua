@@ -31,6 +31,7 @@ local War_Manual_SubCoroutine, War_ShowFightCoroutine
 local War_Fight_SubCoroutine, War_MovePersonCoroutine, War_AutoMoveCoroutine
 local War_PoisonCoroutine, War_DecPoisonCoroutine, War_DoctorCoroutine
 local War_ExecuteMenuCoroutine, War_Fight_ExecuteCoroutine, SelectAttackTargetCoroutine
+local War_ExecuteMenu_SubCoroutine
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
