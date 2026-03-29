@@ -92,6 +92,40 @@ love src/
 - 使用 4 个空格缩进
 - 行长度保持合理 (<120 字符)
 
+### 协程开发注意事项 (war_async.lua)
+
+`war_async.lua` 使用 local 函数定义协程，必须在文件开头添加前向声明：
+
+```lua
+-- 前向声明（只声明一次，避免重复）
+local War_ManualCoroutine, War_AutoCoroutine, War_SettlementCoroutine
+local War_AttackCoroutine, War_MoveCoroutine, SelectTargetCoroutine
+-- ... 其他协程函数名
+```
+
+**添加新协程函数时**：
+1. 先在前向声明行添加函数名
+2. 再使用 `FunctionName = function()` 语法定义
+3. 切勿使用 `local function FunctionName()` 语法（会导致声明顺序问题）
+
+**错误示例**：
+```lua
+-- 错误：缺少前向声明
+NewCoroutine = function()  -- 运行时报错：attempt read write to undeclared variable
+    ...
+end
+```
+
+**正确示例**：
+```lua
+-- 正确：先声明后定义
+local NewCoroutine  -- 添加到前向声明
+-- ...
+NewCoroutine = function()
+    ...
+end
+```
+
 ## 原版实现参考
 
 ```lua
