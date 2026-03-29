@@ -614,7 +614,7 @@ War_MoveCoroutine = function()
         WarDrawMap(1, x, y)
         
         -- 等待按键
-        local key = InputAsync.waitKeyCoroutine()
+        local key = InputAsync.WaitKeyCoroutine()
         
         lib.Debug("War_MoveCoroutine: key=" .. key .. " at (" .. x .. "," .. y .. ")")
         
