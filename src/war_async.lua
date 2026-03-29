@@ -1356,6 +1356,7 @@ end
 -- 战斗物品菜单（协程版本）
 War_ThingMenuCoroutine = function()
     local scheduler = CoroutineScheduler.getInstance()
+    local ItemAsync = require("item_async")
     
     WAR.ShowHead = 0
     
@@ -1381,24 +1382,17 @@ War_ThingMenuCoroutine = function()
         return 7  -- 没有物品，继续菜单
     end
     
-    -- 构建物品菜单
-    local menu = {}
-    for i = 0, num - 1 do
-        local name = JY.Thing[thing[i]]["名称"]
-        menu[i + 1] = {string.format("%s X%d", name, thingnum[i]), nil, 1, thing[i]}
-    end
-    
-    local r = MenuAsync.ShowMenuCoroutine(menu, num, 0, CC.MainSubMenuX, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    -- 使用Grid形式选择物品
+    local r = ItemAsync.SelectThingByArrayAsync(thing, thingnum, num)
     
     Cls()
     
-    if r <= 0 then
+    if r < 0 then
         WAR.ShowHead = 1
         return 7  -- ESC取消，继续菜单
     end
     
-    local thingId = menu[r][4]
-    local thingType = JY.Thing[thingId]["类型"]
+    local thingType = JY.Thing[r]["类型"]
     local useResult = 0
     
     if thingType == 3 then
@@ -1406,14 +1400,14 @@ War_ThingMenuCoroutine = function()
         local pid = WAR.Person[WAR.CurID]["人物编号"]
         
         -- 调用原版的 UseThingEffect
-        if UseThingEffect(thingId, pid) == 1 then
-            instruct_32(thingId, -1)  -- 减少物品数量
+        if UseThingEffect(r, pid) == 1 then
+            instruct_32(r, -1)  -- 减少物品数量
             useResult = 1
             WaitKey()
         end
     elseif thingType == 4 then
         -- 暗器：调用战斗暗器协程
-        useResult = War_ExecuteMenuCoroutine(4, thingId)
+        useResult = War_ExecuteMenuCoroutine(4, r)
     end
     
     WAR.ShowHead = 1
