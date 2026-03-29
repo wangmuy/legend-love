@@ -1261,7 +1261,7 @@ War_ExecuteMenuCoroutine = function(flag, thingid)
     local y0 = WAR.Person[WAR.CurID]["坐标Y"]
     local x, y = x0, y0
     
-    WAR.DrawMode = 2
+    WAR.DrawMode = 1
     WAR.MoveCursorX = x
     WAR.MoveCursorY = y
     
@@ -1292,7 +1292,7 @@ War_ExecuteMenuCoroutine = function(flag, thingid)
             WAR.DrawMode = nil
             WAR.MoveCursorX = nil
             WAR.MoveCursorY = nil
-            return 0
+            return 7
         end
         
         if GetWarMap(x2, y2, 3) < 128 then
