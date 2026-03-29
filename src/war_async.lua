@@ -408,7 +408,6 @@ War_AutoCoroutine = function()
     local id = WAR.CurID
     local pid = WAR.Person[id]["人物编号"]
     
-    -- 简单AI：先移动再攻击
     local wugongnum = 1
     for i = 1, 10 do
         if JY.Person[pid]["武功" .. i] and JY.Person[pid]["武功" .. i] > 0 then
@@ -417,24 +416,18 @@ War_AutoCoroutine = function()
         end
     end
     
-    -- 自动移动
-    local moveResult = War_AutoMoveCoroutine(wugongnum)
+    War_AutoMoveCoroutine(wugongnum)
     
-    -- 选择目标
-    local targetId = -1
-    for i = 0, WAR.PersonNum - 1 do
-        if WAR.Person[i]["死亡"] == false and WAR.Person[i]["我方"] == false then
-            targetId = i
-            break
-        end
+    local wugongid = JY.Person[pid]["武功" .. wugongnum]
+    local level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+    local x0 = WAR.Person[WAR.CurID]["坐标X"]
+    local y0 = WAR.Person[WAR.CurID]["坐标Y"]
+    
+    local maxnum, x, y = War_AutoCalMaxEnemy(x0, y0, wugongid, level)
+    
+    if x ~= nil then
+        War_Fight_SubCoroutine(WAR.CurID, wugongnum, x, y)
     end
-    
-    if targetId < 0 then
-        return 0
-    end
-    
-    -- 执行攻击（异步版本）
-    War_Fight_SubCoroutine(id, wugongnum, targetId, targetId)
     
     return 0
 end
@@ -1046,12 +1039,29 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
             PlayWavE(eft)
         end
         
-        WarDrawMap(0)
+        local pic = WAR.Person[WAR.CurID]["贴图"] / 2
+        
+        if i < fightdelay then
+            WarDrawMap(4, pic * 2, mytype, -1)
+        else
+            starteft = starteft + 1
+            WarDrawMap(4, pic * 2, mytype, starteft * 2)
+        end
+        
         scheduler:waitForTime(frameTime)
     end
     
     WAR.Person[WAR.CurID]["贴图类型"] = 0
     WAR.Person[WAR.CurID]["贴图"] = WarCalPersonPic(WAR.CurID)
+    WarSetPerson()
+    WarDrawMap(0)
+    
+    scheduler:waitForTime(0.2)
+    
+    WarDrawMap(2)
+    scheduler:waitForTime(0.2)
+    
+    WarDrawMap(0)
 end
 
 -- 用毒（协程版本）
@@ -1078,6 +1088,83 @@ War_DoctorCoroutine = function()
     return r
 end
 
+-- 执行医疗、解毒、用毒子函数（协程版本）
+War_ExecuteMenu_SubCoroutine = function(x1, y1, flag, thingid)
+    local scheduler = CoroutineScheduler.getInstance()
+    local pid = WAR.Person[WAR.CurID]["人物编号"]
+    local x0 = WAR.Person[WAR.CurID]["坐标X"]
+    local y0 = WAR.Person[WAR.CurID]["坐标Y"]
+    
+    CleanWarMap(4, 0)
+    
+    WAR.Person[WAR.CurID]["人方向"] = War_Direct(x0, y0, x1, y1)
+    
+    SetWarMap(x1, y1, 4, 1)
+    
+    local emeny = GetWarMap(x1, y1, 2)
+    if emeny >= 0 then
+        if flag == 1 then
+            if WAR.Person[WAR.CurID]["我方"] ~= WAR.Person[emeny]["我方"] then
+                WAR.Person[emeny]["点数"] = War_PoisonHurt(pid, WAR.Person[emeny]["人物编号"])
+                SetWarMap(x1, y1, 4, 5)
+                WAR.Effect = 5
+            end
+        elseif flag == 2 then
+            if WAR.Person[WAR.CurID]["我方"] == WAR.Person[emeny]["我方"] then
+                WAR.Person[emeny]["点数"] = ExecDecPoison(pid, WAR.Person[emeny]["人物编号"])
+                SetWarMap(x1, y1, 4, 6)
+                WAR.Effect = 6
+            end
+        elseif flag == 3 then
+            if WAR.Person[WAR.CurID]["我方"] == WAR.Person[emeny]["我方"] then
+                WAR.Person[emeny]["点数"] = ExecDoctor(pid, WAR.Person[emeny]["人物编号"])
+                SetWarMap(x1, y1, 4, 4)
+                WAR.Effect = 4
+            end
+        elseif flag == 4 then
+            if WAR.Person[WAR.CurID]["我方"] ~= WAR.Person[emeny]["我方"] then
+                WAR.Person[emeny]["点数"] = War_AnqiHurt(pid, WAR.Person[emeny]["人物编号"], thingid)
+                SetWarMap(x1, y1, 4, 2)
+                WAR.Effect = 2
+            end
+        end
+    end
+    
+    WAR.EffectXY = {}
+    WAR.EffectXY[1] = {x1, y1}
+    WAR.EffectXY[2] = {x1, y1}
+    
+    if flag == 1 then
+        War_ShowFightCoroutine(pid, 0, 0, 0, x1, y1, 30)
+    elseif flag == 2 then
+        War_ShowFightCoroutine(pid, 0, 0, 0, x1, y1, 36)
+    elseif flag == 3 then
+        War_ShowFightCoroutine(pid, 0, 0, 0, x1, y1, 0)
+    elseif flag == 4 then
+        if emeny >= 0 then
+            War_ShowFightCoroutine(pid, 0, -1, 0, x1, y1, JY.Thing[thingid]["暗器动画编号"])
+        end
+    end
+    
+    for i = 0, WAR.PersonNum - 1 do
+        WAR.Person[i]["点数"] = 0
+    end
+    
+    if flag == 4 then
+        if emeny >= 0 then
+            instruct_32(thingid, -1)
+            return 1
+        else
+            return 0
+        end
+    else
+        WAR.Person[WAR.CurID]["经验"] = WAR.Person[WAR.CurID]["经验"] + 1
+        AddPersonAttrib(pid, "体力", -2)
+    end
+    
+    return 1
+end
+
 -- 执行医疗、解毒、用毒（协程版本）
 War_ExecuteMenuCoroutine = function(flag, thingid)
     local scheduler = CoroutineScheduler.getInstance()
@@ -1096,13 +1183,11 @@ War_ExecuteMenuCoroutine = function(flag, thingid)
     
     War_CalMoveStep(WAR.CurID, step, 1)
     
-    -- 选择目标
     local x0 = WAR.Person[WAR.CurID]["坐标X"]
     local y0 = WAR.Person[WAR.CurID]["坐标Y"]
     local x, y = x0, y0
     
-    -- 设置移动选择模式
-    WAR.DrawMode = 2  -- 使用不同颜色
+    WAR.DrawMode = 2
     WAR.MoveCursorX = x
     WAR.MoveCursorY = y
     
@@ -1123,15 +1208,13 @@ War_ExecuteMenuCoroutine = function(flag, thingid)
         elseif key == VK_RIGHT then
             x2 = x + 1
         elseif key == VK_SPACE or key == VK_RETURN then
-            -- 确认
             if x ~= x0 or y ~= y0 then
                 WAR.DrawMode = nil
                 WAR.MoveCursorX = nil
                 WAR.MoveCursorY = nil
-                return War_ExecuteMenu_Sub(x, y, flag, thingid)
+                return War_ExecuteMenu_SubCoroutine(x, y, flag, thingid)
             end
         elseif key == VK_ESCAPE then
-            -- 取消
             WAR.DrawMode = nil
             WAR.MoveCursorX = nil
             WAR.MoveCursorY = nil
