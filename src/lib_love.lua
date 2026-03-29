@@ -506,7 +506,27 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
     if xnew < -1000 or xnew > CONFIG.Width + 1000 or ynew < -1000 or ynew > CONFIG.Height + 1000 then
         return
     end
+    
+    -- 处理颜色效果 (flag: b1=alpha混合, b2=全黑, b3=全白)
+    -- Love2D 11.0+ 使用 0-1 范围的颜色值
+    local r, g, b, a = 1, 1, 1, 1
+    local hasAlpha = bit32.band(flag, 0x2) ~= 0  -- bit1: alpha混合
+    local isBlack = bit32.band(flag, 0x4) ~= 0   -- bit2: 全黑
+    local isWhite = bit32.band(flag, 0x8) ~= 0   -- bit3: 全白
+    
+    if isBlack then
+        r, g, b = 0, 0, 0
+    elseif isWhite then
+        r, g, b = 1, 1, 1
+    end
+    
+    if hasAlpha then
+        a = (value or 128) / 255  -- 转换为 0-1 范围
+    end
+    
+    love.graphics.setColor(r, g, b, a)
     love.graphics.draw(piccache.img, xnew, ynew)
+    love.graphics.setColor(1, 1, 1, 1) -- 重置颜色
 end
 
 local JY_LoadPic = PicLoadCache
@@ -1157,6 +1177,7 @@ function DrawWarMap(flag, x, y, v1, v2, v3)
     end
 
     if (flag==1) or (flag==2) then -- 在地面上绘制移动范围
+        lib.Debug(string.format("DrawWarMap: flag=%d, drawing move range", flag))
         for j=0, 2*jend-2*jstart+CONFIG.WMapAddY do
             for i=istart,iend do
                 local i1=i+math.floor(j/2)+jstart

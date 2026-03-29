@@ -458,25 +458,22 @@ handlers["GAME_WMAP"] = {
     
     draw = function()
         -- 战斗渲染：每帧调用 WarDrawMap 渲染战斗场景
-        if JY.Status == GAME_WMAP and WAR and WAR.Person then
-            local curId = WAR.CurID or 0
-            local x = WAR.Person[curId] and WAR.Person[curId]["坐标X"] or 0
-            local y = WAR.Person[curId] and WAR.Person[curId]["坐标Y"] or 0
-            if x and y then
-                -- 检查是否在移动选择模式
-                if WAR.DrawMode and WAR.MoveCursorX and WAR.MoveCursorY then
-                    if WAR.DrawMode == 1 then
-                        -- 移动选择模式：显示移动范围
-                        lib.DrawWarMap(1, x, y, WAR.MoveCursorX, WAR.MoveCursorY, -1)
-                    elseif WAR.DrawMode == 2 then
-                        -- 用毒/解毒/医疗模式：使用不同颜色
-                        lib.DrawWarMap(2, x, y, WAR.MoveCursorX, WAR.MoveCursorY, -1)
-                    else
-                        lib.DrawWarMap(0, x, y, 0, 0, -1)
-                    end
+        if JY.Status == GAME_WMAP and WAR and WAR.Person and WAR.CurID and WAR.Person[WAR.CurID] then
+            -- 检查是否在移动选择模式
+            lib.Debug(string.format("GAME_WMAP draw: DrawMode=%s, MoveCursorX=%s, MoveCursorY=%s", 
+                tostring(WAR.DrawMode), tostring(WAR.MoveCursorX), tostring(WAR.MoveCursorY)))
+            if WAR.DrawMode and WAR.MoveCursorX and WAR.MoveCursorY then
+                if WAR.DrawMode == 1 then
+                    -- 移动选择模式：显示移动范围
+                    WarDrawMap(1, WAR.MoveCursorX, WAR.MoveCursorY)
+                elseif WAR.DrawMode == 2 then
+                    -- 用毒/解毒/医疗模式：使用不同颜色
+                    WarDrawMap(2, WAR.MoveCursorX, WAR.MoveCursorY)
                 else
-                    lib.DrawWarMap(0, x, y, 0, 0, -1)
+                    WarDrawMap(0)
                 end
+            else
+                WarDrawMap(0)
             end
         end
     end
