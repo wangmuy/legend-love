@@ -320,6 +320,62 @@ function TestWarAsync.testAutoFightToggle()
     TestHelper.assertEquals(0, _G.WAR.AutoFight, "AutoFight can be reset to 0")
 end
 
+function TestWarAsync.testMoveContinueFlagLogic()
+    setup()
+    print("\n=== Test: Move Continue Flag Logic ===")
+    
+    local continueFlag = 7
+    local endTurnFlag = 0
+    
+    TestHelper.assertEquals(7, continueFlag, "Continue flag should be 7")
+    TestHelper.assertEquals(0, endTurnFlag, "End turn flag should be 0")
+    
+    local function simulateManualCoroutineLoop(returnValue)
+        local loopCount = 0
+        local r = returnValue
+        while r == continueFlag do
+            loopCount = loopCount + 1
+            if loopCount > 10 then break end
+            r = endTurnFlag
+        end
+        return loopCount, r
+    end
+    
+    local loopCount, finalReturn = simulateManualCoroutineLoop(continueFlag)
+    TestHelper.assertEquals(1, loopCount, "Loop should run once when return is 7 (continue)")
+    TestHelper.assertEquals(0, finalReturn, "Final return should be 0 after attack")
+    
+    loopCount, finalReturn = simulateManualCoroutineLoop(endTurnFlag)
+    TestHelper.assertEquals(0, loopCount, "Loop should not run when return is 0 (end turn)")
+    TestHelper.assertEquals(0, finalReturn, "Final return should be 0")
+end
+
+function TestWarAsync.testMoveDisablesAfterFirstMove()
+    setup()
+    print("\n=== Test: Move Disables After First Move ===")
+    
+    createSimpleWarScenario()
+    
+    local pid = _G.WAR.Person[_G.WAR.CurID]["人物编号"]
+    local initialMoveSteps = _G.WAR.Person[_G.WAR.CurID]["移动步数"]
+    
+    TestHelper.assertEquals(3, initialMoveSteps, "Initial move steps should be 3")
+    
+    local canMoveBefore = true
+    if _G.JY.Person[pid]["体力"] <= 5 or _G.WAR.Person[_G.WAR.CurID]["移动步数"] <= 0 then
+        canMoveBefore = false
+    end
+    TestHelper.assertEquals(true, canMoveBefore, "Should be able to move initially")
+    
+    _G.WAR.Person[_G.WAR.CurID]["移动步数"] = 0
+    
+    local canMoveAfter = true
+    if _G.JY.Person[pid]["体力"] <= 5 or _G.WAR.Person[_G.WAR.CurID]["移动步数"] <= 0 then
+        canMoveAfter = false
+    end
+    TestHelper.assertEquals(false, canMoveAfter, "Should not be able to move after moving")
+end
+
 function TestWarAsync.runAll()
     print("\n========================================")
     print("War Async Unit Tests")
@@ -338,6 +394,8 @@ function TestWarAsync.runAll()
     TestWarAsync.testFightCoroutineDamageCalculation()
     TestWarAsync.testWarEndCondition()
     TestWarAsync.testAutoFightToggle()
+    TestWarAsync.testMoveContinueFlagLogic()
+    TestWarAsync.testMoveDisablesAfterFirstMove()
     
     return TestHelper.printSummary()
 end

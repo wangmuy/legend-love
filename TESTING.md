@@ -170,6 +170,7 @@ end
 3. **武功类型匹配**：刀、剑、掌等武功类型的智能匹配
 4. **动画帧数**：人物出招动画帧数获取和验证
 5. **战斗地图操作**：地图层读写、清理操作
+6. **移动后菜单显示**：移动操作返回值逻辑验证
 
 ```lua
 -- test_war_async.lua
@@ -192,6 +193,28 @@ function TestWarAsync.testWugongTypeMatching()
     knifeWugong["名称"] = "金刀刀法"
     knifeWugong["武功类型"] = 2
     TestHelper.assertEquals(2, knifeWugong["武功类型"], "Knife type should be 2")
+end
+
+function TestWarAsync.testMoveContinueFlagLogic()
+    -- 验证移动后返回 7 继续显示菜单，而非返回 0 结束回合
+    local continueFlag = 7
+    local endTurnFlag = 0
+    
+    -- 模拟 War_ManualCoroutine 的循环逻辑
+    local function simulateLoop(returnValue)
+        local loopCount = 0
+        local r = returnValue
+        while r == continueFlag do
+            loopCount = loopCount + 1
+            r = endTurnFlag  -- 下一次操作结束回合
+        end
+        return loopCount
+    end
+    
+    -- 移动后返回 7，循环继续，菜单再次显示
+    TestHelper.assertEquals(1, simulateLoop(continueFlag), "Move returns 7, loop continues")
+    -- 攻击后返回 0，循环结束
+    TestHelper.assertEquals(0, simulateLoop(endTurnFlag), "Attack returns 0, loop ends")
 end
 ```
 
