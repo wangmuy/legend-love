@@ -783,7 +783,7 @@ War_Fight_SubCoroutine = function(id, wugongnum, x, y)
             end
         end
         
-        War_ShowFightCoroutine(pid, wugong, JY.Wugong[wugong]["类型"], level, x, y, JY.Wugong[wugong]["武功动画&音效"])
+        War_ShowFightCoroutine(pid, wugong, JY.Wugong[wugong]["武功类型"], level, x, y, JY.Wugong[wugong]["武功动画&音效"])
         
         for i = 0, WAR.PersonNum - 1 do
             WAR.Person[i]["点数"] = 0
@@ -984,16 +984,78 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
     local y0 = WAR.Person[WAR.CurID]["坐标Y"]
     
     local wugongtype = wugongtype or 0
+    
+    if wugong and JY.Wugong[wugong] then
+        lib.Debug(string.format("War_ShowFightCoroutine: 武功名称='%s'", JY.Wugong[wugong]["名称"] or "未知"))
+    end
+    
+    lib.Debug(string.format("War_ShowFightCoroutine: person name=%s, direction=%d", 
+        JY.Person[pid]["姓名"], WAR.Person[WAR.CurID]["人方向"]))
+    
+    lib.Debug(string.format("War_ShowFightCoroutine: pid=%d, wugong=%s, 原始wugongtype=%d", 
+        pid, tostring(wugong), wugongtype))
+    
     local fightdelay, fightframe, sounddelay
     if wugongtype >= 0 then
+        lib.Debug(string.format("War_ShowFightCoroutine: checking frames for type %d", wugongtype + 1))
+        for t = 1, 5 do
+            local f = JY.Person[pid]["出招动画帧数" .. t]
+            lib.Debug(string.format("  出招动画帧数%d = %s", t, tostring(f)))
+        end
+        
+        fightframe = JY.Person[pid]["出招动画帧数" .. wugongtype + 1] or 0
+        
+        if fightframe == 0 then
+            lib.Debug(string.format("War_ShowFightCoroutine: 类型 %d 无动画帧，尝试智能匹配", wugongtype))
+            
+            local name = wugong and JY.Wugong[wugong] and JY.Wugong[wugong]["名称"] or ""
+            local preferredType = nil
+            
+            if name:find("刀") or name:find("刀法") then
+                preferredType = 2
+            elseif name:find("剑") or name:find("剑法") then
+                preferredType = 1
+            elseif name:find("掌") or name:find("拳") or name:find("指") then
+                preferredType = 0
+            elseif name:find("棍") or name:find("杖") or name:find("鞭") then
+                preferredType = 3
+            end
+            
+            if preferredType then
+                local preferredFrame = JY.Person[pid]["出招动画帧数" .. preferredType + 1] or 0
+                if preferredFrame > 0 then
+                    lib.Debug(string.format("War_ShowFightCoroutine: 根据武功名称 '%s' 匹配类型 %d，有 %d 帧", 
+                        name, preferredType, preferredFrame))
+                    wugongtype = preferredType
+                end
+            end
+            
+            if JY.Person[pid]["出招动画帧数" .. wugongtype + 1] == 0 then
+                for t = 0, 4 do
+                    local f = JY.Person[pid]["出招动画帧数" .. t + 1] or 0
+                    if f > 0 then
+                        lib.Debug(string.format("War_ShowFightCoroutine: 回退使用类型 %d，有 %d 帧", t, f))
+                        wugongtype = t
+                        break
+                    end
+                end
+            end
+        end
+        
         fightdelay = JY.Person[pid]["出招动画延迟" .. wugongtype + 1] or 0
         fightframe = JY.Person[pid]["出招动画帧数" .. wugongtype + 1] or 0
         sounddelay = JY.Person[pid]["武功音效延迟" .. wugongtype + 1] or 0
+        
+        lib.Debug(string.format("War_ShowFightCoroutine: 最终wugongtype=%d, fightdelay=%d, fightframe=%d", 
+            wugongtype, fightdelay, fightframe))
     else
         fightdelay = 0
         fightframe = -1
         sounddelay = -1
     end
+    
+    lib.Debug(string.format("War_ShowFightCoroutine: fightdelay=%d, fightframe=%d, sounddelay=%d", 
+        fightdelay, fightframe, sounddelay))
     
     local framenum = fightdelay + (CC.Effect and CC.Effect[eft] or 10) or 10
     
