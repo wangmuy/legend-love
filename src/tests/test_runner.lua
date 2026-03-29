@@ -7,6 +7,7 @@ local TestInputManager = require("tests.unit.test_input_manager")
 local TestEventBridge = require("tests.unit.test_event_bridge")
 local TestCoroutineScheduler = require("tests.unit.test_coroutine_scheduler")
 local TestByteIO = require("tests.unit.test_byte_io")
+local TestItemAsync = require("tests.unit.test_item_async")
 local TestWarAsync = require("tests.unit.test_war_async")
 
 local TestRunner = {}
@@ -81,6 +82,17 @@ function TestRunner.runAll()
     allPassed = allPassed and bioResult
     
     print("\n" .. string.rep("-", 60))
+    print("运行物品系统测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local itemResult = TestItemAsync.runAll()
+    local itemStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + itemStats.total
+    totalStats.passed = totalStats.passed + itemStats.passed
+    totalStats.failed = totalStats.failed + itemStats.failed
+    allPassed = allPassed and itemResult
+    
+    print("\n" .. string.rep("-", 60))
     print("运行战斗系统测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
@@ -123,11 +135,13 @@ function TestRunner.runModule(moduleName)
         return TestCoroutineScheduler.runAll()
     elseif moduleName == "byte_io" then
         return TestByteIO.runAll()
+    elseif moduleName == "item_async" then
+        return TestItemAsync.runAll()
     elseif moduleName == "war_async" then
         return TestWarAsync.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, war_async")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, item_async, war_async")
         return false
     end
 end
