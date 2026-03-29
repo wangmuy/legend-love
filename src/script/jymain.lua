@@ -4863,6 +4863,8 @@ function WarDrawMap(flag,v1,v2,v3)
     local x=WAR.Person[WAR.CurID]["坐标X"];
     local y=WAR.Person[WAR.CurID]["坐标Y"];
 
+    lib.Debug(string.format("WarDrawMap: flag=%d, maptype=%s", flag, tostring(WAR.Data and WAR.Data["地图"])))
+
     if flag==0 then
         lib.DrawWarMap(0,x,y,0,0,-1);
     elseif flag==1 then

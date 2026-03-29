@@ -72,10 +72,6 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     lib.Debug("WarMainCoroutine: calling WarLoadMap")
     WarLoadMap(WAR.Data["地图"])
     
-    -- 设置状态为战斗
-    local prevState = JY.Status
-    JY.Status = GAME_WMAP
-    
     -- 加载贴图文件
     lib.PicLoadFile(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0)
     lib.PicLoadFile(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
@@ -95,6 +91,10 @@ function WarAsync.WarMainCoroutine(warid, isexp)
                         string.format(CC.FightPicFile[2], JY.Person[pid]["头像代号"]),
                         4 + i)
     end
+    
+    -- 设置状态为战斗（在初始化完成后）
+    local prevState = JY.Status
+    JY.Status = GAME_WMAP
     
     -- 战斗主循环
     local first = 0
@@ -652,6 +652,8 @@ War_MoveCoroutine = function()
     WAR.DrawMode = 1
     WAR.MoveCursorX = x
     WAR.MoveCursorY = y
+    
+    lib.Debug("War_MoveCoroutine: set DrawMode=1, cursor=(" .. x .. "," .. y .. ")")
     
     lib.Debug("War_MoveCoroutine: start at (" .. x .. "," .. y .. ")")
     
