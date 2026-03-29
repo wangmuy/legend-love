@@ -463,7 +463,20 @@ handlers["GAME_WMAP"] = {
             local x = WAR.Person[curId] and WAR.Person[curId]["坐标X"] or 0
             local y = WAR.Person[curId] and WAR.Person[curId]["坐标Y"] or 0
             if x and y then
-                lib.DrawWarMap(0, x, y, 0, 0, -1)
+                -- 检查是否在移动选择模式
+                if WAR.DrawMode and WAR.MoveCursorX and WAR.MoveCursorY then
+                    if WAR.DrawMode == 1 then
+                        -- 移动选择模式：显示移动范围
+                        lib.DrawWarMap(1, x, y, WAR.MoveCursorX, WAR.MoveCursorY, -1)
+                    elseif WAR.DrawMode == 2 then
+                        -- 用毒/解毒/医疗模式：使用不同颜色
+                        lib.DrawWarMap(2, x, y, WAR.MoveCursorX, WAR.MoveCursorY, -1)
+                    else
+                        lib.DrawWarMap(0, x, y, 0, 0, -1)
+                    end
+                else
+                    lib.DrawWarMap(0, x, y, 0, 0, -1)
+                end
             end
         end
     end
