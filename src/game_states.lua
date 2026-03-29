@@ -517,6 +517,7 @@ handlers["GAME_END"] = {
 handlers["GAME_DEAD"] = {
     enter = function()
         lib.Debug("Enter GAME_DEAD state")
+        PlayMIDI(0)
         JY.DeadScreen = {
             name = JY.Person[0]["姓名"],
             datetime = os.date("%Y-%m-%d %H:%M")
