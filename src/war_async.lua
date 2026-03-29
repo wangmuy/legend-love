@@ -270,8 +270,12 @@ War_Manual_SubCoroutine = function()
         return War_DoctorCoroutine()
     elseif r == 6 then
         -- 物品
-        War_ThingMenu()
-        return 0
+        local thingResult = War_ThingMenu()
+        if thingResult == 1 then
+            return 0  -- 使用物品成功，结束回合
+        else
+            return 7  -- ESC取消或使用失败，继续显示菜单
+        end
     elseif r == 7 then
         -- 等待（把当前人物调到队尾，稍后行动）
         War_WaitMenu()
