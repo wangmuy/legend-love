@@ -472,6 +472,17 @@ handlers["GAME_WMAP"] = {
                 end
             elseif WAR.DrawMode == 4 and WAR.AnimPic then
                 WarDrawMap(4, WAR.AnimPic, WAR.AnimType or 0, WAR.AnimEffect or -1)
+            elseif WAR.DrawMode == 5 and WAR.HitNumbers then
+                -- 显示伤害数字
+                WarDrawMap(0)
+                local y_off = WAR.HitYOffset or 0
+                local effectColor = WAR.EffectColor and WAR.EffectColor[WAR.HitEffect] or C_WHITE
+                for j = 0, WAR.HitNum - 1 do
+                    if WAR.HitClips[j] then
+                        DrawString(WAR.HitClips[j].x1, WAR.HitClips[j].y1 - y_off, 
+                            WAR.HitNumbers[j][3], effectColor, CC.DefaultFont)
+                    end
+                end
             elseif WAR.DrawMode == 2 then
                 WarDrawMap(2)
             else

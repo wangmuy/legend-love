@@ -1135,6 +1135,61 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
     WAR.DrawMode = 2
     scheduler:waitForTime(0.2)
     
+    -- 收集命中点数数据
+    local HitXY = {}
+    local HitXYNum = 0
+    local x0 = WAR.Person[WAR.CurID]["坐标X"]
+    local y0 = WAR.Person[WAR.CurID]["坐标Y"]
+    
+    for i = 0, WAR.PersonNum - 1 do
+        local x1 = WAR.Person[i]["坐标X"]
+        local y1 = WAR.Person[i]["坐标Y"]
+        if WAR.Person[i]["死亡"] == false then
+            if GetWarMap(x1, y1, 4) > 1 then
+                local n = WAR.Person[i]["点数"]
+                HitXY[HitXYNum] = {x1, y1, string.format("%+d", n)}
+                HitXYNum = HitXYNum + 1
+            end
+        end
+    end
+    
+    -- 计算命中点数显示坐标
+    if HitXYNum > 0 then
+        local clips = {}
+        for i = 0, HitXYNum - 1 do
+            local dx = HitXY[i][1] - x0
+            local dy = HitXY[i][2] - y0
+            local ll = string.len(HitXY[i][3])
+            local w = ll * CC.DefaultFont / 2 + 1
+            clips[i] = {
+                x1 = CC.XScale * (dx - dy) + CC.ScreenW / 2,
+                y1 = CC.YScale * (dx + dy) + CC.ScreenH / 2,
+                x2 = CC.XScale * (dx - dy) + CC.ScreenW / 2 + w,
+                y2 = CC.YScale * (dx + dy) + CC.ScreenH / 2 + CC.DefaultFont + 1
+            }
+        end
+        
+        -- 设置伤害数字显示数据
+        WAR.HitNumbers = HitXY
+        WAR.HitClips = clips
+        WAR.HitNum = HitXYNum
+        WAR.HitEffect = WAR.Effect
+        
+        -- 显示伤害数字 15 帧
+        local frameTime = (CC.Frame or 50) / 1000
+        for i = 1, 15 do
+            WAR.HitYOffset = i * 2 + 65
+            WAR.DrawMode = 5
+            scheduler:waitForTime(frameTime)
+        end
+        
+        WAR.HitNumbers = nil
+        WAR.HitClips = nil
+        WAR.HitNum = nil
+        WAR.HitEffect = nil
+        WAR.HitYOffset = nil
+    end
+    
     WAR.DrawMode = nil
 end
 
