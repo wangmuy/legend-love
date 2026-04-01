@@ -52,13 +52,13 @@ end
 
 -- convert 16bit signed short to bytes(little endian)
 function sshort2bytel(s)
-    local us = s>=0 and s or 65536+n
+    local us = s>=0 and s or 65536+s
     return bit32.band(us,0xFF), bit32.rshift(us,8)
 end
 
 -- convert 16bit signed short to bytes(big endian)
 function sshort2byteb(s)
-    local us = s>=0 and s or 65536+n
+    local us = s>=0 and s or 65536+s
     return bit32.rshift(us,8), bit32.band(us,0xFF)
 end
 
@@ -66,10 +66,19 @@ function LoadToTable16Inner(t, filename, size, seekPos, isLittleEndian)
     local oldsize = t and #t or 0
     local tbl = t or {}
     local f = io.open(filename, "rb")
+    if not f then
+        for i=1,size do tbl[i]=0 end
+        return tbl
+    end
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
     for i=1,size do
-        local b1,b2 = f:read(2):byte(1,2)
-        tbl[i] = isLittleEndian and byte2sshortl(b1,b2) or byte2ushortb(b1,b2)
+        local bytes = f:read(2)
+        if not bytes then
+            tbl[i] = 0
+        else
+            local b1,b2 = bytes:byte(1,2)
+            tbl[i] = isLittleEndian and byte2sshortl(b1,b2) or byte2ushortb(b1,b2)
+        end
     end
     f:close()
     if oldsize > size then
@@ -84,14 +93,47 @@ end
 
 function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     if t==nil or #t<=0 then return end
-    local f = io.open(filename, "wb")
-    if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
+    local startTime = os.clock()
+    
     local b = begIdx or 1
     local s = size or #t
-    for i=b,b+s-1 do
-        f:write( string.char( isLittleEndian and sshort2bytel(t[i]) or sshort2byteb(t[i]) ) )
+    local totalBytes = s * 2
+    
+    -- 使用 Love2D ByteData（C 实现，更快）
+    local data = love.data.newByteData(totalBytes)
+    
+    local band = bit32.band
+    local rshift = bit32.rshift
+    
+    -- 填充数据（同步，不 yield）
+    if isLittleEndian then
+        for i = 0, s - 1 do
+            local v = t[b + i] or 0
+            local us = v>=0 and v or 65536+v
+            data:setByte(i * 2, band(us, 0xFF))
+            data:setByte(i * 2 + 1, rshift(us, 8))
+        end
+    else
+        for i = 0, s - 1 do
+            local v = t[b + i] or 0
+            local us = v>=0 and v or 65536+v
+            data:setByte(i * 2, rshift(us, 8))
+            data:setByte(i * 2 + 1, band(us, 0xFF))
+        end
     end
+    
+    -- 写入文件
+    local f = io.open(filename, "r+b")
+    if not f then f = io.open(filename, "wb") end
+    if not f then return end
+    if seekPos and seekPos > 0 then f:seek("set", seekPos) end
+    f:write(data:getString())
     f:close()
+    
+    local elapsed = os.clock() - startTime
+    if lib and lib.Debug then
+        lib.Debug(string.format("SaveFromTable16: %d elements, %.3fs", s, elapsed))
+    end
 end
 
 function LoadToTable8(t, filename, size, seekPos)
@@ -111,7 +153,12 @@ end
 
 function SaveFromTable8(t, filename, size, begIdx, seekPos)
     if t==nil or #t<=0 then return end
-    local f = io.open(filename, "wb")
+    local mode = "r+b"
+    local f = io.open(filename, mode)
+    if not f then
+        f = io.open(filename, "wb")
+    end
+    if not f then return end
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
     local b = begIdx or 1
     local s = size or #t
