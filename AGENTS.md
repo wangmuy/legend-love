@@ -17,6 +17,10 @@
 
 **架构文档**: 详见 [ARCHITECTURE.md](ARCHITECTURE.md) 和 [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)。
 
+**文件清单**: 详见 [SRC_FILES.md](SRC_FILES.md)（src/ 目录文件分析）、[SCRIPT_FILES.md](SCRIPT_FILES.md)（script/ 脚本文件说明）和 [DATA_FILES.md](DATA_FILES.md)（data/ 目录数据文件说明）。
+
+> **重要**: 以下文档内容以实际运行代码为准，文档可能与代码存在偏差，开发时请优先参考源码。
+
 ## 事件驱动架构
 
 ### 核心数据流
@@ -43,6 +47,7 @@
 ```
 src/
 ├── main.lua                    # 程序入口
+├── conf.lua                    # Love2D 配置
 ├── config.lua                  # 游戏配置 (CONFIG.*)
 │
 ├── 核心模块 (事件驱动架构)
@@ -52,20 +57,45 @@ src/
 │   ├── input_manager.lua       # 输入管理器 (事件队列)
 │   ├── coroutine_scheduler.lua # 协程调度器
 │   ├── menu_async.lua          # 异步菜单
-│   └── talk_async.lua          # 异步对话
+│   ├── menu_state_machine.lua  # 菜单状态机
+│   ├── talk_async.lua          # 异步对话
+│   ├── war_async.lua           # 战斗系统
+│   ├── jymain_async.lua        # 主菜单异步
+│   └── jymain_adapter.lua      # 游戏适配器
+│
+├── 异步辅助模块
+│   ├── input_async.lua         # 异步输入
+│   ├── person_status_async.lua # 人物状态
+│   ├── item_async.lua          # 物品系统
+│   ├── async_dialog.lua        # 对话框管理
+│   ├── async_message_box.lua   # 消息框
+│   ├── async_globals.lua       # 全局函数替换
+│   └── async_wrapper.lua       # 异步包装器
+│
+├── 事件执行
+│   └── event_executor.lua      # 事件执行器
 │
 ├── 工具模块
 │   ├── lib_love.lua            # 图形/音频封装 (lib.*)
-│   └── lib_Byte.lua            # 二进制数据工具
+│   ├── lib_Byte.lua            # 二进制数据工具
+│   ├── lib_log.lua             # 日志工具
+│   └── luabit.lua              # 位运算库 (Lua 5.1 兼容)
 │
 ├── 游戏逻辑
 │   └── script/
 │       ├── jymain.lua          # 主游戏逻辑
 │       ├── jyconst.lua         # 常量和游戏数据
-│       └── oldevent/           # 事件脚本
+│       ├── jymodify.lua        # 游戏修改扩展
+│       ├── oldevent/           # 事件脚本 (1018个)
+│       └── newevent/           # 新增事件
 │
-└── openspec/                   # OpenSpec 变更管理
+├── data/                       # 数据文件 (贴图/地图/存档)
+├── pic/                        # 图片资源
+├── sound/                      # 音频资源
+└── tests/                      # 单元测试
 ```
+
+> 完整文件清单见 [SRC_FILES.md](SRC_FILES.md)。
 
 ## 构建/运行命令
 
