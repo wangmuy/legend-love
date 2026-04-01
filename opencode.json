@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "model": "baishan/GLM-5",
+  "model": "poe/gpt-5.3-codex-spark",
   "provider": {
     "poe": {
       "options": {
@@ -9,17 +9,6 @@
       },
       "models": {
         "gpt-5.3-codex-spark": {}
-      }
-    },
-    "baishan": {
-      "options": {
-        "baseURL": "https://api.edgefn.net/v1",
-        "apiKey": "{env:BAISHAN_API_KEY}"
-      },
-      "models": {
-        "kimi-k2.5": {},
-        "MiniMax-M2.5": {},
-        "GLM-5": {}
       }
     }
   }
