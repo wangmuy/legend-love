@@ -1,3 +1,11 @@
+-- 金庸群侠传 Love2D 完全事件驱动架构主入口
+-- 重构后的标准Love2D回调实现
+
+-- 全局模块引用
+local EventBridge = require("event_bridge")
+local MenuAsync = require("menu_async")
+local JYMainAdapter = require("jymain_adapter")
+
 function love.load()
     -- 使用 regular alpha 模式（非预乘）
     if love.graphics then
@@ -8,67 +16,66 @@ function love.load()
     
     math.randomseed(os.time())
     math.random()
+    
+    -- 加载配置
     require "config"
     Byte = require "lib_Byte"
     lib = require "lib_love"
+    
+    -- 加载事件桥接器并初始化
+    EventBridge.getInstance():init()
+    
+    -- 加载游戏主逻辑
     require(CONFIG.ScriptPath .. "jymain")
+    
+    -- 初始化游戏（事件驱动版本）
+    JYMainAdapter.init()
 end
 
-function love.run()
-    math.randomseed(os.time())
-    math.random()
+function love.update(dt)
+    -- 更新游戏适配器
+    JYMainAdapter.update(dt)
+    
+    -- 通过事件桥接器更新游戏逻辑
+    EventBridge.getInstance():update(dt)
+    
+    -- 更新异步菜单
+    MenuAsync.update(dt)
+end
 
-    if love.load then love.load(arg) end
-    JY_Main()
---[[
-    IncludeFile();
-    SetGlobalConst();
-    SetGlobal();
-    JY.Status=GAME_START;
-    Cls()
-    lib.ShowSlow(50,0);
-    Cls()
-    Cls()
-    love.graphics.present()
-    while(lib.GetKey()) do  end
-]]
-    --lib.PicInit("data/Mmap.col")
-    --lib.PicLoadFile("data/Mmap.idx", "data/Mmap.grp", 0)
-    --print("fileid=1,picid=1:", lib.PicGetXY(1, 1))
-    --print("CC.MWidth:", CC.MWidth)
-    --lib.LoadMMap_Sub(CONFIG.DataPath .. "Earth.002")
-
-    --[[os.remove("debug.txt")
-    for i=180,200 do lib.picFileCache[1]:getPic(i) end
-    local hdsize = #(lib.picFileCache[1].pcache)
-    local offset = 180
-    for i=180,200 do
-        love.graphics.draw(lib.picFileCache[1].pcache[i].img, ((i-1-offset)%10)*60, math.floor((i-1-offset)/10)*60)
+function love.draw()
+    -- 调试：记录draw被调用
+    if lib and lib.Debug then
+        lib.Debug("love.draw called")
     end
-    love.graphics.present()
-    lib.GetKey()--]]
---[[
-    local dt = 0
-
-    while true do
-        if love.timer then
-            love.timer.step()
-            dt = love.timer.getDelta()
-        end
-
-        if love.update then love.update(dt) end
-        if love.graphics then
-            love.graphics.clear()
-            if love.draw then love.draw() end
-            local pic = love.graphics.newImage("pic/title.png")
-            if pic ~= nil then
-                love.graphics.draw(pic, 0, 0)
-            end
-        end
-
-        --if love.timer then love.timer.sleep(0.001) end
-        if love.graphics then love.graphics.present() end
-        lib.GetKey()
+    
+    -- 设置标志，表示现在在 love.draw() 中
+    if lib and lib.SetDrawLoopFlag then
+        lib.SetDrawLoopFlag(true)
     end
---]]
+    
+    -- 通过事件桥接器渲染游戏
+    EventBridge.getInstance():draw()
+    
+    -- 渲染异步菜单
+    MenuAsync.draw()
+    
+    -- 清除标志
+    if lib and lib.SetDrawLoopFlag then
+        lib.SetDrawLoopFlag(false)
+    end
+end
+
+-- 按键事件由event_bridge在init()中注册
+-- 这里不需要定义love.keypressed/love.keyreleased
+
+function love.quit()
+    -- 清理资源
+    if EventBridge then
+        EventBridge.getInstance():reset()
+    end
+    if JYMainAdapter then
+        JYMainAdapter.reset()
+    end
+    return false
 end

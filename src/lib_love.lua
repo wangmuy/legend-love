@@ -19,34 +19,41 @@ require "lib_log"
 local Byte = require "lib_Byte"
 
 keymap = {
-    ["escape"] = VK_ESCAPE,
-    [" "] = VK_SPACE,
-    ["return"] = VK_RETURN,
-    ["up"] = VK_UP,
-    ["down"] = VK_DOWN,
-    ["left"] = VK_LEFT,
-    ["right"] = VK_RIGHT,
+    ["escape"] = 27,        -- VK_ESCAPE
+    [" "] = 32,             -- VK_SPACE
+    ["return"] = 13,        -- VK_RETURN
+    ["up"] = 1073741906,    -- VK_UP (SDLK_UP)
+    ["down"] = 1073741905,  -- VK_DOWN (SDLK_DOWN)
+    ["left"] = 1073741904,  -- VK_LEFT (SDLK_LEFT)
+    ["right"] = 1073741903, -- VK_RIGHT (SDLK_RIGHT)
 }
 
 function GetKey()
-    --love.graphics.present()
-    local e,a,b,c,d
-    if not love.event then return -1 end
-    love.event.pump()
-    local f, s, var = love.event.poll()
-    e,a,b,c,d = f(s, var)
-    if e==nil or e~="keypressed" then return -1 end
-    return keymap[a]
+    local InputManager = package.loaded["input_manager"]
+    if InputManager then
+        local key = InputManager.getInstance():getKey()
+        return key
+    end
+    
+    return -1
 end
 
 function EnableKeyRepeat(delay, interval)
-    -- LOVE 11.x API: setKeyRepeat(repeat, delay) - both in seconds
-    -- delay: initial delay before repeat starts (in ms)
-    -- interval: time between repeats (in ms)
-    if delay > 0 and interval > 0 then
-        love.keyboard.setKeyRepeat(true)
+    -- 使用事件驱动的输入管理器
+    local InputManager = package.loaded["input_manager"]
+    if InputManager then
+        local inst = InputManager.getInstance()
+        inst:setKeyRepeat(delay > 0)
+        if delay > 0 and interval > 0 then
+            inst:setKeyRepeatParams(delay / 1000.0, interval / 1000.0)  -- 转换为秒
+        end
     else
-        love.keyboard.setKeyRepeat(false)
+        -- 回退到原始实现
+        if delay > 0 and interval > 0 then
+            love.keyboard.setKeyRepeat(true)
+        else
+            love.keyboard.setKeyRepeat(false)
+        end
     end
 end
 
@@ -59,16 +66,29 @@ function GetTime()
 end
 
 local fontTbl = {}
+local defaultFont = nil
 local function getFont(fontname)
-    if fontname==nil then return end
+    if fontname==nil then 
+        if defaultFont == nil then
+            defaultFont = love.graphics.newFont(20)
+        end
+        return defaultFont
+    end
     if fontTbl[fontname] == nil then
-        fontTbl[fontname] = love.graphics.newFont(fontname, 20)
+        local success, font = pcall(function() return love.graphics.newFont(fontname, 20) end)
+        if success then
+            fontTbl[fontname] = font
+        else
+            if defaultFont == nil then
+                defaultFont = love.graphics.newFont(20)
+            end
+            fontTbl[fontname] = defaultFont
+        end
     end
     return fontTbl[fontname]
 end
   
 function DrawStr(x, y, str, color, size, fontname)
-    --Debug("DrawStr: x,y=%d,%d, str=%s, color=%d, size=%d, fontname=%s", x,y,str,color,size,fontname)
     local oldR, oldG, oldB, oldA = love.graphics.getColor()
     love.graphics.setFont(getFont(fontname))
     local r, g, b = GetRGB(color)
@@ -144,12 +164,30 @@ end
 //显示表面
 //flag = 0 显示全部表面  =1 按照SetClip设置的矩形显示，如果没有矩形，则不显示
 --]]
+-- 标记是否在 love.draw() 中
+local inDrawLoop = false
+
+function SetDrawLoopFlag(flag)
+    inDrawLoop = flag
+end
+
 function ShowSurface(flag)
-    love.graphics.present()
+    -- 在 Love2D 事件驱动架构中，只有 love.draw() 应该调用 present()
+    -- 如果在其他地方调用，会导致屏幕抖动/闪烁
+    if inDrawLoop then
+        love.graphics.present()
+    else
+        Debug("ShowSurface called outside love.draw() - skipping present()")
+    end
 end
 
 function ShowSlow(delaytime, flag)
-    love.graphics.present()
+    -- 同上，只有 love.draw() 应该调用 present()
+    if inDrawLoop then
+        love.graphics.present()
+    else
+        Debug("ShowSlow called outside love.draw() - skipping present()")
+    end
 end
 
 local color32Pallette = {}
@@ -302,8 +340,8 @@ function LoadPic(openfile, idx1, idx2)
     local data4 = header:sub(7, 8)
     local w = Byte.byte2ushortl(data1:byte(1,2))
     local h = Byte.byte2ushortl(data2:byte(1,2))
-    local xoff = Byte.byte2ushortl(data3:byte(1,2))
-    local yoff = Byte.byte2ushortl(data4:byte(1,2))
+    local xoff = Byte.byte2sshortl(data3:byte(1,2))
+    local yoff = Byte.byte2sshortl(data4:byte(1,2))
     Debug("LoadPic: idx1=%d, idx2=%d, w=%d, h=%d, off: %d, %d" , idx1, idx2, w, h, xoff, yoff)
 
     -- 根据grp读入图像
@@ -448,7 +486,6 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
     fileid = fileid+1 -- lua starts with 1
     picid = picid+1 -- lua starts with 1
     picfile = picFileCache[fileid]
-    Debug("PicLoadCache: fileid=%d, original_picid=%d, calculated_picid=%d, idx_count=%d", fileid, original_picid, picid, picfile and #(picfile.idx) or -1)
     if picfile == nil or fileid < 1 or picid < 1 or picid > #(picfile.idx) then
         Debug("PicLoadCache: invalid picfile or picid out of range")
         return
@@ -465,9 +502,31 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
         ynew = y - piccache.yoff
     end
 
-    -- 使用 regular alpha 模式绘制图片
-    Debug("PicLoadCache: drawing image at xnew=%d, ynew=%d", xnew, ynew)
+    -- 跳过屏幕外的贴图
+    if xnew < -1000 or xnew > CONFIG.Width + 1000 or ynew < -1000 or ynew > CONFIG.Height + 1000 then
+        return
+    end
+    
+    -- 处理颜色效果 (flag: b1=alpha混合, b2=全黑, b3=全白)
+    -- Love2D 11.0+ 使用 0-1 范围的颜色值
+    local r, g, b, a = 1, 1, 1, 1
+    local hasAlpha = bit32.band(flag, 0x2) ~= 0  -- bit1: alpha混合
+    local isBlack = bit32.band(flag, 0x4) ~= 0   -- bit2: 全黑
+    local isWhite = bit32.band(flag, 0x8) ~= 0   -- bit3: 全白
+    
+    if isBlack then
+        r, g, b = 0, 0, 0
+    elseif isWhite then
+        r, g, b = 1, 1, 1
+    end
+    
+    if hasAlpha then
+        a = (value or 128) / 255  -- 转换为 0-1 范围
+    end
+    
+    love.graphics.setColor(r, g, b, a)
     love.graphics.draw(piccache.img, xnew, ynew)
+    love.graphics.setColor(1, 1, 1, 1) -- 重置颜色
 end
 
 local JY_LoadPic = PicLoadCache
@@ -726,7 +785,7 @@ end
 
 -- // 绘制主地图
 function DrawMMap(x, y, Mypic)
-    local oldScissor = {love.graphics.getScissor()}
+    local oldScissorX, oldScissorY, oldScissorW, oldScissorH = love.graphics.getScissor()
     
     local rect = {x=nil, y=nil, w=nil, h=nil}
     rect.x, rect.y, rect.w, rect.h = love.graphics.getScissor()
@@ -770,6 +829,7 @@ function DrawMMap(x, y, Mypic)
         end
     end
 
+    -- 先绘制普通建筑（非主角）
     for i=0,buildNumber-1 do
         local idxi = i+1
         local i1=buildList[idxi].x -x
@@ -777,12 +837,36 @@ function DrawMMap(x, y, Mypic)
         local x1=CONFIG.XScale*(i1-j1)+math.floor(CONFIG.Width/2)
         local y1=CONFIG.YScale*(i1+j1)+math.floor(CONFIG.Height/2)
         local picnum=buildList[idxi].num
-        if picnum>0 then
+        -- 跳过主角和船贴图，最后单独绘制
+        if picnum>0 and not ((picnum >= 5002 and picnum <= 5096) or (picnum >= 7430 and picnum <= 7500)) then
             JY_LoadPic(0,picnum,x1,y1,0,0)
         end
     end
     
-    love.graphics.setScissor(oldScissor[1], oldScissor[2], oldScissor[3], oldScissor[4])
+    -- 最后绘制主角和船，确保显示在最前面
+    for i=0,buildNumber-1 do
+        local idxi = i+1
+        local i1=buildList[idxi].x -x
+        local j1=buildList[idxi].y -y
+        local x1=CONFIG.XScale*(i1-j1)+math.floor(CONFIG.Width/2)
+        local y1=CONFIG.YScale*(i1+j1)+math.floor(CONFIG.Height/2)
+        local picnum=buildList[idxi].num
+        -- 只绘制主角和船贴图
+        if picnum>0 and ((picnum >= 5002 and picnum <= 5096) or (picnum >= 7430 and picnum <= 7500)) then
+            -- 主角和船贴图需要额外的Y轴偏移，因为它们的yoff值较大
+            -- 注意: picnum是Mypic*2，所以范围需要乘以2
+            -- 主角贴图范围: 5002-5096 (2501*2 - 2548*2)
+            -- 船贴图范围: 7430-7500 (3715*2 - 3750*2)
+            local y_adjust = -10  -- 调整值，使主角显示在正确的位置
+            JY_LoadPic(0,picnum,x1,y1+y_adjust,0,0)
+        end
+    end
+    
+    if oldScissorX then
+        love.graphics.setScissor(oldScissorX, oldScissorY, oldScissorW, oldScissorH)
+    else
+        love.graphics.setScissor()
+    end
 end
 
 function UnloadMMap()
@@ -822,12 +906,30 @@ end
 
 -- 保存S*D*
 function SaveSMap(Sfilename, Dfilename)
-    if smap == nil then return end
+    local startTime = os.clock()
+    lib.Debug("SaveSMap: start")
+    
+    if smap == nil then 
+        lib.Debug("SaveSMap: smap is nil, returning")
+        return 
+    end
+    
     local s_size = S_XMax*S_YMax*6*S_Num
-    Byte.SaveFromTable16(smap, Sfilename, s_size, 0, true)
-    if dmap == nil then return end
+    lib.Debug(string.format("SaveSMap: saving %d elements to %s", s_size, Sfilename))
+    
+    Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
+    lib.Debug(string.format("SaveSMap: S file done (%.2fs)", os.clock() - startTime))
+    
+    if dmap == nil then 
+        lib.Debug("SaveSMap: dmap is nil, returning")
+        return 
+    end
+    
     local d_size = D_Num1*D_Num2*S_Num
-    Byte.SaveFromTable16(dmap, Dfilename, d_size, 0, true)
+    lib.Debug(string.format("SaveSMap: saving %d elements to %s", d_size, Dfilename))
+    
+    Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
+    lib.Debug(string.format("SaveSMap: complete (%.2fs total)", os.clock() - startTime))
 end
 
 function GetS(id, x, y, level)
@@ -877,6 +979,7 @@ end
 
 -- 绘制场景地图
 function DrawSMap(sceneid, x,  y, xoff, yoff, Mypic)
+    lib.Debug(string.format("DrawSMap called: sceneid=%d, x=%d, y=%d, xoff=%d, yoff=%d, Mypic=%d", sceneid, x, y, xoff, yoff, Mypic))
     local oldScissor = {love.graphics.getScissor()}
     
     local rect = {x=nil, y=nil, w=nil, h=nil}
@@ -947,6 +1050,7 @@ function DrawSMap(sceneid, x,  y, xoff, yoff, Mypic)
                 end
 
                 if (i1==-xoff) and (j1==-yoff) then -- 主角
+                       lib.Debug(string.format("DrawSMap: drawing hero at i1=%d, j1=%d, xoff=%d, yoff=%d, MyPic=%d, picid=%d", i1, j1, xoff, yoff, Mypic, Mypic*2));
                        JY_LoadPic(0,Mypic*2,x1,y1-d4,0,0);
                 end
             end
@@ -1073,6 +1177,7 @@ function DrawWarMap(flag, x, y, v1, v2, v3)
     end
 
     if (flag==1) or (flag==2) then -- 在地面上绘制移动范围
+        lib.Debug(string.format("DrawWarMap: flag=%d, drawing move range", flag))
         for j=0, 2*jend-2*jstart+CONFIG.WMapAddY do
             for i=istart,iend do
                 local i1=i+math.floor(j/2)+jstart

@@ -1,0 +1,160 @@
+-- test_runner.lua
+-- 测试运行器 - 运行所有单元测试
+
+local TestHelper = require("tests.test_helper")
+local TestStateMachine = require("tests.unit.test_state_machine")
+local TestInputManager = require("tests.unit.test_input_manager")
+local TestEventBridge = require("tests.unit.test_event_bridge")
+local TestCoroutineScheduler = require("tests.unit.test_coroutine_scheduler")
+local TestByteIO = require("tests.unit.test_byte_io")
+local TestItemAsync = require("tests.unit.test_item_async")
+local TestWarAsync = require("tests.unit.test_war_async")
+
+local TestRunner = {}
+
+-- 运行所有测试
+function TestRunner.runAll()
+    print("\n" .. string.rep("=", 60))
+    print("金庸群侠传 Love2D 重构 - 单元测试套件")
+    print(string.rep("=", 60))
+    
+    local allPassed = true
+    local totalStats = { total = 0, passed = 0, failed = 0 }
+    
+    -- 运行状态机测试
+    print("\n" .. string.rep("-", 60))
+    print("运行状态机测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local smResult = TestStateMachine.runAll()
+    local smStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + smStats.total
+    totalStats.passed = totalStats.passed + smStats.passed
+    totalStats.failed = totalStats.failed + smStats.failed
+    allPassed = allPassed and smResult
+    
+    -- 运行输入管理器测试
+    print("\n" .. string.rep("-", 60))
+    print("运行输入管理器测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local imResult = TestInputManager.runAll()
+    local imStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + imStats.total
+    totalStats.passed = totalStats.passed + imStats.passed
+    totalStats.failed = totalStats.failed + imStats.failed
+    allPassed = allPassed and imResult
+    
+    -- 运行事件桥接测试
+    print("\n" .. string.rep("-", 60))
+    print("运行事件桥接测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local ebResult = TestEventBridge.runAll()
+    local ebStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + ebStats.total
+    totalStats.passed = totalStats.passed + ebStats.passed
+    totalStats.failed = totalStats.failed + ebStats.failed
+    allPassed = allPassed and ebResult
+    
+    -- 运行协程调度器测试
+    print("\n" .. string.rep("-", 60))
+    print("运行协程调度器测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local csResult = TestCoroutineScheduler.runAll()
+    local csStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + csStats.total
+    totalStats.passed = totalStats.passed + csStats.passed
+    totalStats.failed = totalStats.failed + csStats.failed
+    allPassed = allPassed and csResult
+    
+    -- 运行 Byte I/O 测试
+    print("\n" .. string.rep("-", 60))
+    print("运行 Byte I/O 测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local bioResult = TestByteIO.runAll()
+    local bioStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + bioStats.total
+    totalStats.passed = totalStats.passed + bioStats.passed
+    totalStats.failed = totalStats.failed + bioStats.failed
+    allPassed = allPassed and bioResult
+    
+    print("\n" .. string.rep("-", 60))
+    print("运行物品系统测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local itemResult = TestItemAsync.runAll()
+    local itemStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + itemStats.total
+    totalStats.passed = totalStats.passed + itemStats.passed
+    totalStats.failed = totalStats.failed + itemStats.failed
+    allPassed = allPassed and itemResult
+    
+    print("\n" .. string.rep("-", 60))
+    print("运行战斗系统测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local warResult = TestWarAsync.runAll()
+    local warStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + warStats.total
+    totalStats.passed = totalStats.passed + warStats.passed
+    totalStats.failed = totalStats.failed + warStats.failed
+    allPassed = allPassed and warResult
+    
+    print("\n" .. string.rep("=", 60))
+    print("总体测试结果")
+    print(string.rep("=", 60))
+    print(string.format("总测试数: %d", totalStats.total))
+    print(string.format("通过: %d", totalStats.passed))
+    print(string.format("失败: %d", totalStats.failed))
+    print(string.rep("=", 60))
+    
+    if allPassed then
+        print("✓ 所有测试通过!")
+    else
+        print("✗ 部分测试失败")
+    end
+    print(string.rep("=", 60))
+    
+    return allPassed
+end
+
+-- 运行单个测试模块
+function TestRunner.runModule(moduleName)
+    TestHelper.resetCounts()
+    
+    if moduleName == "state_machine" then
+        return TestStateMachine.runAll()
+    elseif moduleName == "input_manager" then
+        return TestInputManager.runAll()
+    elseif moduleName == "event_bridge" then
+        return TestEventBridge.runAll()
+    elseif moduleName == "coroutine_scheduler" then
+        return TestCoroutineScheduler.runAll()
+    elseif moduleName == "byte_io" then
+        return TestByteIO.runAll()
+    elseif moduleName == "item_async" then
+        return TestItemAsync.runAll()
+    elseif moduleName == "war_async" then
+        return TestWarAsync.runAll()
+    else
+        print("未知测试模块: " .. tostring(moduleName))
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, item_async, war_async")
+        return false
+    end
+end
+
+-- 如果直接运行此文件
+if arg and arg[0]:match("test_runner.lua$") then
+    if arg[1] then
+        -- 运行指定模块
+        TestRunner.runModule(arg[1])
+    else
+        -- 运行所有测试
+        TestRunner.runAll()
+    end
+end
+
+return TestRunner

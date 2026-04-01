@@ -372,7 +372,7 @@ function SetGlobalConst()
    CC.PersonMoveFrame=CC.Frame*2;          --主角移动速度，用于主角移动事件
    CC.AnimationFrame=CC.Frame*3;           --动画显示帧速，用于显示动画事件
 
-   CC.WarAutoDelay=300;                   --自动战斗时显示头像的延时
+   CC.WarAutoDelay=800;                   --自动战斗时显示头像的延时
 
    CC.DirectX={0,1,-1,0};  --不同方向x，y的加减值，用于走路改变坐标值
    CC.DirectY={-1,0,0,1};
