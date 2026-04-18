@@ -17,7 +17,7 @@
 
 **架构文档**: 详见 [ARCHITECTURE.md](ARCHITECTURE.md) 和 [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)。
 
-**文件清单**: 详见 [SRC_FILES.md](SRC_FILES.md)（src/ 目录文件分析）、[SCRIPT_FILES.md](SCRIPT_FILES.md)（script/ 脚本文件说明）和 [DATA_FILES.md](DATA_FILES.md)（data/ 目录数据文件说明）。
+**文件清单**: 详见 [SRC_FILES.md](SRC_FILES.md)（game/ 目录文件分析）、[SCRIPT_FILES.md](SCRIPT_FILES.md)（script/ 脚本文件说明）和 [DATA_FILES.md](DATA_FILES.md)（data/ 目录数据文件说明）。
 
 > **重要**: 以下文档内容以实际运行代码为准，文档可能与代码存在偏差，开发时请优先参考源码。
 
@@ -45,7 +45,7 @@
 ## 文件组织结构
 
 ```
-src/
+game/
 ├── main.lua                    # 程序入口
 ├── conf.lua                    # Love2D 配置
 ├── config.lua                  # 游戏配置 (CONFIG.*)
@@ -99,10 +99,29 @@ src/
 
 ## 构建/运行命令
 
+### 本地开发
 ```bash
-love src/
-# 调试输出: src/debug.txt
+# 直接运行（开发模式）
+love game/
+
+# 或使用本地构建的 .love 文件
+./tools/build-love.sh
+/home/woodfish/bin/love.AppImage builds/1/jylegend.love
 ```
+
+### 调试输出
+```
+game/debug.txt
+```
+
+### CI/CD 构建
+项目已配置 GitHub Actions 自动构建：
+- Android APK (debug)
+- Linux AppImage
+- Windows ZIP
+- LÖVE .love 文件
+
+详见 `.github/workflows/build.yml`
 
 ## 代码风格规范
 
@@ -185,8 +204,8 @@ end
 
 - **添加 NPC 对话**: 在 `script/oldevent/` 创建文件
 - **修改游戏数据**: 编辑 `script/jyconst.lua`
-- **调试**: 检查 `src/debug.txt`
-- **运行测试**: `cd src && lua tests/test_runner.lua`
+- **调试**: 检查 `game/debug.txt`
+- **运行测试**: `cd game && lua tests/test_runner.lua`
 
 ## 单元测试
 
@@ -194,8 +213,8 @@ end
 
 快速命令：
 ```bash
-cd src && lua tests/test_runner.lua              # 运行所有测试
-cd src && lua tests/test_runner.lua input_manager # 运行指定模块
+cd game && lua tests/test_runner.lua              # 运行所有测试
+cd game && lua tests/test_runner.lua input_manager # 运行指定模块
 ```
 
 ## Spec 驱动开发

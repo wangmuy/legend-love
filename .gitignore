@@ -1,6 +1,7 @@
 bin/*.txt
 bin/jy
-src/debug.txt
+game/debug.txt
+builds/
 
 # opencode
 .opencode/
