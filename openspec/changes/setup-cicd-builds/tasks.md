@@ -78,11 +78,23 @@
 - [x] 7.4 验证所有单元测试通过（28/28 全部通过）
 - [ ] 7.5 （可选）手动测试：运行 `/home/woodfish/bin/love.AppImage builds/1/jylegend.love` 验证游戏启动
 
+## 7.6 跨平台文件系统适配（love.filesystem）
+
+- [x] 7.6.1 新增 `game/lib_file.lua` 作为统一文件读写封装，优先使用 `love.filesystem`（相对路径）
+- [x] 7.6.2 调整日志输出到 `love.filesystem` 路径（`debug.txt`）
+- [x] 7.6.3 调整存档/索引等核心文件读写路径通过 `FileUtil` 访问（`lib_Byte.lua`、`lib_love.lua`、`script/jymain.lua`）
+- [x] 7.6.4 验证 `debug.txt` 已写入 `~/.local/share/love/wangmuy.love2d.jygame/`
+- [x] 7.6.5 存档槽路径切换：`id=0` 使用内置 `data/*` 模板，`id=1/2/3` 使用 `save/*` 可写路径
+- [x] 7.6.6 修复读档失败时的菜单交互：显示“存档不存在”提示后返回菜单（不丢失 UI）
+- [x] 7.6.7 事件驱动适配器中改用异步消息框（`AsyncMessageBox`），避免阻塞式提示导致菜单卡死/无响应
+
 ## 8. Git 提交和推送
 
 - [x] 8.1 更新 `.gitignore`（添加 builds/ 目录，更新 debug.txt 路径）
-- [ ] 8.2 添加所有变更到 git：`git add .`
-- [ ] 8.3 创建提交，包含清晰的变更说明（目录重命名 + CI/CD 添加 + build.yml 修改）
+- [x] 8.2 添加所有变更到 git：`git add .`
+- [x] 8.3 创建提交，包含清晰的变更说明（目录重命名 + CI/CD 添加 + build.yml 修改）
+  - 提交信息："Setup CI/CD builds: add GitHub Actions, move src/ to game/, add product.env"
+  - 1461 个文件变更，2450 行新增，65 行删除
 - [ ] 8.4 推送变更到 GitHub：`git push origin love2d-event-driven`（当前分支）
 
 ## 9. GitHub Secrets 配置（**手动执行**，有问题通知我）

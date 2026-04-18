@@ -8,6 +8,7 @@ local JYMainAdapter = {}
 local EventBridge = require("event_bridge")
 local GameStates = require("game_states")
 local MenuAsync = require("menu_async")
+local AsyncMessageBox = require("async_message_box")
 local CoroutineScheduler = require("coroutine_scheduler")
 local InputAsync = require("input_async")
 local EventExecutor = require("event_executor")
@@ -270,7 +271,13 @@ function JYMainAdapter.startNewGame(menux)
     ShowScreen()
     
     -- 载入新游戏数据
-    LoadRecord(0)
+    local okLoad = LoadRecord(0)
+    if not okLoad then
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "新游戏基础数据缺失，无法开始", C_WHITE, CC.DefaultFont)
+        EventBridge.getInstance():switchState(getStateId("GAME_START"))
+        JYMainAdapter.showStartMenuCoroutine()
+        return
+    end
     JY.Person[0]["姓名"] = CC.NewPersonName
     
     -- 属性选择循环（异步版本）
@@ -371,13 +378,19 @@ function JYMainAdapter.loadGame()
     DrawString(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
     
-    LoadRecord(r)
+    local ok = LoadRecord(r)
     
     Cls()
     ShowScreen()
     
-    -- 切换到首次主地图状态
-    EventBridge.getInstance():switchState(getStateId("GAME_FIRSTMMAP"))
+    if ok then
+        -- 切换到首次主地图状态
+        EventBridge.getInstance():switchState(getStateId("GAME_FIRSTMMAP"))
+    else
+        AsyncMessageBox.ShowMessageCoroutine(-1, -1, "该存档不存在或已损坏", C_WHITE, CC.DefaultFont)
+        EventBridge.getInstance():switchState(getStateId("GAME_START"))
+        JYMainAdapter.showStartMenuCoroutine()
+    end
 end
 
 -- 更新函数（每帧调用）

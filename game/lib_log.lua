@@ -1,13 +1,28 @@
+local LOG_HANDLES = {}
+
+local FileUtil = require "lib_file"
+
+local function getLogHandle(logfile)
+    if logfile == nil then
+        return nil
+    end
+    local h = LOG_HANDLES[logfile]
+    if h ~= nil then
+        return h
+    end
+    h = FileUtil.open(logfile, "w")
+    LOG_HANDLES[logfile] = h
+    return h
+end
+
 function Log(logfile, traceback, fmt, ...)
     local out
     local str = string.format("%s\n%s%s" .. fmt .. "\n\n", os.date("%H:%M:%S"),
         traceback and debug.traceback() or "", traceback and "\n" or "", ...)
-    if logfile~=nil then
-        out = io.open(logfile, "a+")
-    end
+    out = getLogHandle(logfile)
     if out ~= nil then
         out:write(str)
-        out:close()
+        out:flush()
     else
         io.write(str)
     end

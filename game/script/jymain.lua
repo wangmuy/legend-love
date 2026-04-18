@@ -7,6 +7,8 @@
 
 ---本代码由游泳的鱼编写
 
+local FileUtil = require "lib_file"
+
 --本模块是lua主模块，由C主程序JYLua.exe调用。C程序主要提供游戏需要的视频、音乐、键盘等API函数，供lua调用。
 --游戏的所有逻辑都在lua代码中，以方便大家对代码的修改。
 --为加快速度，显示主地图/场景地图/战斗地图部分用C API实现。
@@ -14,8 +16,19 @@
 --导入其他模块。之所以做成函数是为了避免编译查错时编译器会寻找这些模块。
 function IncludeFile()              --导入其他模块
     --dofile("config.lua");       --此文件在C函数中预先加载。这里就不加载了
-    dofile(CONFIG.ScriptPath .. "jyconst.lua");
-    dofile(CONFIG.ScriptPath .. "jymodify.lua");
+    -- Use love.filesystem.load for .love file compatibility
+    local jyconst_loader = love.filesystem.load(CONFIG.ScriptPath .. "jyconst.lua")
+    if jyconst_loader then
+        jyconst_loader()
+    else
+        dofile(CONFIG.ScriptPath .. "jyconst.lua")
+    end
+    local jymodify_loader = love.filesystem.load(CONFIG.ScriptPath .. "jymodify.lua")
+    if jymodify_loader then
+        jymodify_loader()
+    else
+        dofile(CONFIG.ScriptPath .. "jymodify.lua")
+    end
 end
 
 
@@ -103,7 +116,7 @@ function SetGlobal()   --设置游戏内部使用的全程变量
 end
 
 function JY_Main()        --主程序入口
-    os.remove("debug.txt");        --清除以前的debug输出
+    FileUtil.remove("debug.txt");        --清除以前的debug输出
     xpcall(JY_Main_sub,myErrFun);     --捕获调用错误
 end
 
@@ -196,10 +209,14 @@ function JY_Main_sub()        --真正的游戏主程序入口
         Cls();
         DrawString(menux,CC.StartMenuY,"请稍候...",C_RED,CC.StartMenuFontSize);
         ShowScreen();
-        LoadRecord(r);
+        local ok = LoadRecord(r);
         Cls();
         ShowScreen();
-        JY.Status=GAME_FIRSTMMAP;
+        if ok then
+            JY.Status=GAME_FIRSTMMAP;
+        else
+            DrawStrBoxWaitKey("该存档不存在或已损坏",C_WHITE,CC.DefaultFont,1);
+        end
 
     elseif menuReturn == 3 then
         return ;
@@ -217,7 +234,11 @@ function CleanMemory()            --清理lua内存
 end
 
 function NewGame()     --选择新游戏，设置主角初始属性
-    LoadRecord(0); --  载入新游戏数据
+    local ok = LoadRecord(0); --  载入新游戏数据
+    if not ok then
+        DrawStrBoxWaitKey("新游戏基础数据缺失，无法开始",C_WHITE,CC.DefaultFont,1);
+        return;
+    end
     JY.Person[0]["姓名"]=CC.NewPersonName;
 
     while true do
@@ -668,9 +689,14 @@ function Menu_ReadRecord()        --读取进度菜单
     elseif r>0 then
         DrawStrBox(CC.MainSubMenuX2,CC.MainSubMenuY,"请稍候......",C_WHITE,CC.DefaultFont);
         ShowScreen();
-        LoadRecord(r);
-        JY.Status=GAME_FIRSTMMAP;
-        return 1;
+        local ok = LoadRecord(r);
+        if ok then
+            JY.Status=GAME_FIRSTMMAP;
+            return 1;
+        else
+            DrawStrBoxWaitKey("该存档不存在或已损坏",C_WHITE,CC.DefaultFont,1);
+            return 0;
+        end
     end
 end
 
@@ -1585,9 +1611,31 @@ end
 function LoadRecord(id)       -- 读取游戏进度
     local t1=lib.GetTime();
 
+    local idxFile = CC.R_IDXFilename[id]
+    local grpFile = CC.R_GRPFilename[id]
+    local sFile = CC.S_Filename[id]
+    local dFile = CC.D_Filename[id]
+
+    lib.Debug(string.format("LoadRecord: id=%d", id));
+    lib.Debug(string.format("LoadRecord: idx=%s grp=%s s=%s d=%s", tostring(idxFile), tostring(grpFile), tostring(sFile), tostring(dFile)));
+
+    -- 存档文件不存在时，不做任何读取，避免崩溃
+    if id > 0 then
+        if not FileUtil.exists(idxFile) or not FileUtil.exists(grpFile) or not FileUtil.exists(sFile) or not FileUtil.exists(dFile) then
+            lib.Debug(string.format("LoadRecord: save slot %d missing files, skip load", id));
+            return false;
+        end
+    else
+        -- 新游戏基础数据必须存在
+        if not FileUtil.exists(idxFile) or not FileUtil.exists(grpFile) then
+            lib.Debug("LoadRecord: base new game files missing, skip load");
+            return false;
+        end
+    end
+
     --读取R*.idx文件
     local data=Byte.create(6*4);
-    Byte.loadfile(data,CC.R_IDXFilename[id],0,6*4);
+    Byte.loadfile(data,idxFile,0,6*4);
 
     local idx={};
     idx[0]=0;
@@ -1597,7 +1645,7 @@ function LoadRecord(id)       -- 读取游戏进度
 
     --读取R*.grp文件
     JY.Data_Base=Byte.create(idx[1]-idx[0]);              --基本数据
-    Byte.loadfile(JY.Data_Base,CC.R_GRPFilename[id],idx[0],idx[1]-idx[0]);
+    Byte.loadfile(JY.Data_Base,grpFile,idx[0],idx[1]-idx[0]);
 
     --设置访问基本数据的方法，这样就可以用访问表的方式访问了。而不用把二进制数据转化为表。节约加载时间和空间
     local meta_t={
@@ -1615,7 +1663,7 @@ function LoadRecord(id)       -- 读取游戏进度
     JY.PersonNum=math.floor((idx[2]-idx[1])/CC.PersonSize);   --人物
 
     JY.Data_Person=Byte.create(CC.PersonSize*JY.PersonNum);
-    Byte.loadfile(JY.Data_Person,CC.R_GRPFilename[id],idx[1],CC.PersonSize*JY.PersonNum);
+    Byte.loadfile(JY.Data_Person,grpFile,idx[1],CC.PersonSize*JY.PersonNum);
 
     for i=0,JY.PersonNum-1 do
         JY.Person[i]={};
@@ -1633,7 +1681,7 @@ function LoadRecord(id)       -- 读取游戏进度
 
     JY.ThingNum=math.floor((idx[3]-idx[2])/CC.ThingSize);     --物品
     JY.Data_Thing=Byte.create(CC.ThingSize*JY.ThingNum);
-    Byte.loadfile(JY.Data_Thing,CC.R_GRPFilename[id],idx[2],CC.ThingSize*JY.ThingNum);
+    Byte.loadfile(JY.Data_Thing,grpFile,idx[2],CC.ThingSize*JY.ThingNum);
     for i=0,JY.ThingNum-1 do
         JY.Thing[i]={};
         local meta_t={
@@ -1650,7 +1698,7 @@ function LoadRecord(id)       -- 读取游戏进度
 
     JY.SceneNum=math.floor((idx[4]-idx[3])/CC.SceneSize);     --场景
     JY.Data_Scene=Byte.create(CC.SceneSize*JY.SceneNum);
-    Byte.loadfile(JY.Data_Scene,CC.R_GRPFilename[id],idx[3],CC.SceneSize*JY.SceneNum);
+    Byte.loadfile(JY.Data_Scene,grpFile,idx[3],CC.SceneSize*JY.SceneNum);
     for i=0,JY.SceneNum-1 do
         JY.Scene[i]={};
         local meta_t={
@@ -1667,7 +1715,7 @@ function LoadRecord(id)       -- 读取游戏进度
 
     JY.WugongNum=math.floor((idx[5]-idx[4])/CC.WugongSize);     --武功
     JY.Data_Wugong=Byte.create(CC.WugongSize*JY.WugongNum);
-    Byte.loadfile(JY.Data_Wugong,CC.R_GRPFilename[id],idx[4],CC.WugongSize*JY.WugongNum);
+    Byte.loadfile(JY.Data_Wugong,grpFile,idx[4],CC.WugongSize*JY.WugongNum);
     for i=0,JY.WugongNum-1 do
         JY.Wugong[i]={};
         local meta_t={
@@ -1684,7 +1732,7 @@ function LoadRecord(id)       -- 读取游戏进度
 
     JY.ShopNum=math.floor((idx[6]-idx[5])/CC.ShopSize);     --小宝商店
     JY.Data_Shop=Byte.create(CC.ShopSize*JY.ShopNum);
-    Byte.loadfile(JY.Data_Shop,CC.R_GRPFilename[id],idx[5],CC.ShopSize*JY.ShopNum);
+    Byte.loadfile(JY.Data_Shop,grpFile,idx[5],CC.ShopSize*JY.ShopNum);
     for i=0,JY.ShopNum-1 do
         JY.Shop[i]={};
         local meta_t={
@@ -1700,10 +1748,11 @@ function LoadRecord(id)       -- 读取游戏进度
 
     end
 
-    lib.LoadSMap(CC.S_Filename[id],CC.TempS_Filename,JY.SceneNum,CC.SWidth,CC.SHeight,CC.D_Filename[id],CC.DNum,11);
+    lib.LoadSMap(sFile,CC.TempS_Filename,JY.SceneNum,CC.SWidth,CC.SHeight,dFile,CC.DNum,11);
     collectgarbage();
 
     lib.Debug(string.format("Loadrecord time=%d",lib.GetTime()-t1));
+    return true;
 end
 
 -- 写游戏进度
@@ -1747,7 +1796,10 @@ end
 -----------------------------------通用函数-------------------------------------------
 
 function filelength(filename)         --得到文件长度
-    local inp=io.open(filename,"rb");
+    local inp=FileUtil.open(filename,"rb");
+    if inp == nil then
+        return 0;
+    end
     local l= inp:seek("end");
     inp:close();
     return l;
@@ -2943,11 +2995,17 @@ end
 
 --根据oldtalk.grp文件来idx索引文件。供后面读对话使用
 function GenTalkIdx()         --生成对话索引文件
-    os.remove(CC.TalkIdxFile);
-    local p=io.open(CC.TalkIdxFile,"w");
+    FileUtil.remove(CC.TalkIdxFile);
+    local p=FileUtil.open(CC.TalkIdxFile,"w");
+    if p == nil then
+        return;
+    end
     p:close();
 
-    p=io.open(CC.TalkGrpFile,"r");
+    p=FileUtil.open(CC.TalkGrpFile,"r");
+    if p == nil then
+        return;
+    end
     local num=0
     for line in p:lines() do
         num=num+1;
@@ -2990,7 +3048,10 @@ function ReadTalk(talkid)            --从文件读取一条对话
         id2=Byte.get32(data,4);
     end
 
-    local p=io.open(grpfile,"r");
+    local p=FileUtil.open(grpfile,"r");
+    if p == nil then
+        return nil;
+    end
     p:seek("set",id1);
     local talk=p:read("*line");
     p:close();
@@ -7056,5 +7117,3 @@ function War_AutoDoctor()            --自动医疗
 
     War_ExecuteMenu_Sub(x1,y1,3,-1);
 end
-
-

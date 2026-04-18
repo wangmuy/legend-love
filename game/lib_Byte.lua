@@ -1,4 +1,5 @@
 require "lib_log"
+local FileUtil = require "lib_file"
 
 local M = {}
 do
@@ -65,7 +66,7 @@ end
 function LoadToTable16Inner(t, filename, size, seekPos, isLittleEndian)
     local oldsize = t and #t or 0
     local tbl = t or {}
-    local f = io.open(filename, "rb")
+    local f = FileUtil.open(filename, "rb")
     if not f then
         for i=1,size do tbl[i]=0 end
         return tbl
@@ -123,8 +124,8 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     end
     
     -- 写入文件
-    local f = io.open(filename, "r+b")
-    if not f then f = io.open(filename, "wb") end
+    local f = FileUtil.open(filename, "r+b")
+    if not f then f = FileUtil.open(filename, "wb") end
     if not f then return end
     if seekPos and seekPos > 0 then f:seek("set", seekPos) end
     f:write(data:getString())
@@ -139,7 +140,7 @@ end
 function LoadToTable8(t, filename, size, seekPos)
     local oldsize = t and #t or 0
     local tbl = t or {}
-    local f = io.open(filename, "rb")
+    local f = FileUtil.open(filename, "rb")
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
     for i=1,size do
         tbl[i] = f:read(1):byte(1)
@@ -154,9 +155,9 @@ end
 function SaveFromTable8(t, filename, size, begIdx, seekPos)
     if t==nil or #t<=0 then return end
     local mode = "r+b"
-    local f = io.open(filename, mode)
+    local f = FileUtil.open(filename, mode)
     if not f then
-        f = io.open(filename, "wb")
+        f = FileUtil.open(filename, "wb")
     end
     if not f then return end
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
