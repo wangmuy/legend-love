@@ -13,7 +13,15 @@ do
 end
 
 require "config"
-dofile(CONFIG.ScriptPath .. "jyconst.lua")
+local FileUtil = require "lib_file"
+-- Use love.filesystem.load for .love file compatibility
+local jyconst_loader = love.filesystem.load(CONFIG.ScriptPath .. "jyconst.lua")
+if jyconst_loader then
+    jyconst_loader()
+else
+    -- Fallback to dofile for development mode
+    dofile(CONFIG.ScriptPath .. "jyconst.lua")
+end
 SetGlobalConst()
 require "lib_log"
 local Byte = require "lib_Byte"
@@ -192,7 +200,7 @@ end
 
 local color32Pallette = {}
 local function LoadPallette(filename)
-    local f = io.open(filename, "rb")
+    local f = FileUtil.open(filename, "rb")
     if f == nil then return false end
     Debug("Loading palette from: %s", filename)
     for i=1,256 do
@@ -254,7 +262,7 @@ end
 function PicFile:getPic(picid)
     if self.pcache[picid] == nil then
         Debug("getPic: loading picid=%d from %s", picid, self.grpfilename)
-        local f = io.open(self.grpfilename, "rb")
+        local f = FileUtil.open(self.grpfilename, "rb")
         if f == nil then
             Debug("getPic: failed to open file %s", self.grpfilename)
             return nil
@@ -277,7 +285,7 @@ function PicFile:getPic(picid)
 end
 
 local function FileLength(fname)
-    local f = io.open(fname, "rb")
+    local f = FileUtil.open(fname, "rb")
     if f == nil then return -1 end
     local len = f:seek("end")
     f:close()
@@ -433,7 +441,7 @@ function PicLoadFile(idxfilename, grpfilename, fileid)
     local idxlen = FileLength(idxfilename)
     local grplen = FileLength(grpfilename)
     if idxlen < 0 or grplen < 0 then return end
-    local f = io.open(idxfilename, "rb")
+    local f = FileUtil.open(idxfilename, "rb")
     local num = idxlen/4
 
     pic_file.idx[1] = 0
@@ -1088,7 +1096,7 @@ function LoadWarMap(WarIDXfilename, WarGRPfilename, mapid, num, x_max, y_max)
     if mapid==0 then -- 第0个地图，从0开始读
         p=0
     else
-        local f = io.open(WarIDXfilename, "rb") -- 读idx文件
+        local f = FileUtil.open(WarIDXfilename, "rb") -- 读idx文件
         f:seek("set", 4*(mapid-1))
         p = Byte.byte2uintl(f:read(4):byte(1,4))
         f:close()

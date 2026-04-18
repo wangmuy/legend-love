@@ -78,25 +78,27 @@ function SetGlobalConst()
    CC.ScreenH=CONFIG.Height;
 
    --定义记录文件名。S和D由于是固定大小，因此不再定义idx了。
+   -- id=0 读取内置模板数据；id=1/2/3 使用可写存档目录（love.filesystem save 路径）
+   local SavePath = "save/";
    CC.R_IDXFilename={[0]=CONFIG.DataPath .. "ranger.idx",
-                     CONFIG.DataPath .. "r1.idx",
-					 CONFIG.DataPath .. "r2.idx",
-					 CONFIG.DataPath .. "r3.idx",};
+                     SavePath .. "r1.idx",
+					 SavePath .. "r2.idx",
+					 SavePath .. "r3.idx",};
    CC.R_GRPFilename={[0]=CONFIG.DataPath .. "ranger.grp",
-                     CONFIG.DataPath .. "r1.grp",
-					 CONFIG.DataPath .. "r2.grp",
-					 CONFIG.DataPath .. "r3.grp",};
+                     SavePath .. "r1.grp",
+					 SavePath .. "r2.grp",
+					 SavePath .. "r3.grp",};
    CC.S_Filename={[0]=CONFIG.DataPath .. "allsin.grp",
-                  CONFIG.DataPath .. "s1.grp",
-				  CONFIG.DataPath .. "s2.grp",
-				  CONFIG.DataPath .. "s3.grp",};
+                  SavePath .. "s1.grp",
+				  SavePath .. "s2.grp",
+				  SavePath .. "s3.grp",};
 
    CC.TempS_Filename=CONFIG.DataPath .. "allsinbk.grp";
 
    CC.D_Filename={[0]=CONFIG.DataPath .. "alldef.grp",
-                   CONFIG.DataPath .. "d1.grp",
-				   CONFIG.DataPath .. "d2.grp",
-				   CONFIG.DataPath .. "d3.grp",};
+                   SavePath .. "d1.grp",
+				   SavePath .. "d2.grp",
+				   SavePath .. "d3.grp",};
 
    CC.PaletteFile=CONFIG.DataPath .. "mmap.col";
 
