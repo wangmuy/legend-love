@@ -1,11 +1,11 @@
-# src/script 目录文件说明
+# game/script 目录文件说明
 
-本文档记录 `src/script` 目录下各脚本文件的用途和结构。
+本文档记录 `game/script` 目录下各脚本文件的用途和结构。
 
 ## 目录结构
 
 ```
-src/script/
+game/script/
 ├── jymain.lua          # 主游戏逻辑 (223KB)
 ├── jyconst.lua         # 常量和配置定义 (23KB)
 ├── jymodify.lua        # 游戏修改和扩展 (9KB)

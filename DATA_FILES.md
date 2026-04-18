@@ -1,6 +1,6 @@
-# src/data 目录文件说明
+# game/data 目录文件说明
 
-本文档记录 `src/data` 目录下各数据文件的用途和格式。
+本文档记录 `game/data` 目录下各数据文件的用途和格式。
 
 ## 文件类型总览
 
@@ -212,7 +212,7 @@ SaveRecord(id)
 
 ## 六、数据结构定义位置
 
-所有数据结构定义在 `src/script/jyconst.lua`：
+所有数据结构定义在 `game/script/jyconst.lua`：
 
 | 常量名 | 说明 |
 |--------|------|
@@ -255,7 +255,7 @@ SaveRecord(id)
 
 | 文件 | 说明 |
 |------|------|
-| `src/script/jyconst.lua` | 数据文件名和结构定义 |
-| `src/script/jymain.lua` | 加载/保存函数实现 |
-| `src/lib_love.lua` | 图片加载和 RLE 解码 |
-| `src/lib_Byte.lua` | 二进制数据读写工具 |
+| `game/script/jyconst.lua` | 数据文件名和结构定义 |
+| `game/script/jymain.lua` | 加载/保存函数实现 |
+| `game/lib_love.lua` | 图片加载和 RLE 解码 |
+| `game/lib_Byte.lua` | 二进制数据读写工具 |
