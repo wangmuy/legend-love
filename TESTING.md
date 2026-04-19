@@ -10,8 +10,8 @@
 
 | 工具 | 文件 | 用途 |
 |------|------|------|
-| 测试运行器 | `src/tests/test_runner.lua` | 运行所有或指定模块的测试 |
-| 测试工具集 | `src/tests/test_helper.lua` | 提供断言、Mock、Spy、Stub 等工具 |
+| 测试运行器 | `game/tests/test_runner.lua` | 运行所有或指定模块的测试 |
+| 测试工具集 | `game/tests/test_helper.lua` | 提供断言、Mock、Spy、Stub 等工具 |
 
 ### 测试技术
 
@@ -23,7 +23,7 @@
 ## 测试结构
 
 ```
-src/tests/
+game/tests/
 ├── test_runner.lua              # 测试运行器
 ├── test_helper.lua              # 测试工具集
 ├── README.md                    # 测试目录说明
@@ -86,17 +86,17 @@ return TestTargetModule
 ### 运行所有测试
 
 ```bash
-cd src && lua tests/test_runner.lua
+cd game && lua tests/test_runner.lua
 ```
 
 ### 运行单个模块测试
 
 ```bash
 # 通过 test_runner
-cd src && lua tests/test_runner.lua input_manager
+cd game && lua tests/test_runner.lua input_manager
 
 # 直接运行测试文件
-cd src && lua tests/unit/test_input_manager.lua
+cd game && lua tests/unit/test_input_manager.lua
 ```
 
 ### 可用模块
@@ -395,7 +395,7 @@ spy.restore()
 
 ## 添加新测试
 
-1. 在 `src/tests/unit/` 创建 `test_<模块>.lua`
+1. 在 `game/tests/unit/` 创建 `test_<模块>.lua`
 2. 使用测试模板编写测试
 3. 在 `test_runner.lua` 中注册：
    - 添加 `require` 语句

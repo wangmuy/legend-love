@@ -130,7 +130,7 @@ EventExecutor.startEvent(id, flag, callback)
 ## 文件结构
 
 ```
-src/
+game/
 ├── main.lua                    # 主入口，Love2D 回调
 ├── config.lua                  # 游戏配置
 ├── conf.lua                    # Love2D 配置
