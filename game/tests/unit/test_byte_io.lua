@@ -18,6 +18,78 @@ local function cleanup()
     os.remove("/tmp/test_save_be.bin")
 end
 
+-- 测试8: little-endian 32位编码（用于对话索引写入）
+function TestByteIO.testUint32LittleEndianEncoding()
+    setup()
+    print("\n=== Test: Uint32 Little Endian Encoding ===")
+
+    local function encodeU32LE(n)
+        local b1 = n % 256
+        n = math.floor(n / 256)
+        local b2 = n % 256
+        n = math.floor(n / 256)
+        local b3 = n % 256
+        n = math.floor(n / 256)
+        local b4 = n % 256
+        return string.char(b1, b2, b3, b4)
+    end
+
+    local path = "/tmp/test_u32le.bin"
+    local f = io.open(path, "wb")
+    TestHelper.assertNotNil(f, "File handle should be created")
+    if f then
+        f:write(encodeU32LE(0x12345678))
+        f:close()
+    end
+
+    local r = io.open(path, "rb")
+    TestHelper.assertNotNil(r, "Encoded file should exist")
+    if r then
+        local bytes = r:read("*a")
+        r:close()
+        TestHelper.assertEquals(4, #bytes, "Encoded bytes length should be 4")
+        TestHelper.assertEquals(0x78, bytes:byte(1), "LE byte1 should be low byte")
+        TestHelper.assertEquals(0x56, bytes:byte(2), "LE byte2 should match")
+        TestHelper.assertEquals(0x34, bytes:byte(3), "LE byte3 should match")
+        TestHelper.assertEquals(0x12, bytes:byte(4), "LE byte4 should be high byte")
+    end
+
+    os.remove(path)
+    cleanup()
+end
+
+-- 测试9: ReadTalk 越界判断应使用 or（防止 and 回归）
+function TestByteIO.testReadTalkBoundsCondition()
+    setup()
+    print("\n=== Test: ReadTalk Bounds Condition ===")
+
+    local function isOutOfRange(talkid, length)
+        return talkid < 0 or talkid >= length / 4
+    end
+
+    TestHelper.assertEquals(true, isOutOfRange(-1, 40), "Negative talk id should be out of range")
+    TestHelper.assertEquals(false, isOutOfRange(0, 40), "First talk id should be valid")
+    TestHelper.assertEquals(false, isOutOfRange(9, 40), "Last valid talk id should be valid")
+    TestHelper.assertEquals(true, isOutOfRange(10, 40), "talk id equal to count should be out of range")
+
+    cleanup()
+end
+
+-- 测试10: bit32 兼容层可用（防初始化黑屏回归）
+function TestByteIO.testBit32Compatibility()
+    setup()
+    print("\n=== Test: bit32 Compatibility ===")
+
+    local Byte = require("lib_Byte")
+    TestHelper.assertNotNil(_G.bit32, "Global bit32 should be available after loading lib_Byte")
+    TestHelper.assertNotNil(_G.bit32.band, "bit32.band should exist")
+    TestHelper.assertNotNil(_G.bit32.rshift, "bit32.rshift should exist")
+    TestHelper.assertEquals(0x34, _G.bit32.band(0x1234, 0xFF), "bit32.band should work")
+    TestHelper.assertEquals(0x12, _G.bit32.rshift(0x1234, 8), "bit32.rshift should work")
+
+    cleanup()
+end
+
 -- 测试1: SaveFromTable16 基本功能（小端）
 function TestByteIO.testSaveFromTable16LittleEndian()
     setup()
@@ -233,6 +305,9 @@ function TestByteIO.runAll()
     TestByteIO.testEmptyData()
     TestByteIO.testLargeDataPerformance()
     TestByteIO.testSeekPos()
+    TestByteIO.testUint32LittleEndianEncoding()
+    TestByteIO.testReadTalkBoundsCondition()
+    TestByteIO.testBit32Compatibility()
     
     return TestHelper.printSummary()
 end

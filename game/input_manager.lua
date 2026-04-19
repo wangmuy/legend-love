@@ -65,9 +65,6 @@ end
 
 -- 添加事件到队列
 local function enqueueEvent(event)
-    local info = debug.getinfo(2, "nSl")
-    lib.Debug(string.format("enqueueEvent: key=%d, queueHead=%d, queueTail=%d, caller=%s:%d", 
-        event.key, queueHead, queueTail, tostring(info.short_src), info.currentline))
     local nextTail = queueTail + 1
     if nextTail > maxQueueSize then
         nextTail = 1
@@ -82,7 +79,6 @@ local function enqueueEvent(event)
     
     eventQueue[queueTail] = event
     queueTail = nextTail
-    lib.Debug(string.format("enqueueEvent: done, new queueTail=%d", queueTail))
 end
 
 -- 从队列取出事件
@@ -99,7 +95,6 @@ local function dequeueEvent()
         queueHead = 1
     end
     
-    lib.Debug(string.format("dequeueEvent: key=%d, oldHead=%d, new queueHead=%d, queueTail=%d", event.key, oldHead, queueHead, queueTail))
     return event
 end
 
@@ -124,8 +119,6 @@ function InputManager:onKeyPressed(key, scancode, isrepeat)
     if isrepeat then
         return
     end
-    
-    lib.Debug(string.format("InputManager:onKeyPressed: key=%s, gameKey=%d", key, gameKey))
     
     -- 添加按键按下事件到队列
     enqueueEvent({
@@ -185,7 +178,6 @@ function InputManager:update(dt)
             end
             
             if shouldRepeat then
-                lib.Debug(string.format("InputManager:update: generating repeat event for key=%d", gameKey))
                 -- 添加重复事件到队列
                 enqueueEvent({
                     type = "repeat",
@@ -209,7 +201,6 @@ function InputManager:getKey()
     -- 从队列中获取事件
     local event = dequeueEvent()
     if event then
-        lib.Debug(string.format("InputManager:getKey: returning key=%d", event.key))
         return event.key
     end
     

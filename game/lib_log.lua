@@ -1,4 +1,6 @@
 local LOG_HANDLES = {}
+local LAST_FLUSH_TS = {}
+local FLUSH_INTERVAL = 0.5
 
 local FileUtil = require "lib_file"
 
@@ -22,23 +24,34 @@ function Log(logfile, traceback, fmt, ...)
     out = getLogHandle(logfile)
     if out ~= nil then
         out:write(str)
-        out:flush()
+        local now = os.clock()
+        local last = LAST_FLUSH_TS[logfile] or 0
+        if (now - last) >= FLUSH_INTERVAL then
+            out:flush()
+            LAST_FLUSH_TS[logfile] = now
+        end
     else
         io.write(str)
     end
 end
 
 function Debugt(fmt, ...)
+    if CONFIG and CONFIG.Debug ~= 1 then
+        return
+    end
     local logfile = CONFIG and CONFIG.DEBUG_FILE or nil
     Log(logfile, true, fmt, ...)
 end
 
 function Debug(fmt, ...)
+    if CONFIG and CONFIG.Debug ~= 1 then
+        return
+    end
     local logfile = CONFIG and CONFIG.DEBUG_FILE or nil
     Log(logfile, false, fmt, ...)
 end
 
 function JY_Error(fmt, ...)
-    local logfile = CONFIG and CONFIG.DEBUG_FILE or nil
+    local logfile = (CONFIG and CONFIG.ERROR_FILE) or (CONFIG and CONFIG.DEBUG_FILE) or nil
     Log(logfile, false, fmt, ...)
 end

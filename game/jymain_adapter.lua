@@ -12,6 +12,7 @@ local AsyncMessageBox = require("async_message_box")
 local CoroutineScheduler = require("coroutine_scheduler")
 local InputAsync = require("input_async")
 local EventExecutor = require("event_executor")
+local PerfLog = require("perf_log")
 
 -- 游戏初始化标志
 local isInitialized = false
@@ -52,6 +53,7 @@ end
 
 -- 初始化协程
 function JYMainAdapter.initCoroutine()
+    PerfLog.init()
     lib.Debug("JYMainAdapter.initCoroutine started")
     
     -- 导入其他模块
@@ -266,12 +268,17 @@ end
 
 -- 开始新游戏（异步版本）
 function JYMainAdapter.startNewGame(menux)
+    local tAll = PerfLog.begin("startNewGame total")
+    PerfLog.mark("startNewGame begin")
+
     Cls()
     DrawString(menux, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
     
     -- 载入新游戏数据
+    local tLoad = PerfLog.begin("startNewGame.LoadRecord(0)")
     local okLoad = LoadRecord(0)
+    PerfLog.finish(tLoad, "ok=" .. tostring(okLoad))
     if not okLoad then
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "新游戏基础数据缺失，无法开始", C_WHITE, CC.DefaultFont)
         EventBridge.getInstance():switchState(getStateId("GAME_START"))
@@ -297,7 +304,9 @@ function JYMainAdapter.startNewGame(menux)
         }
         local fontsize = CC.NewGameFontSize
         local x1 = (CC.ScreenW - fontsize * 4 * 4) / 2
+        local tMenu = PerfLog.begin("startNewGame.attributeMenu")
         local ok = MenuAsync.ShowMenu2Coroutine(menu, 2, 0, x1 + 11 * fontsize, CC.NewGameY - CC.MenuBorderPixel, 0, 0, 0, 1, fontsize, C_RED, C_WHITE)
+        PerfLog.finish(tMenu, "choice=" .. tostring(ok))
         
         -- 清除绘制回调
         EventBridge.clearGlobalDrawCallback()
@@ -342,23 +351,26 @@ function JYMainAdapter.startNewGame(menux)
     JY.AnimationState.active = false
     JY.AnimationState.currentFrame = 0
     
-    Init_SMap(0)
-    
     -- 切换到场景状态（在事件执行前切换，确保对话期间能正确绘制场景）
     lib.Debug("startNewGame: switching to GAME_SMAP state")
+    local tSwitch = PerfLog.begin("startNewGame.switchState(GAME_SMAP)")
     EventBridge.getInstance():switchState(getStateId("GAME_SMAP"))
+    PerfLog.finish(tSwitch)
     lib.Debug("startNewGame: switched to GAME_SMAP state, JY.Status=" .. tostring(JY.Status))
     
     if CC.NewGameEvent > 0 then
         -- 在协程中执行新游戏事件
         -- 使用 event_executor 中的 oldCallEventCoroutine，避免 C-call boundary 问题
         local EventExecutor = require("event_executor")
+        local tEvent = PerfLog.begin("startNewGame.oldCallEventCoroutine")
         EventExecutor.oldCallEventCoroutine(CC.NewGameEvent)
+        PerfLog.finish(tEvent, "event=" .. tostring(CC.NewGameEvent))
     end
     
     -- 事件执行完毕后，恢复主角贴图为默认值
     JY.MyPic = CC.NewPersonPic
     lib.Debug("startNewGame: restored MyPic to " .. tostring(JY.MyPic))
+    PerfLog.finish(tAll)
 end
 
 -- 载入游戏

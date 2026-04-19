@@ -67,8 +67,14 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     -- 安装异步全局函数替换
     AsyncGlobals.install()
     
-    -- 使用 loadfile 加载事件脚本，避免 dofile 的 C 调用边界问题
-    local chunk, err = loadfile(CONFIG.OldEventPath .. eventfilename)
+    -- 优先使用 love.filesystem.load，确保在不同 cwd/打包模式下路径一致。
+    local chunk, err = nil, nil
+    if love and love.filesystem and love.filesystem.load then
+        chunk, err = love.filesystem.load(CONFIG.OldEventPath .. eventfilename)
+    end
+    if not chunk then
+        chunk, err = loadfile(CONFIG.OldEventPath .. eventfilename)
+    end
     if chunk then
         chunk()  -- 直接执行，不在 pcall 中
     else

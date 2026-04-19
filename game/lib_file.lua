@@ -18,64 +18,58 @@ local function normalizeReadFormat(format)
     return format
 end
 
+local function toLoveOpenMode(mode)
+    if mode and mode:find("+", 1, true) then
+        return "c"
+    end
+    if mode and mode:find("w", 1, true) then
+        return "w"
+    end
+    if mode and mode:find("a", 1, true) then
+        return "a"
+    end
+    return "r"
+end
+
 -- File open wrapper - handles both io.open and love.filesystem
 -- Returns a file handle compatible object
 function FileUtil.open(filepath, mode)
     mode = mode or "r"
 
-    if not hasLoveFS() then
-        return nil
-    end
+    if hasLoveFS() then
+        local writable = isWriteMode(mode)
+        local hasExisting = love.filesystem.getInfo(filepath) ~= nil
 
-    local info = love.filesystem.getInfo(filepath)
-    local hasExisting = info ~= nil
-    local writable = isWriteMode(mode)
-
-    if not hasExisting and not writable then
-        return nil
-    end
-
-    local content = ""
-    if hasExisting and mode:find("w", 1, true) == nil then
-        local okRead, existing = pcall(function()
-            return love.filesystem.read(filepath)
-        end)
-        if okRead and type(existing) == "string" then
-            content = existing
-        elseif not writable then
+        if not hasExisting and not writable then
             return nil
         end
-    end
 
-    -- r+ requires existing file
-    if mode:find("+", 1, true) and mode:find("r", 1, true) and not hasExisting then
-        return nil
-    end
+        if writable then
+            local parent = filepath:match("^(.*)/[^/]+$")
+            if parent and parent ~= "" then
+                love.filesystem.createDirectory(parent)
+            end
+        end
 
-    if mode:find("w", 1, true) then
-        content = ""
-    end
-
-    local pos = 1
-    if mode:find("a", 1, true) then
-        pos = #content + 1
-    end
-
-    if writable then
-        local parent = filepath:match("^(.*)/[^/]+$")
-        if parent and parent ~= "" then
-            love.filesystem.createDirectory(parent)
+        local lf = love.filesystem.newFile(filepath)
+        local openMode = toLoveOpenMode(mode)
+        local okOpen, opened = pcall(function()
+            return lf:open(openMode)
+        end)
+        if okOpen and opened then
+            return FileUtil.wrapHandle({
+                file = lf,
+                mode = mode,
+                loveStream = true,
+            }, true)
         end
     end
 
-    return FileUtil.wrapHandle({
-        path = filepath,
-        mode = mode,
-        content = content,
-        pos = pos,
-        closed = false,
-        dirty = false,
-    }, true)
+    local native = io.open(filepath, mode)
+    if native then
+        return FileUtil.wrapHandle(native, false)
+    end
+    return nil
 end
 
 -- Lines iterator wrapper - compatible with io.lines
@@ -201,6 +195,42 @@ function FileUtil.wrapHandle(handle, isLoveHandle)
 end
 
 function FileUtil.FileHandle:read(format)
+    if self._isLove and self._handle and self._handle.loveStream then
+        local f = self._handle.file
+        format = normalizeReadFormat(format)
+        if type(format) == "number" then
+            return f:read(format)
+        elseif format == "*all" or format == "a" then
+            local cur = f:tell()
+            local size = f:getSize()
+            local remain = size - cur
+            if remain <= 0 then
+                return ""
+            end
+            return f:read(remain)
+        elseif format == "*line" or format == "l" then
+            local chars = {}
+            while true do
+                local ch = f:read(1)
+                if ch == nil or ch == "" then
+                    if #chars == 0 then
+                        return nil
+                    end
+                    return table.concat(chars)
+                end
+                if ch == "\n" then
+                    return table.concat(chars)
+                end
+                chars[#chars + 1] = ch
+            end
+        elseif format == "*number" or format == "n" then
+            local line = self:read("*line")
+            return tonumber(line)
+        else
+            return self:read("*line")
+        end
+    end
+
     if self._isLove and type(self._handle.content) == "string" then
         local h = self._handle
         if h.closed then
@@ -250,6 +280,15 @@ function FileUtil.FileHandle:read(format)
 end
 
 function FileUtil.FileHandle:write(...)
+    if self._isLove and self._handle and self._handle.loveStream then
+        local parts = { ... }
+        local chunk = ""
+        for i = 1, #parts do
+            chunk = chunk .. tostring(parts[i])
+        end
+        return self._handle.file:write(chunk)
+    end
+
     if self._isLove and type(self._handle.content) == "string" then
         local h = self._handle
         if h.closed then
@@ -279,6 +318,10 @@ function FileUtil.FileHandle:write(...)
 end
 
 function FileUtil.FileHandle:close()
+    if self._isLove and self._handle and self._handle.loveStream then
+        return self._handle.file:close()
+    end
+
     if self._isLove and type(self._handle.content) == "string" then
         local h = self._handle
         if h.closed then
@@ -295,6 +338,14 @@ function FileUtil.FileHandle:close()
 end
 
 function FileUtil.FileHandle:flush()
+    if self._isLove and self._handle and self._handle.loveStream then
+        local f = self._handle.file
+        if f.flush then
+            return f:flush()
+        end
+        return true
+    end
+
     if self._isLove and type(self._handle.content) == "string" then
         local h = self._handle
         if h.closed then
@@ -315,6 +366,27 @@ end
 function FileUtil.FileHandle:seek(whence, offset)
     whence = whence or "cur"
     offset = offset or 0
+
+    if self._isLove and self._handle and self._handle.loveStream then
+        local f = self._handle.file
+        local base
+        if whence == "set" then
+            base = 0
+        elseif whence == "cur" then
+            base = f:tell()
+        elseif whence == "end" then
+            base = f:getSize()
+        else
+            return nil
+        end
+        local newPos = base + offset
+        if newPos < 0 then
+            newPos = 0
+        end
+        f:seek(newPos)
+        return newPos
+    end
+
     if self._isLove and type(self._handle.content) == "string" then
         local h = self._handle
         if h.closed then
@@ -342,6 +414,13 @@ function FileUtil.FileHandle:seek(whence, offset)
 end
 
 function FileUtil.FileHandle:lines()
+    if self._isLove and self._handle and self._handle.loveStream then
+        local function iterator()
+            return self:read("*line")
+        end
+        return iterator
+    end
+
     if self._isLove and type(self._handle.content) == "string" then
         local function iterator()
             return self:read("*line")

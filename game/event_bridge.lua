@@ -84,11 +84,8 @@ function EventBridge:registerLoveCallbacks()
     local originalKeyPressed = love.keypressed
     local originalKeyReleased = love.keyreleased
     
-    self:_debug(string.format("EventBridge: originalKeyPressed=%s", tostring(originalKeyPressed)))
-    
     -- 重写keypressed
     love.keypressed = function(key, scancode, isrepeat)
-        self:_debug(string.format("EventBridge: love.keypressed called: key=%s", tostring(key)))
         InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
         if originalKeyPressed then
             originalKeyPressed(key, scancode, isrepeat)
@@ -156,13 +153,9 @@ function EventBridge:update(dt)
     
     -- 更新对话框
     AsyncDialog.getInstance():update(dt)
-    self:_debug("EventBridge.update: AsyncDialog.update done")
     
     -- 更新当前状态
     StateMachine.getInstance():update(dt)
-    self:_debug("EventBridge.update: StateMachine.update done")
-    
-    self:_debug("EventBridge.update: end")
 end
 
 -- 渲染 (在love.draw中调用)
@@ -178,8 +171,6 @@ function EventBridge.clearGlobalDrawCallback()
 end
 
 function EventBridge:draw()
-    self:_debug("EventBridge:draw called")
-    
     -- 执行全局绘制回调（如果有）
     if globalDrawCallback then
         globalDrawCallback()

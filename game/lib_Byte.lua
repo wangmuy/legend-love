@@ -14,6 +14,11 @@ do
         bit32 = bit -- band rshift
         bit32.rshift = bit.brshift
     end
+
+    -- 确保脚本层可见 bit32（部分 setfenv 场景下不会自动回写全局）
+    if _G and bit32 and not _G.bit32 then
+        _G.bit32 = bit32
+    end
 end
 
 -- convert bytes(little endian) to 32 bit signed int
@@ -72,15 +77,35 @@ function LoadToTable16Inner(t, filename, size, seekPos, isLittleEndian)
         return tbl
     end
     if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
-    for i=1,size do
-        local bytes = f:read(2)
-        if not bytes then
-            tbl[i] = 0
-        else
-            local b1,b2 = bytes:byte(1,2)
-            tbl[i] = isLittleEndian and byte2sshortl(b1,b2) or byte2ushortb(b1,b2)
+
+    local totalBytes = size * 2
+    local blob = f:read(totalBytes) or ""
+    local n = #blob
+    local j = 1
+    if isLittleEndian then
+        for i = 1, size do
+            if j + 1 <= n then
+                local b1 = blob:byte(j)
+                local b2 = blob:byte(j + 1)
+                tbl[i] = byte2sshortl(b1, b2)
+                j = j + 2
+            else
+                tbl[i] = 0
+            end
+        end
+    else
+        for i = 1, size do
+            if j + 1 <= n then
+                local b1 = blob:byte(j)
+                local b2 = blob:byte(j + 1)
+                tbl[i] = byte2ushortb(b1, b2)
+                j = j + 2
+            else
+                tbl[i] = 0
+            end
         end
     end
+
     f:close()
     if oldsize > size then
         for i=size+1,oldsize do tbl[i]=nil end
@@ -98,37 +123,32 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     
     local b = begIdx or 1
     local s = size or #t
-    local totalBytes = s * 2
-    
-    -- 使用 Love2D ByteData（C 实现，更快）
-    local data = love.data.newByteData(totalBytes)
-    
     local band = bit32.band
     local rshift = bit32.rshift
-    
-    -- 填充数据（同步，不 yield）
+    local out = {}
+
+    -- 构建二进制字符串，避免依赖不同版本 Love2D 的 ByteData API 差异
     if isLittleEndian then
         for i = 0, s - 1 do
             local v = t[b + i] or 0
             local us = v>=0 and v or 65536+v
-            data:setByte(i * 2, band(us, 0xFF))
-            data:setByte(i * 2 + 1, rshift(us, 8))
+            out[#out + 1] = string.char(band(us, 0xFF), rshift(us, 8))
         end
     else
         for i = 0, s - 1 do
             local v = t[b + i] or 0
             local us = v>=0 and v or 65536+v
-            data:setByte(i * 2, rshift(us, 8))
-            data:setByte(i * 2 + 1, band(us, 0xFF))
+            out[#out + 1] = string.char(rshift(us, 8), band(us, 0xFF))
         end
     end
+    local dataStr = table.concat(out)
     
     -- 写入文件
     local f = FileUtil.open(filename, "r+b")
     if not f then f = FileUtil.open(filename, "wb") end
     if not f then return end
     if seekPos and seekPos > 0 then f:seek("set", seekPos) end
-    f:write(data:getString())
+    f:write(dataStr)
     f:close()
     
     local elapsed = os.clock() - startTime
@@ -141,10 +161,22 @@ function LoadToTable8(t, filename, size, seekPos)
     local oldsize = t and #t or 0
     local tbl = t or {}
     local f = FileUtil.open(filename, "rb")
-    if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
-    for i=1,size do
-        tbl[i] = f:read(1):byte(1)
+    if not f then
+        for i=1,size do tbl[i]=0 end
+        return tbl
     end
+    if seekPos~=nil and seekPos>0 then f:seek("set", seekPos) end
+
+    local blob = f:read(size) or ""
+    local n = #blob
+    for i = 1, size do
+        if i <= n then
+            tbl[i] = blob:byte(i)
+        else
+            tbl[i] = 0
+        end
+    end
+
     f:close()
     if oldsize > size then
         for i=size+1,oldsize do tbl[i]=nil end
