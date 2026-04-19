@@ -8,6 +8,7 @@ local EventExecutor = {}
 local CoroutineScheduler = require("coroutine_scheduler")
 local AsyncWrapper = require("async_wrapper")
 local AsyncGlobals = require("async_globals")
+local ScriptLoader = require("script_loader")
 
 -- 事件执行状态
 local executingEvent = nil
@@ -67,18 +68,14 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     -- 安装异步全局函数替换
     AsyncGlobals.install()
     
-    -- 优先使用 love.filesystem.load，确保在不同 cwd/打包模式下路径一致。
-    local chunk, err = nil, nil
-    if love and love.filesystem and love.filesystem.load then
-        chunk, err = love.filesystem.load(CONFIG.OldEventPath .. eventfilename)
-    end
-    if not chunk then
-        chunk, err = loadfile(CONFIG.OldEventPath .. eventfilename)
-    end
+    local chunk, err = ScriptLoader.load(CONFIG.OldEventPath .. eventfilename)
     if chunk then
         chunk()  -- 直接执行，不在 pcall 中
     else
         lib.Debug("oldCallEventCoroutine: failed to load " .. eventfilename .. ": " .. tostring(err))
+        if JY_Error then
+            JY_Error("oldCallEventCoroutine load failed: %s (%s)", tostring(eventfilename), tostring(err))
+        end
     end
     
     -- 卸载异步全局函数替换

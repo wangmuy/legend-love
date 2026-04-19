@@ -8,6 +8,7 @@
 ---本代码由游泳的鱼编写
 
 local FileUtil = require "lib_file"
+local ScriptLoader = require "script_loader"
 
 --本模块是lua主模块，由C主程序JYLua.exe调用。C程序主要提供游戏需要的视频、音乐、键盘等API函数，供lua调用。
 --游戏的所有逻辑都在lua代码中，以方便大家对代码的修改。
@@ -2762,13 +2763,7 @@ end
 function oldCallEvent(eventnum)     --执行旧的事件函数
     local eventfilename=string.format("oldevent_%d.lua",eventnum);
     lib.Debug(string.format("oldCallEvent: eventnum=%d, filename=%s", eventnum, eventfilename));
-    local chunk, err = nil, nil
-    if love and love.filesystem and love.filesystem.load then
-        chunk, err = love.filesystem.load(CONFIG.OldEventPath .. eventfilename)
-    end
-    if not chunk then
-        chunk, err = loadfile(CONFIG.OldEventPath .. eventfilename)
-    end
+    local chunk, err = ScriptLoader.load(CONFIG.OldEventPath .. eventfilename)
     if chunk then
         chunk()
     else
