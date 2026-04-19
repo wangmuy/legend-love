@@ -44,11 +44,6 @@ function love.update(dt)
 end
 
 function love.draw()
-    -- 调试：记录draw被调用
-    if lib and lib.Debug then
-        lib.Debug("love.draw called")
-    end
-    
     -- 设置标志，表示现在在 love.draw() 中
     if lib and lib.SetDrawLoopFlag then
         lib.SetDrawLoopFlag(true)

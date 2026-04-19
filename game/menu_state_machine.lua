@@ -33,7 +33,6 @@ function MenuStateMachine.getInstance()
         instance:init()
         instance:_debug("MenuStateMachine: created new instance, id=" .. tostring(instance))
     end
-    instance:_debug("MenuStateMachine.getInstance: returning instance id=" .. tostring(instance))
     return instance
 end
 
@@ -220,8 +219,6 @@ function MenuStateMachine:handleInput()
     end
     
     local key = lib.GetKey()
-    self:_debug(string.format("MenuStateMachine:handleInput: key=%d", key))
-    
     if key == -1 then
         return
     end
@@ -236,7 +233,6 @@ function MenuStateMachine:handleInput()
     
     -- 处理方向键
     if key == VK_DOWN then
-        self:_debug(string.format("MenuStateMachine: VK_DOWN, current=%d -> %d", menu.current, menu.current + 1))
         menu.prevCurrent = menu.current
         menu.current = menu.current + 1
         if menu.current > (menu.start + menu.num - 1) then
@@ -247,7 +243,6 @@ function MenuStateMachine:handleInput()
             menu.current = 1
         end
     elseif key == VK_UP then
-        self:_debug(string.format("MenuStateMachine: VK_UP, current=%d -> %d", menu.current, menu.current - 1))
         menu.prevCurrent = menu.current
         menu.current = menu.current - 1
         if menu.current < menu.start then

@@ -10,6 +10,7 @@ local EventExecutor = require("event_executor")
 local JyMainAsync = require("jymain_async")
 local CoroutineScheduler = require("coroutine_scheduler")
 local MenuAsync = require("menu_async")
+local PerfLog = require("perf_log")
 
 -- 游戏状态处理器表
 local handlers = {}
@@ -132,6 +133,7 @@ handlers["GAME_MMAP"] = {
         
         -- 检查是否进入子场景
         if JY.SubScene >= 0 then
+            PerfLog.mark("GAME_MMAP entering subscene", tostring(JY.SubScene))
             lib.Debug("Entering subscene: " .. tostring(JY.SubScene))
             
             -- 先切换状态，让exit处理资源清理
@@ -178,7 +180,9 @@ handlers["GAME_SMAP"] = {
     enter = function()
         lib.Debug("Enter GAME_SMAP state")
         -- 在enter中调用Init_SMap，确保状态已经切换
+        local t = PerfLog.begin("GAME_SMAP.enter.Init_SMap(0)")
         Init_SMap(0)
+        PerfLog.finish(t)
     end,
     
     exit = function()
@@ -247,24 +251,21 @@ handlers["GAME_SMAP"] = {
         end
         
         if isout == 1 then
-            JY.Status = getStateId("GAME_MMAP")
-            lib.PicInit()
-            CleanMemory()
-            lib.ShowSlow(50, 1)
-            
+            PerfLog.mark("GAME_SMAP exit-to-mmap start")
             if JY.MmapMusic < 0 then
                 JY.MmapMusic = JY.Scene[JY.SubScene]["出门音乐"]
             end
-            
-            Init_MMap()
-            
+
             JY.SubScene = -1
             JY.oldSMapX = -1
             JY.oldSMapY = -1
-            
-            lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], GetMyPic())
-            lib.ShowSlow(50, 0)
-            lib.GetKey()
+
+            -- 立即切换状态，避免当前帧继续按 GAME_SMAP 绘制导致黑屏闪烁。
+            local t = PerfLog.begin("GAME_SMAP.exit.switchState(GAME_MMAP)")
+            EventBridge.getInstance():switchState(getStateId("GAME_MMAP"))
+            PerfLog.finish(t)
+
+            PerfLog.mark("GAME_SMAP exit-to-mmap done")
             return
         end
         
@@ -273,6 +274,7 @@ handlers["GAME_SMAP"] = {
             if JY.Base["人X1"] == JY.Scene[JY.SubScene]["跳转口X1"] and JY.Base["人Y1"] == JY.Scene[JY.SubScene]["跳转口Y1"] then
                 JY.SubScene = JY.Scene[JY.SubScene]["跳转场景"]
                 lib.ShowSlow(50, 1)
+                PerfLog.mark("GAME_SMAP jump scene", tostring(JY.SubScene))
                 
                 if JY.Scene[JY.SubScene]["外景入口X1"] == 0 and JY.Scene[JY.SubScene]["外景入口Y1"] == 0 then
                     JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
@@ -282,7 +284,9 @@ handlers["GAME_SMAP"] = {
                     JY.Base["人Y1"] = JY.Scene[JY.SubScene]["跳转口Y2"]
                 end
                 
+                local t = PerfLog.begin("GAME_SMAP.jump.Init_SMap(1)")
                 Init_SMap(1)
+                PerfLog.finish(t)
                 return
             end
         end

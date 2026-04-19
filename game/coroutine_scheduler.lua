@@ -87,6 +87,9 @@ function CoroutineScheduler:start(id, ...)
         info.status = "error"
         info.error = result
         self:_debug("CoroutineScheduler.start: ERROR in coroutine " .. tostring(id) .. ": " .. tostring(result))
+        if JY_Error then
+            JY_Error("CoroutineScheduler.start error id=%s name=%s err=%s", tostring(id), tostring(info.name), tostring(result))
+        end
         -- 清理出错的协程，防止阻塞后续事件
         coroutines[id] = nil
         return false, result
@@ -171,14 +174,11 @@ end
 -- 更新所有协程
 -- @param dt: delta time
 function CoroutineScheduler:update(dt)
-    self:_debug("CoroutineScheduler.update called, coroutines count=" .. tostring(#coroutines))
-    
     local activeCoroutines = {}
     local keyWaitingCoroutines = {}
     
     -- 收集所有需要更新的协程
     for id, info in pairs(coroutines) do
-        self:_debug("CoroutineScheduler.update: checking coroutine id=" .. tostring(id) .. ", status=" .. tostring(info.status) .. ", waitingFor=" .. tostring(info.waitingFor) .. ", name=" .. tostring(info.name))
         if info.status == "suspended" then
             if info.waitingFor == "key" then
                 -- 等待按键的协程单独处理
@@ -188,8 +188,6 @@ function CoroutineScheduler:update(dt)
             end
         end
     end
-    
-    self:_debug("CoroutineScheduler.update: active coroutines=" .. tostring(#activeCoroutines) .. ", key waiting=" .. tostring(#keyWaitingCoroutines))
     
     -- 检查是否有按键按下
     local keyPressed = false
@@ -201,9 +199,7 @@ function CoroutineScheduler:update(dt)
         if pressedKey ~= -1 then
             im:_getKeyInternal()
             keyPressed = true
-            self:_debug("CoroutineScheduler.update: key pressed=" .. tostring(pressedKey))
         end
-        self:_debug("CoroutineScheduler.update: checking key, pressedKey=" .. tostring(pressedKey) .. ", keyWaitingCoroutines=" .. tostring(#keyWaitingCoroutines))
     end
     
     -- 恢复等待按键的协程（如果有按键按下）
@@ -211,7 +207,6 @@ function CoroutineScheduler:update(dt)
         for _, id in ipairs(keyWaitingCoroutines) do
             local info = coroutines[id]
             if info and info.status == "suspended" and info.waitingFor == "key" then
-                self:_debug("CoroutineScheduler.update: resuming key-waiting coroutine id=" .. tostring(id) .. " with key=" .. tostring(pressedKey))
                 self:resume(id, pressedKey)  -- 传递按键值给协程
             end
         end
@@ -221,7 +216,6 @@ function CoroutineScheduler:update(dt)
     for _, id in ipairs(activeCoroutines) do
         local info = coroutines[id]
         if info and info.status == "suspended" then
-            self:_debug("CoroutineScheduler.update: resuming coroutine id=" .. tostring(id))
             self:resume(id)
         end
     end

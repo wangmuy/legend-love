@@ -10,6 +10,10 @@ do
         require "luabit"
         bit32 = bit
     end
+
+    if _G and bit32 and not _G.bit32 then
+        _G.bit32 = bit32
+    end
 end
 
 require "config"
@@ -184,8 +188,6 @@ function ShowSurface(flag)
     -- 如果在其他地方调用，会导致屏幕抖动/闪烁
     if inDrawLoop then
         love.graphics.present()
-    else
-        Debug("ShowSurface called outside love.draw() - skipping present()")
     end
 end
 
@@ -193,8 +195,6 @@ function ShowSlow(delaytime, flag)
     -- 同上，只有 love.draw() 应该调用 present()
     if inDrawLoop then
         love.graphics.present()
-    else
-        Debug("ShowSlow called outside love.draw() - skipping present()")
     end
 end
 
@@ -261,7 +261,6 @@ end
 
 function PicFile:getPic(picid)
     if self.pcache[picid] == nil then
-        Debug("getPic: loading picid=%d from %s", picid, self.grpfilename)
         local f = FileUtil.open(self.grpfilename, "rb")
         if f == nil then
             Debug("getPic: failed to open file %s", self.grpfilename)
@@ -272,13 +271,10 @@ function PicFile:getPic(picid)
             f:close()
             return nil
         end
-        Debug("getPic: calling LoadPic with idx[%d]=%d, idx[%d]=%d", picid, self.idx[picid], picid+1, self.idx[picid+1])
         self.pcache[picid] = LoadPic(f, self.idx[picid], self.idx[picid+1])
         f:close()
         if self.pcache[picid] == nil then
             Debug("getPic: LoadPic returned nil for picid=%d", picid)
-        else
-            Debug("getPic: loaded picid=%d successfully, w=%d, h=%d", picid, self.pcache[picid].w, self.pcache[picid].h)
         end
     end
     return self.pcache[picid]
@@ -309,7 +305,6 @@ function LoadPic(openfile, idx1, idx2)
     -- 检查PNG文件头 (89 50 4E 47 0D 0A 1A 0A)
     if header:byte(1) == 0x89 and header:byte(2) == 0x50 and header:byte(3) == 0x4E and header:byte(4) == 0x47 then
         -- 这是PNG文件，使用love2d的PNG加载
-        Debug("LoadPic: detected PNG format at idx1=%d", idx1)
         local pngSize = idx2 - idx1
         openfile:seek("set", idx1)
         local pngData = openfile:read(pngSize)
@@ -330,7 +325,6 @@ function LoadPic(openfile, idx1, idx2)
         
         local w = imgdata:getWidth()
         local h = imgdata:getHeight()
-        Debug("LoadPic: loaded PNG image, w=%d, h=%d", w, h)
         
         local cache = PicCache:new()
         cache.w = w
@@ -350,8 +344,6 @@ function LoadPic(openfile, idx1, idx2)
     local h = Byte.byte2ushortl(data2:byte(1,2))
     local xoff = Byte.byte2sshortl(data3:byte(1,2))
     local yoff = Byte.byte2sshortl(data4:byte(1,2))
-    Debug("LoadPic: idx1=%d, idx2=%d, w=%d, h=%d, off: %d, %d" , idx1, idx2, w, h, xoff, yoff)
-
     -- 根据grp读入图像
     -- 先初始化为透明图片
     local imgdata = love.image.newImageData(w, h)
@@ -489,6 +481,7 @@ end
 //  value 按照flag定义，为alpha值， 
 --]]
 function PicLoadCache(fileid, picid, x, y, flag, value)
+    flag = flag or 0
     local original_picid = picid
     picid = math.floor(picid/2)
     fileid = fileid+1 -- lua starts with 1
@@ -941,7 +934,11 @@ function SaveSMap(Sfilename, Dfilename)
 end
 
 function GetS(id, x, y, level)
-    if id<0 or id>=S_Num or x<0 or x>=S_XMax or y<0 or y>=S_YMax or level <0 or level >=6 then
+    if id < 0 then
+        -- 切场景过渡期会出现 SubScene=-1，直接返回避免日志风暴。
+        return 0
+    end
+    if id>=S_Num or x<0 or x>=S_XMax or y<0 or y>=S_YMax or level <0 or level >=6 then
         JY_Error("GetS error: data out of range! id=%d,x=%d,y=%d,level=%d\n",id,x,y,level)
         return 0
     end
@@ -963,7 +960,10 @@ end
 
 -- 取D*
 function GetD(Sceneid, id, i)
-    if Sceneid<0 or Sceneid>=S_Num then
+    if Sceneid < 0 then
+        return 0
+    end
+    if Sceneid>=S_Num then
         JY_Error("GetD error: sceneid=%d out of range!\n",Sceneid)
         return 0
     end
@@ -975,7 +975,10 @@ end
 
 -- 存D*
 function SetD(Sceneid, id, i, v)
-    if Sceneid<0 or Sceneid>=S_Num then
+    if Sceneid < 0 then
+        return 0
+    end
+    if Sceneid>=S_Num then
         JY_Error("GetD error: sceneid=%d out of range!\n",Sceneid)
         return 0
     end
@@ -987,7 +990,6 @@ end
 
 -- 绘制场景地图
 function DrawSMap(sceneid, x,  y, xoff, yoff, Mypic)
-    lib.Debug(string.format("DrawSMap called: sceneid=%d, x=%d, y=%d, xoff=%d, yoff=%d, Mypic=%d", sceneid, x, y, xoff, yoff, Mypic))
     local oldScissor = {love.graphics.getScissor()}
     
     local rect = {x=nil, y=nil, w=nil, h=nil}
@@ -1058,7 +1060,6 @@ function DrawSMap(sceneid, x,  y, xoff, yoff, Mypic)
                 end
 
                 if (i1==-xoff) and (j1==-yoff) then -- 主角
-                       lib.Debug(string.format("DrawSMap: drawing hero at i1=%d, j1=%d, xoff=%d, yoff=%d, MyPic=%d, picid=%d", i1, j1, xoff, yoff, Mypic, Mypic*2));
                        JY_LoadPic(0,Mypic*2,x1,y1-d4,0,0);
                 end
             end

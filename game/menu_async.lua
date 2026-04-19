@@ -88,7 +88,6 @@ end
 
 -- 渲染菜单（在love.draw中调用）
 function MenuAsync.draw()
-    _debug("MenuAsync.draw called")
     local msm = MenuStateMachine.getInstance()
     msm:draw()
 end

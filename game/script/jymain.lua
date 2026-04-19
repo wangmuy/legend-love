@@ -2762,7 +2762,18 @@ end
 function oldCallEvent(eventnum)     --执行旧的事件函数
     local eventfilename=string.format("oldevent_%d.lua",eventnum);
     lib.Debug(string.format("oldCallEvent: eventnum=%d, filename=%s", eventnum, eventfilename));
-    dofile(CONFIG.OldEventPath .. eventfilename);
+    local chunk, err = nil, nil
+    if love and love.filesystem and love.filesystem.load then
+        chunk, err = love.filesystem.load(CONFIG.OldEventPath .. eventfilename)
+    end
+    if not chunk then
+        chunk, err = loadfile(CONFIG.OldEventPath .. eventfilename)
+    end
+    if chunk then
+        chunk()
+    else
+        JY_Error("oldCallEvent load failed: %s (%s)", tostring(eventfilename), tostring(err))
+    end
     lib.Debug(string.format("oldCallEvent: eventnum=%d finished", eventnum));
 end
 
@@ -2995,12 +3006,16 @@ end
 
 --根据oldtalk.grp文件来idx索引文件。供后面读对话使用
 function GenTalkIdx()         --生成对话索引文件
-    FileUtil.remove(CC.TalkIdxFile);
-    local p=FileUtil.open(CC.TalkIdxFile,"w");
-    if p == nil then
-        return;
+    local band = bit32 and bit32.band
+    local rshift = bit32 and bit32.rshift
+
+    -- 索引已存在且格式合法时直接复用，避免每次启动全量重建
+    local idxInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(CC.TalkIdxFile)
+    local grpInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(CC.TalkGrpFile)
+    local idxSize = FileUtil.getsize(CC.TalkIdxFile)
+    if idxSize and idxSize > 0 and idxSize % 4 == 0 and idxInfo and grpInfo and idxInfo.modtime and grpInfo.modtime and idxInfo.modtime >= grpInfo.modtime then
+        return
     end
-    p:close();
 
     p=FileUtil.open(CC.TalkGrpFile,"r");
     if p == nil then
@@ -3011,16 +3026,35 @@ function GenTalkIdx()         --生成对话索引文件
         num=num+1;
     end
     p:seek("set",0);
-    local data=Byte.create(num*4);
+    local out=FileUtil.open(CC.TalkIdxFile,"wb");
+    if out == nil then
+        p:close();
+        return;
+    end
 
     for i=0,num-1 do
         local talk=p:read("*line");
         local offset=p:seek();
-        Byte.set32(data,i*4,offset);
+        local b1, b2, b3, b4
+        if band and rshift then
+            b1 = band(offset, 0xFF)
+            b2 = band(rshift(offset, 8), 0xFF)
+            b3 = band(rshift(offset, 16), 0xFF)
+            b4 = band(rshift(offset, 24), 0xFF)
+        else
+            local n = offset
+            b1 = n % 256
+            n = math.floor(n / 256)
+            b2 = n % 256
+            n = math.floor(n / 256)
+            b3 = n % 256
+            n = math.floor(n / 256)
+            b4 = n % 256
+        end
+        out:write(string.char(b1, b2, b3, b4))
     end
     p:close();
-
-    Byte.savefile(data,CC.TalkIdxFile,0,num*4);
+    out:close();
 end
 
 --从old_talk.lua中读取编号为talkid的字符串。
@@ -3031,7 +3065,7 @@ function ReadTalk(talkid)            --从文件读取一条对话
 
     local length=filelength(idxfile);
 
-    if talkid<0 and talkid>=length/4 then
+    if talkid<0 or talkid>=length/4 then
         lib.Debug(string.format("ReadTalk: talkid=%d out of range", talkid));
         return
     end
