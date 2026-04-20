@@ -28,3 +28,6 @@ love.AppImage game/
 ```bash
 cd game && lua tests/test_runner.lua
 ```
+
+### GitHub Actions
+[bootstrap-love2d-project](https://github.com/Oval-Tutu/bootstrap-love2d-project)
