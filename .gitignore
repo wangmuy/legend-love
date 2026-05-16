@@ -4,6 +4,17 @@ game/debug.txt
 builds/
 
 # opencode
+opencode.json
 .opencode/
 !.opencode/command/
 !.opencode/skills/
+
+# codex
+.codex/
+!.codex/skills/
+
+# claude
+.claude/
+!.claude/commands/
+!.claude/skills/
+

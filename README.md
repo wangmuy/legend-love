@@ -3,10 +3,12 @@
 ## 文档
 
 - [AGENTS.md](AGENTS.md) - 项目编码指南和架构说明
+- [ARCHITECTURE.md](ARCHITECTURE.md) - 事件驱动架构详解
+- [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) - 从阻塞式到事件驱动的迁移指南
 - [TESTING.md](TESTING.md) - 测试方法和命令
 - [SRC_FILES.md](SRC_FILES.md) - game/ 目录文件分析（使用状态和作用说明）
-- [DATA_FILES.md](DATA_FILES.md) - game/data/ 数据文件格式说明
 - [SCRIPT_FILES.md](SCRIPT_FILES.md) - game/script/ 脚本文件说明
+- [DATA_FILES.md](DATA_FILES.md) - game/data/ 数据文件格式说明
 
 > **重要**: 以上文档内容以实际运行代码为准，文档可能与代码存在偏差，开发时请优先参考源码。
 

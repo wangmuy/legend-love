@@ -6,8 +6,8 @@
 
 | 扩展名 | 数量 | 用途 |
 |--------|------|------|
-| `.idx` | 111  | 索引文件，存储图片偏移量 |
-| `.grp` | 112  | 图片组文件，存储实际图片数据 |
+| `.idx` | ~111 | 索引文件，存储图片偏移量 |
+| `.grp` | ~112 | 图片组文件，存储实际图片数据 |
 | `.002` | 5    | 主地图数据文件 |
 | `.sta` | 1    | 战斗配置数据 |
 | `.col` | 1    | 调色板文件 |
@@ -72,25 +72,17 @@ idx 文件存储各段的起始偏移量（6 个 4 字节整数）。
 | 文件 | 用途 | 代码引用 |
 |------|------|----------|
 | `allsin.grp` | 所有场景数据合并 | `CC.S_Filename[0]` |
-| `s1.grp` | 场景数据分卷 1 | `CC.S_Filename[1]` |
-| `s2.grp` | 场景数据分卷 2 | `CC.S_Filename[2]` |
-| `s3.grp` | 场景数据分卷 3 | `CC.S_Filename[3]` |
 | `allsinbk.grp` | 场景数据备份 | `CC.TempS_Filename` |
 
-> 注：`allsin.idx`、`s1.idx`、`s2.idx`、`s3.idx` 存在于目录中，但代码未引用，可能是转换工具遗留或备用。
+> 注：`s1.grp`、`s2.grp`、`s3.grp` 及对应 idx 文件存在于目录中，但代码未引用，可能是转换工具遗留或备用。
 
 ### D 防御数据文件
 
 | 文件 | 用途 | 代码引用 |
 |------|------|----------|
 | `alldef.grp` | 所有场景防御数据 | `CC.D_Filename[0]` |
-| `d1.grp` | 防御数据分卷 1 | `CC.D_Filename[1]` |
-| `d2.grp` | 防御数据分卷 2 | `CC.D_Filename[2]` |
-| `d3.grp` | 防御数据分卷 3 | `CC.D_Filename[3]` |
 
-> 注：`alldef.idx`、`d1.idx`、`d2.idx`、`d3.idx` 存在于目录中，但代码未引用，可能是转换工具遗留或备用。
-
-> 注：`alldef.idx`、`d1.idx`、`d2.idx`、`d3.idx` 存在于目录中，但代码未引用，可能是转换工具遗留或备用。
+> 注：`d1.grp`、`d2.grp`、`d3.grp` 及对应 idx 文件存在于目录中，但代码未引用，可能是转换工具遗留或备用。
 
 ### 战斗人物贴图 (fight000 - fight109)
 
@@ -161,7 +153,7 @@ idx 文件存储各段的起始偏移量（6 个 4 字节整数）。
 
 | 文件 | 大小 | 用途 | 代码引用 |
 |------|------|------|----------|
-| `mmap.col` | 768 字节 | 主地图调色板 | `CC.PaletteFile` |
+| `mmap.col` | 768 字节 | 主地图调色板（256 色） | `CC.PaletteFile` |
 
 ### 格式说明
 
@@ -235,17 +227,24 @@ SaveRecord(id)
 | 特效贴图 | eft |
 | 人物贴图 | hdgrp, fight000-109 |
 | 存档数据 | ranger, r1, r2, r3 |
-| 场景数据 | allsin, s1, s2, s3, allsinbk |
-| 防御数据 | alldef, d1, d2, d3 |
+| 场景数据 | allsin, allsinbk |
+| 防御数据 | alldef |
 | 地图数据 | earth, surface, building, buildx, buildy (002) |
 | 配置数据 | war.sta, mmap.col |
+
+### 对话数据文件（位于 script/ 目录）
+
+| 文件 | 用途 | 代码引用 |
+|------|------|----------|
+| `oldtalk.idx` | 对话索引 | `CC.TalkIdxFile` |
+| `oldtalk.grp` | 对话内容 | `CC.TalkGrpFile` |
+
+> 注：这两个文件位于 `game/script/` 目录，而非 `game/data/` 目录。
 
 ### 缺失的 fight 文件
 
 部分编号的 fight 文件不存在（对应不存在的人物），这是正常现象：
 - fight030, fight039-042, fight052, fight066, fight072-075, fight089, fight103-108
-
-实际存在的 fight 文件编号：000-029, 031-038, 043-051, 053-065, 067-071, 076-088, 090-102, 109（共 92 对）
 
 实际存在的 fight 文件编号：000-029, 031-038, 043-051, 053-065, 067-071, 076-088, 090-102, 109（共 92 对）
 
@@ -259,3 +258,4 @@ SaveRecord(id)
 | `game/script/jymain.lua` | 加载/保存函数实现 |
 | `game/lib_love.lua` | 图片加载和 RLE 解码 |
 | `game/lib_Byte.lua` | 二进制数据读写工具 |
+| `game/config.lua` | 路径配置（CONFIG.DataPath, CONFIG.ScriptPath 等） |

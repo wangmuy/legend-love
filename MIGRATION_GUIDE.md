@@ -1,5 +1,7 @@
 # 迁移指南
 
+> **说明**：此文档记录了从阻塞式架构迁移到事件驱动架构的过程，供历史参考。部分 API 可能已在后续版本中更新，请以实际代码为准。
+
 ## 从阻塞式到事件驱动的迁移
 
 ### 主要变化
@@ -47,7 +49,7 @@ local key = WaitKey()
 
 **新代码（协程中）:**
 ```lua
-local key = InputAsync.WaitKey()
+local key = InputAsync.WaitKeyCoroutine()
 ```
 
 #### 对话框
@@ -57,7 +59,12 @@ local key = InputAsync.WaitKey()
 local result = DrawStrBoxYesNo(-1, -1, "确定吗？", C_WHITE, CC.DefaultFont)
 ```
 
-**新代码:**
+**新代码（协程同步式，推荐）:**
+```lua
+local result = AsyncMessageBox.ShowYesNoCoroutine(-1, -1, "确定吗？", C_WHITE, CC.DefaultFont)
+```
+
+**新代码（回调式）:**
 ```lua
 AsyncDialog.getInstance():showYesNo("确定吗？", function(result)
     -- 处理结果
@@ -66,7 +73,10 @@ end, {color = C_WHITE, size = CC.DefaultFont})
 
 ### 事件脚本迁移
 
-事件脚本（oldevent/目录）**无需修改**，event_coroutine.lua会自动包装instruct函数。
+事件脚本（oldevent/目录）**无需修改**，event_executor.lua 会自动：
+1. 安装异步全局函数替换（async_globals.lua）
+2. 动态加载事件脚本
+3. 在协程中执行 instruct_* 函数
 
 ### 状态机使用
 
@@ -88,16 +98,16 @@ EventBridge.getInstance():switchState(GAME_MMAP)
 ### 常见问题
 
 **Q: 为什么按键没有响应？**
-A: 确保在love.update中调用了EventBridge.getInstance():update(dt)
+A: 确保在 love.update 中调用了 `EventBridge.getInstance():update(dt)` 和 `InputManager.getInstance():update(dt)`
 
 **Q: 菜单为什么不显示？**
-A: 确保在love.draw中调用了MenuAsync.draw()
+A: 确保在 love.draw 中调用了 `MenuAsync.draw()` 和 `EventBridge.getInstance():draw()`
 
 **Q: 事件脚本如何执行？**
-A: 使用EventCoroutine.execute(eventFn, callback)
+A: 使用 `EventExecutor.startEvent(id, flag, callback)` 或 `EventExecuteSync(id, flag)`
 
 **Q: 如何调试协程？**
-A: 使用CoroutineScheduler.getInstance():getAllCoroutines()查看所有协程
+A: 使用 `CoroutineScheduler.getInstance():getAllCoroutines()` 查看所有协程
 
 ### 回滚方案
 

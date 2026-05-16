@@ -34,19 +34,19 @@
 ### 每帧流程
 
 **love.update(dt)**:
-1. `InputManager.update(dt)` - 处理按键重复
-2. `CoroutineScheduler.update(dt)` - 恢复挂起的协程
-3. `StateMachine.update(dt)` - 更新当前游戏状态
+1. `JYMainAdapter.update(dt)` - 游戏适配器更新
+2. `EventBridge.getInstance():update(dt)` - 事件桥接器更新（包含输入管理、协程调度、状态机更新）
+3. `MenuAsync.update(dt)` - 异步菜单更新
 
 **love.draw()**:
-1. `StateMachine.draw()` - 渲染当前状态
+1. `EventBridge.getInstance():draw()` - 渲染当前游戏状态
 2. `MenuAsync.draw()` - 渲染活动菜单
 
 ## 文件组织结构
 
 ```
 game/
-├── main.lua                    # 程序入口
+├── main.lua                    # 程序入口 (Love2D 回调)
 ├── conf.lua                    # Love2D 配置
 ├── config.lua                  # 游戏配置 (CONFIG.*)
 │
@@ -61,25 +61,30 @@ game/
 │   ├── talk_async.lua          # 异步对话
 │   ├── war_async.lua           # 战斗系统
 │   ├── jymain_async.lua        # 主菜单异步
-│   └── jymain_adapter.lua      # 游戏适配器
+│   ├── jymain_adapter.lua      # 游戏适配器
+│   ├── person_status_async.lua # 人物状态异步
+│   └── item_async.lua          # 物品系统异步
 │
 ├── 异步辅助模块
-│   ├── input_async.lua         # 异步输入
-│   ├── person_status_async.lua # 人物状态
-│   ├── item_async.lua          # 物品系统
-│   ├── async_dialog.lua        # 对话框管理
-│   ├── async_message_box.lua   # 消息框
+│   ├── input_async.lua         # 异步输入函数
+│   ├── async_dialog.lua        # 对话框管理器
+│   ├── async_message_box.lua   # 消息框封装
 │   ├── async_globals.lua       # 全局函数替换
 │   └── async_wrapper.lua       # 异步包装器
 │
 ├── 事件执行
-│   └── event_executor.lua      # 事件执行器
+│   ├── event_executor.lua      # 事件执行器
+│   ├── event_coroutine.lua     # ⚠️ 已废弃
+│   └── instruct_async.lua      # ⚠️ 已废弃
 │
 ├── 工具模块
 │   ├── lib_love.lua            # 图形/音频封装 (lib.*)
 │   ├── lib_Byte.lua            # 二进制数据工具
 │   ├── lib_log.lua             # 日志工具
-│   └── luabit.lua              # 位运算库 (Lua 5.1 兼容)
+│   ├── lib_file.lua            # 文件操作封装
+│   ├── script_loader.lua       # 脚本加载器
+│   ├── luabit.lua              # 位运算库 (Lua 5.1)
+│   └── perf_log.lua            # 性能日志
 │
 ├── 游戏逻辑
 │   └── script/
@@ -95,6 +100,7 @@ game/
 └── tests/                      # 单元测试
 ```
 
+> **废弃文件**（不参与运行）：`event_coroutine.lua`, `instruct_async.lua`, `convert.lua`
 > 完整文件清单见 [SRC_FILES.md](SRC_FILES.md)。
 
 ## 构建/运行命令
