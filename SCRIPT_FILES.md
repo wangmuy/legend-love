@@ -6,19 +6,14 @@
 
 ```
 game/script/
-├── jymain.lua          # 主游戏逻辑 (223KB)
-├── jyconst.lua         # 常量和配置定义 (23KB)
-├── jymodify.lua        # 游戏修改和扩展 (9KB)
-├── old_talk.lua        # 对话文本 Lua 表格式 (341KB)
-├── oldtalk.idx         # 对话索引文件 (12KB)
-├── oldtalk.grp         # 对话内容文件 (278KB)
+├── jymain.lua          # 主游戏逻辑
+├── jyconst.lua         # 常量和配置定义
+├── jymodify.lua        # 游戏修改和扩展
 ├── convertkdef2.lua    # KDEF/TALK 转换工具
-├── convertkdef2.bat    # 转换批处理脚本
-├── ConvertKdef&talk.txt # 转换说明文档
-├── oldevent_320.lua    # 修复的事件文件
-├── oldevent_458.lua    # 修复的事件文件
-├── oldevent_655.lua    # 修复的事件文件
-├── oldevent_676.lua    # 修复的事件文件
+├── oldevent_320.lua    # 修复的事件文件（需覆盖到 oldevent/ 目录）
+├── oldevent_458.lua    # 修复的事件文件（需覆盖到 oldevent/ 目录）
+├── oldevent_655.lua    # 修复的事件文件（需覆盖到 oldevent/ 目录）
+├── oldevent_676.lua    # 修复的事件文件（需覆盖到 oldevent/ 目录）
 ├── oldevent/           # 原版事件脚本目录 (1018个文件)
 │   ├── oldevent_0.lua
 │   ├── oldevent_1.lua
@@ -26,6 +21,8 @@ game/script/
 └── newevent/           # 新增事件脚本目录
     └── scene_1_event_19.lua
 ```
+
+> **注意**：`old_talk.lua` 和 `oldtalk.idx/grp` 已不再使用，对话直接从二进制文件读取。
 
 ---
 
@@ -50,9 +47,16 @@ game/script/
 -- main.lua:29
 require(CONFIG.ScriptPath .. "jymain")
 
--- jymain.lua:17-18
-dofile(CONFIG.ScriptPath .. "jyconst.lua");
-dofile(CONFIG.ScriptPath .. "jymodify.lua");
+-- jymain.lua:18-33
+function IncludeFile()
+    local jyconst_loader = love.filesystem.load(CONFIG.ScriptPath .. "jyconst.lua")
+    if jyconst_loader then
+        jyconst_loader()
+    else
+        dofile(CONFIG.ScriptPath .. "jyconst.lua")
+    end
+    -- 同理加载 jymodify.lua
+end
 ```
 
 ---
@@ -101,39 +105,11 @@ end
 
 ## 二、对话系统文件
 
-### 1. old_talk.lua - 对话文本（Lua 格式）
+> **状态**：对话系统使用二进制格式，`old_talk.lua` 已不再使用。
 
-**用途**：存储所有游戏对话文本，使用 Lua table 格式。
+### 1. oldtalk.idx / oldtalk.grp - 对话文件（二进制格式）
 
-**格式**：
-```lua
-oldtalk = {};
-oldtalk[0] = [==[小兄弟，到此寒天雪地，*不知有何指教？]==];
-oldtalk[1] = [==[请问你是胡斐胡大哥吗？]==];
--- ... 共约 3000 条对话
-```
-
-**特点**：
-- `*` 表示换行符
-- `[==[ ]==]` 用于包含特殊字符的长字符串
-- 由 `convertkdef2.lua` 从 talk.txt 转换生成
-
-**使用方式**：
-```lua
--- 直接读取
-local text = oldtalk[talkid]
-
--- 或从二进制文件读取
-function ReadTalk(talkid)
-    -- 从 oldtalk.grp 读取
-end
-```
-
----
-
-### 2. oldtalk.idx / oldtalk.grp - 对话文件（二进制格式）
-
-**用途**：二进制格式的对话存储，由 `GenTalkIdx()` 生成索引。
+**用途**：二进制格式的对话存储。
 
 **格式**：
 - `oldtalk.idx`：每条 4 字节偏移量
@@ -141,10 +117,17 @@ end
 
 **代码引用**：
 ```lua
--- jyconst.lua:131-132
-CC.TalkIdxFile = CONFIG.ScriptPath .. "oldtalk.idx";
-CC.TalkGrpFile = CONFIG.ScriptPath .. "oldtalk.grp";
+-- jyconst.lua:133-134
+CC.TalkIdxFile = CONFIG.ScriptPath .. "oldtalk.idx"
+CC.TalkGrpFile = CONFIG.ScriptPath .. "oldtalk.grp"
+
+-- jymain.lua:3057
+function ReadTalk(talkid)
+    -- 从 oldtalk.idx/grp 读取对话
+end
 ```
+
+**不再使用**：`old_talk.lua`（Lua 表格式）已废弃，对话通过 `ReadTalk()` 函数从二进制文件读取。
 
 ---
 
@@ -168,32 +151,51 @@ CC.TalkGrpFile = CONFIG.ScriptPath .. "oldtalk.grp";
 --end
 ```
 
-**加载方式**：
+**加载方式**：事件脚本独立于游戏框架，框架不直接 require 它们，而是在运行时根据场景数据动态加载。
+
 ```lua
--- jymain.lua:2710-2715
+-- jymain.lua:2763
 function oldCallEvent(eventnum)
-    local eventfilename = string.format("oldevent_%d.lua", eventnum);
-    dofile(CONFIG.OldEventPath .. eventfilename);
+    local eventfilename = string.format("oldevent_%d.lua", eventnum)
+    local chunk, err = ScriptLoader.load(CONFIG.OldEventPath .. eventfilename)
+    if chunk then
+        chunk()
+    else
+        JY_Error("oldCallEvent load failed: %s (%s)", tostring(eventfilename), tostring(err))
+    end
 end
 ```
+
+**事件调用链路**：
+```
+场景数据 GetD(scene, id, 2/3/4)
+        ↓
+EventExecute(id, flag)  -- jymain.lua:2728
+        ↓
+oldEventExecute(flag)   -- jymain.lua:2744 → 从 GetD 读取事件编号
+        ↓
+oldCallEvent(eventnum)  -- 动态加载 oldevent_{id}.lua
+```
+
+**框架引用**：main.lua 只加载核心脚本 (`jymain`, `jyconst`, `jymodify`)，不引用任何 oldevent 文件。
 
 **注意事项**：
 - 文件开头函数定义被注释掉（`--function oldevent_xxx()`）
 - 使用全局 `instruct_*` 函数执行指令
-- 部分事件有 bug，需要修复文件覆盖
+- 部分事件有 bug，需要用根目录的修复文件覆盖
 
 ---
 
 ### 2. 根目录的 oldevent_*.lua 文件
 
-| 文件 | 大小 | 说明 |
-|------|------|------|
-| `oldevent_320.lua` | 18KB | 东方不败剧情修复 |
-| `oldevent_458.lua` | 986B | 事件修复 |
-| `oldevent_655.lua` | 1.2KB | 事件修复 |
-| `oldevent_676.lua` | 2.8KB | 事件修复 |
+| 文件 | 说明 |
+|------|------|
+| `oldevent_320.lua` | 东方不败剧情修复 |
+| `oldevent_458.lua` | 事件修复 |
+| `oldevent_655.lua` | 事件修复 |
+| `oldevent_676.lua` | 事件修复 |
 
-**用途**：原版转换脚本有 bug，这些是修正后的版本，需覆盖到 `oldevent/` 目录。
+**用途**：原版转换脚本有 bug，这些是修正后的版本，需手动覆盖到 `oldevent/` 目录对应文件。
 
 ---
 
@@ -211,10 +213,10 @@ end
 
 **使用方式**：
 ```lua
--- jymodify.lua
+-- jymodify.lua:33
 JY.SceneNewEventFunction[1] = newSceneEvent_1
 
--- 定义函数时加载 newevent 文件
+-- jymodify.lua:296
 function newSceneEvent_1(flag)
     local eventfilename = string.format(
         CONFIG.NewEventPath .. "scene_%d_event_%d.lua",
@@ -222,6 +224,15 @@ function newSceneEvent_1(flag)
     );
     dofile(eventfilename);
 end
+```
+
+**调用链路**：
+```
+EventExecute(id, flag)
+    ↓
+JY.SceneNewEventFunction[scene_id](flag)  -- 如果已注册
+    ↓
+dofile "newevent/scene_X_event_Y.lua"
 ```
 
 ---
@@ -280,15 +291,17 @@ main.lua
   ├─ require "config"
   ├─ require "lib_Byte"
   ├─ require "lib_love"
-  │    └─ dofile "jyconst.lua"
-  └─ require "jymain"
-       ├─ dofile "jyconst.lua"
-       └─ dofile "jymodify.lua"
-            └─ SetModify() 执行修改
+  │    └─ love.filesystem.load/dofile "jyconst.lua"
+  ├─ require "jymain"
+  │    ├─ love.filesystem.load/dofile "jyconst.lua"
+  │    └─ love.filesystem.load/dofile "jymodify.lua"
+  │         └─ SetModify() 执行修改
+  ├─ EventBridge:init()
+  └─ JYMainAdapter.init()
 
 运行时:
   ├─ oldCallEvent(eventnum)
-  │    └─ dofile "oldevent/oldevent_xxx.lua"
+  │    └─ ScriptLoader.load "oldevent/oldevent_xxx.lua"
   └─ JY.SceneNewEventFunction[id](flag)
        └─ dofile "newevent/scene_x_event_y.lua"
 ```
@@ -299,17 +312,17 @@ main.lua
 
 | 类别 | 文件 | 使用状态 |
 |------|------|----------|
-| 核心逻辑 | jymain.lua | ✅ 主模块 |
-| 常量定义 | jyconst.lua | ✅ 被加载 |
-| 修改扩展 | jymodify.lua | ✅ 被加载 |
-| 对话文本 | old_talk.lua | ✅ 可选加载 |
-| 对话二进制 | oldtalk.idx/grp | ✅ 主要使用 |
-| 转换工具 | convertkdef2.* | ⚠️ 开发工具 |
-| 事件脚本 | oldevent/*.lua | ✅ 运行时加载 |
-| 修复文件 | oldevent_*.lua | ⚠️ 需覆盖 |
-| 新事件 | newevent/*.lua | ✅ 自定义使用 |
+| 核心逻辑 | jymain.lua | ✅ main.lua 加载 |
+| 常量定义 | jyconst.lua | ✅ 被多次加载 |
+| 修改扩展 | jymodify.lua | ✅ jymain.lua 加载 |
+| 对话文本 | old_talk.lua | ❌ 已废弃 |
+| 对话二进制 | oldtalk.idx/grp | ✅ ReadTalk() 使用 |
+| 转换工具 | convertkdef2.* | ⚠️ 开发工具，不参与运行 |
+| 事件脚本 | oldevent/*.lua | ✅ 运行时动态加载 |
+| 修复文件 | oldevent_*.lua | ⚠️ 需覆盖到 oldevent/ |
+| 新事件 | newevent/*.lua | ✅ 通过 SceneNewEventFunction 使用 |
 
-> **注**: 根目录的 4 个修复文件 (`oldevent_320.lua`, `oldevent_458.lua`, `oldevent_655.lua`, `oldevent_676.lua`) 与 `oldevent/` 目录中的同名文件内容相同，已经覆盖到位。
+> **注**：根目录的 4 个修复文件 (`oldevent_320.lua`, `oldevent_458.lua`, `oldevent_655.lua`, `oldevent_676.lua`) 需要覆盖到 `oldevent/` 目录对应文件。
 
 ---
 
@@ -317,12 +330,10 @@ main.lua
 
 1. **修改游戏**：优先在 `jymodify.lua` 中进行，避免修改 `jymain.lua`
 
-2. **添加对话**：
-   - 简单方式：在 `old_talk.lua` 添加新条目
-   - 标准方式：修改 `oldtalk.grp` 并更新索引
+2. **添加对话**：直接修改 `oldtalk.grp` 并通过 `GenTalkIdx()` 重新生成索引
 
 3. **添加事件**：
    - 简单事件：创建 `oldevent/oldevent_xxx.lua`
-   - 复杂事件：创建 `newevent/scene_x_event_y.lua` 并在 `jymodify.lua` 注册
+   - 复杂事件：创建 `newevent/scene_x_event_y.lua` 并在 `jymodify.lua` 注册 `JY.SceneNewEventFunction[scene_id]`
 
-4. **修复 bug**：参考根目录的 `oldevent_*.lua` 修复文件
+4. **修复 bug**：参考根目录的 `oldevent_*.lua` 修复文件，手动覆盖到 `oldevent/` 目录
