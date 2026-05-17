@@ -17,14 +17,14 @@ local ScriptLoader = require "script_loader"
 --导入其他模块。之所以做成函数是为了避免编译查错时编译器会寻找这些模块。
 function IncludeFile()              --导入其他模块
     --dofile("config.lua");       --此文件在C函数中预先加载。这里就不加载了
-    -- Use love.filesystem.load for .love file compatibility
-    local jyconst_loader = love.filesystem.load(CONFIG.ScriptPath .. "jyconst.lua")
+    -- Use EngineAPI.script.load for .love file compatibility
+    local jyconst_loader, err = EngineAPI.script.load(CONFIG.ScriptPath .. "jyconst.lua")
     if jyconst_loader then
         jyconst_loader()
     else
         dofile(CONFIG.ScriptPath .. "jyconst.lua")
     end
-    local jymodify_loader = love.filesystem.load(CONFIG.ScriptPath .. "jymodify.lua")
+    local jymodify_loader, err2 = EngineAPI.script.load(CONFIG.ScriptPath .. "jymodify.lua")
     if jymodify_loader then
         jymodify_loader()
     else
@@ -3005,10 +3005,10 @@ function GenTalkIdx()         --生成对话索引文件
     local rshift = bit32 and bit32.rshift
 
     -- 索引已存在且格式合法时直接复用，避免每次启动全量重建
-    local idxInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(CC.TalkIdxFile)
-    local grpInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(CC.TalkGrpFile)
+    local idxExists = EngineAPI.file.exists(CC.TalkIdxFile)
+    local grpExists = EngineAPI.file.exists(CC.TalkGrpFile)
     local idxSize = FileUtil.getsize(CC.TalkIdxFile)
-    if idxSize and idxSize > 0 and idxSize % 4 == 0 and idxInfo and grpInfo and idxInfo.modtime and grpInfo.modtime and idxInfo.modtime >= grpInfo.modtime then
+    if idxSize and idxSize > 0 and idxSize % 4 == 0 and idxExists and grpExists then
         return
     end
 
