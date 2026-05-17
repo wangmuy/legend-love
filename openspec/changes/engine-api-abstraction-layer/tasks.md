@@ -61,9 +61,9 @@
 - [x] 5.2 编写 EngineAPI 集成测试（验证 Love2D 引擎和测试引擎行为一致）
 - [x] 5.3 验证 `jymain.lua` 中无 `love.*` 直接调用
 - [x] 5.4 验证 `script_loader.lua` 中无 `love.*` 直接调用
-- [ ] 5.5 报告不可自动化测试的内容（渲染/音频/性能）
-- [ ] 5.6 更新 `ENGINE_API_DESIGN.md` 为最终版本
-- [ ] 5.7 更新 `AGENTS.md` 添加 EngineAPI 相关说明
+- [x] 5.5 报告不可自动化测试的内容（渲染/音频/性能）
+- [x] 5.6 更新 `ENGINE_API_DESIGN.md` 为最终版本
+- [x] 5.7 更新 `AGENTS.md` 添加 EngineAPI 相关说明
 
 ## 6. 目录结构调整
 
