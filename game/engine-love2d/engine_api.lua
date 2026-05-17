@@ -171,6 +171,10 @@ function M.time.sleep(millis) end
 -- @return number 毫秒
 function M.time.getTime() end
 
+--- 获取当前时间（秒）
+-- @return number 秒
+function M.time.getTimeSeconds() end
+
 --------------------------------------------------------------------
 -- file - 文件系统
 --------------------------------------------------------------------
@@ -195,6 +199,18 @@ function M.file.getSize(filename) end
 -- @param filename string 文件路径
 -- @return boolean
 function M.file.exists(filename) end
+
+--- 读取文件内容
+function M.file.read(filename) end
+
+--- 写入文件
+function M.file.write(filename, content, mode) end
+
+--- 逐行读取文件
+function M.file.lines(filename) end
+
+--- 创建目录
+function M.file.createDirectory(dirpath) end
 
 --------------------------------------------------------------------
 -- script - 脚本加载
@@ -261,5 +277,13 @@ function M.coroutine.yieldPoint() end
 -- @param timeout number|nil 超时（毫秒）
 -- @return boolean 条件是否满足
 function M.coroutine.waitFor(condition, timeout) end
+
+--------------------------------------------------------------------
+-- app - 应用程序控制
+--------------------------------------------------------------------
+M.app = {}
+
+--- 退出游戏
+function M.app.quit() end
 
 return M

@@ -498,7 +498,7 @@ handlers["GAME_END"] = {
     enter = function()
         lib.Debug("Enter GAME_END state")
         -- 退出游戏
-        love.event.quit()
+        EngineAPI.app.quit()
     end,
     
     exit = function()

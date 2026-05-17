@@ -171,6 +171,10 @@ EngineAPI.time.getTime = function()
     return os.clock() * 1000
 end
 
+EngineAPI.time.getTimeSeconds = function()
+    return os.clock()
+end
+
 --------------------------------------------------------------------
 -- file 模块 - 正常实现
 --------------------------------------------------------------------
@@ -203,6 +207,42 @@ EngineAPI.file.exists = function(filename)
         return true
     end
     return false
+end
+
+EngineAPI.file.read = function(filename)
+    logCall("file.read", filename)
+    local f = io.open(filename, "rb")
+    if f then
+        local content = f:read("*a")
+        f:close()
+        return content
+    end
+    return nil
+end
+
+EngineAPI.file.write = function(filename, content, mode)
+    logCall("file.write", filename, content, mode)
+    mode = mode or "w"
+    local f = io.open(filename, mode)
+    if f then
+        f:write(content)
+        f:close()
+        return true
+    end
+    return false
+end
+
+EngineAPI.file.lines = function(filename)
+    logCall("file.lines", filename)
+    local f = io.open(filename, "r")
+    if f then
+        return f:lines()
+    end
+    return function() end
+end
+
+EngineAPI.file.createDirectory = function(dirpath)
+    logCall("file.createDirectory", dirpath)
 end
 
 --------------------------------------------------------------------
@@ -296,5 +336,10 @@ _G.lib = setmetatable(EngineAPI, { __index = {
 } })
 
 EngineAPI.init = function() end
+
+EngineAPI.app = EngineAPI.app or {}
+EngineAPI.app.quit = function()
+    logCall("app.quit")
+end
 
 return EngineAPI

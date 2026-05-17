@@ -22,7 +22,7 @@ InputAsync.WaitKeyCoroutine = InputAsync.WaitKey
 -- @return: 按键值，如果超时返回-1
 function InputAsync.WaitKeyTimeout(timeout)
     local scheduler = CoroutineScheduler.getInstance()
-    local startTime = love.timer.getTime()
+    local startTime = EngineAPI.time.getTimeSeconds()
     
     while true do
         local key = lib.GetKey()
@@ -30,7 +30,7 @@ function InputAsync.WaitKeyTimeout(timeout)
             return key
         end
         
-        if love.timer.getTime() - startTime >= timeout then
+        if EngineAPI.time.getTimeSeconds() - startTime >= timeout then
             return -1
         end
         
