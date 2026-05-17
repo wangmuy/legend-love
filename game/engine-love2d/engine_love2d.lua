@@ -124,6 +124,10 @@ EngineAPI.time.getTime = function()
     return lib.GetTime()
 end
 
+EngineAPI.time.getTimeSeconds = function()
+    return love.timer.getTime()
+end
+
 -- file 模块
 EngineAPI.file.open = function(filename, mode)
     local FileUtil = require("framework.lib_file")
@@ -143,6 +147,26 @@ end
 EngineAPI.file.exists = function(filename)
     local info = love.filesystem.getInfo(filename)
     return info ~= nil
+end
+
+EngineAPI.file.read = function(filename)
+    local FileUtil = require("framework.lib_file")
+    return FileUtil.read(filename)
+end
+
+EngineAPI.file.write = function(filename, content, mode)
+    local FileUtil = require("framework.lib_file")
+    return FileUtil.write(filename, content, mode)
+end
+
+EngineAPI.file.lines = function(filename)
+    local FileUtil = require("framework.lib_file")
+    return FileUtil.lines(filename)
+end
+
+EngineAPI.file.createDirectory = function(dirpath)
+    local FileUtil = require("framework.lib_file")
+    return FileUtil.createdir(dirpath)
 end
 
 -- script 模块
@@ -258,6 +282,11 @@ EngineAPI.init = function()
     end
     math.randomseed(os.time())
     math.random()
+end
+
+EngineAPI.app = EngineAPI.app or {}
+EngineAPI.app.quit = function()
+    love.event.quit()
 end
 
 return EngineAPI

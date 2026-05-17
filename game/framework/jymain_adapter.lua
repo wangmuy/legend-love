@@ -131,7 +131,7 @@ function JYMainAdapter.showStartMenuCoroutine()
         JYMainAdapter.loadGame()
     elseif menuReturn == 3 then
         JY.Status = getStateId("GAME_END")
-        love.event.quit()
+        EngineAPI.app.quit()
     end
 end
 

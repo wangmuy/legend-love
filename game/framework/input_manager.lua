@@ -6,6 +6,14 @@
 local InputManager = {}
 InputManager.__index = InputManager
 
+-- 获取时间（秒），优先使用 EngineAPI 或回退到 love.timer
+local function getTimeSeconds()
+    if EngineAPI and EngineAPI.time and EngineAPI.time.getTimeSeconds then
+        return EngineAPI.time.getTimeSeconds()
+    end
+    return love.timer.getTime()
+end
+
 -- 事件队列（环形缓冲区）
 local eventQueue = {}
 local queueHead = 1
@@ -124,7 +132,7 @@ function InputManager:onKeyPressed(key, scancode, isrepeat)
     enqueueEvent({
         type = "pressed",
         key = gameKey,
-        time = love.timer.getTime()
+        time = getTimeSeconds()
     })
     
     -- 更新按键状态
@@ -133,8 +141,8 @@ function InputManager:onKeyPressed(key, scancode, isrepeat)
     -- 初始化重复计时器
     if keyRepeatEnabled then
         keyRepeatTimers[gameKey] = {
-            pressedTime = love.timer.getTime(),
-            lastRepeatTime = love.timer.getTime(),
+            pressedTime = getTimeSeconds(),
+            lastRepeatTime = getTimeSeconds(),
             repeatCount = 0
         }
     end
@@ -163,7 +171,7 @@ function InputManager:update(dt)
         return
     end
     
-    local currentTime = love.timer.getTime()
+    local currentTime = getTimeSeconds()
     
     for gameKey, timer in pairs(keyRepeatTimers) do
         if keyStates[gameKey] then

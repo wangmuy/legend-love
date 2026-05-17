@@ -511,7 +511,7 @@ War_GameOverCoroutine = function()
         JY.Status = GAME_FIRSTMMAP
     else
         JY.Status = GAME_END
-        love.event.quit()
+        EngineAPI.app.quit()
     end
 end
 

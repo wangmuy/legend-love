@@ -5,7 +5,9 @@ local logfile = "perf.txt"
 local initialized = false
 
 local function now()
-    if love and love.timer and love.timer.getTime then
+    if EngineAPI and EngineAPI.time and EngineAPI.time.getTimeSeconds then
+        return EngineAPI.time.getTimeSeconds()
+    elseif love and love.timer and love.timer.getTime then
         return love.timer.getTime()
     end
     return os.clock()
