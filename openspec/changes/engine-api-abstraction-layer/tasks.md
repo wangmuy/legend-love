@@ -76,7 +76,7 @@
 - [x] 6.7 从 main.lua 中抽取 Love2D 特有初始化到 engine-love2d/ 的 init()
 - [x] 6.8 更新测试文件中的 require 路径
 - [x] 6.9 运行全部测试验证
-- [ ] 6.10 人工验证游戏正常运行
+- [x] 6.10 人工验证游戏正常运行（修复 lib_love.lua 中 package.loaded 路径不匹配问题）
 
 ## 7. 消除 framework/ 中的 Love2D 直接引用
 
