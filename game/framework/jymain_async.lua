@@ -6,13 +6,13 @@
 
 local JyMainAsync = {}
 
-local CoroutineScheduler = require("coroutine_scheduler")
-local MenuAsync = require("menu_async")
-local AsyncMessageBox = require("async_message_box")
-local InputAsync = require("input_async")
-local TalkAsync = require("talk_async")
-local ItemAsync = require("item_async")
-local PersonStatusAsync = require("person_status_async")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local MenuAsync = require("framework.menu_async")
+local AsyncMessageBox = require("framework.async_message_box")
+local InputAsync = require("framework.input_async")
+local TalkAsync = require("framework.talk_async")
+local ItemAsync = require("framework.item_async")
+local PersonStatusAsync = require("framework.person_status_async")
 
 -- ============================================
 -- 主菜单系统
@@ -205,7 +205,7 @@ function JyMainAsync.Menu_PersonExit()
         local personid = JY.Base["队伍" .. r]
         for i, v in ipairs(CC.PersonExit) do
             if personid == v[1] then
-                local AsyncGlobals = require("async_globals")
+                local AsyncGlobals = require("framework.async_globals")
                 AsyncGlobals.install()
                 oldCallEvent(v[2])
                 AsyncGlobals.uninstall()
@@ -294,7 +294,7 @@ function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbil
     
     -- 显示菜单（使用回调确保标题和菜单一起清除）
     local result = nil
-    local CoroutineScheduler = require("coroutine_scheduler")
+    local CoroutineScheduler = require("framework.coroutine_scheduler")
     local scheduler = CoroutineScheduler.getInstance()
     local menuClosed = false
     
@@ -395,7 +395,7 @@ function JyMainAsync.SelectTeamMemberWithLifeAsync(title)
     
     -- 显示菜单（使用回调确保标题和菜单一起清除）
     local result = nil
-    local CoroutineScheduler = require("coroutine_scheduler")
+    local CoroutineScheduler = require("framework.coroutine_scheduler")
     local scheduler = CoroutineScheduler.getInstance()
     local menuClosed = false
     
@@ -530,7 +530,7 @@ function JyMainAsync.SelectTeamMemberWithPoisonAsync(title)
     
     -- 显示菜单（使用回调确保标题和菜单一起清除）
     local result = nil
-    local CoroutineScheduler = require("coroutine_scheduler")
+    local CoroutineScheduler = require("framework.coroutine_scheduler")
     local scheduler = CoroutineScheduler.getInstance()
     local menuClosed = false
     
@@ -571,7 +571,7 @@ function JyMainAsync.ExecDecPoisonAsync(id1, id2)
 end
 
 -- 导入物品异步模块
-local ItemAsync = require("item_async")
+local ItemAsync = require("framework.item_async")
 
 -- 物品子菜单
 function JyMainAsync.Menu_Thing()

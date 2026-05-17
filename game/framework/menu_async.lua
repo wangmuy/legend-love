@@ -5,7 +5,7 @@
 local MenuAsync = {}
 
 -- 导入菜单状态机
-local MenuStateMachine = require("menu_state_machine")
+local MenuStateMachine = require("framework.menu_state_machine")
 
 -- 当前活动的菜单回调
 local currentCallback = nil
@@ -112,14 +112,14 @@ function MenuAsync.clear()
     currentCallback = nil
     
     -- 确保恢复键盘输入
-    local InputManager = require("input_manager")
+    local InputManager = require("framework.input_manager")
     InputManager.disableInput = false
     _debug("MenuAsync.clear: disableInput set to false")
 end
 
 -- 包装为协程版本（用于在协程中同步调用）
 function MenuAsync.ShowMenuCoroutine(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
-    local CoroutineScheduler = require("coroutine_scheduler")
+    local CoroutineScheduler = require("framework.coroutine_scheduler")
     local scheduler = CoroutineScheduler.getInstance()
     
     local result = nil
@@ -146,7 +146,7 @@ end
 
 -- 包装ShowMenu2为协程版本
 function MenuAsync.ShowMenu2Coroutine(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
-    local CoroutineScheduler = require("coroutine_scheduler")
+    local CoroutineScheduler = require("framework.coroutine_scheduler")
     local scheduler = CoroutineScheduler.getInstance()
     
     local result = nil

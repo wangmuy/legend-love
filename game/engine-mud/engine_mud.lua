@@ -3,7 +3,7 @@
 -- 所有渲染/音频为空操作，输入返回预设值
 -- 用于 CI/CD 和单元测试，无需显示器
 
-local EngineAPI = require("engine_api")
+local EngineAPI = require("engine-love2d.engine_api")
 
 -- 调用日志
 EngineAPI._callLog = {}
@@ -294,5 +294,7 @@ _G.lib = setmetatable(EngineAPI, { __index = {
     GetTime = EngineAPI.time.getTime,
     Delay = EngineAPI.time.sleep,
 } })
+
+EngineAPI.init = function() end
 
 return EngineAPI

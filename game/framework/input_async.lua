@@ -5,7 +5,7 @@
 local InputAsync = {}
 
 -- 导入协程调度器
-local CoroutineScheduler = require("coroutine_scheduler")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
 
 -- 等待按键（协程版本）
 -- 在协程中使用，不会阻塞游戏主循环
@@ -59,7 +59,7 @@ end
 -- 等待特定按键被释放
 function InputAsync.WaitKeyRelease(targetKey)
     local scheduler = CoroutineScheduler.getInstance()
-    local InputManager = require("input_manager")
+    local InputManager = require("framework.input_manager")
     local im = InputManager.getInstance()
     
     while im:isKeyDown(targetKey) do
@@ -69,7 +69,7 @@ end
 
 -- 获取按键状态（非阻塞）
 function InputAsync.GetKeyState(key)
-    local InputManager = require("input_manager")
+    local InputManager = require("framework.input_manager")
     return InputManager.getInstance():isKeyDown(key)
 end
 

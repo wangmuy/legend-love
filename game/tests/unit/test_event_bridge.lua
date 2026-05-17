@@ -2,7 +2,7 @@
 -- 事件桥接模块单元测试
 
 local TestHelper = require("tests.test_helper")
-local EventBridge = require("event_bridge")
+local EventBridge = require("framework.event_bridge")
 
 local TestEventBridge = {}
 

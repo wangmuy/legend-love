@@ -5,7 +5,7 @@
 local PersonStatusAsync = {}
 
 -- 导入必要的模块
-local CoroutineScheduler = require("coroutine_scheduler")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
 
 -- 当前显示的状态数据
 local currentStatus = nil
@@ -19,14 +19,14 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
     end
     
     -- 设置标志，阻止游戏主循环处理按键
-    local InputManager = require("input_manager")
+    local InputManager = require("framework.input_manager")
     InputManager.disableInput = true
     
     local page = 1
     local pagenum = 2
     local teamnum = GetTeamNum()
     local scheduler = CoroutineScheduler.getInstance()
-    local InputAsync = require("input_async")
+    local InputAsync = require("framework.input_async")
     
     if lib and lib.Debug then
         lib.Debug("PersonStatusAsync.ShowStatusCoroutine: modules loaded")
@@ -75,7 +75,7 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
             -- 清除状态显示
             currentStatus = nil
             -- 清除标志，恢复游戏主循环按键处理
-            local InputManager = require("input_manager")
+            local InputManager = require("framework.input_manager")
             InputManager.disableInput = false
             break
         elseif keypress == VK_UP then

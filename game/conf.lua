@@ -1,4 +1,4 @@
-require "config"
+require "framework.config"
 
 -- Read product configuration from product.env
 -- Shared between the game and CI

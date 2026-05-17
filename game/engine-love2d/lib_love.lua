@@ -7,7 +7,7 @@ do
         _ENV = M -- for 5.2
     end
     if _VERSION < "Lua 5.2" then
-        require "luabit"
+        require "framework.luabit"
         bit32 = bit
     end
 
@@ -16,8 +16,8 @@ do
     end
 end
 
-require "config"
-local FileUtil = require "lib_file"
+require "framework.config"
+local FileUtil = require "framework.lib_file"
 -- Use love.filesystem.load for .love file compatibility
 local jyconst_loader = love.filesystem.load(CONFIG.ScriptPath .. "jyconst.lua")
 if jyconst_loader then
@@ -27,8 +27,8 @@ else
     dofile(CONFIG.ScriptPath .. "jyconst.lua")
 end
 SetGlobalConst()
-require "lib_log"
-local Byte = require "lib_Byte"
+require "framework.lib_log"
+local Byte = require "framework.lib_Byte"
 
 keymap = {
     ["escape"] = 27,        -- VK_ESCAPE

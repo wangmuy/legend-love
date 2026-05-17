@@ -142,7 +142,7 @@ end
 function TestHelper.mockLoveData()
     -- 确保 bit32 可用（标准 Lua 5.1 需要加载 luabit）
     if not bit32 then
-        require("luabit")
+        require("framework.luabit")
         bit32 = bit
         bit32.rshift = bit.brshift
     end
