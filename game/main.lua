@@ -2,19 +2,18 @@
 -- 重构后的标准Love2D回调实现
 
 -- 全局模块引用
+local InputManager = require("framework.input_manager")
 local EventBridge = require("framework.event_bridge")
 local MenuAsync = require("framework.menu_async")
 local JYMainAdapter = require("framework.jymain_adapter")
 
 -- 注册 Love2D 按键回调（全局函数形式，Love2D 要求回调在顶层定义）
-local onKeyPressed, onKeyReleased = EventBridge.getKeyHandlers()
-
 function love.keypressed(key, scancode, isrepeat)
-    onKeyPressed(key, scancode, isrepeat)
+    InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
 end
 
 function love.keyreleased(key, scancode)
-    onKeyReleased(key, scancode)
+    InputManager.getInstance():onKeyReleased(key, scancode)
 end
 
 function love.load()

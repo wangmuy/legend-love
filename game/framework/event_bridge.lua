@@ -71,18 +71,7 @@ function EventBridge:init()
     InputManager.getInstance():setKeyRepeat(true)
     InputManager.getInstance():setKeyRepeatParams(0.3, 0.1)
     
-    self:_debug("EventBridge:init() completed")
-end
-
--- 获取按键处理函数，供 main.lua 注册 Love2D 回调
-function EventBridge.getKeyHandlers()
-    local handleKeyPressed = function(key, scancode, isrepeat)
-        InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
-    end
-    local handleKeyReleased = function(key, scancode)
-        InputManager.getInstance():onKeyReleased(key, scancode)
-    end
-    return handleKeyPressed, handleKeyReleased
+self:_debug("EventBridge:init() completed")
 end
 
 -- 注册游戏状态处理器
