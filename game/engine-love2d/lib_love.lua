@@ -41,7 +41,7 @@ keymap = {
 }
 
 function GetKey()
-    local InputManager = package.loaded["input_manager"]
+    local InputManager = package.loaded["input_manager"] or package.loaded["framework.input_manager"]
     if InputManager then
         local key = InputManager.getInstance():getKey()
         return key
@@ -52,7 +52,7 @@ end
 
 function EnableKeyRepeat(delay, interval)
     -- 使用事件驱动的输入管理器
-    local InputManager = package.loaded["input_manager"]
+    local InputManager = package.loaded["input_manager"] or package.loaded["framework.input_manager"]
     if InputManager then
         local inst = InputManager.getInstance()
         inst:setKeyRepeat(delay > 0)
