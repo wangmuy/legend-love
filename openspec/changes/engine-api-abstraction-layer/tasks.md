@@ -106,8 +106,8 @@
 
 ### 7e. lib_file.lua love.filesystem 替换 + script_loader 清理
 
-- [ ] 7e.1 将 engine_love2d 中 EngineAPI.file.* 的实现从委托 lib_file 改为直接使用 love.filesystem（打破循环依赖）
-- [ ] 7e.2 将 lib_file.lua 中的 `love.filesystem.*` 替换为 `EngineAPI.file.*`
-- [ ] 7e.3 清理 script_loader.lua 中的 `love.filesystem.load` 回退路径
-- [ ] 7e.4 运行全部测试验证
+- [x] 7e.1 将 engine_love2d 中 EngineAPI.file.* 的实现从委托 lib_file 改为直接使用 love.filesystem（打破循环依赖）
+- [x] 7e.2 将 lib_file.lua 中的 `love.filesystem.*` 替换为 `EngineAPI.file.*`
+- [x] 7e.3 清理 script_loader.lua 中的 `love.filesystem.load` 回退路径
+- [x] 7e.4 运行全部测试验证（37/37 通过）
 - [ ] 7e.5 人工验证游戏正常运行

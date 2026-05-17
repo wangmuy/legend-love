@@ -128,20 +128,27 @@ EngineAPI.time.getTimeSeconds = function()
     return love.timer.getTime()
 end
 
--- file 模块
+-- file 模块（直接使用 love.filesystem，不委托 lib_file）
 EngineAPI.file.open = function(filename, mode)
-    local FileUtil = require("framework.lib_file")
-    return FileUtil.open(filename, mode)
+    if love and love.filesystem and love.filesystem.newFile then
+        return love.filesystem.newFile(filename, mode or "r")
+    end
+    return io.open(filename, mode or "r")
 end
 
 EngineAPI.file.remove = function(filename)
-    local FileUtil = require("framework.lib_file")
-    return FileUtil.remove(filename)
+    if love and love.filesystem and love.filesystem.remove then
+        return love.filesystem.remove(filename)
+    end
+    return os.remove(filename)
 end
 
 EngineAPI.file.getSize = function(filename)
-    local FileUtil = require("framework.lib_file")
-    return FileUtil.getsize(filename)
+    local info = love.filesystem.getInfo(filename)
+    if info then
+        return info.size
+    end
+    return -1
 end
 
 EngineAPI.file.exists = function(filename)
@@ -150,23 +157,47 @@ EngineAPI.file.exists = function(filename)
 end
 
 EngineAPI.file.read = function(filename)
-    local FileUtil = require("framework.lib_file")
-    return FileUtil.read(filename)
+    if love and love.filesystem and love.filesystem.read then
+        return love.filesystem.read(filename)
+    end
+    local f = io.open(filename, "rb")
+    if f then
+        local content = f:read("*a")
+        f:close()
+        return content
+    end
+    return nil
 end
 
 EngineAPI.file.write = function(filename, content, mode)
-    local FileUtil = require("framework.lib_file")
-    return FileUtil.write(filename, content, mode)
+    mode = mode or "w"
+    if love and love.filesystem and love.filesystem.write then
+        return love.filesystem.write(filename, content, mode == "a" and #content or nil)
+    end
+    local f = io.open(filename, mode)
+    if f then
+        f:write(content)
+        f:close()
+        return true
+    end
+    return false
 end
 
 EngineAPI.file.lines = function(filename)
-    local FileUtil = require("framework.lib_file")
-    return FileUtil.lines(filename)
+    if love and love.filesystem and love.filesystem.lines then
+        return love.filesystem.lines(filename)
+    end
+    local f = io.open(filename, "r")
+    if f then
+        return f:lines()
+    end
+    return function() end
 end
 
 EngineAPI.file.createDirectory = function(dirpath)
-    local FileUtil = require("framework.lib_file")
-    return FileUtil.createdir(dirpath)
+    if love and love.filesystem and love.filesystem.createDirectory then
+        return love.filesystem.createDirectory(dirpath)
+    end
 end
 
 -- script 模块
