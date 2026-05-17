@@ -2,25 +2,11 @@
 -- 重构后的标准Love2D回调实现
 
 -- 全局模块引用
-local InputManager = require("framework.input_manager")
 local EventBridge = require("framework.event_bridge")
 local MenuAsync = require("framework.menu_async")
 local JYMainAdapter = require("framework.jymain_adapter")
 
--- 在模块级别定义 love.keypressed（部分 Love2D 版本需要）
-function love.keypressed(key, scancode, isrepeat) end
-function love.keyreleased(key, scancode) end
-
 function love.load()
-    -- 注册 Love2D 按键回调
-    love.keypressed = function(key, scancode, isrepeat)
-        InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
-    end
-    love.keyreleased = function(key, scancode)
-        InputManager.getInstance():onKeyReleased(key, scancode)
-    end
-    
-    -- 加载配置
     -- 加载配置
     require "framework.config"
     Byte = require "framework.lib_Byte"
