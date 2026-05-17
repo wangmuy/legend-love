@@ -6,6 +6,17 @@ local EventBridge = require("framework.event_bridge")
 local MenuAsync = require("framework.menu_async")
 local JYMainAdapter = require("framework.jymain_adapter")
 
+-- 注册 Love2D 按键回调（后备，确保回调可用）
+function love.keypressed(key, scancode, isrepeat)
+    local InputManager = require("framework.input_manager")
+    InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
+end
+
+function love.keyreleased(key, scancode)
+    local InputManager = require("framework.input_manager")
+    InputManager.getInstance():onKeyReleased(key, scancode)
+end
+
 function love.load()
     -- 加载配置
     require "framework.config"
