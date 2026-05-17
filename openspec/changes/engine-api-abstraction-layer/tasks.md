@@ -64,3 +64,16 @@
 - [ ] 5.5 报告不可自动化测试的内容（渲染/音频/性能）
 - [ ] 5.6 更新 `ENGINE_API_DESIGN.md` 为最终版本
 - [ ] 5.7 更新 `AGENTS.md` 添加 EngineAPI 相关说明
+
+## 6. 目录结构调整
+
+- [x] 6.1 删除废弃文件 event_coroutine.lua、instruct_async.lua、convert.lua
+- [ ] 6.2 创建 `game/engine-love2d/`，移入 engine_api.lua、engine_love2d.lua、lib_love.lua
+- [ ] 6.3 创建 `game/engine-mud/`，以 engine_test.lua 为初版创建 engine_mud.lua（文本命令行界面引擎）
+- [ ] 6.4 将 engine_test.lua 移入 `game/tests/`
+- [ ] 6.5 创建 `game/framework/`，移入所有框架层文件（event_bridge / state_machine / 异步模块 / 工具模块 / config.lua / script_loader.lua / jymain_adapter.lua）
+- [ ] 6.6 更新所有文件的 require 路径指向新目录
+- [ ] 6.7 从 main.lua 中抽取 Love2D 特有初始化到 engine-love2d/ 的 init()
+- [ ] 6.8 更新测试文件中的 require 路径
+- [ ] 6.9 运行全部测试验证
+- [ ] 6.10 人工验证游戏正常运行
