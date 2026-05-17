@@ -69,36 +69,20 @@ function EventBridge:init()
     
     -- 启用按键重复，以便按住方向键时持续移动
     InputManager.getInstance():setKeyRepeat(true)
-    InputManager.getInstance():setKeyRepeatParams(0.3, 0.1)  -- 首次延迟300ms，后续间隔100ms
+    InputManager.getInstance():setKeyRepeatParams(0.3, 0.1)
     
-    -- 注册Love2D事件回调
-    self:_debug("EventBridge:init() calling registerLoveCallbacks")
-    self:registerLoveCallbacks()
     self:_debug("EventBridge:init() completed")
 end
 
--- 注册Love2D事件回调
-function EventBridge:registerLoveCallbacks()
-    self:_debug("EventBridge:registerLoveCallbacks() called")
-    
-    local originalKeyPressed = love.keypressed
-    local originalKeyReleased = love.keyreleased
-    
-    -- 重写keypressed
-    love.keypressed = function(key, scancode, isrepeat)
+-- 获取按键处理函数，供 main.lua 注册 Love2D 回调
+function EventBridge.getKeyHandlers()
+    local handleKeyPressed = function(key, scancode, isrepeat)
         InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
-        if originalKeyPressed then
-            originalKeyPressed(key, scancode, isrepeat)
-        end
     end
-    
-    -- 重写keyreleased
-    love.keyreleased = function(key, scancode)
+    local handleKeyReleased = function(key, scancode)
         InputManager.getInstance():onKeyReleased(key, scancode)
-        if originalKeyReleased then
-            originalKeyReleased(key, scancode)
-        end
     end
+    return handleKeyPressed, handleKeyReleased
 end
 
 -- 注册游戏状态处理器
