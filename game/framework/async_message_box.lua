@@ -5,8 +5,8 @@
 
 local AsyncMessageBox = {}
 
-local AsyncDialog = require("async_dialog")
-local CoroutineScheduler = require("coroutine_scheduler")
+local AsyncDialog = require("framework.async_dialog")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
 
 -- 显示消息框并等待按键（协程版本）
 -- 替代 DrawStrBoxWaitKey

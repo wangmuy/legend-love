@@ -5,12 +5,12 @@
 local GameStates = {}
 
 -- 导入必要的模块
-local EventBridge = require("event_bridge")
-local EventExecutor = require("event_executor")
-local JyMainAsync = require("jymain_async")
-local CoroutineScheduler = require("coroutine_scheduler")
-local MenuAsync = require("menu_async")
-local PerfLog = require("perf_log")
+local EventBridge = require("framework.event_bridge")
+local EventExecutor = require("framework.event_executor")
+local JyMainAsync = require("framework.jymain_async")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local MenuAsync = require("framework.menu_async")
+local PerfLog = require("framework.perf_log")
 
 -- 游戏状态处理器表
 local handlers = {}
@@ -24,7 +24,7 @@ local function startMenuCoroutine()
         lib.Debug("MMenuCoroutine: ended, calling MenuAsync.clear()")
         -- 菜单关闭后清理状态
         MenuAsync.clear()
-        local InputManager = require("input_manager")
+        local InputManager = require("framework.input_manager")
         lib.Debug("MMenuCoroutine: MenuAsync.clear() done, disableInput=" .. tostring(InputManager.disableInput))
     end, "main_menu")
     scheduler:start(co)
@@ -196,7 +196,7 @@ handlers["GAME_SMAP"] = {
         end
         
         -- 检查是否正在播放动画，如果是则禁用输入
-        local InputManager = require("input_manager")
+        local InputManager = require("framework.input_manager")
         if JY.AnimationState.active then
             InputManager.disableInput = true
         else
@@ -298,7 +298,7 @@ handlers["GAME_SMAP"] = {
         
         -- 检查是否正在显示人物状态或物品选择，如果是则跳过按键处理
         -- 注意：现在统一通过 InputManager.disableInput 实现
-        local InputManager = require("input_manager")
+        local InputManager = require("framework.input_manager")
         if InputManager.disableInput then
             keypress = -1  -- 忽略按键
         end

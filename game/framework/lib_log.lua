@@ -2,7 +2,7 @@ local LOG_HANDLES = {}
 local LAST_FLUSH_TS = {}
 local FLUSH_INTERVAL = 0.5
 
-local FileUtil = require "lib_file"
+local FileUtil = require "framework.lib_file"
 
 local function getLogHandle(logfile)
     if logfile == nil then

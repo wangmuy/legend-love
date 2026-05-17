@@ -5,9 +5,9 @@
 
 local AsyncGlobals = {}
 
-local AsyncMessageBox = require("async_message_box")
-local MenuAsync = require("menu_async")
-local TalkAsync = require("talk_async")
+local AsyncMessageBox = require("framework.async_message_box")
+local MenuAsync = require("framework.menu_async")
+local TalkAsync = require("framework.talk_async")
 
 -- 保存原始函数
 local _DrawStrBoxWaitKey
@@ -110,7 +110,7 @@ function AsyncGlobals.install()
         lib.Delay = AsyncGlobals.lib_Delay_Async
     end
 
-    local ItemAsync = require("item_async")
+    local ItemAsync = require("framework.item_async")
     if _G.SelectThing then
         _G.SelectThing = function() return ItemAsync.SelectThingAsync() end
     end

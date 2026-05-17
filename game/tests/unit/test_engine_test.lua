@@ -13,7 +13,7 @@ function TestEngineTest.testRenderNoOps()
     setup()
     print("\n=== Test: Engine test render no-ops ===")
     
-    local EngineAPI = require("engine_test")
+    local EngineAPI = require("tests.engine_test")
     EngineAPI._clearLog()
     EngineAPI._logEnabled = true
     
@@ -33,7 +33,7 @@ function TestEngineTest.testInputKeyQueue()
     setup()
     print("\n=== Test: Engine test input key queue ===")
     
-    local EngineAPI = require("engine_test")
+    local EngineAPI = require("tests.engine_test")
     EngineAPI._setKeyQueue({27, 32, 13})
     
     local key1 = EngineAPI.input.waitForKey()
@@ -54,7 +54,7 @@ function TestEngineTest.testTimeNoWait()
     setup()
     print("\n=== Test: Engine test time no-wait ===")
     
-    local EngineAPI = require("engine_test")
+    local EngineAPI = require("tests.engine_test")
     
     local start = EngineAPI.time.getTime()
     EngineAPI.time.sleep(1000)  -- 应该立即返回
@@ -67,7 +67,7 @@ function TestEngineTest.testFileOperations()
     setup()
     print("\n=== Test: Engine test file operations ===")
     
-    local EngineAPI = require("engine_test")
+    local EngineAPI = require("tests.engine_test")
     
     -- 测试文件存在
     local exists = EngineAPI.file.exists("script/jyconst.lua")
@@ -82,7 +82,7 @@ function TestEngineTest.testColorModule()
     setup()
     print("\n=== Test: Engine test color module ===")
     
-    local EngineAPI = require("engine_test")
+    local EngineAPI = require("tests.engine_test")
     
     local packed = EngineAPI.color.pack(236, 236, 236)
     local r, g, b = EngineAPI.color.unpack(packed)
@@ -97,7 +97,7 @@ function TestEngineTest.testCoroutineModule()
     setup()
     print("\n=== Test: Engine test coroutine module ===")
     
-    local EngineAPI = require("engine_test")
+    local EngineAPI = require("tests.engine_test")
     
     -- 在协程中测试
     local co = coroutine.create(function()

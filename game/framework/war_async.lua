@@ -4,11 +4,11 @@
 
 local WarAsync = {}
 
-local CoroutineScheduler = require("coroutine_scheduler")
-local MenuAsync = require("menu_async")
-local AsyncMessageBox = require("async_message_box")
-local InputAsync = require("input_async")
-local PersonStatusAsync = require("person_status_async")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local MenuAsync = require("framework.menu_async")
+local AsyncMessageBox = require("framework.async_message_box")
+local InputAsync = require("framework.input_async")
+local PersonStatusAsync = require("framework.person_status_async")
 
 -- 战斗状态
 local warState = {
@@ -484,7 +484,7 @@ end
 -- 游戏结束处理（协程版本）
 War_GameOverCoroutine = function()
     local scheduler = CoroutineScheduler.getInstance()
-    local MenuAsync = require("menu_async")
+    local MenuAsync = require("framework.menu_async")
     
     JY.Status = GAME_DEAD
     JY.DeadScreen = {
@@ -1405,7 +1405,7 @@ end
 -- 战斗物品菜单（协程版本）
 War_ThingMenuCoroutine = function()
     local scheduler = CoroutineScheduler.getInstance()
-    local ItemAsync = require("item_async")
+    local ItemAsync = require("framework.item_async")
     
     WAR.ShowHead = 0
     

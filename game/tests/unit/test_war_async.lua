@@ -118,7 +118,7 @@ function TestWarAsync.testWarStateInitialization()
     setup()
     print("\n=== Test: War State Initialization ===")
     
-    local WarAsync = require("war_async")
+    local WarAsync = require("framework.war_async")
     local state = WarAsync.getWarState()
     
     TestHelper.assertEquals(nil, state.warId, "warId should be nil initially")
@@ -130,7 +130,7 @@ function TestWarAsync.testWarStateReset()
     setup()
     print("\n=== Test: War State Reset ===")
     
-    local WarAsync = require("war_async")
+    local WarAsync = require("framework.war_async")
     WarAsync.reset()
     
     local state = WarAsync.getWarState()
@@ -144,10 +144,10 @@ function TestWarAsync.testMoveCoroutineKeyHandling()
     
     createSimpleWarScenario()
     
-    local CoroutineScheduler = require("coroutine_scheduler")
-    local InputManager = require("input_manager")
-    local MenuAsync = require("menu_async")
-    local war_async = require("war_async")
+    local CoroutineScheduler = require("framework.coroutine_scheduler")
+    local InputManager = require("framework.input_manager")
+    local MenuAsync = require("framework.menu_async")
+    local war_async = require("framework.war_async")
     
     local scheduler = CoroutineScheduler.getInstance()
     scheduler:init({ timeSource = function() return 0 end })
@@ -529,7 +529,7 @@ function TestWarAsync.testThingMenuUsesGridDisplay()
     setup()
     print("\n=== Test: Thing Menu Uses Grid Display ===")
     
-    local ItemAsync = require("item_async")
+    local ItemAsync = require("framework.item_async")
     
     TestHelper.assertNotNil(ItemAsync.SelectThingByArrayAsync, "ItemAsync should have SelectThingByArrayAsync for Grid display")
     TestHelper.assertNotNil(ItemAsync.SelectThingGridAsync, "ItemAsync should have SelectThingGridAsync for Grid display")
@@ -573,7 +573,7 @@ function TestWarAsync.testThingMenuGridNotTextMenu()
     setup()
     print("\n=== Test: Thing Menu Grid Not Text Menu ===")
     
-    local ItemAsync = require("item_async")
+    local ItemAsync = require("framework.item_async")
     
     local gridFunctionExists = type(ItemAsync.SelectThingGridAsync) == "function"
     TestHelper.assertEquals(true, gridFunctionExists, "Grid function should exist (not simple text menu)")
@@ -623,7 +623,7 @@ function TestWarAsync.testStatusMenuShowsPrompt()
     setup()
     print("\n=== Test: Status Menu Shows Prompt ===")
     
-    local WarAsync = require("war_async")
+    local WarAsync = require("framework.war_async")
     
     TestHelper.assertNotNil(WarAsync.War_StatusMenuCoroutine, "War_StatusMenuCoroutine should exist")
 end
@@ -632,8 +632,8 @@ function TestWarAsync.testStatusMenuUsesPersonStatusAsync()
     setup()
     print("\n=== Test: Status Menu Uses PersonStatusAsync ===")
     
-    local WarAsync = require("war_async")
-    local PersonStatusAsync = require("person_status_async")
+    local WarAsync = require("framework.war_async")
+    local PersonStatusAsync = require("framework.person_status_async")
     
     TestHelper.assertNotNil(WarAsync.War_StatusMenuCoroutine, "War_StatusMenuCoroutine should exist")
     TestHelper.assertNotNil(PersonStatusAsync.ShowStatusCoroutine, "PersonStatusAsync.ShowStatusCoroutine should exist")
@@ -678,7 +678,7 @@ function TestWarAsync.testGameOverCoroutineExists()
     setup()
     print("\n=== Test: Game Over Coroutine Exists ===")
     
-    local WarAsync = require("war_async")
+    local WarAsync = require("framework.war_async")
     
     TestHelper.assertNotNil(WarAsync.War_GameOverCoroutine, "War_GameOverCoroutine should exist")
 end
@@ -781,7 +781,7 @@ function TestWarAsync.testDefeatWithExpShowsGameOver()
     setup()
     print("\n=== Test: Defeat With Exp Shows Game Over ===")
     
-    local WarAsync = require("war_async")
+    local WarAsync = require("framework.war_async")
     
     TestHelper.assertNotNil(WarAsync.War_GameOverCoroutine, "War_GameOverCoroutine should exist")
 end

@@ -2,8 +2,8 @@
 -- Love2D 引擎实现 - 实现 EngineAPI 接口
 -- 内部委托给 lib_love.lua 的现有实现
 
-local EngineAPI = require("engine_api")
-local lib = require("lib_love")
+local EngineAPI = require("engine-love2d.engine_api")
+local lib = require("engine-love2d.lib_love")
 
 -- 将 lib_love 中的函数映射到 EngineAPI 各模块
 -- render 模块
@@ -126,17 +126,17 @@ end
 
 -- file 模块
 EngineAPI.file.open = function(filename, mode)
-    local FileUtil = require("lib_file")
+    local FileUtil = require("framework.lib_file")
     return FileUtil.open(filename, mode)
 end
 
 EngineAPI.file.remove = function(filename)
-    local FileUtil = require("lib_file")
+    local FileUtil = require("framework.lib_file")
     return FileUtil.remove(filename)
 end
 
 EngineAPI.file.getSize = function(filename)
-    local FileUtil = require("lib_file")
+    local FileUtil = require("framework.lib_file")
     return FileUtil.getsize(filename)
 end
 
@@ -247,6 +247,17 @@ end
 
 EngineAPI.LoadPicture = function(filename, x, y)
     lib.LoadPicture(filename, x, y)
+end
+
+-- Love2D 引擎初始化
+EngineAPI.init = function()
+    if love.graphics then
+        love.graphics.setBlendMode("alpha")
+        love.graphics.setDefaultFilter("nearest", "nearest")
+        love.graphics.setBackgroundColor(0, 0, 0, 1)
+    end
+    math.randomseed(os.time())
+    math.random()
 end
 
 return EngineAPI

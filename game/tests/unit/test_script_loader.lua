@@ -30,7 +30,7 @@ function TestScriptLoader.testFallbackToGamePrefixedPath()
     local oldLoadfile = _G.loadfile
     _G.loadfile = function() return nil, "native disabled in test" end
 
-    local ScriptLoader = require("script_loader")
+    local ScriptLoader = require("framework.script_loader")
     local chunk = ScriptLoader.load("script/oldevent/oldevent_691.lua")
 
     _G.loadfile = oldLoadfile

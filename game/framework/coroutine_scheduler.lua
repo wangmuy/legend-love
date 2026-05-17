@@ -6,7 +6,7 @@ local CoroutineScheduler = {}
 CoroutineScheduler.__index = CoroutineScheduler
 
 -- 导入依赖模块
-local InputManager = require("input_manager")
+local InputManager = require("framework.input_manager")
 
 -- 协程列表
 local coroutines = {}

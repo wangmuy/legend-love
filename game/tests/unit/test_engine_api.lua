@@ -13,7 +13,7 @@ function TestEngineAPI.testRenderModule()
     setup()
     print("\n=== Test: EngineAPI render module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.render, "render module should exist")
     TestHelper.assertNotNil(EngineAPI.render.text, "render.text should exist")
@@ -29,7 +29,7 @@ function TestEngineAPI.testSpriteModule()
     setup()
     print("\n=== Test: EngineAPI sprite module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.sprite, "sprite module should exist")
     TestHelper.assertNotNil(EngineAPI.sprite.initSprites, "sprite.initSprites should exist")
@@ -45,7 +45,7 @@ function TestEngineAPI.testMapModule()
     setup()
     print("\n=== Test: EngineAPI map module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.map, "map module should exist")
     TestHelper.assertNotNil(EngineAPI.map.loadMain, "map.loadMain should exist")
@@ -61,7 +61,7 @@ function TestEngineAPI.testInputModule()
     setup()
     print("\n=== Test: EngineAPI input module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.input, "input module should exist")
     TestHelper.assertNotNil(EngineAPI.input.getKey, "input.getKey should exist")
@@ -73,7 +73,7 @@ function TestEngineAPI.testAudioModule()
     setup()
     print("\n=== Test: EngineAPI audio module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.audio, "audio module should exist")
     TestHelper.assertNotNil(EngineAPI.audio.playMusic, "audio.playMusic should exist")
@@ -85,7 +85,7 @@ function TestEngineAPI.testTimeModule()
     setup()
     print("\n=== Test: EngineAPI time module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.time, "time module should exist")
     TestHelper.assertNotNil(EngineAPI.time.sleep, "time.sleep should exist")
@@ -96,7 +96,7 @@ function TestEngineAPI.testFileModule()
     setup()
     print("\n=== Test: EngineAPI file module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.file, "file module should exist")
     TestHelper.assertNotNil(EngineAPI.file.open, "file.open should exist")
@@ -109,7 +109,7 @@ function TestEngineAPI.testScriptModule()
     setup()
     print("\n=== Test: EngineAPI script module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.script, "script module should exist")
     TestHelper.assertNotNil(EngineAPI.script.load, "script.load should exist")
@@ -119,7 +119,7 @@ function TestEngineAPI.testFontModule()
     setup()
     print("\n=== Test: EngineAPI font module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.font, "font module should exist")
     TestHelper.assertNotNil(EngineAPI.font.get, "font.get should exist")
@@ -129,7 +129,7 @@ function TestEngineAPI.testColorModule()
     setup()
     print("\n=== Test: EngineAPI color module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.color, "color module should exist")
     TestHelper.assertNotNil(EngineAPI.color.pack, "color.pack should exist")
@@ -140,7 +140,7 @@ function TestEngineAPI.testDebugModule()
     setup()
     print("\n=== Test: EngineAPI debug module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.debug, "debug module should exist")
     TestHelper.assertNotNil(EngineAPI.debug.log, "debug.log should exist")
@@ -150,7 +150,7 @@ function TestEngineAPI.testCoroutineModule()
     setup()
     print("\n=== Test: EngineAPI coroutine module ===")
     
-    local EngineAPI = require("engine_api")
+    local EngineAPI = require("engine-love2d.engine_api")
     
     TestHelper.assertNotNil(EngineAPI.coroutine, "coroutine module should exist")
     TestHelper.assertNotNil(EngineAPI.coroutine.isRunning, "coroutine.isRunning should exist")

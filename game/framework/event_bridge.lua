@@ -7,10 +7,10 @@ local EventBridge = {}
 EventBridge.__index = EventBridge
 
 -- 依赖模块
-local StateMachine = require("state_machine")
-local InputManager = require("input_manager")
-local CoroutineScheduler = require("coroutine_scheduler")
-local AsyncDialog = require("async_dialog")
+local StateMachine = require("framework.state_machine")
+local InputManager = require("framework.input_manager")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local AsyncDialog = require("framework.async_dialog")
 
 -- 游戏状态常量
 local GAME_STATES = {
@@ -180,19 +180,19 @@ function EventBridge:draw()
     StateMachine.getInstance():draw()
     
     -- 渲染人物状态（在场景之上）
-    local PersonStatusAsync = require("person_status_async")
+    local PersonStatusAsync = require("framework.person_status_async")
     PersonStatusAsync.draw()
     
     -- 渲染物品选择界面（在场景之上）
-    local ItemAsync = require("item_async")
+    local ItemAsync = require("framework.item_async")
     ItemAsync.draw()
     
     -- 渲染菜单标题（在场景之上）
-    local JyMainAsync = require("jymain_async")
+    local JyMainAsync = require("framework.jymain_async")
     JyMainAsync.drawMenuTitle()
     
     -- 渲染对话（在场景之上，对话框之下）
-    local TalkAsync = require("talk_async")
+    local TalkAsync = require("framework.talk_async")
     TalkAsync.draw()
     
     -- 渲染对话框（在最上层）

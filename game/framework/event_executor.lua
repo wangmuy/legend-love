@@ -5,10 +5,10 @@
 
 local EventExecutor = {}
 
-local CoroutineScheduler = require("coroutine_scheduler")
-local AsyncWrapper = require("async_wrapper")
-local AsyncGlobals = require("async_globals")
-local ScriptLoader = require("script_loader")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local AsyncWrapper = require("framework.async_wrapper")
+local AsyncGlobals = require("framework.async_globals")
+local ScriptLoader = require("framework.script_loader")
 
 -- 事件执行状态
 local executingEvent = nil

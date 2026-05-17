@@ -420,7 +420,7 @@ end
 -- @param options: 可选配置（x, y, color, size等）
 -- @return: 无返回值
 function AsyncDialog:showMessageCoroutine(message, options)
-    local scheduler = require("coroutine_scheduler").getInstance()
+    local scheduler = require("framework.coroutine_scheduler").getInstance()
     local result = nil
     local done = false
     
@@ -480,7 +480,7 @@ end
 -- @param options: 可选配置
 -- @return: boolean (true=是，false=否)
 function AsyncDialog:showYesNoCoroutine(message, options)
-    local scheduler = require("coroutine_scheduler").getInstance()
+    local scheduler = require("framework.coroutine_scheduler").getInstance()
     local result = nil
     local done = false
     
