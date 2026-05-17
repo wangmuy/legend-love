@@ -7,16 +7,20 @@ local EventBridge = require("framework.event_bridge")
 local MenuAsync = require("framework.menu_async")
 local JYMainAdapter = require("framework.jymain_adapter")
 
--- 注册 Love2D 按键回调（全局函数形式，Love2D 要求回调在顶层定义）
-function love.keypressed(key, scancode, isrepeat)
-    InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
-end
-
-function love.keyreleased(key, scancode)
-    InputManager.getInstance():onKeyReleased(key, scancode)
-end
+-- 在模块级别定义 love.keypressed（部分 Love2D 版本需要）
+function love.keypressed(key, scancode, isrepeat) end
+function love.keyreleased(key, scancode) end
 
 function love.load()
+    -- 注册 Love2D 按键回调
+    love.keypressed = function(key, scancode, isrepeat)
+        InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
+    end
+    love.keyreleased = function(key, scancode)
+        InputManager.getInstance():onKeyReleased(key, scancode)
+    end
+    
+    -- 加载配置
     -- 加载配置
     require "framework.config"
     Byte = require "framework.lib_Byte"
