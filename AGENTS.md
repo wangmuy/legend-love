@@ -9,17 +9,59 @@
 - **支持平台**: 跨平台 (Linux, macOS, Windows)
 - **文件编码**: UTF-8
 
-## 当前任务：事件驱动架构迁移
+## 当前任务：事件驱动架构迁移 + EngineAPI 抽象层
 
-本项目已完成从阻塞式同步流程到事件驱动架构的迁移。
+本项目已完成从阻塞式同步流程到事件驱动架构的迁移，并已完成 EngineAPI 抽象层的设计与实现。
 
 **任务进度**: 参考 `openspec/changes/` 目录下的活动变更，以及 `openspec/changes/archive/` 下的已归档变更。
 
 **架构文档**: 详见 [ARCHITECTURE.md](ARCHITECTURE.md) 和 [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)。
 
+**EngineAPI 设计**: 详见 [ENGINE_API_DESIGN.md](ENGINE_API_DESIGN.md)（后续引擎实现与脚本事件驱动化计划）。
+
 **文件清单**: 详见 [SRC_FILES.md](SRC_FILES.md)（game/ 目录文件分析）、[SCRIPT_FILES.md](SCRIPT_FILES.md)（script/ 脚本文件说明）和 [DATA_FILES.md](DATA_FILES.md)（data/ 目录数据文件说明）。
 
 > **重要**: 以下文档内容以实际运行代码为准，文档可能与代码存在偏差，开发时请优先参考源码。
+
+## EngineAPI 架构
+
+EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 11 个模块约 37 个函数。所有引擎操作通过 `EngineAPI.*` 或 `lib.*` 调用，`game/script/` 中的脚本不直接依赖任何引擎。
+
+```
+game/script/ (游戏逻辑)
+    → instruct_0~67 / JY.* / CC.*
+    → EngineAPI.* / lib.*
+
+game/
+├── engine-love2d/     ← Love2D 引擎实现（可整体替换）
+│   ├── engine_api.lua     (接口定义)
+│   ├── engine_love2d.lua  (EngineAPI 实现)
+│   └── lib_love.lua       (原始 Love2D 实现)
+│
+├── engine-mud/        ← MUD 文本引擎（以 engine_test.lua 为初版）
+│   └── engine_mud.lua
+│
+├── framework/         ← 引擎无关，只通过 EngineAPI 调用引擎
+│   ├── 事件驱动: event_bridge / state_machine / game_states
+│   ├── 异步: coroutine_scheduler / *_async / async_*
+│   ├── 工具: lib_Byte / lib_file / lib_log / luabit / perf_log
+│   └── config.lua / script_loader.lua / jymain_adapter.lua
+│
+├── script/            ← 游戏脚本（纯游戏逻辑）
+│   ├── jymain.lua / jyconst.lua / jymodify.lua
+│   ├── oldevent/ (1018个)
+│   └── newevent/
+│
+├── main.lua           ← Love2D 入口（仅回调骨架）
+├── conf.lua           ← Love2D 配置
+└── tests/             ← 单元测试 + engine_test.lua
+```
+
+### 换引擎方式
+
+1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 37 个函数
+2. 实现对应的 `main.lua` 入口（Love2D 用 `love.*` 回调，MUD 用 `main()`）
+3. `framework/` 和 `script/` 完全不变
 
 ## 事件驱动架构
 
@@ -51,10 +93,21 @@ game/
 ├── config.lua                  # 游戏配置 (CONFIG.*)
 │
 ├── 核心模块 (事件驱动架构)
+│   ├── event_bridge/           ← love2d-engine/framework/  // 已拆分
+│
+├── engine-love2d/              # Love2D 引擎实现
+│   ├── engine_api.lua          # EngineAPI 接口定义
+│   ├── engine_love2d.lua       # EngineAPI Love2D 实现
+│   └── lib_love.lua            # 原始 Love2D 实现（被委托）
+│
+├── engine-mud/                 # MUD 文本引擎
+│   └── engine_mud.lua
+│
+├── framework/                  # 引擎无关框架，只通过 EngineAPI 调用
 │   ├── event_bridge.lua        # 事件桥接器
 │   ├── state_machine.lua       # 状态机
 │   ├── game_states.lua         # 游戏状态处理器
-│   ├── input_manager.lua       # 输入管理器 (事件队列)
+│   ├── input_manager.lua       # 输入管理器 (事件队列
 │   ├── coroutine_scheduler.lua # 协程调度器
 │   ├── menu_async.lua          # 异步菜单
 │   ├── menu_state_machine.lua  # 菜单状态机
@@ -62,42 +115,33 @@ game/
 │   ├── war_async.lua           # 战斗系统
 │   ├── jymain_async.lua        # 主菜单异步
 │   ├── jymain_adapter.lua      # 游戏适配器
-│   ├── person_status_async.lua # 人物状态异步
-│   └── item_async.lua          # 物品系统异步
-│
-├── 异步辅助模块
-│   ├── input_async.lua         # 异步输入函数
-│   ├── async_dialog.lua        # 对话框管理器
-│   ├── async_message_box.lua   # 消息框封装
+│   ├── person_status_async.lua # 人物状态
+│   ├── item_async.lua          # 物品系统
+│   ├── input_async.lua         # 异步输入
+│   ├── async_dialog.lua        # 对话框管理
+│   ├── async_message_box.lua   # 消息框
 │   ├── async_globals.lua       # 全局函数替换
-│   └── async_wrapper.lua       # 异步包装器
-│
-├── 事件执行
+│   ├── async_wrapper.lua       # 异步包装器
 │   ├── event_executor.lua      # 事件执行器
-│   ├── event_coroutine.lua     # ⚠️ 已废弃
-│   └── instruct_async.lua      # ⚠️ 已废弃
+│   ├── lib_Byte.lua            # 二进制数据
+│   ├── lib_file.lua            # 文件操作
+│   ├── lib_log.lua             # 日志
+│   ├── luabit.lua              # 位运算
+│   ├── perf_log.lua            # 性能日志
+│   ├── config.lua              # 游戏配置
+│   └── script_loader.lua       # 脚本加载器
 │
-├── 工具模块
-│   ├── lib_love.lua            # 图形/音频封装 (lib.*)
-│   ├── lib_Byte.lua            # 二进制数据工具
-│   ├── lib_log.lua             # 日志工具
-│   ├── lib_file.lua            # 文件操作封装
-│   ├── script_loader.lua       # 脚本加载器
-│   ├── luabit.lua              # 位运算库 (Lua 5.1)
-│   └── perf_log.lua            # 性能日志
-│
-├── 游戏逻辑
-│   └── script/
-│       ├── jymain.lua          # 主游戏逻辑
-│       ├── jyconst.lua         # 常量和游戏数据
-│       ├── jymodify.lua        # 游戏修改扩展
-│       ├── oldevent/           # 事件脚本 (1018个)
-│       └── newevent/           # 新增事件
+├── script/                     # 游戏脚本（纯游戏逻辑）
+│   ├── jymain.lua              # 主游戏逻辑
+│   ├── jyconst.lua             # 常量和游戏数据
+│   ├── jymodify.lua            # 游戏修改扩展
+│   ├── oldevent/               # 事件脚本 (1018个)
+│   └── newevent/               # 新增事件
 │
 ├── data/                       # 数据文件 (贴图/地图/存档)
 ├── pic/                        # 图片资源
 ├── sound/                      # 音频资源
-└── tests/                      # 单元测试
+└── tests/                      # 单元测试 + engine_test.lua
 ```
 
 > **废弃文件**（不参与运行）：`event_coroutine.lua`, `instruct_async.lua`, `convert.lua`
