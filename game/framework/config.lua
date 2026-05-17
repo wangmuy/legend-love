@@ -6,7 +6,7 @@
 
 CONFIG={};
 
-CONFIG.Debug=0;         --输出调试和错误信息，=0不输出 =1 输出信息在debug.txt和error.txt到当前目录
+CONFIG.Debug=1;         --输出调试和错误信息，=0不输出 =1 输出信息在debug.txt和error.txt到当前目录
 CONFIG.DEBUG_FILE="debug.txt";
 CONFIG.ERROR_FILE="error.txt";
 

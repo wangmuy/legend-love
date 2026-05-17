@@ -6,6 +6,17 @@ local EventBridge = require("framework.event_bridge")
 local MenuAsync = require("framework.menu_async")
 local JYMainAdapter = require("framework.jymain_adapter")
 
+-- 注册 Love2D 按键回调（全局函数形式，Love2D 要求回调在顶层定义）
+local onKeyPressed, onKeyReleased = EventBridge.getKeyHandlers()
+
+function love.keypressed(key, scancode, isrepeat)
+    onKeyPressed(key, scancode, isrepeat)
+end
+
+function love.keyreleased(key, scancode)
+    onKeyReleased(key, scancode)
+end
+
 function love.load()
     -- 加载配置
     require "framework.config"
@@ -52,9 +63,6 @@ function love.draw()
         lib.SetDrawLoopFlag(false)
     end
 end
-
--- 按键事件由event_bridge在init()中注册
--- 这里不需要定义love.keypressed/love.keyreleased
 
 function love.quit()
     -- 清理资源
