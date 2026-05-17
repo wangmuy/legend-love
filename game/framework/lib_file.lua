@@ -4,7 +4,7 @@
 local FileUtil = {}
 
 local function hasLoveFS()
-    return love and love.filesystem
+    return EngineAPI and EngineAPI.file
 end
 
 local function isWriteMode(mode)
@@ -77,65 +77,31 @@ function FileUtil.lines(filepath)
     if not hasLoveFS() then
         return function() return nil end
     end
-    -- Try love.filesystem.lines first
-    if love.filesystem.getInfo(filepath) then
-        return love.filesystem.lines(filepath)
-    end
-
-    return function() return nil end
+    return EngineAPI.file.lines(filepath)
 end
 
 -- Remove file wrapper - handles both os.remove and love.filesystem.remove
 function FileUtil.remove(filepath)
     if not hasLoveFS() then
-        return false, "love.filesystem unavailable"
+        return false, "EngineAPI.file unavailable"
     end
-    -- Try love.filesystem.remove first
-    local success = pcall(function()
-        return love.filesystem.remove(filepath)
-    end)
-    
-    if success then
-        return true
-    end
-    
-    return false, "remove failed"
+    return EngineAPI.file.remove(filepath)
 end
 
 -- Read entire file - wrapper that works in both modes
 function FileUtil.read(filepath)
     if not hasLoveFS() then
-        return nil, "love.filesystem unavailable"
+        return nil, "EngineAPI.file unavailable"
     end
-    -- Try love.filesystem.read first
-    local success, content = pcall(function()
-        return love.filesystem.read(filepath)
-    end)
-    
-    if success and content then
-        return content
-    end
-    
-    return nil, "Could not read file: " .. filepath
+    return EngineAPI.file.read(filepath)
 end
 
 -- Write entire file - wrapper that works in both modes
 function FileUtil.write(filepath, content, mode)
-    mode = mode or "w"
     if not hasLoveFS() then
-        return nil, "love.filesystem unavailable"
+        return nil, "EngineAPI.file unavailable"
     end
-    
-    -- Try love.filesystem.write first
-    local success, err = pcall(function()
-        return love.filesystem.write(filepath, content)
-    end)
-    
-    if success then
-        return true
-    end
-    
-    return nil, err or "Could not write file: " .. filepath
+    return EngineAPI.file.write(filepath, content, mode)
 end
 
 -- File exists check - wrapper
@@ -143,30 +109,15 @@ function FileUtil.exists(filepath)
     if not hasLoveFS() then
         return false
     end
-    -- Try love.filesystem.getInfo first
-    local info = love.filesystem.getInfo(filepath)
-    if info then
-        return true
-    end
-
-    return false
+    return EngineAPI.file.exists(filepath)
 end
 
--- Create directory - wrapper (works in love.writePath only for love mode)
+-- Create directory - wrapper
 function FileUtil.createdir(dirpath)
     if not hasLoveFS() then
         return false
     end
-    -- In love mode, we can only create in save directory or write directory
-    local success = pcall(function()
-        return love.filesystem.createDirectory(dirpath)
-    end)
-    
-    if success then
-        return true
-    end
-    
-    return false
+    return EngineAPI.file.createDirectory(dirpath)
 end
 
 -- Get file size - wrapper
@@ -174,13 +125,7 @@ function FileUtil.getsize(filepath)
     if not hasLoveFS() then
         return nil
     end
-    -- Try love.filesystem.getInfo first
-    local info = love.filesystem.getInfo(filepath)
-    if info then
-        return info.size
-    end
-
-    return nil
+    return EngineAPI.file.getSize(filepath)
 end
 
 -- Wrapper object for file handle - provides common methods
@@ -328,7 +273,7 @@ function FileUtil.FileHandle:close()
             return true
         end
         if h.dirty and hasLoveFS() then
-            love.filesystem.write(h.path, h.content)
+            EngineAPI.file.write(h.path, h.content)
         end
         h.closed = true
         return true
@@ -352,7 +297,7 @@ function FileUtil.FileHandle:flush()
             return nil
         end
         if h.dirty and hasLoveFS() then
-            love.filesystem.write(h.path, h.content)
+            EngineAPI.file.write(h.path, h.content)
             h.dirty = false
         end
         return true
