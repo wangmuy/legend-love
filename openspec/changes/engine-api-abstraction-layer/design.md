@@ -124,3 +124,27 @@ game/
 **迁移方式**：分批进行，先移 engine-love2d/，再移 framework/，最后验证。
 
 **风险**：需要更新所有 require 路径，回归风险中等。
+
+## 决策 7：消除 framework/ 中的 Love2D 直接引用
+
+**方案**：将 `framework/` 中所有 `love.*` 直接调用替换为 `EngineAPI.*` 调用。
+
+**需替换的引用**：
+
+| 文件 | 当前代码 | 替换为 |
+|------|---------|--------|
+| `input_manager.lua` | `love.timer.getTime()` | `EngineAPI.time.getTime()` |
+| `input_async.lua` | `love.timer.getTime()` | `EngineAPI.time.getTime()` |
+| `coroutine_scheduler.lua` | `love.timer.getTime` | `EngineAPI.time.getTime` |
+| `perf_log.lua` | `love.timer.getTime()` | `EngineAPI.time.getTime()` |
+| `lib_file.lua` | `love.filesystem.*` | `EngineAPI.file.*` |
+| `script_loader.lua` | `love.filesystem.load` | `EngineAPI.script.load` |
+| `jymain_adapter.lua` | `love.event.quit()` | 新增`EngineAPI.quit()` |
+| `game_states.lua` | `love.event.quit()` | `EngineAPI.quit()` |
+| `war_async.lua` | `love.event.quit()` | `EngineAPI.quit()` |
+
+**理由**：
+- `framework/` 应该与具体引擎无关，只通过 EngineAPI 调用底层功能
+- 消除后，`framework/` 可整体复用到 Godot、MUD 等其他引擎
+
+**风险**：低。每个替换都是一对一的函数映射，不会改变行为。
