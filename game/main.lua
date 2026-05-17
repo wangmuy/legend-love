@@ -20,7 +20,8 @@ function love.load()
     -- 加载配置
     require "config"
     Byte = require "lib_Byte"
-    lib = require "lib_love"
+    require "lib_love"  -- 保持初始化（加载 jyconst.lua、设置 keymap 等）
+    lib = require "engine_love2d"  -- EngineAPI 接口，覆盖 lib 全局变量
     
     -- 加载事件桥接器并初始化
     EventBridge.getInstance():init()
