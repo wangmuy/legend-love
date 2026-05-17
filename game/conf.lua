@@ -1,5 +1,21 @@
 require "framework.config"
 
+-- 注册 Love2D 按键回调（conf.lua 最先运行，确保回调被 Love2D 识别）
+local InputManager
+
+local function inputKeyPressed(key, scancode, isrepeat)
+    if not InputManager then InputManager = require("framework.input_manager") end
+    InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
+end
+
+local function inputKeyReleased(key, scancode)
+    if not InputManager then InputManager = require("framework.input_manager") end
+    InputManager.getInstance():onKeyReleased(key, scancode)
+end
+
+love.keypressed = inputKeyPressed
+love.keyreleased = inputKeyReleased
+
 -- Read product configuration from product.env
 -- Shared between the game and CI
 local product_config = {}
