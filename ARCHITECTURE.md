@@ -58,7 +58,6 @@
 - 物品使用（装备/修炼/使用）的协程版本
 
 ### 10. 事件指令系统
-- instruct_async.lua（已废弃，功能被 async_globals.lua + event_executor.lua 组合替代）
 - 所有 instruct_XXX 函数通过 async_globals.lua 自动替换为异步版本
 
 ### 11. 事件执行器 (event_executor.lua)
@@ -141,59 +140,59 @@ EventExecutor.startEvent(id, flag, callback)
 ```
 game/
 ├── main.lua                    # 主入口，Love2D 回调
-├── config.lua                  # 游戏配置
 ├── conf.lua                    # Love2D 配置
 │
-├── lib_love.lua                # 图形/音频封装
-├── lib_Byte.lua                # 二进制数据工具
-├── lib_log.lua                 # 日志工具
-├── lib_file.lua                # 文件操作封装
-├── script_loader.lua           # 脚本加载器
-├── luabit.lua                  # 位运算库
+├── engine-love2d/              # Love2D 引擎实现（可整体替换）
+│   ├── engine_api.lua          # EngineAPI 接口定义
+│   ├── engine_love2d.lua       # EngineAPI Love2D 实现
+│   └── lib_love.lua            # 原始 Love2D 实现，被委托
 │
-├── coroutine_scheduler.lua     # 协程调度器
-├── state_machine.lua           # 状态机
-├── input_manager.lua           # 输入管理器
-├── input_async.lua             # 异步输入函数
+├── engine-mud/                 # MUD 文本引擎（预留）
+│   └── engine_mud.lua
 │
-├── async_dialog.lua            # 异步对话框
-├── async_message_box.lua       # 异步消息框
-├── async_wrapper.lua           # 异步函数包装器
-├── async_globals.lua           # 异步全局替换
+├── framework/                  # 引擎无关框架，只通过 EngineAPI 调用
+│   ├── event_bridge.lua        # 事件桥接
+│   ├── state_machine.lua       # 状态机
+│   ├── game_states.lua         # 游戏状态定义
+│   ├── input_manager.lua       # 输入管理器
+│   ├── coroutine_scheduler.lua # 协程调度器
+│   ├── input_async.lua         # 异步输入函数
+│   ├── async_dialog.lua        # 异步对话框
+│   ├── async_message_box.lua   # 异步消息框
+│   ├── async_globals.lua       # 异步全局替换
+│   ├── async_wrapper.lua       # 异步函数包装器
+│   ├── menu_state_machine.lua  # 菜单状态机
+│   ├── menu_async.lua          # 异步菜单
+│   ├── talk_async.lua          # 异步对话系统
+│   ├── war_async.lua           # 异步战斗系统
+│   ├── event_executor.lua      # 事件执行器
+│   ├── jymain_adapter.lua      # 主逻辑适配器
+│   ├── jymain_async.lua        # 主逻辑异步版本
+│   ├── person_status_async.lua # 人物状态异步
+│   ├── item_async.lua          # 物品系统异步
+│   ├── lib_Byte.lua            # 二进制数据工具
+│   ├── lib_file.lua            # 文件操作封装
+│   ├── lib_log.lua             # 日志工具
+│   ├── luabit.lua              # 位运算库
+│   ├── perf_log.lua            # 性能日志
+│   ├── config.lua              # 游戏配置
+│   └── script_loader.lua       # 脚本加载器
 │
-├── menu_state_machine.lua      # 菜单状态机
-├── menu_async.lua              # 异步菜单
-│
-├── talk_async.lua              # 异步对话系统
-├── war_async.lua               # 异步战斗系统
-│
-├── event_executor.lua          # 事件执行器
-├── event_bridge.lua            # 事件桥接
-├── game_states.lua             # 游戏状态定义
-│
-├── jymain_adapter.lua          # 主逻辑适配器
-├── jymain_async.lua            # 主逻辑异步版本
-├── person_status_async.lua     # 人物状态异步显示
-├── item_async.lua              # 物品系统异步
-├── perf_log.lua                # 性能日志
-│
-├── script/
+├── script/                     # 游戏脚本
 │   ├── jymain.lua              # 游戏主逻辑
 │   ├── jyconst.lua             # 游戏常量
 │   ├── jymodify.lua            # 游戏修改
 │   ├── oldevent/               # 旧版事件脚本 (1018个)
 │   └── newevent/               # 新版事件脚本
 │
-├── data/                       # 游戏数据文件
-├── pic/                        # 图片资源
-├── sound/                      # 音频资源
+├── data/ / pic/ / sound/       # 资源文件
+└── tests/                      # 单元测试 + engine_test.lua
 └── tests/                      # 单元测试
 ```
 
 > **废弃文件**（不参与运行）：
 > - `event_coroutine.lua` - 已废弃，被 event_executor.lua 替代
-> - `instruct_async.lua` - 已废弃，功能被 async_globals.lua 组合替代
-> - `convert.lua` - 数据转换工具，运行时不需要
+> **废弃文件**（不参与运行）：`convert.lua`
 
 ## 废弃的阻塞函数
 

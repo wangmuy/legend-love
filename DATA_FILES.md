@@ -256,6 +256,6 @@ SaveRecord(id)
 |------|------|
 | `game/script/jyconst.lua` | 数据文件名和结构定义 |
 | `game/script/jymain.lua` | 加载/保存函数实现 |
-| `game/lib_love.lua` | 图片加载和 RLE 解码 |
-| `game/lib_Byte.lua` | 二进制数据读写工具 |
-| `game/config.lua` | 路径配置（CONFIG.DataPath, CONFIG.ScriptPath 等） |
+| `game/engine-love2d/lib_love.lua` | 图片加载和 RLE 解码 |
+| `game/framework/lib_Byte.lua` | 二进制数据读写工具 |
+| `game/framework/config.lua` | 路径配置（CONFIG.DataPath, CONFIG.ScriptPath 等） |
