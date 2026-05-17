@@ -123,7 +123,7 @@ game/
 
 **迁移方式**：分批进行，先移 engine-love2d/，再移 framework/，最后验证。
 
-**风险**：需要更新所有 require 路径，回归风险中等。
+**风险**：需要更新所有 require 路径，回归风险中等。特别注意 `lib_love.lua` 中通过 `package.loaded["xxx"]` 硬编码引用的模块路径——移动目录后需同步更新。
 
 ## 决策 7：消除 framework/ 中的 Love2D 直接引用
 
