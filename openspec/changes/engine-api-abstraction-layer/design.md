@@ -84,3 +84,43 @@
 | async_globals.lua 重构可能影响事件脚本执行 | 保持向后兼容，现有脚本行为不变 |
 | EngineAPI 接口设计可能遗漏某些引擎特性 | 第一阶段为"最小可行接口"，后续可扩展 |
 | 测试引擎无法验证渲染正确性 | 明确标注不可自动化测试的范围，渲染测试需人工
+
+## 决策 6：目录结构拆分为 engine-*/ 和 framework/ 子目录
+
+**方案**：将 `game/` 下文件按职责拆分：
+
+```
+game/
+├── engine-love2d/          ← Love2D 引擎，换引擎时整个目录替换
+│   ├── engine_api.lua          (接口定义，引擎无关)
+│   ├── engine_love2d.lua       (EngineAPI Love2D 实现)
+│   └── lib_love.lua            (原始 Love2D 实现，被委托)
+│
+├── engine-mud/             ← 文本命令行界面引擎（以 engine_test.lua 为初版）
+│   └── engine_mud.lua          (EngineAPI MUD 实现)
+│
+├── framework/              ← 引擎无关，只通过 EngineAPI 调用
+│   ├── 事件驱动: event_bridge / state_machine / game_states
+│   ├── 异步: coroutine_scheduler / *_async / async_*
+│   ├── 工具: lib_Byte / lib_file / lib_log / luabit / perf_log
+│   ├── 配置: config.lua / script_loader.lua
+│   └── jymain_adapter.lua
+│
+├── script/                 ← 不变
+├── data/ / pic/ / sound/
+├── main.lua                ← Love2D 入口，仅回调骨架
+│                              love.load → EngineAPI.init → framework.init
+│                              Love2D 特有初始化可抽入 engine-love2d/ 的 init()
+├── conf.lua                ← Love2D 配置，必须在此
+└── tests/                  ← 不变，engine_test.lua 移入此处
+```
+
+**理由**：
+- `engine-love2d/` 可整体替换为 `engine-godot/`、`engine-mud/` 等
+- `framework/` 只通过 EngineAPI，与具体引擎无关
+- `main.lua` / `conf.lua` 保留 Love2D 回调骨架，内部初始化委托给 `engine-love2d/`
+- 换 MUD 引擎时 `main.lua` 完全不同（无 `love.*`），但 framework + script + engine_api.lua 完全不变
+
+**迁移方式**：分批进行，先移 engine-love2d/，再移 framework/，最后验证。
+
+**风险**：需要更新所有 require 路径，回归风险中等。
