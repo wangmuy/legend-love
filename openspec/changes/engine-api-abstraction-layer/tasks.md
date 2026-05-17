@@ -29,7 +29,7 @@
 - [x] 2.9 设置全局 `lib` 变量指向 EngineAPI，保持向后兼容
 - [x] 2.10 修改 `game/script/jymain.lua` 中 3 处 `love.filesystem` 调用为 `EngineAPI.file.*`
 - [x] 2.11 修改 `game/script_loader.lua` 使用 `EngineAPI.script.load`
-- [ ] 2.12 验证游戏在 Love2D 下正常运行（人工测试）
+- [x] 2.12 验证游戏在 Love2D 下正常运行（人工测试）
 
 ## 3. 命令行测试引擎
 
@@ -102,9 +102,12 @@
 ### 7d. 验证
 
 - [x] 7d.1 运行全部测试验证（37/37 通过）
-- [ ] 7d.2 人工验证游戏正常运行
+- [x] 7d.2 人工验证游戏正常运行
 
-### 待后续处理
+### 7e. lib_file.lua love.filesystem 替换 + script_loader 清理
 
-- `lib_file.lua` 中的 `love.filesystem.*` — 需要更大范围的 EngineAPI.file 重构
-- `script_loader.lua` 中的 `love.filesystem.load` 回退路径 — 当前作为安全网保留
+- [ ] 7e.1 将 engine_love2d 中 EngineAPI.file.* 的实现从委托 lib_file 改为直接使用 love.filesystem（打破循环依赖）
+- [ ] 7e.2 将 lib_file.lua 中的 `love.filesystem.*` 替换为 `EngineAPI.file.*`
+- [ ] 7e.3 清理 script_loader.lua 中的 `love.filesystem.load` 回退路径
+- [ ] 7e.4 运行全部测试验证
+- [ ] 7e.5 人工验证游戏正常运行

@@ -148,3 +148,20 @@ game/
 - 消除后，`framework/` 可整体复用到 Godot、MUD 等其他引擎
 
 **风险**：低。每个替换都是一对一的函数映射，不会改变行为。
+
+**已完成替换**（2026-05 实施）：
+| 文件 | 替换内容 | 状态 |
+|------|---------|------|
+| `input_manager.lua` | `love.timer.getTime()` → `EngineAPI.time.getTimeSeconds()` | ✅ |
+| `input_async.lua` | `love.timer.getTime()` → `EngineAPI.time.getTimeSeconds()` | ✅ |
+| `coroutine_scheduler.lua` | `love.timer.getTime` → `EngineAPI.time.getTimeSeconds` | ✅ |
+| `perf_log.lua` | `love.timer.getTime()` → `EngineAPI.time.getTimeSeconds()` | ✅ |
+| `jymain_adapter.lua` | `love.event.quit()` → `EngineAPI.app.quit()` | ✅ |
+| `game_states.lua` | `love.event.quit()` → `EngineAPI.app.quit()` | ✅ |
+| `war_async.lua` | `love.event.quit()` → `EngineAPI.app.quit()` | ✅ |
+
+**待处理**：
+| 文件 | 替换内容 | 说明 |
+|------|---------|------|
+| `lib_file.lua` | `love.filesystem.*` → `EngineAPI.file.*` | 需要先解耦循环依赖（EngineAPI.file 当前委托 lib_file） |
+| `script_loader.lua` | `love.filesystem.load` 回退路径 | 作为安全网保留，EngineAPI 不可用时触发 |
