@@ -4,11 +4,12 @@
 
 ## 概述
 
-游戏代码分为两大目录：
+游戏代码分为三大目录：
 - `game/script/` - 游戏脚本（事件、数据、逻辑配置）
-- `game/` - 核心框架代码（事件驱动架构、异步系统）
+- `game/framework/` - 引擎无关框架代码（事件驱动架构、异步系统）
+- `game/engine-love2d/` - Love2D 引擎实现（可整体替换）
 
-> **原则**：优先在 `script/` 目录进行修改，只有框架级别的新功能才需要修改 `game/` 目录。
+> **原则**：优先在 `script/` 目录进行修改，只有框架级别的新功能才需要修改 `framework/` 或 `engine-love2d/` 目录。
 
 ---
 
@@ -30,7 +31,7 @@ end
 instruct_N(1, 2, 3)  -- 直接调用
 ```
 
-> **注意**：如需支持协程异步，还需修改 `game/async_globals.lua` 添加全局替换。
+> **注意**：如需支持协程异步，还需修改 `framework/async_globals.lua` 添加全局替换。
 
 ### 1.2 新增对话
 
@@ -88,7 +89,7 @@ end
 
 ---
 
-## 二、需要同时修改 game/ 目录的场景
+## 二、需要同时修改 framework/ 目录的场景
 
 ### 2.1 新增人物头像贴图
 
@@ -122,16 +123,16 @@ end
 
 | 修改位置 | 说明 |
 |----------|------|
-| `game/war_async.lua` | 战斗流程协程 |
-| `game/game_states.lua` | 战斗状态处理器 |
+| `framework/war_async.lua` | 战斗流程协程 |
+| `framework/game_states.lua` | 战斗状态处理器 |
 | `script/jyconst.lua` | 战斗相关配置 |
 
 ### 2.6 新增菜单系统
 
 | 修改位置 | 说明 |
 |----------|------|
-| `game/menu_async.lua` | 异步菜单逻辑 |
-| `game/menu_state_machine.lua` | 菜单状态机 |
+| `framework/menu_async.lua` | 异步菜单逻辑 |
+| `framework/menu_state_machine.lua` | 菜单状态机 |
 | `script/jymodify.lua` | 注册新菜单函数 |
 
 ### 2.7 修改事件指令为异步
@@ -141,8 +142,8 @@ end
 | 修改位置 | 说明 |
 |----------|------|
 | `script/jymain.lua` | 保留原函数 |
-| `game/async_globals.lua` | 添加全局替换逻辑 |
-| `game/event_executor.lua` | 确保协程调度正确 |
+| `framework/async_globals.lua` | 添加全局替换逻辑 |
+| `framework/event_executor.lua` | 确保协程调度正确 |
 
 ---
 
@@ -150,7 +151,7 @@ end
 
 | 修改内容 | 主要修改文件 | 辅助修改文件 |
 |----------|-------------|-------------|
-| 新 instruct 指令 | script/jymain.lua | game/async_globals.lua（可选） |
+| 新 instruct 指令 | script/jymain.lua | framework/async_globals.lua（可选） |
 | 新对话 | script/oldtalk.grp | script/oldtalk.idx |
 | 新事件脚本 | script/oldevent/*.lua | - |
 | 新场景事件 | script/newevent/*.lua | script/jymodify.lua |
@@ -161,17 +162,19 @@ end
 | 战斗动画贴图 | data/eft.idx/grp | script/jyconst.lua |
 | 地图贴图 | data/*.idx/grp | script/jyconst.lua |
 | 音效/音乐 | sound/* | script/jyconst.lua |
-| 战斗逻辑 | game/war_async.lua | script/jyconst.lua |
-| 菜单系统 | game/menu_async.lua | script/jymodify.lua |
-| 核心框架 | game/*.lua | - |
+| 战斗逻辑 | framework/war_async.lua | script/jyconst.lua |
+| 菜单系统 | framework/menu_async.lua | script/jymodify.lua |
+| 核心框架 | framework/*.lua | - |
+| 换引擎 | engine-love2d/*.lua | - |
 
 ---
 
 ## 四、修改优先级
 
 1. **优先修改 `script/` 目录** - 大部分游戏内容调整都在这里
-2. **只在需要新框架功能时修改 `game/`** - 如新的交互模式、异步流程
-3. **资源文件（图片/音乐）添加到对应目录** - 然后在 `jyconst.lua` 引用
+2. **只在需要新框架功能时修改 `framework/`** - 如新的交互模式、异步流程
+3. **换引擎时只修改 `engine-love2d/`** - 实现新的 EngineAPI 即可
+4. **资源文件（图片/音乐）添加到对应目录** - 然后在 `jyconst.lua` 引用
 
 ---
 
