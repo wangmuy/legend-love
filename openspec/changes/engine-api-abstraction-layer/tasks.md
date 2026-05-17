@@ -80,13 +80,31 @@
 
 ## 7. 消除 framework/ 中的 Love2D 直接引用
 
-- [ ] 7.1 将 input_manager.lua 中的 `love.timer.getTime()` 替换为 `EngineAPI.time.getTime()`
-- [ ] 7.2 将 input_async.lua 中的 `love.timer.getTime()` 替换为 `EngineAPI.time.getTime()`
-- [ ] 7.3 将 coroutine_scheduler.lua 中的 `love.timer.getTime` 替换为 `EngineAPI.time.getTime`
-- [ ] 7.4 将 perf_log.lua 中的 `love.timer.getTime()` 替换为 `EngineAPI.time.getTime()`
-- [ ] 7.5 将 lib_file.lua 中的 `love.filesystem.*` 替换为 `EngineAPI.file.*`
-- [ ] 7.6 将 script_loader.lua 中的 `love.filesystem.load` 替换为 `EngineAPI.script.load`
-- [ ] 7.7 在 EngineAPI 中新增 `quit()` 函数，替换 `love.event.quit()`
-- [ ] 7.8 将 jymain_adapter.lua、game_states.lua、war_async.lua 中的 `love.event.quit()` 替换为 `EngineAPI.quit()`
-- [ ] 7.9 运行全部测试验证
-- [ ] 7.10 人工验证游戏正常运行
+### 7a. 扩展 EngineAPI 接口
+
+- [x] 7a.1 在 EngineAPI.time 中新增 `getTimeSeconds()`
+- [x] 7a.2 在 EngineAPI 中新增 `app.quit()`
+- [x] 7a.3 扩展 EngineAPI.file 接口（read/write/lines/createDirectory）
+
+### 7b. 替换 love.timer.getTime
+
+- [x] 7b.1 替换 input_manager.lua 中的 `love.timer.getTime()`
+- [x] 7b.2 替换 input_async.lua 中的 `love.timer.getTime()`
+- [x] 7b.3 替换 coroutine_scheduler.lua 中的 `love.timer.getTime`
+- [x] 7b.4 替换 perf_log.lua 中的 `love.timer.getTime()`
+
+### 7c. 替换 love.event.quit
+
+- [x] 7c.1 替换 jymain_adapter.lua 中的 `love.event.quit()`
+- [x] 7c.2 替换 game_states.lua 中的 `love.event.quit()`
+- [x] 7c.3 替换 war_async.lua 中的 `love.event.quit()`
+
+### 7d. 验证
+
+- [x] 7d.1 运行全部测试验证（37/37 通过）
+- [ ] 7d.2 人工验证游戏正常运行
+
+### 待后续处理
+
+- `lib_file.lua` 中的 `love.filesystem.*` — 需要更大范围的 EngineAPI.file 重构
+- `script_loader.lua` 中的 `love.filesystem.load` 回退路径 — 当前作为安全网保留
