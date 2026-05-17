@@ -5,12 +5,12 @@
 
 local AsyncWrapper = {}
 
-local CoroutineScheduler = require("coroutine_scheduler")
-local AsyncDialog = require("async_dialog")
-local AsyncMessageBox = require("async_message_box")
-local InputAsync = require("input_async")
-local MenuAsync = require("menu_async")
-local TalkAsync = require("talk_async")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local AsyncDialog = require("framework.async_dialog")
+local AsyncMessageBox = require("framework.async_message_box")
+local InputAsync = require("framework.input_async")
+local MenuAsync = require("framework.menu_async")
+local TalkAsync = require("framework.talk_async")
 
 -- ============================================
 -- 消息框函数

@@ -5,11 +5,11 @@
 local ItemAsync = {}
 
 -- 导入必要的依赖模块
-local CoroutineScheduler = require("coroutine_scheduler")
-local MenuAsync = require("menu_async")
-local AsyncMessageBox = require("async_message_box")
-local AsyncDialog = require("async_dialog")
-local InputAsync = require("input_async")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local MenuAsync = require("framework.menu_async")
+local AsyncMessageBox = require("framework.async_message_box")
+local AsyncDialog = require("framework.async_dialog")
+local InputAsync = require("framework.input_async")
 
 -- 当前显示的物品选择状态（用于draw函数）
 local currentItemSelect = nil
@@ -119,10 +119,10 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
     local currentPage = 1
     local selectedIndex = 1  -- 当前选中的物品索引（1-based）
     local scheduler = CoroutineScheduler.getInstance()
-    local InputAsync = require("input_async")
+    local InputAsync = require("framework.input_async")
     
     -- 设置标志，阻止游戏主循环处理按键
-    local InputManager = require("input_manager")
+    local InputManager = require("framework.input_manager")
     InputManager.disableInput = true
     if CONFIG and CONFIG.Debug == 1 then
         Debug("ItemAsync.SelectThingGridAsync: disableInput set to true")
@@ -170,7 +170,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
         if keypress == VK_ESCAPE then
             -- ESC取消选择
             currentItemSelect = nil  -- 清除显示状态
-            local InputManager = require("input_manager")
+            local InputManager = require("framework.input_manager")
             InputManager.disableInput = false
             if CONFIG and CONFIG.Debug == 1 then
                 Debug("ItemAsync.SelectThingGridAsync: ESC pressed, disableInput set to false")
@@ -180,7 +180,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
             -- 确认选择
             if selectedItem then
                 currentItemSelect = nil  -- 清除显示状态
-                local InputManager = require("input_manager")
+                local InputManager = require("framework.input_manager")
                 InputManager.disableInput = false
                 return selectedItem.id
             end

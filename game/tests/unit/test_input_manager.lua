@@ -2,7 +2,7 @@
 -- 输入管理器模块单元测试
 
 local TestHelper = require("tests.test_helper")
-local InputManager = require("input_manager")
+local InputManager = require("framework.input_manager")
 
 local TestInputManager = {}
 

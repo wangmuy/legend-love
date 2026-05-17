@@ -1,5 +1,5 @@
-require "lib_log"
-local FileUtil = require "lib_file"
+require "framework.lib_log"
+local FileUtil = require "framework.lib_file"
 
 local M = {}
 do
@@ -10,7 +10,7 @@ do
         _ENV = M -- for 5.2
     end
     if _VERSION < "Lua 5.2" then
-        require "luabit"
+        require "framework.luabit"
         bit32 = bit -- band rshift
         bit32.rshift = bit.brshift
     end

@@ -1,6 +1,6 @@
 local PerfLog = {}
 
-local FileUtil = require "lib_file"
+local FileUtil = require "framework.lib_file"
 local logfile = "perf.txt"
 local initialized = false
 

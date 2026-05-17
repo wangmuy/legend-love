@@ -80,7 +80,7 @@ function TestByteIO.testBit32Compatibility()
     setup()
     print("\n=== Test: bit32 Compatibility ===")
 
-    local Byte = require("lib_Byte")
+    local Byte = require("framework.lib_Byte")
     TestHelper.assertNotNil(_G.bit32, "Global bit32 should be available after loading lib_Byte")
     TestHelper.assertNotNil(_G.bit32.band, "bit32.band should exist")
     TestHelper.assertNotNil(_G.bit32.rshift, "bit32.rshift should exist")
@@ -95,7 +95,7 @@ function TestByteIO.testSaveFromTable16LittleEndian()
     setup()
     print("\n=== Test: SaveFromTable16 Little Endian ===")
     
-    local Byte = require("lib_Byte")
+    local Byte = require("framework.lib_Byte")
     
     -- 创建测试数据
     local t = {1000, 2000, 30000, 65535, 0}
@@ -127,7 +127,7 @@ function TestByteIO.testSaveFromTable16BigEndian()
     setup()
     print("\n=== Test: SaveFromTable16 Big Endian ===")
     
-    local Byte = require("lib_Byte")
+    local Byte = require("framework.lib_Byte")
     
     -- 创建测试数据
     local t = {1000, 2000}
@@ -155,7 +155,7 @@ function TestByteIO.testSaveAndLoadConsistency()
     setup()
     print("\n=== Test: Save and Load Consistency ===")
     
-    local Byte = require("lib_Byte")
+    local Byte = require("framework.lib_Byte")
     
     -- 创建测试数据（使用 0-32767 范围内的正数，避免有符号转换问题）
     local original = {}
@@ -192,7 +192,7 @@ function TestByteIO.testSignedNumbers()
     setup()
     print("\n=== Test: Signed Numbers (Little Endian) ===")
     
-    local Byte = require("lib_Byte")
+    local Byte = require("framework.lib_Byte")
     
     -- 创建包含大于 32767 的数值（会被解释为负数）
     local t = {65535, 65436, 32768}
@@ -216,7 +216,7 @@ function TestByteIO.testEmptyData()
     setup()
     print("\n=== Test: Empty Data ===")
     
-    local Byte = require("lib_Byte")
+    local Byte = require("framework.lib_Byte")
     
     -- 空表
     Byte.SaveFromTable16({}, "/tmp/test_save.bin", 0, 1, nil, true)
@@ -235,7 +235,7 @@ function TestByteIO.testLargeDataPerformance()
     setup()
     print("\n=== Test: Large Data Performance ===")
     
-    local Byte = require("lib_Byte")
+    local Byte = require("framework.lib_Byte")
     
     -- 创建大数据（10万元素，使用 0-32767 范围）
     local t = {}
@@ -269,7 +269,7 @@ function TestByteIO.testSeekPos()
     setup()
     print("\n=== Test: Seek Position ===")
     
-    local Byte = require("lib_Byte")
+    local Byte = require("framework.lib_Byte")
     
     -- 创建并保存数据
     local t1 = {100, 200}

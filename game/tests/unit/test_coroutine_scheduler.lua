@@ -2,8 +2,8 @@
 -- 协程调度器模块单元测试
 
 local TestHelper = require("tests.test_helper")
-local CoroutineScheduler = require("coroutine_scheduler")
-local InputManager = require("input_manager")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local InputManager = require("framework.input_manager")
 
 local TestCoroutineScheduler = {}
 

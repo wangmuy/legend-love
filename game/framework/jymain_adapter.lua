@@ -5,14 +5,14 @@
 local JYMainAdapter = {}
 
 -- 导入模块
-local EventBridge = require("event_bridge")
-local GameStates = require("game_states")
-local MenuAsync = require("menu_async")
-local AsyncMessageBox = require("async_message_box")
-local CoroutineScheduler = require("coroutine_scheduler")
-local InputAsync = require("input_async")
-local EventExecutor = require("event_executor")
-local PerfLog = require("perf_log")
+local EventBridge = require("framework.event_bridge")
+local GameStates = require("framework.game_states")
+local MenuAsync = require("framework.menu_async")
+local AsyncMessageBox = require("framework.async_message_box")
+local CoroutineScheduler = require("framework.coroutine_scheduler")
+local InputAsync = require("framework.input_async")
+local EventExecutor = require("framework.event_executor")
+local PerfLog = require("framework.perf_log")
 
 -- 游戏初始化标志
 local isInitialized = false
@@ -361,7 +361,7 @@ function JYMainAdapter.startNewGame(menux)
     if CC.NewGameEvent > 0 then
         -- 在协程中执行新游戏事件
         -- 使用 event_executor 中的 oldCallEventCoroutine，避免 C-call boundary 问题
-        local EventExecutor = require("event_executor")
+        local EventExecutor = require("framework.event_executor")
         local tEvent = PerfLog.begin("startNewGame.oldCallEventCoroutine")
         EventExecutor.oldCallEventCoroutine(CC.NewGameEvent)
         PerfLog.finish(tEvent, "event=" .. tostring(CC.NewGameEvent))

@@ -7,8 +7,8 @@
 
 ---本代码由游泳的鱼编写
 
-local FileUtil = require "lib_file"
-local ScriptLoader = require "script_loader"
+local FileUtil = require "framework.lib_file"
+local ScriptLoader = require "framework.script_loader"
 
 --本模块是lua主模块，由C主程序JYLua.exe调用。C程序主要提供游戏需要的视频、音乐、键盘等API函数，供lua调用。
 --游戏的所有逻辑都在lua代码中，以方便大家对代码的修改。
@@ -3196,8 +3196,8 @@ function instruct_6(warid,tmp,tmp2,flag)      --战斗
     local isexp = (flag == 0) and 0 or (flag or 1)
     if co then
         lib.Debug("instruct_6: running in coroutine, warid=" .. warid .. ", flag=" .. tostring(flag) .. ", isexp=" .. tostring(isexp))
-        local scheduler = require("coroutine_scheduler")
-        local WarAsync = require("war_async")
+        local scheduler = require("framework.coroutine_scheduler")
+        local WarAsync = require("framework.war_async")
         
         lib.Debug("instruct_6: creating battle sub-coroutine")
         local warCo = scheduler:create(function()
@@ -3517,7 +3517,7 @@ function instruct_27(id,startpic,endpic)           --显示动画
     -- 获取协程调度器
     local scheduler = nil
     if coroutine.running() then
-        scheduler = require("coroutine_scheduler").getInstance()
+        scheduler = require("framework.coroutine_scheduler").getInstance()
     end
     
     if scheduler then
