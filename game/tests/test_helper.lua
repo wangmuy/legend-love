@@ -263,6 +263,36 @@ function TestHelper.mockGlobals()
     TestHelper.mockWAR()
     TestHelper.mockLib()
     TestHelper.mockWarFunctions()
+    TestHelper.mockEngineAPI()
+end
+
+function TestHelper.mockEngineAPI()
+    _G.EngineAPI = {
+        time = {
+            getTime = function() return love and love.timer and love.timer.getTime and love.timer.getTime() * 1000 or 0 end,
+            getTimeSeconds = function() return love and love.timer and love.timer.getTime and love.timer.getTime() or 0 end,
+            sleep = function() end,
+        },
+        file = {
+            exists = function() return false end,
+            getSize = function() return -1 end,
+            open = function() end,
+            openFile = function() end,
+            read = function() return nil end,
+            write = function() return false end,
+            lines = function() return function() end end,
+            createDirectory = function() end,
+            remove = function() return false end,
+        },
+        debug = { log = function() end },
+        coroutine = {
+            isRunning = function() return false end,
+            yieldPoint = function() end,
+            waitFor = function() return false end,
+        },
+        app = { quit = function() end },
+        script = { load = function() return nil end },
+    }
 end
 
 function TestHelper.mockWarFunctions()

@@ -7,8 +7,6 @@ local initialized = false
 local function now()
     if EngineAPI and EngineAPI.time and EngineAPI.time.getTimeSeconds then
         return EngineAPI.time.getTimeSeconds()
-    elseif love and love.timer and love.timer.getTime then
-        return love.timer.getTime()
     end
     return os.clock()
 end
@@ -23,8 +21,8 @@ local function writeLine(line)
 end
 
 function PerfLog.init()
-    if initialized then
-        return
+    local function getTime()
+        return EngineAPI.time.getTimeSeconds()
     end
     local f = FileUtil.open(logfile, "w")
     if f then
