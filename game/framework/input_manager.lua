@@ -6,12 +6,9 @@
 local InputManager = {}
 InputManager.__index = InputManager
 
--- 获取时间（秒），优先使用 EngineAPI 或回退到 love.timer
+-- 获取时间（秒）
 local function getTimeSeconds()
-    if EngineAPI and EngineAPI.time and EngineAPI.time.getTimeSeconds then
-        return EngineAPI.time.getTimeSeconds()
-    end
-    return love.timer.getTime()
+    return EngineAPI.time.getTimeSeconds()
 end
 
 -- 事件队列（环形缓冲区）
