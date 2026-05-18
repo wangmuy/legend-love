@@ -31,14 +31,14 @@ local function toLoveOpenMode(mode)
     return "r"
 end
 
--- File open wrapper - handles both io.open and love.filesystem
+-- File open wrapper - handles both EngineAPI.file and io.open
 -- Returns a file handle compatible object
 function FileUtil.open(filepath, mode)
     mode = mode or "r"
 
     if hasLoveFS() then
         local writable = isWriteMode(mode)
-        local hasExisting = love.filesystem.getInfo(filepath) ~= nil
+        local hasExisting = EngineAPI.file.exists(filepath)
 
         if not hasExisting and not writable then
             return nil
@@ -47,21 +47,13 @@ function FileUtil.open(filepath, mode)
         if writable then
             local parent = filepath:match("^(.*)/[^/]+$")
             if parent and parent ~= "" then
-                love.filesystem.createDirectory(parent)
+                EngineAPI.file.createDirectory(parent)
             end
         end
 
-        local lf = love.filesystem.newFile(filepath)
-        local openMode = toLoveOpenMode(mode)
-        local okOpen, opened = pcall(function()
-            return lf:open(openMode)
-        end)
-        if okOpen and opened then
-            return FileUtil.wrapHandle({
-                file = lf,
-                mode = mode,
-                loveStream = true,
-            }, true)
+        local rawHandle = EngineAPI.file.openFile(filepath, toLoveOpenMode(mode))
+        if rawHandle then
+            return FileUtil.wrapHandle(rawHandle, true)
         end
     end
 

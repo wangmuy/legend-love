@@ -136,6 +136,19 @@ EngineAPI.file.open = function(filename, mode)
     return io.open(filename, mode or "r")
 end
 
+EngineAPI.file.openFile = function(filename, mode)
+    if love and love.filesystem and love.filesystem.newFile then
+        local f = love.filesystem.newFile(filename)
+        if f then
+            local ok = f:open(mode or "r")
+            if ok then
+                return { file = f, mode = mode or "r", loveStream = true }
+            end
+        end
+    end
+    return io.open(filename, mode or "r")
+end
+
 EngineAPI.file.remove = function(filename)
     if love and love.filesystem and love.filesystem.remove then
         return love.filesystem.remove(filename)
