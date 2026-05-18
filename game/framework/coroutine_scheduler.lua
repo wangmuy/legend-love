@@ -31,7 +31,7 @@ function CoroutineScheduler:init(deps)
     currentCoroutine = nil
     coroutineIdCounter = 0
     -- 注入时间源，默认为 love.timer.getTime
-    self.timeSource = deps.timeSource or (EngineAPI and EngineAPI.time and EngineAPI.time.getTimeSeconds) or (love and love.timer and love.timer.getTime)
+    self.timeSource = deps.timeSource or (EngineAPI and EngineAPI.time and EngineAPI.time.getTimeSeconds) or os.clock
 end
 
 -- 内部调试方法，便于测试时 mock
