@@ -183,6 +183,11 @@ EngineAPI.file.open = function(filename, mode)
     return io.open(filename, mode)
 end
 
+EngineAPI.file.openFile = function(filename, mode)
+    logCall("file.openFile", filename, mode)
+    return io.open(filename, mode or "r")
+end
+
 EngineAPI.file.remove = function(filename)
     logCall("file.remove", filename)
     return os.remove(filename)

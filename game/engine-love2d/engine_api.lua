@@ -186,6 +186,12 @@ M.file = {}
 -- @return table|nil 文件句柄
 function M.file.open(filename, mode) end
 
+--- 打开原始文件句柄（引擎原生格式，用于底层 FileHandle 封装）
+-- @param filename string 文件路径
+-- @param mode string 打开模式
+-- @return table|nil 引擎原生文件对象
+function M.file.openFile(filename, mode) end
+
 --- 删除文件
 -- @param filename string 文件路径
 function M.file.remove(filename) end
