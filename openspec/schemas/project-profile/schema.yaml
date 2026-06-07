@@ -1,0 +1,174 @@
+name: project-profile
+version: 1
+description: >
+  Living project identity, status dashboard, governance constitution,
+  standards guides, and architectural canvas. Profiles are created once
+  and updated continuously — they are NEVER archived.
+
+artifacts:
+  - id: profile
+    generates: profile.md
+    description: >
+      Project identity card and auto-derived status dashboard.
+      This is the first thing anyone (human or AI) reads about the project.
+    template: profile.md
+    instruction: |
+      Create the project profile. This is the project's identity card.
+
+      Sections:
+      - **Identity**: One-sentence description of what this project is.
+        Examples: "A simplified WeChat clone for learning distributed systems."
+        "An open-source World of Warcraft server implementation."
+        Include tech stack summary, license, and repository links if applicable.
+
+      - **Current Status**: Auto-derived from scanning the project state.
+        Scan `openspec/specs/`, `openspec/epics/`, and `openspec/changes/` to populate:
+        - **Implemented Capabilities**: List specs in `openspec/specs/` with brief descriptions.
+        - **Active Epics**: Table from `openspec/epics/`:
+          | Epic | Created | Slices (done/total) | Status |
+        - **In-Progress Changes**: Active changes from `openspec/changes/` (non-archive)
+          with schema type and artifact status.
+
+      - **Quick Start**: Minimal steps to get the project running locally.
+
+      Status sections MUST be derived by scanning the actual filesystem.
+      Note at the top: "Last auto-derived: <date>.
+      Run `/opsx:verify project-profile` to refresh."
+
+      Preserve user notes in `## Notes` section across auto-refreshes.
+
+      If this document exceeds ~500 lines, use fan-out: split into
+      `profile/_index.md`, `profile/identity.md`, `profile/status.md`,
+      `profile/quickstart.md`.
+    requires: []
+
+  - id: constitution
+    generates: constitution.md
+    description: >
+      Non-negotiable governance rules (hard constraints: MUST / NEVER).
+      Defines absolute constraints for all AI agents and developers.
+    template: constitution.md
+    instruction: |
+      Create the project constitution — the rulebook of hard constraints.
+
+      Sections:
+      - **Core Principles**: 3-5 immutable design principles.
+      - **Banned Patterns**: Absolute prohibitions (NEVER).
+      - **Required Patterns**: Must-follow conventions (MUST).
+      - **Compliance Requirements**: Legal, security, regulatory constraints.
+      - **Tech Stack Constraints**: Banned/required technologies.
+
+      Each rule must be specific enough to check programmatically.
+      Avoid vague guidance like "write good code" — that belongs in standards.md.
+
+      This document is injected as a constraint layer into every AI prompt.
+      Make it precise and testable.
+    requires: []
+
+  - id: standards
+    generates: standards.md
+    description: >
+      Advisory guidance: conventions, best practices, style guides
+      (SHOULD / PREFER). Softer than constitution — deviation allowed
+      with justification.
+    template: standards.md
+    instruction: |
+      Create the standards guide — advisory conventions for this project.
+
+      Sections:
+      - **Coding Style**: Formatting, naming conventions, file organization.
+        Example: "Prefer `const` over `let`. Use arrow functions for components."
+      - **Best Practices**: Recommended patterns, anti-patterns to avoid.
+        Example: "Prefer composition over inheritance for React components."
+      - **Language Patterns**: Idiomatic patterns for the tech stack.
+        Example: "Use async/await over raw Promise chains."
+      - **Testing Style**: Test organization, naming, coverage expectations.
+        Example: "Unit tests should test behavior, not implementation."
+      - **Project Idioms**: Conventions specific to this project.
+        Example: "All API handlers go in `src/handlers/`."
+
+      These are ADVISORY. AI SHOULD follow them. Deviations are allowed
+      with explicit justification. This contrasts with constitution.md
+      where violations are blocking.
+    requires: []
+
+  - id: architecture
+    generates: architecture.md
+    description: >
+      Living architectural canvas showing bounded contexts, data flows,
+      integration points, and global constraints.
+    template: architecture.md
+    instruction: |
+      Create the architecture canvas — the big-picture map of the system.
+
+      Derive from scanning `openspec/specs/` structure.
+
+      Sections:
+      - **Bounded Contexts**: Each domain with responsibility, key entities,
+        and link to its spec.
+      - **Data Flow Topology**: How domains connect. Mermaid diagrams.
+      - **Integration Points**: External systems, APIs, message queues.
+      - **Global Constraints**: Cross-cutting architectural rules.
+      - **Evolution Log**: Dated log of significant architectural changes.
+
+      Mark sections with "Last verified: <date>" so stale content is visible.
+
+      Support fan-out: split into `architecture/_index.md`,
+      `architecture/domains.md`, `architecture/data-flows.md`,
+      `architecture/integrations.md` if this document exceeds ~500 lines.
+    requires: [profile]
+
+  - id: domain-map
+    generates: domain-map.md
+    description: >
+      Maps bounded contexts to source repositories, teams, and owners.
+      Required for polyrepo projects, optional for monorepos.
+    template: domain-map.md
+    instruction: |
+      Create the domain map — linking domains to physical locations.
+
+      Only create if the project has multiple repositories or
+      different domains owned by different teams/agents.
+
+      Table format:
+      | Domain | Repository(s) | Owner | Spec Link |
+      |--------|--------------|-------|-----------|
+
+      If monorepo with single owner, note:
+      "Monorepo. Domain map not required."
+    requires: [architecture]
+
+apply:
+  requires: [profile]
+  tracks: null
+  instruction: >
+    Project profiles are NOT typical changes — they cannot be applied
+    or archived normally. After creating profile artifacts:
+
+    1. Verify all artifacts exist in `openspec/project/`
+    2. Profile must accurately reflect project state
+    3. Architecture must reference all existing spec domains
+    4. Constitution must be specific and testable (hard constraints)
+    5. Standards must be advisory (SHOULD/PREFER, not MUST/NEVER)
+
+    After setup, direct the user to `openspec/WORKFLOW.md` for the
+    canonical workflow reference (zoom model, walkthrough, upgrade paths).
+
+    To refresh status, re-create the profile artifact.
+
+    Before creating, check `openspec/skills-profile.yaml`
+    for suggested skills (keys: `project-profile.proposal`,
+    `project-profile.constitution`).
+
+    ## Scale Assessment
+
+    When creating the profile, assess the project scale:
+    Sketch (vague) → Blueprint (crystallizing) → Modular (multi-stream)
+    → Ecosystem (multi-repo/vendor). Recommend schemas accordingly.
+
+    If the scale is unclear, recommend running /opsx:explore first.
+
+    ## UX Rule
+
+    When presenting scale or schema choices, always include
+    "Other — write your own" as the LAST option.

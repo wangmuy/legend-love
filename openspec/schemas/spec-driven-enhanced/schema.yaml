@@ -1,0 +1,188 @@
+name: spec-driven-enhanced
+version: 2
+description: >
+  Enhanced spec-driven development with traceability, blast radius
+  constraints, ADRs, negative constraints, and verification.
+  Forked from stock spec-driven. Use at Blueprint scale or above.
+  Skill suggestions are configured in `openspec/skills-profile.yaml`,
+  not embedded in this schema.
+
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: >
+      Business proposal with scope boundaries, parent context,
+      and traceability planning.
+    template: proposal.md
+    instruction: |
+      Create the proposal. In addition to standard sections, include:
+
+      - **Parent Context** (if applicable):
+        - Epic: Link to `openspec/epics/YYYY-MM-<slug>/epic.md`
+        - Slice: Link to the vertical-slice change
+        - If standalone, state "Standalone change."
+
+      - **Scope Boundaries**: Explicit In Scope / Out of Scope.
+        Out of Scope is critical — it prevents scope creep.
+
+      - **Capabilities**: Standard, but plan [REQ-XXX] IDs for each
+        new capability. IDs will be assigned in the specs phase.
+
+      - **Contract Adherence**: If this change is part of a slice,
+        confirm adherence to shared contract stubs from the
+        change-manifest. List and justify any deviations.
+
+      Standard sections: Why, What Changes, Capabilities, Impact.
+
+      Before creating, check `openspec/skills-profile.yaml`
+      for suggested skills (key: `spec-driven-enhanced.proposal`).
+    requires: []
+
+  - id: specs
+    generates: specs/**/*.md
+    description: >
+      Delta specs with mandatory [REQ-XXX] traceability IDs
+      and BDD Given/When/Then scenarios.
+    template: spec.md
+    instruction: |
+      Create delta spec files.
+
+      **Traceability IDs**: Every requirement MUST have a unique
+      `[REQ-XXX]` ID in the header:
+      `### Requirement: Name [REQ-XXX]`
+      These IDs link specs to tasks and verification.
+
+      **BDD Scenarios**: Every scenario MUST use Given/When/Then format.
+      All stock rules apply: ADDED/MODIFIED/REMOVED, RFC 2119,
+      #### Scenario format, full content for MODIFIED.
+
+      Before creating, check `openspec/skills-profile.yaml`
+      for suggested skills (key: `spec-driven-enhanced.specs`).
+    requires: [proposal]
+
+  - id: design
+    generates: design.md
+    description: >
+      Technical design with ADRs, negative constraints,
+      and constitution alignment check.
+    template: design.md
+    instruction: |
+      Create the design document. In addition to standard sections:
+
+      - **Architecture Decision Records (ADR)**:
+        ```
+        ### ADR-NNN: <Title>
+        - **Context**: What problem?
+        - **Decision**: What we chose and why.
+        - **Alternatives Considered**: Rejected and why.
+        - **Consequences**: Easier/harder trade-offs.
+        ```
+
+      - **Negative Constraints**: What MUST NOT be changed or introduced.
+        "Do NOT modify `src/main.ts`."
+        "Do NOT introduce new libraries without review."
+
+      - **Alignment Check**: Verify this design does not violate
+        `openspec/project/constitution.md`. List edge cases or exceptions.
+
+      Standard sections: Context, Goals/Non-Goals, Decisions, Risks.
+
+      Before creating, check `openspec/skills-profile.yaml`
+      for suggested skills (key: `spec-driven-enhanced.design`).
+    requires: [proposal]
+
+  - id: tasks
+    generates: tasks.md
+    description: >
+      Implementation checklist with blast radius constraints
+      and machine-verifiable Definition of Done per task.
+    template: tasks.md
+    instruction: |
+      Create the task list. Standard checkbox format plus:
+
+      Each task group:
+      ```
+      ## N. <Group Name>
+      Traceability: [REQ-XXX]
+
+      - [ ] N.M <Task description>
+        Blast Radius: `["src/auth/*", "tests/auth/*"]`
+        DoD:
+          - [ ] `npm run test:auth` passes
+          - [ ] Lint passes for modified files
+      ```
+
+      **Blast Radius**: Glob whitelist of files this task may modify.
+      AI MUST NOT touch files outside these patterns.
+      If a task needs files outside its radius, pause and update.
+
+      **Definition of Done**: Machine-verifiable criteria.
+      "Test suite passes", "Linter 0 errors", "API returns 200".
+
+      **Traceability**: Every group references the [REQ-XXX] it implements.
+
+      Before creating, check `openspec/skills-profile.yaml`
+      for suggested skills (key: `spec-driven-enhanced.tasks`).
+    requires: [specs, design]
+
+  - id: verification
+    generates: verification.md
+    description: >
+      Post-implementation verification: traceability matrix,
+      blast radius compliance, test results, deviation analysis.
+    template: verification.md
+    instruction: |
+      Create the verification report AFTER implementation.
+
+      Sections:
+      - **Traceability Matrix**:
+        | Requirement ID | Spec Location | Implementation Files | Covered? |
+
+      - **Blast Radius Compliance**: Compare git diff to allowed paths.
+        List violations. FAILED if any violations exist.
+
+      - **Test Results**: Total / Passed / Failed / Skipped,
+        coverage, lint/security scan results.
+
+      - **Deviation Analysis**: Differences between spec intent and
+        implementation. If specs need updating, note for archive sync.
+
+      - **Overall Verdict**: ✓ PASSED or ✗ FAILED.
+        FAILED MUST be resolved before archive.
+
+      Before creating, check `openspec/skills-profile.yaml`
+      for suggested skills (key: `spec-driven-enhanced.verification`).
+    requires: [tasks]
+
+apply:
+  requires: [tasks]
+  tracks: tasks.md
+  instruction: |
+    Read context files, work through pending tasks, mark complete as you go.
+
+    Enhanced guards:
+    - Respect blast radius per task — pause if a task needs files outside
+    - Mark tasks complete as you go
+    - After all tasks, run verification to validate against specs
+    - Check `openspec/skills-profile.yaml` for suggested skills before each phase
+
+    ## Fit-Level Reminder
+
+    If the scope of this change feels larger than expected, pause and
+    re-assess. Use `/opsx:explore` (invocable anytime, at any scale).
+    Explorer concludes with a fit-level recommendation:
+    project-wide | new-epic | vertical-slice | simple-change
+    This change may need to upgrade to a vertical-slice if scope expands.
+
+    ## TODO.md Triage
+
+    After each task completion, check this change's `TODO.md` for
+    emergent ideas. When archive is near, scan `openspec/project/TODO.md`
+    and surface: "You have N items. Promote to a follow-up change or dismiss?"
+
+    ## UX Rule
+
+    When presenting any choice menu (fit-level, triage, schema, skills),
+    always include "Other — write your own" as the LAST option.
+
+    Pause if you hit blockers or need clarification.

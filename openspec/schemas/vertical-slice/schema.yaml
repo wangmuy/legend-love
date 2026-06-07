@@ -1,0 +1,103 @@
+name: vertical-slice
+version: 1
+description: >
+  Vertical slice (MVP) planning. A slice is an independently testable
+  and shippable unit of work. Slices may be user-facing features,
+  infrastructure scaffolding, cross-team coordination, or any
+  verifiable behavior. Decomposes into implementable changes with
+  shared contract stubs.
+
+artifacts:
+  - id: slice-proposal
+    generates: slice-proposal.md
+    description: >
+      Slice scope, acceptance criteria, and domain impact.
+      Links back to parent epic if applicable.
+    template: slice-proposal.md
+    instruction: |
+      Create the slice proposal defining this MVP's scope.
+
+      Sections:
+      - **Parent Epic**: Link to `openspec/epics/YYYY-MM-<slug>/epic.md`
+        (if part of an epic). Otherwise "Standalone vertical slice."
+      - **Slice Type**: Feature / Infrastructure / Coordination
+      - **User Story**: One sentence. "As a <role>, I can <action> so that <value>."
+        For infrastructure slices: "The system can <capability>."
+      - **In Scope**: Specific behaviors this slice delivers.
+        Include ALL layers (API, UI, DB) as a unified behavior.
+        NOTE: When multiple repositories are involved, a slice MAY decompose
+        along tech boundaries (frontend/backend) — provided the slice has
+        a UNIFIED DoD spanning all changes. The contract stubs in the
+        change-manifest are the coordination mechanism.
+      - **Out of Scope**: Explicitly exclude behaviors belonging to OTHER slices.
+      - **Acceptance Criteria**: E2E testable scenarios using Given-When-Then.
+        These are the slice's DoD.
+      - **Affected Domains**: Bounded contexts from architecture.md that are touched.
+    requires: []
+
+  - id: change-manifest
+    generates: change-manifest.md
+    description: >
+      Decomposition into spec-driven changes with shared API contracts.
+      This is the bridge between planning and implementation.
+    template: change-manifest.md
+    instruction: |
+      Create the change manifest — decompose this slice into concrete
+      spec-driven changes with shared contract stubs.
+
+      Sections:
+      - **Change Assignments**: For each implementation unit:
+        ```
+        ### Change: <kebab-case-name>
+        - **Repository**: <repo-name> (or "this repo" for monorepo)
+        - **Scope**: <frontend/backend/fullstack/database/infra>
+        - **Responsibility**: What this change owns in the slice
+        - **Depends On**: Other changes in this manifest (or "none")
+        - **Status**: [ ] Created / [~] In Progress / [x] Archived
+        ```
+
+      - **Shared Contract Stubs**: API contracts enabling parallel development.
+        Each contract must be specific enough for a frontend change
+        to build complete UI mocks without the backend existing.
+
+      - **Integration Test Plan**: How to verify the slice end-to-end
+        after all constituent changes are complete.
+
+      After creating this manifest, create each change individually:
+      `openspec new change <name> --schema spec-driven`
+
+      Each change's proposal MUST reference this slice and adhere
+      to the shared contract stubs.
+
+      Before creating, check `openspec/skills-profile.yaml`
+      for suggested skills (keys: `vertical-slice.slice-proposal`,
+      `vertical-slice.change-manifest`).
+    requires: [slice-proposal]
+
+apply:
+  requires: [change-manifest]
+  tracks: change-manifest.md
+  instruction: >
+    After creating the slice plan:
+    1. Verify each change assignment is scoped correctly
+    2. Confirm contract stubs are precise enough for parallel development
+    3. Create the spec-driven changes listed in the manifest
+
+    The slice is "done" when all changes in the manifest are archived.
+
+    ## Scale and Fit-Level Reminder
+
+    - This slice may be part of an epic or standalone.
+    - If scope is unclear, use `/opsx:explore` first (invocable anytime).
+    - Explorer concludes with a fit-level recommendation:
+      project-wide | new-epic | vertical-slice | simple-change
+
+    ## TODO.md Triage
+
+    Scan `openspec/project/TODO.md` and the slice's `TODO.md`
+    for emergent ideas. Surface: "Promote to a task/change or dismiss?"
+
+    ## UX Rule
+
+    When presenting any choice menu, always include
+    "Other — write your own" as the LAST option.

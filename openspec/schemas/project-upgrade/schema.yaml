@@ -1,0 +1,93 @@
+name: project-upgrade
+version: 1
+description: >
+  Project scale transition. Upgrades a project from one scale
+  level to the next (Sketch → Blueprint → Modular → Ecosystem).
+  Bootstraps new artifacts from existing project state via AI.
+
+artifacts:
+  - id: upgrade-plan
+    generates: upgrade-plan.md
+    description: >
+      Migration plan from current scale to target scale.
+      Scans project state and determines what needs to be created.
+    template: upgrade-plan.md
+    instruction: |
+      Create the upgrade plan by analyzing current project state.
+
+      Sections:
+      - **Current Scale Assessment**:
+        - Read `openspec/config.yaml` for current schema
+        - Scan `openspec/specs/` for existing capabilities
+        - Scan `openspec/changes/` for active work
+        - Determine: Sketch / Blueprint / Modular / Ecosystem
+
+      - **Target Scale**: What to upgrade to.
+        If not specified, recommend the next logical step.
+
+      - **New Artifacts to Create**:
+        | Artifact | Schema | Auto-derivable? | Notes |
+
+      - **Migration Steps**: Ordered checklist with concrete actions.
+      - **What Stays the Same**: Existing specs, changes, archives unaffected.
+      - **Rollback Plan**: How to undo if issues arise.
+
+      Before creating, check `openspec/skills-profile.yaml`
+      for suggested skills (key: `project-upgrade.upgrade-plan`).
+    requires: []
+
+  - id: upgrade-verification
+    generates: upgrade-verification.md
+    description: >
+      Post-upgrade verification checklist.
+    template: upgrade-verification.md
+    instruction: |
+      Verify the upgrade completed successfully.
+
+      Checklist:
+      - [ ] `openspec/project/` artifacts exist and are valid
+      - [ ] Constitution has specific, testable rules
+      - [ ] Architecture covers all existing spec domains
+      - [ ] `openspec/config.yaml` updated with correct schema defaults
+      - [ ] New schemas validate: `openspec schema validate <name>`
+      - [ ] Existing changes are NOT broken
+      - [ ] AI can read project context (test change)
+
+      **Acceptance Test**: Create a test change. AI should:
+      1. Reference constitution for constraints
+      2. Reference architecture for domain context
+      3. Not violate banned patterns
+
+      All checks must pass for VERIFIED status.
+    requires: [upgrade-plan]
+
+apply:
+  requires: [upgrade-verification]
+  tracks: null
+  instruction: >
+    Apply the upgrade:
+    1. Create new artifacts using their respective schemas
+    2. Update config.yaml
+    3. Run `openspec schema validate` for each schema
+    4. Create a test change to verify AI context injection
+    5. Run upgrade verification
+
+    The upgrade change can be archived after verification passes.
+    New artifacts persist independently.
+
+    ## Scale Assessment During Upgrade
+
+    The upgrade plan assesses the current scale (Sketch/Blueprint/Modular/
+    Ecosystem) and recommends targets. If the current scale assessment
+    is unclear, recommend running `/mvp:evaluate-scale` first for a
+    structured diagnosis, then return to this upgrade with a clear target.
+
+    Scale selection logic:
+    - Sketch → Blueprint: add project-profile + enhanced spec-driven
+    - Blueprint → Modular: add epic + vertical-slice + domain-map
+    - Modular → Ecosystem: add external-ingest + code-to-spec
+
+    ## UX Rule
+
+    When presenting upgrade target choices, always include
+    "Other — write your own scale" as the LAST option.
