@@ -1,0 +1,5 @@
+schema: spec-driven
+created: 2026-06-07
+parent_epic: web-mud-text-version
+slice: 1
+slice_name: 数据提取管线
