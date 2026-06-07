@@ -1,0 +1,55 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    background: #0a0a0a;
+    color: #c0c0c0;
+    font-family: 'Courier New', 'Noto Sans SC', monospace;
+    height: 100vh;
+    overflow: hidden;
+}
+
+#container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+#terminal {
+    flex: 1;
+    padding: 8px;
+    overflow: hidden;
+}
+
+#terminal .xterm {
+    height: 100%;
+}
+
+#input-line {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #111;
+    border-top: 1px solid #333;
+    flex-shrink: 0;
+}
+
+#prompt {
+    color: #0f0;
+    font-weight: bold;
+    margin-right: 8px;
+    font-size: 14px;
+}
+
+#command-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #c0c0c0;
+    font-family: 'Courier New', 'Noto Sans SC', monospace;
+    font-size: 14px;
+    outline: none;
+}
+
+#command-input::placeholder {
+    color: #555;
+}
