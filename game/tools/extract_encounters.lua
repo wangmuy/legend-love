@@ -1,6 +1,6 @@
 -- Extracts battle map and encounter data from game binary files
 -- Run: cd game && lua tools/extract_encounters.lua
--- Produces: data-web/wmap.json
+-- Produces: engine-web/data-web/wmap.json
 
 local function readFile(path)
     local f = io.open(path, "rb")
@@ -94,7 +94,7 @@ local function writeJSON(outputPath, data)
     local json = encode(data)
     local f = io.open(outputPath, "w")
     if not f then
-        os.execute("mkdir -p data-web")
+        os.execute("mkdir -p engine-web/data-web")
         f = io.open(outputPath, "w")
     end
     f:write(json)
@@ -249,7 +249,7 @@ local function main()
         table.insert(output.encounters, enc)
     end
 
-    writeJSON("data-web/wmap.json", output)
+    writeJSON("engine-web/data-web/wmap.json", output)
 
     print("\n=== Summary ===")
     print("  fight*.grp files: " .. #maps)
