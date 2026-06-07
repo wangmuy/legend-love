@@ -8,13 +8,13 @@
 - **GIVEN** 战斗地图索引文件存在
 - **WHEN** 运行提取脚本
 - **THEN** 读取所有战斗地图的编号、名称、尺寸
-- **AND** 将数据写入 `data-web/wmap.json`
+- **AND** 将数据写入 `engine-web/data-web/wmap.json`
 
 #### Scenario: 提取遇敌配置
 - **WHEN** 处理场景/大地图遇敌数据时
 - **THEN** 提取每个场景/区域可遇到的敌人列表
 - **AND** 提取遇敌概率
-- **AND** 将数据写入 `data-web/wmap.json`
+- **AND** 将数据写入 `engine-web/data-web/wmap.json`
 
 #### Scenario: wmap.json 结构
 - **WHEN** 读取 wmap.json

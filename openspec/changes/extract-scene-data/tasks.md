@@ -12,7 +12,7 @@
 - [ ] 2.3 实现 `extractSceneNPCItems()` — 读取场景数据解析 NPC/物品坐标
 - [ ] 2.4 实现 `extractSceneEvents()` — 读取 d* 文件解析事件触发点
 - [ ] 2.5 实现场景类型推断逻辑
-- [ ] 2.6 写入 `data-web/scenes.json`
+- [ ] 2.6 写入 `engine-web/data-web/scenes.json`
 
 ## 3. 验证
 

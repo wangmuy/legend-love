@@ -9,7 +9,7 @@
 - **WHEN** 运行提取脚本
 - **THEN** 系统读取 idx 文件获取每条对话的偏移量
 - **AND** 按偏移量从 grp 文件中读取每条对话文本
-- **AND** 将对话数据写入 `data-web/dialogues.json`
+- **AND** 将对话数据写入 `engine-web/data-web/dialogues.json`
 
 #### Scenario: 对话计数正确
 - **GIVEN** 对话数据提取完成

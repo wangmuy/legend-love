@@ -9,7 +9,7 @@ Web MUD 需要人物、物品、武功的静态数据用于显示状态、管理
 - 在 `tools/extract_web_data.lua` 中实现运行时数据导出模块
 - 加载 `script/jyconst.lua` 获取 CC.Person_S、CC.Thing_S 等数据定义
 - 遍历所有人物/物品/武功编号，读取核心属性
-- 输出 `data-web/chars.json`、`items.json`、`skills.json`
+- 输出 `engine-web/data-web/chars.json`、`items.json`、`skills.json`
 
 ## 能力
 
@@ -23,6 +23,6 @@ Web MUD 需要人物、物品、武功的静态数据用于显示状态、管理
 
 ## 影响
 
-- 新增 `data-web/chars.json`（约 200 KB）
-- 新增 `data-web/items.json`（约 100 KB）
-- 新增 `data-web/skills.json`（约 100 KB）
+- 新增 `engine-web/data-web/chars.json`（约 200 KB）
+- 新增 `engine-web/data-web/items.json`（约 100 KB）
+- 新增 `engine-web/data-web/skills.json`（约 100 KB）

@@ -7,7 +7,7 @@
 
 - [ ] 2.1 实现 `extractWarMaps()` — 读取战斗地图列表
 - [ ] 2.2 实现 `extractEncounters()` — 读取遇敌配置
-- [ ] 2.3 写入 `data-web/wmap.json`
+- [ ] 2.3 写入 `engine-web/data-web/wmap.json`
 
 ## 3. 验证
 
