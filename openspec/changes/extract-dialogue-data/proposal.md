@@ -8,7 +8,7 @@ Web 版（Fengari）无法直接读取二进制文件，需要提取为 JSON。
 - 在 `tools/extract_web_data.lua` 中实现对话数据提取模块
 - 读取 `game/data/oldtalk.idx`（4 字节偏移量数组）
 - 按偏移量从 `game/data/oldtalk.grp` 读取每条对话文本
-- 输出 `game/data-web/dialogues.json`
+- 输出 `game/engine-web/data-web/dialogues.json`
 
 ## 能力
 
@@ -20,5 +20,5 @@ Web 版（Fengari）无法直接读取二进制文件，需要提取为 JSON。
 
 ## 影响
 
-- 新增 `game/data-web/dialogues.json`（约 1-2 MB）
+- 新增 `game/engine-web/data-web/dialogues.json`（约 1-2 MB）
 - 无现有代码修改

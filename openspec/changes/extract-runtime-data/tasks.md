@@ -7,9 +7,9 @@
 
 - [ ] 2.1 在提取脚本中加载 `script/jyconst.lua` 获取数据结构定义
 - [ ] 2.2 模拟游戏初始化或直接读取二进制数据填充人物表
-- [ ] 2.3 提取人物数据写入 `data-web/chars.json`
-- [ ] 2.4 提取物品数据写入 `data-web/items.json`
-- [ ] 2.5 提取武功数据写入 `data-web/skills.json`
+- [ ] 2.3 提取人物数据写入 `engine-web/data-web/chars.json`
+- [ ] 2.4 提取物品数据写入 `engine-web/data-web/items.json`
+- [ ] 2.5 提取武功数据写入 `engine-web/data-web/skills.json`
 
 ## 3. 验证
 

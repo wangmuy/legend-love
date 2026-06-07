@@ -12,28 +12,15 @@ created: 2026-06
 ## 架构概述
 
 ```
-浏览器 (static web)
-  ┌───────────────────────────────────┐
-  │  index.html + xterm.js            │
-  │  ┌─────────────────────────────┐  │
-  │  │  Fengari (Lua 5.3 VM)       │  │
-  │  │                             │  │
-  │  │  engine_web.lua             │  │
-  │  │   ─ render.* → ANSI 流      │  │
-  │  │   ─ input.* → xterm 输入    │  │
-  │  │   ─ file.* → fetch JSON     │  │
-  │  │   ─ sprite/map/audio → noop │  │
-  │  │                             │  │
-  │  │  framework/*.lua (不改)      │  │
-  │  │  script/*.lua (不改)         │  │
-  │  │  data-web/*.json (精简数据)  │  │
-  │  └─────────────────────────────┘  │
-  │                                    │
-  │  JS Bridge:                        │
-  │   ─ requestAnimationFrame 驱动     │
-  │   ─ 事件队列调度协程               │
-  │   ─ Lua → ANSI → xterm.js         │
-  └───────────────────────────────────┘
+game/
+├── framework/*.lua
+├── script/*.lua
+└── engine-web/
+    ├── index.html + xterm.js
+    ├── engine_web.lua
+    ├── data_loader.lua
+    ├── data-web/*.json
+    └── ...
 ```
 
 ## 交互设计
@@ -55,13 +42,13 @@ created: 2026-06
 
 | 产出文件 | 内容 | 原始来源 |
 |----------|------|----------|
-| `data-web/dialogues.json` | 对话文本（原版 5000+ 条） | `oldtalk.grp/.idx` |
-| `data-web/scenes.json` | 场景结构 + NPC/物品坐标 + 出口 | `allsin.grp/.idx`、`s*.grp/.idx`、`d*.grp/.idx` |
-| `data-web/chars.json` | 人物数据（初始状态、属性） | `jyconst.lua` + 二进制验证 |
-| `data-web/items.json` | 物品数据 | `jyconst.lua` + 二进制验证 |
-| `data-web/skills.json` | 武功数据 | `jyconst.lua` + 二进制验证 |
-| `data-web/entrances.json` | 大地图场景入口坐标 → 场景 ID 映射 | `mmap.grp/.idx` |
-| `data-web/wmap.json` | 遇敌信息（地图 → 敌人列表） | 原版遇敌配置 |
+| `game/engine-web/data-web/dialogues.json` | 对话文本（原版 5000+ 条） | `oldtalk.grp/.idx` |
+| `game/engine-web/data-web/scenes.json` | 场景结构 + NPC/物品坐标 + 出口 | `allsin.grp/.idx`、`s*.grp/.idx`、`d*.grp/.idx` |
+| `game/engine-web/data-web/chars.json` | 人物数据（初始状态、属性） | `jyconst.lua` + 二进制验证 |
+| `game/engine-web/data-web/items.json` | 物品数据 | `jyconst.lua` + 二进制验证 |
+| `game/engine-web/data-web/skills.json` | 武功数据 | `jyconst.lua` + 二进制验证 |
+| `game/engine-web/data-web/entrances.json` | 大地图场景入口坐标 → 场景 ID 映射 | `mmap.grp/.idx` |
+| `game/engine-web/data-web/wmap.json` | 遇敌信息（地图 → 敌人列表） | 原版遇敌配置 |
 
 **DoD**：在 Love2D 环境中运行提取脚本 `tools/extract_web_data.lua`，产出所有 JSON 文件。每份 JSON 可以被 Lua 直接 `require` 加载。JSON 总大小 ≤ 15MB。
 
@@ -84,8 +71,7 @@ created: 2026-06
 |------|------|
 | `index.html` | 页面骨架：输出区 (#output, xterm.js) + 输入区 (#input, `<input>`) |
 | `index.js` | Fengari bootstrap、JS ↔ Lua 桥接、事件队列、xterm.js 配置 |
-| `engine/engine_web.lua` | EngineAPI 37 个函数的 Web 实现 |
-| `engine/web_bridge.lua` | ANSI 输出桥接、输入路由、事件队列 |
+| `engine_web.lua` | EngineAPI 37 个函数的 Web 实现 |
 
 **engine_web.lua 关键映射**：
 

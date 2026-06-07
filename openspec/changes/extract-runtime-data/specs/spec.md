@@ -9,7 +9,7 @@
 - **WHEN** 运行提取脚本
 - **THEN** 遍历所有人物编号（0-999）
 - **AND** 读取人物的姓名、头像编号、初始等级、初始血量/内力等属性
-- **AND** 将数据写入 `data-web/chars.json`
+- **AND** 将数据写入 `engine-web/data-web/chars.json`
 
 #### Scenario: chars.json 结构
 - **WHEN** 读取 chars.json
@@ -23,7 +23,7 @@
 - **WHEN** 运行提取脚本
 - **THEN** 遍历所有物品编号
 - **AND** 读取物品的名称、类型（剧情/装备/秘籍/药品/暗器）、效果值、价格等
-- **AND** 将数据写入 `data-web/items.json`
+- **AND** 将数据写入 `engine-web/data-web/items.json`
 
 ### Requirement: 武功数据导出
 
@@ -33,7 +33,7 @@
 - **WHEN** 运行提取脚本
 - **THEN** 遍历所有武功编号
 - **AND** 读取武功的名称、类型（拳掌/剑法/刀法/特殊/暗器）、威力、消耗内力、攻击范围等
-- **AND** 将数据写入 `data-web/skills.json`
+- **AND** 将数据写入 `engine-web/data-web/skills.json`
 
 #### Scenario: 攻击范围字段
 - **WHEN** 导出武功数据时

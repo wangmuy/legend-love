@@ -65,7 +65,7 @@ extract-encounter-data ──┘
 
 | 约定 | 规则 |
 |------|------|
-| 文件位置 | `game/data-web/` |
+| 文件位置 | `game/engine-web/data-web/` |
 | 顶层字段 | 必须包含 `version`、`extracted`、`total` |
 | 文件名 | 固定：dialogues.json, scenes.json, chars.json, items.json, skills.json, entrances.json, wmap.json |
 | 编码 | UTF-8，无 BOM |
