@@ -1,0 +1,160 @@
+# Skills Profile
+#
+# Independent skill suggestions for each workflow step.
+# Schemas reference this file; edit skills freely without changing schema.yaml.
+#
+# ## How to Use
+#
+# 1. Add entries under `suggestions:` using key format:
+#    `schema-id.artifact-id` (e.g., spec-driven-enhanced.tasks)
+#    `exploration` for the /opsx:explore step
+#    `mvp-<command>` for mvp-schemas commands (e.g., mvp-evaluate-scale)
+#
+# 2. Each entry: name, source (community/local/built-in), url (for community),
+#    when (before_creation/after_creation/during), description
+#
+# 3. Skills are SUGGESTIONS only — AI or user decides whether to load them
+#
+# 4. This file changes independently of schema.yaml — experiment freely
+#
+# 5. Only mvp local skills are active below. Community skills are shown as
+#    commented examples — uncomment and fill in real URLs when available.
+#
+# ## UX Reminder
+#
+# When presenting skill choices to the user, always include
+# "None — skip skill loading" and "Other — write your own" as options.
+
+suggestions:
+  # ─── MVP Local Skills (active) ──────────────────────────────────────────
+
+  mvp-evaluate-scale:
+    - name: mvp-evaluate-scale
+      source: local
+      when: during
+      description: "Diagnose project scale using filesystem signals + user interview"
+
+  mvp-init-profile:
+    - name: mvp-init-profile
+      source: local
+      when: during
+      description: "Bootstrap project-profile from conversation or existing code"
+
+  mvp-create-epic:
+    - name: mvp-create-epic
+      source: local
+      when: during
+      description: "Create an epic with vertical slice decomposition"
+
+  mvp-create-slice:
+    - name: mvp-create-slice
+      source: local
+      when: during
+      description: "Create a vertical-slice change with auto-scaffolded child changes"
+
+  mvp-apply-slice:
+    - name: mvp-apply-slice
+      source: local
+      when: during
+      description: "Apply all child changes from a slice change-manifest in order"
+
+  mvp-ingest:
+    - name: mvp-ingest
+      source: local
+      when: during
+      description: "Ingest external docs into BDD shadow specs with gap analysis"
+
+  mvp-reverse:
+    - name: mvp-reverse
+      source: local
+      when: during
+      description: "Reverse-engineer behavioral specs from undocumented source code"
+
+  mvp-upgrade:
+    - name: mvp-upgrade
+      source: local
+      when: during
+      description: "Upgrade project scale with verification gate"
+
+  mvp-audit:
+    - name: mvp-audit
+      source: local
+      when: during
+      description: "Scan project structure for standalone items and propose hierarchy fixes"
+
+  mvp-organize:
+    - name: mvp-organize
+      source: local
+      when: during
+      description: "Execute structural reorganization: merge, create, abandon, unarchive, reactivate"
+
+  mvp-reflect:
+    - name: mvp-reflect
+      source: local
+      when: after_creation
+      description: "Reactive-only. Post-completion reflection after change/slice/epic finishes."
+
+  # ─── Community Skill Examples (commented — uncomment and fill real URLs) ─
+
+  # exploration:
+  #   - name: brainstorm
+  #     source: community
+  #     url: https://github.com/example/skills/brainstorm
+  #     when: during
+  #     description: "Explore alternative approaches before committing"
+
+  #   - name: grill-me
+  #     source: community
+  #     url: https://github.com/example/skills/grill-me
+  #     when: during
+  #     description: "Rigorously challenge ideas, assumptions, and scope"
+
+  # spec-driven-enhanced.proposal:
+  #   - name: grill-me
+  #     source: community
+  #     url: https://github.com/example/skills/grill-me
+  #     when: after_creation
+  #     description: "Challenge scope boundaries and assumptions"
+
+  # spec-driven-enhanced.design:
+  #   - name: system-design
+  #     source: community
+  #     url: https://github.com/example/skills/system-design
+  #     when: after_creation
+  #     description: "Review design for architectural soundness"
+
+  # spec-driven-enhanced.tasks:
+  #   - name: tdd
+  #     source: community
+  #     url: https://github.com/example/skills/tdd
+  #     when: during
+  #     description: "Write tests before implementation"
+
+  # spec-driven-enhanced.verification:
+  #   - name: security-audit
+  #     source: community
+  #     url: https://github.com/example/skills/security-audit
+  #     when: during
+  #     description: "Verify no security regressions"
+
+  # project-profile.constitution:
+  #   - name: security-audit
+  #     source: community
+  #     url: https://github.com/example/skills/security-audit
+  #     when: after_creation
+  #     description: "Review constitution for security policy gaps"
+
+  # ─── Local Skill Examples (commented — create in .opencode/skills/ first) ─
+
+  # project-profile.proposal:
+  #   - name: my-reviewer
+  #     source: local
+  #     when: after_creation
+  #     description: "Internal architecture review checklist"
+
+  # code-to-spec.reverse-engineering:
+  #   - name: code-review
+  #     source: community
+  #     url: https://github.com/example/skills/code-review
+  #     when: during
+  #     description: "Review code for behavioral patterns"
