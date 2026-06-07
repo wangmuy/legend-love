@@ -1,0 +1,1476 @@
+{
+  "extracted": "2026-06-07",
+  "scenes": [
+    {
+      "entrance": {
+        "mapX": 85,
+        "mapY": 93
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 0,
+      "idStr": "胡斐居_0",
+      "items": [],
+      "name": "胡斐居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 359,
+        "mapY": 228
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 1,
+      "idStr": "河洛客棧_1",
+      "items": [],
+      "name": "河洛客棧",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 17,
+        "mapY": 14
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 2,
+      "idStr": "云鶴崖_2",
+      "items": [],
+      "name": "云鶴崖",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 78,
+        "mapY": 140
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 3,
+      "idStr": "有間客棧_3",
+      "items": [],
+      "name": "有間客棧",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 0,
+        "mapY": 0
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 4,
+      "idStr": "崑侖仙境_4",
+      "items": [],
+      "name": "崑侖仙境",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 64,
+        "mapY": 51
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 5,
+      "idStr": "山洞_5",
+      "items": [],
+      "name": "山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 50,
+        "mapY": 109
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 6,
+      "idStr": "北丑居_6",
+      "items": [],
+      "name": "北丑居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 68,
+        "mapY": 169
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 7,
+      "idStr": "山洞_7",
+      "items": [],
+      "name": "山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 113,
+        "mapY": 297
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 8,
+      "idStr": "大輪寺_8",
+      "items": [],
+      "name": "大輪寺",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 19,
+        "mapY": 248
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 9,
+      "idStr": "成崑居_9",
+      "items": [],
+      "name": "成崑居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 74,
+        "mapY": 226
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 10,
+      "idStr": "山洞_10",
+      "items": [],
+      "name": "山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 68,
+        "mapY": 396
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 11,
+      "idStr": "光明頂_11",
+      "items": [],
+      "name": "光明頂",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 75,
+        "mapY": 363
+      },
+      "events": [],
+      "exits": [
+        {
+          "dir": "jump",
+          "targetX": 29,
+          "targetY": 22,
+          "toSceneId": 13,
+          "x": 56,
+          "y": 32
+        },
+        {
+          "dir": "jump",
+          "targetX": 22,
+          "targetY": 29,
+          "toSceneId": 13,
+          "x": 56,
+          "y": 33
+        },
+        {
+          "dir": "jump",
+          "targetX": 29,
+          "targetY": 23,
+          "toSceneId": 13,
+          "x": 56,
+          "y": 34
+        }
+      ],
+      "height": 64,
+      "id": 12,
+      "idStr": "明教分舵_12",
+      "items": [],
+      "name": "明教分舵",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 0,
+        "mapY": 0
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 13,
+      "idStr": "明教地道_13",
+      "items": [],
+      "name": "明教地道",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 0,
+        "mapY": 0
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 14,
+      "idStr": "高昌迷宮_14",
+      "items": [],
+      "name": "高昌迷宮",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 52,
+        "mapY": 219
+      },
+      "events": [],
+      "exits": [
+        {
+          "dir": "jump",
+          "targetX": 19,
+          "targetY": 21,
+          "toSceneId": 14,
+          "x": 36,
+          "y": 26
+        },
+        {
+          "dir": "jump",
+          "targetX": 21,
+          "targetY": 20,
+          "toSceneId": 14,
+          "x": 36,
+          "y": 26
+        },
+        {
+          "dir": "jump",
+          "targetX": 20,
+          "targetY": 21,
+          "toSceneId": 14,
+          "x": 36,
+          "y": 26
+        }
+      ],
+      "height": 64,
+      "id": 15,
+      "idStr": "沙漠廢墟_15",
+      "items": [],
+      "name": "沙漠廢墟",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 103,
+        "mapY": 396
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 16,
+      "idStr": "金輪寺_16",
+      "items": [],
+      "name": "金輪寺",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 120,
+        "mapY": 342
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 17,
+      "idStr": "回族部落_17",
+      "items": [],
+      "name": "回族部落",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 143,
+        "mapY": 218
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 18,
+      "idStr": "古墓_18",
+      "items": [],
+      "name": "古墓",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 145,
+        "mapY": 216
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 19,
+      "idStr": "重陽宮_19",
+      "items": [],
+      "name": "重陽宮",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 158,
+        "mapY": 271
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 20,
+      "idStr": "百花谷_20",
+      "items": [],
+      "name": "百花谷",
+      "npc": [],
+      "type": "cave",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 308,
+        "mapY": 351
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 21,
+      "idStr": "黑龍潭_21",
+      "items": [],
+      "name": "黑龍潭",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 134,
+        "mapY": 258
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 22,
+      "idStr": "絕情谷_22",
+      "items": [],
+      "name": "絕情谷",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 168,
+        "mapY": 210
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 23,
+      "idStr": "洪七公居_23",
+      "items": [],
+      "name": "洪七公居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 222,
+        "mapY": 187
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 24,
+      "idStr": "苗人鳳居_24",
+      "items": [],
+      "name": "苗人鳳居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 191,
+        "mapY": 295
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 25,
+      "idStr": "武道大會_25",
+      "items": [],
+      "name": "武道大會",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 117,
+        "mapY": 178
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 26,
+      "idStr": "黑木崖_26",
+      "items": [],
+      "name": "黑木崖",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 241,
+        "mapY": 293
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 27,
+      "idStr": "嵩山派_27",
+      "items": [],
+      "name": "嵩山派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 246,
+        "mapY": 300
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 28,
+      "idStr": "少林寺_28",
+      "items": [],
+      "name": "少林寺",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 192,
+        "mapY": 139
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 29,
+      "idStr": "泰山派_29",
+      "items": [],
+      "name": "泰山派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 215,
+        "mapY": 195
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 30,
+      "idStr": "平一指居_30",
+      "items": [],
+      "name": "平一指居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 112,
+        "mapY": 214
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 31,
+      "idStr": "_31",
+      "items": [],
+      "name": "",
+      "npc": [],
+      "type": "outdoor",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 286,
+        "mapY": 156
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 32,
+      "idStr": "海邊小屋_32",
+      "items": [],
+      "name": "海邊小屋",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 215,
+        "mapY": 407
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 33,
+      "idStr": "峨嵋派_33",
+      "items": [],
+      "name": "峨嵋派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 159,
+        "mapY": 314
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 34,
+      "idStr": "崆峒派_34",
+      "items": [],
+      "name": "崆峒派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 132,
+        "mapY": 409
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 35,
+      "idStr": "星宿海_35",
+      "items": [],
+      "name": "星宿海",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 185,
+        "mapY": 369
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 36,
+      "idStr": "青城派_36",
+      "items": [],
+      "name": "青城派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 246,
+        "mapY": 424
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 37,
+      "idStr": "五毒教_37",
+      "items": [],
+      "name": "五毒教",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 185,
+        "mapY": 338
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 38,
+      "idStr": "摩天崖_38",
+      "items": [],
+      "name": "摩天崖",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 166,
+        "mapY": 403
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 39,
+      "idStr": "凌霄城_39",
+      "items": [],
+      "name": "凌霄城",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 221,
+        "mapY": 285
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 40,
+      "idStr": "悅來客棧_40",
+      "items": [],
+      "name": "悅來客棧",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 172,
+        "mapY": 424
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 41,
+      "idStr": "山洞_41",
+      "items": [],
+      "name": "山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 168,
+        "mapY": 426
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 42,
+      "idStr": "無量山洞_42",
+      "items": [],
+      "name": "無量山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 225,
+        "mapY": 340
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 43,
+      "idStr": "武當派_43",
+      "items": [],
+      "name": "武當派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 238,
+        "mapY": 219
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 44,
+      "idStr": "蝴蝶谷_44",
+      "items": [],
+      "name": "蝴蝶谷",
+      "npc": [],
+      "type": "cave",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 295,
+        "mapY": 421
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 45,
+      "idStr": "程瑛居_45",
+      "items": [],
+      "name": "程瑛居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 193,
+        "mapY": 292
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 46,
+      "idStr": "金蛇山洞_46",
+      "items": [],
+      "name": "金蛇山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 314,
+        "mapY": 369
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 47,
+      "idStr": "一燈居_47",
+      "items": [],
+      "name": "一燈居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 302,
+        "mapY": 342
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 48,
+      "idStr": "鐵掌山_48",
+      "items": [],
+      "name": "鐵掌山",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 323,
+        "mapY": 317
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 49,
+      "idStr": "藥王莊_49",
+      "items": [],
+      "name": "藥王莊",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 395,
+        "mapY": 374
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 50,
+      "idStr": "閰基居_50",
+      "items": [],
+      "name": "閰基居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 228,
+        "mapY": 256
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 51,
+      "idStr": "丐幫_51",
+      "items": [],
+      "name": "丐幫",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 307,
+        "mapY": 197
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 52,
+      "idStr": "燕子塢_52",
+      "items": [],
+      "name": "燕子塢",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 176,
+        "mapY": 220
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 53,
+      "idStr": "擂鼓山_53",
+      "items": [],
+      "name": "擂鼓山",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 191,
+        "mapY": 260
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 54,
+      "idStr": "薛慕華居_54",
+      "items": [],
+      "name": "薛慕華居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 330,
+        "mapY": 195
+      },
+      "events": [],
+      "exits": [
+        {
+          "dir": "jump",
+          "targetX": 13,
+          "targetY": 22,
+          "toSceneId": 82,
+          "x": 29,
+          "y": 50
+        },
+        {
+          "dir": "jump",
+          "targetX": 22,
+          "targetY": 14,
+          "toSceneId": 82,
+          "x": 30,
+          "y": 50
+        },
+        {
+          "dir": "jump",
+          "targetX": 14,
+          "targetY": 22,
+          "toSceneId": 82,
+          "x": 31,
+          "y": 50
+        }
+      ],
+      "height": 64,
+      "id": 55,
+      "idStr": "梅莊_55",
+      "items": [],
+      "name": "梅莊",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 368,
+        "mapY": 258
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 56,
+      "idStr": "福威鏢局_56",
+      "items": [],
+      "name": "福威鏢局",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 192,
+        "mapY": 301
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 57,
+      "idStr": "華山派_57",
+      "items": [],
+      "name": "華山派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 355,
+        "mapY": 375
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 58,
+      "idStr": "衡山派_58",
+      "items": [],
+      "name": "衡山派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 385,
+        "mapY": 305
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 59,
+      "idStr": "田伯光居_59",
+      "items": [],
+      "name": "田伯光居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 102,
+        "mapY": 373
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 60,
+      "idStr": "龍門客棧_60",
+      "items": [],
+      "name": "龍門客棧",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 199,
+        "mapY": 400
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 61,
+      "idStr": "高昇客棧_61",
+      "items": [],
+      "name": "高昇客棧",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 18,
+        "mapY": 181
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 62,
+      "idStr": "破廟_62",
+      "items": [],
+      "name": "破廟",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 329,
+        "mapY": 236
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 63,
+      "idStr": "天寧寺_63",
+      "items": [],
+      "name": "天寧寺",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 388,
+        "mapY": 324
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 64,
+      "idStr": "南賢居_64",
+      "items": [],
+      "name": "南賢居",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 364,
+        "mapY": 279
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 65,
+      "idStr": "山洞_65",
+      "items": [],
+      "name": "山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 21,
+        "mapY": 449
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 66,
+      "idStr": "山洞_66",
+      "items": [],
+      "name": "山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 22,
+        "mapY": 439
+      },
+      "events": [],
+      "exits": [
+        {
+          "dir": "jump",
+          "targetX": 48,
+          "targetY": 20,
+          "toSceneId": 4,
+          "x": 28,
+          "y": 46
+        },
+        {
+          "dir": "jump",
+          "targetX": 20,
+          "targetY": 47,
+          "toSceneId": 4,
+          "x": 28,
+          "y": 46
+        },
+        {
+          "dir": "jump",
+          "targetX": 47,
+          "targetY": 20,
+          "toSceneId": 4,
+          "x": 28,
+          "y": 46
+        }
+      ],
+      "height": 64,
+      "id": 67,
+      "idStr": "山洞_67",
+      "items": [],
+      "name": "山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 41,
+        "mapY": 419
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 68,
+      "idStr": "崑侖派_68",
+      "items": [],
+      "name": "崑侖派",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 141,
+        "mapY": 432
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 69,
+      "idStr": "白駝山_69",
+      "items": [],
+      "name": "白駝山",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 356,
+        "mapY": 235
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 70,
+      "idStr": "主角的家_70",
+      "items": [],
+      "name": "主角的家",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 141,
+        "mapY": 112
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 71,
+      "idStr": "神龍教_71",
+      "items": [],
+      "name": "神龍教",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 103,
+        "mapY": 15
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 72,
+      "idStr": "冰火島_72",
+      "items": [],
+      "name": "冰火島",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 186,
+        "mapY": 63
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 73,
+      "idStr": "靈蛇島_73",
+      "items": [],
+      "name": "靈蛇島",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 455,
+        "mapY": 327
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 74,
+      "idStr": "俠客島_74",
+      "items": [],
+      "name": "俠客島",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 341,
+        "mapY": 137
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 75,
+      "idStr": "桃花島_75",
+      "items": [],
+      "name": "桃花島",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 409,
+        "mapY": 216
+      },
+      "events": [],
+      "exits": [
+        {
+          "dir": "jump",
+          "targetX": 41,
+          "targetY": 24,
+          "toSceneId": 83,
+          "x": 28,
+          "y": 46
+        },
+        {
+          "dir": "jump",
+          "targetX": 24,
+          "targetY": 41,
+          "toSceneId": 83,
+          "x": 29,
+          "y": 46
+        },
+        {
+          "dir": "jump",
+          "targetX": 41,
+          "targetY": 25,
+          "toSceneId": 83,
+          "x": 30,
+          "y": 46
+        }
+      ],
+      "height": 64,
+      "id": 76,
+      "idStr": "霹靂堂_76",
+      "items": [],
+      "name": "霹靂堂",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 431,
+        "mapY": 125
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 77,
+      "idStr": "萬鱷島_77",
+      "items": [],
+      "name": "萬鱷島",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 277,
+        "mapY": 42
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 78,
+      "idStr": "浡泥島_78",
+      "items": [],
+      "name": "浡泥島",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 425,
+        "mapY": 37
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 79,
+      "idStr": "山洞_79",
+      "items": [],
+      "name": "山洞",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 132,
+        "mapY": 254
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 80,
+      "idStr": "絕情谷底_80",
+      "items": [],
+      "name": "絕情谷底",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 188,
+        "mapY": 301
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 81,
+      "idStr": "思過崖_81",
+      "items": [],
+      "name": "思過崖",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 0,
+        "mapY": 0
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 82,
+      "idStr": "梅莊地牢_82",
+      "items": [],
+      "name": "梅莊地牢",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    },
+    {
+      "entrance": {
+        "mapX": 0,
+        "mapY": 0
+      },
+      "events": [],
+      "exits": [],
+      "height": 64,
+      "id": 83,
+      "idStr": "圣堂_83",
+      "items": [],
+      "name": "圣堂",
+      "npc": [],
+      "type": "inn",
+      "width": 64
+    }
+  ],
+  "total": 84,
+  "version": "1.0"
+}
