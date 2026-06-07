@@ -54,7 +54,7 @@ web-frontend-shell 需要等两者完成后再集成。
 
 ## Integration Test Plan
 
-1. 打开 `www/index.html`
+1. 打开 `game/engine-web/index.html`
 2. xterm.js 显示引擎初始化中...
 3. Lua VM 加载完成，显示 "Lua VM ready"
 4. JSON 数据加载完成，显示 "Data loaded: 7 files, 0.6 MB"

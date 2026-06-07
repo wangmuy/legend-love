@@ -5,10 +5,10 @@ HTML 页面、加载 Fengari Lua VM、配置 xterm.js 终端、建立 JS ↔ Lua
 
 ## 变更内容
 
-- `www/index.html` — 页面骨架，xterm.js 终端容器
-- `www/style.css` — 暗色终端风格
-- `www/index.js` — Fengari bootstrap、xterm.js 配置、事件队列、requestAnimationFrame 循环
-- `www/lib/` — fengari-web.js 和 xterm.js 库文件（或 CDN 引用）
+- `game/engine-web/index.html` — 页面骨架，xterm.js 终端容器
+- `game/engine-web/style.css` — 暗色终端风格
+- `game/engine-web/index.js` — Fengari bootstrap、xterm.js 配置、事件队列、requestAnimationFrame 循环
+- `game/engine-web/lib/` — fengari-web.js 和 xterm.js 库文件（或 CDN 引用）
 
 ## 能力
 
@@ -20,8 +20,8 @@ HTML 页面、加载 Fengari Lua VM、配置 xterm.js 终端、建立 JS ↔ Lua
 
 ## 影响
 
-- 新增 `www/index.html`
-- 新增 `www/style.css`
-- 新增 `www/index.js`
-- 新增 `www/lib/`（或使用 CDN）
+- 新增 `game/engine-web/index.html`
+- 新增 `game/engine-web/style.css`
+- 新增 `game/engine-web/index.js`
+- 新增 `game/engine-web/lib/`（或使用 CDN）
 - 依赖 fengari-web.js 和 xterm.js

@@ -8,7 +8,7 @@ Web MUD 需要知道在哪里会遇到哪些敌人。战斗地图和遇敌配置
 - 在 `tools/extract_web_data.lua` 中实现遇敌数据提取模块
 - 读取战斗地图索引文件获取战斗地图列表
 - 读取遇敌配置数据（地图区域/场景 → 敌人列表 + 概率）
-- 输出 `data-web/wmap.json`
+- 输出 `engine-web/data-web/wmap.json`
 
 ## 能力
 
@@ -20,4 +20,4 @@ Web MUD 需要知道在哪里会遇到哪些敌人。战斗地图和遇敌配置
 
 ## 影响
 
-- 新增 `data-web/wmap.json`（约 500 KB）
+- 新增 `engine-web/data-web/wmap.json`（约 500 KB）

@@ -7,7 +7,7 @@
 
 - [ ] 2.1 实现 `scanMapEntrances()` — 扫描大地图所有瓦片
 - [ ] 2.2 实现 `extractEntranceJson()` — 汇总入口映射
-- [ ] 2.3 写入 `data-web/entrances.json`
+- [ ] 2.3 写入 `engine-web/data-web/entrances.json`
 
 ## 3. 验证
 

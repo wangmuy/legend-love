@@ -6,7 +6,7 @@ JSON 字符串 → 传入 Lua → 解析为 Lua 表。
 
 ## 变更内容
 
-- `www/engine/data_loader.lua` — JSON 加载、解析、存入全局表
+- `game/engine-web/engine/data_loader.lua` — JSON 加载、解析、存入全局表
 - HTML/JS 中的 fetch 逻辑（作为 index.js 的一部分）
 
 ## 能力
@@ -19,5 +19,5 @@ JSON 字符串 → 传入 Lua → 解析为 Lua 表。
 
 ## 影响
 
-- 新增 `www/engine/data_loader.lua`
+- 新增 `game/engine-web/engine/data_loader.lua`
 - 数据存入 `_G.dataCache` 全局表

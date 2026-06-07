@@ -10,7 +10,7 @@ Web 版无法直接读取。
 - 从 allsin 文件读取场景基础信息（名称、尺寸）
 - 从 s* 文件读取场景出口、NPC 坐标、物品坐标
 - 从 d* 文件读取事件触发点
-- 输出 `game/data-web/scenes.json`
+- 输出 `game/engine-web/data-web/scenes.json`
 
 ## 能力
 
@@ -22,4 +22,4 @@ Web 版无法直接读取。
 
 ## 影响
 
-- 新增 `game/data-web/scenes.json`（约 2-3 MB）
+- 新增 `game/engine-web/data-web/scenes.json`（约 2-3 MB）

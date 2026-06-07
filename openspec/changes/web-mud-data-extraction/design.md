@@ -21,9 +21,9 @@ Slice 1 是整个 Web MUD 的数据基础。后续所有 slice 都依赖本 slic
 
 不放在 openspec/ 下，而是 game/ 下。因为提取工具需要 `require "lib_Byte"` 等 game/ 中的模块，放在 game/ 中可以直接复用 Love2D 版的模块加载路径。
 
-### 2. 输出目录：game/data-web/
+### 2. 输出目录：game/engine-web/data-web/
 
-和 `game/data/` 并列。`data/` 是原版二进制数据，`data-web/` 是提取后的 JSON。
+和 `game/data/` 并列。`data/` 是原版二进制数据，`game/engine-web/data-web/` 是提取后的 JSON。
 
 ### 3. JSON 格式
 

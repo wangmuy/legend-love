@@ -1,23 +1,21 @@
 ## 架构总览
 
 ```
-浏览器
-  │
-  ├── index.html
-  │     └── xterm.js (终端渲染)
-  │
-  ├── index.js
-  │     ├── 加载 fengari-web.js
-  │     ├── bootstrap Lua VM
-  │     ├── dofile("engine/engine_web.lua")   ← EngineAPI 实现
-  │     ├── dofile("engine/data_loader.lua")  ← 加载 JSON
-  │     ├── dofile("engine/web_bridge.lua")   ← JS ↔ Lua 桥接
-  │     └── requestAnimationFrame 循环
-  │           └── processEventQueue()
-  │
-  ├── engine/*.lua  (Fengari 内运行)
-  │
-  └── data-web/*.json (通过 fetch 加载)
+game/engine-web/
+├── index.html
+│     └── xterm.js (终端渲染)
+├── index.js
+│     ├── 加载 fengari-web.js
+│     ├── bootstrap Lua VM
+│     ├── dofile("engine_web.lua")   ← EngineAPI 实现
+│     ├── dofile("data_loader.lua")  ← 加载 JSON
+│     └── requestAnimationFrame 循环
+│           └── processEventQueue()
+├── engine_web.lua
+├── data_loader.lua
+├── data-web/*.json
+├── lib/
+└── style.css
 ```
 
 ## 事件循环
@@ -100,14 +98,12 @@ const term = new Terminal({
 ## 输出文件结构
 
 ```
-www/
+game/engine-web/
 ├── index.html                 ← 页面入口
 ├── index.js                   ← 前端逻辑
-├── engine/
-│   ├── engine_web.lua         ← EngineAPI 37 函数实现
-│   ├── web_bridge.lua         ← 事件队列、ANSI 输出、输入路由
-│   └── data_loader.lua        ← JSON → Lua 表加载
-├── data-web/                  ← 从 game/data-web/ 复制
+├── engine_web.lua             ← EngineAPI 37 函数实现
+├── data_loader.lua            ← JSON → Lua 表加载
+├── data-web/                  ← 从提取脚本产出
 │   └── *.json
 ├── lib/
 │   ├── fengari-web.js         ← Fengari Lua VM
