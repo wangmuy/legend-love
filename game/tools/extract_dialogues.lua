@@ -36,7 +36,7 @@ end
 local function main()
     local idxPath = "script/oldtalk.idx"
     local grpPath = "script/oldtalk.grp"
-    local outputPath = "data-web/dialogues.json"
+    local outputPath = "engine-web/data-web/dialogues.json"
 
     print("Reading " .. idxPath .. " ...")
     local offsets = readIdx(idxPath)
@@ -77,7 +77,7 @@ local function main()
 
     local outFile = io.open(outputPath, "w")
     if not outFile then
-        os.execute("mkdir -p data-web")
+        os.execute("mkdir -p engine-web/data-web")
         outFile = io.open(outputPath, "w")
     end
     outFile:write(json)

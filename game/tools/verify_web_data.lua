@@ -17,7 +17,7 @@ local function readFile(path)
     return content
 end
 
-local dataDir = "data-web"
+local dataDir = "engine-web/data-web"
 
 print("")
 print("=== Web MUD Data Verification ===")
@@ -71,10 +71,10 @@ print("=== Cross-references ===")
 -- Validate with python3
 local cmd = [[python3 -c "
 import json
-scenes = json.load(open('data-web/scenes.json', encoding='utf-8'))
-chars_data = json.load(open('data-web/chars.json', encoding='utf-8'))
-items_data = json.load(open('data-web/items.json', encoding='utf-8'))
-skills_data = json.load(open('data-web/skills.json', encoding='utf-8'))
+scenes = json.load(open('engine-web/data-web/scenes.json', encoding='utf-8'))
+chars_data = json.load(open('engine-web/data-web/chars.json', encoding='utf-8'))
+items_data = json.load(open('engine-web/data-web/items.json', encoding='utf-8'))
+skills_data = json.load(open('engine-web/data-web/skills.json', encoding='utf-8'))
 chars = {c['id']: c for c in chars_data.get('chars', [])}
 items = {i['id']: i for i in items_data.get('items', [])}
 skills = {s['id']: s for s in skills_data.get('skills', [])}

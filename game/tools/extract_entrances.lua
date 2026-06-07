@@ -49,7 +49,7 @@ end
 local function main()
     local idxPath = "data/ranger.idx"
     local grpPath = "data/ranger.grp"
-    local outputPath = "data-web/entrances.json"
+    local outputPath = "engine-web/data-web/entrances.json"
     local sceneSize = 62
     local MWidth = 480
 
@@ -135,7 +135,7 @@ local function main()
 
     local outFile = io.open(outputPath, "w")
     if not outFile then
-        os.execute("mkdir -p data-web")
+        os.execute("mkdir -p engine-web/data-web")
         outFile = io.open(outputPath, "w")
     end
     outFile:write(json)

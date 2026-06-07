@@ -217,7 +217,7 @@ end
 
 if arg and arg[0] and arg[0]:match("extract_scenes%.lua$") then
     local dataDir = arg[1] or "data"
-    local outputFile = arg[2] or "data-web/scenes.json"
+    local outputFile = arg[2] or "engine-web/data-web/scenes.json"
     extract.run(dataDir, outputFile)
 end
 
