@@ -70,7 +70,7 @@ end
 local function writeJSON(path, content)
     local outFile = io.open(path, "w")
     if not outFile then
-        os.execute("mkdir -p data-web")
+        os.execute("mkdir -p engine-web/data-web")
         outFile = io.open(path, "w")
     end
     outFile:write(content)
@@ -398,7 +398,7 @@ local function main()
         '  "total": ' .. personNum .. ',\n' ..
         '  "chars": ' .. jsonTable(charEntries) .. '\n' ..
         '}'
-    writeJSON("data-web/chars.json", charsJson)
+    writeJSON("engine-web/data-web/chars.json", charsJson)
 
     local itemsJson = '{\n' ..
         '  "version": "1.0",\n' ..
@@ -406,7 +406,7 @@ local function main()
         '  "total": ' .. thingNum .. ',\n' ..
         '  "items": ' .. jsonTable(itemEntries) .. '\n' ..
         '}'
-    writeJSON("data-web/items.json", itemsJson)
+    writeJSON("engine-web/data-web/items.json", itemsJson)
 
     local skillsJson = '{\n' ..
         '  "version": "1.0",\n' ..
@@ -414,7 +414,7 @@ local function main()
         '  "total": ' .. wugongNum .. ',\n' ..
         '  "skills": ' .. jsonTable(skillEntries) .. '\n' ..
         '}'
-    writeJSON("data-web/skills.json", skillsJson)
+    writeJSON("engine-web/data-web/skills.json", skillsJson)
 
     print("Done.")
 end

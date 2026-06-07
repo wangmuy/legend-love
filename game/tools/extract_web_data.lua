@@ -11,7 +11,7 @@ dofile("tools/extract_dialogues.lua")
 -- 2. Scenes
 print("[2/5] Extracting scenes...")
 local extract_scenes = dofile("tools/extract_scenes.lua")
-extract_scenes.run("data", "data-web/scenes.json")
+extract_scenes.run("data", "engine-web/data-web/scenes.json")
 
 -- 3. Runtime data (chars, items, skills)
 print("[3/5] Extracting runtime data (chars/items/skills)...")
@@ -27,4 +27,4 @@ dofile("tools/extract_encounters.lua")
 
 print("")
 print("All extractions complete.")
-print("Output: data-web/*.json")
+print("Output: engine-web/data-web/*.json")

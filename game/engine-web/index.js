@@ -130,13 +130,13 @@
         term.write('  JSBridge: ready\r\n');
 
         term.write('Loading engine_web.lua...\r\n');
-        const engineResp = await fetch('engine/engine_web.lua');
+        const engineResp = await fetch('engine_web.lua');
         const engineSource = await engineResp.text();
         await loadLuaModule('engine_web.lua', engineSource);
         term.write('  EngineAPI: ready\r\n');
 
         term.write('Loading data_loader.lua...\r\n');
-        const loaderResp = await fetch('engine/data_loader.lua');
+        const loaderResp = await fetch('data_loader.lua');
         const loaderSource = await loaderResp.text();
         await loadLuaModule('data_loader.lua', loaderSource);
         term.write('  Data loader: ready\r\n');
