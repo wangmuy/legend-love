@@ -1,0 +1,121 @@
+name: epic
+version: 1
+description: >
+  Large initiative decomposition into vertical slices.
+  Epics live in `openspec/epics/` with YYYY-MM-<slug> date prefix.
+  They are tracking artifacts, NOT changes — never archived.
+  The template provides canonical structure without requiring
+  `openspec new change`.
+
+artifacts:
+  - id: epic
+    generates: epic.md
+    description: >
+      Epic vision with vertical slice decomposition.
+      Slices may be features, infrastructure, or coordination units.
+    template: epic.md
+    instruction: |
+      ## Fit-Level Decision: Is This a New Epic?
+
+      Before creating a new epic, use this decision tree to determine
+      if the work actually belongs at the epic level:
+
+      ```
+      What is the scale of this work?
+      │
+      ├─ Changes project identity, architecture, or governance?
+      │    → project-wide (update openspec/project/, not a new epic)
+      │
+      ├─ Spans multiple independent testable streams of work?
+      │    → new epic (this is the right level — proceed)
+      │
+      ├─ A single testable MVP with possibly multiple components?
+      │    → vertical-slice (create a slice, not a full epic)
+      │
+      └─ Straightforward scope, small change?
+           → simple-change (use spec-driven directly, no slice needed)
+      ```
+
+      If you arrive at "new epic", proceed to create the epic document.
+
+      ---
+
+      Create the epic document that decomposes a large initiative into
+      independently shippable vertical slices.
+
+      The epic directory MUST follow: `openspec/epics/YYYY-MM-<slug>/epic.md`
+
+      Sections:
+      - **Vision**: 2-3 sentences on the business goal.
+
+      - **Vertical Slices**: Each slice MUST be independently testable
+        and shippable. A slice may be:
+        - **Feature slice**: user-facing behavior
+        - **Infrastructure slice**: build/devops behavior
+        - **Coordination slice**: integration behavior
+        For each slice:
+        ```
+        ### MVP Slice N: [Name]
+        - **Type**: Feature / Infrastructure / Coordination
+        - **Business Value**: What this slice enables
+        - **Acceptance Criteria (DoD)**: Observable, testable conditions
+        - **Affected Domains**: Which bounded contexts are touched
+        - **Implementation Changes**: Planned spec-driven changes
+        - **Status**: [ ] Planned / [~] In Progress / [x] Done
+        ```
+
+      CORRECT slice (feature): "User can enroll in 2FA"
+      CORRECT slice (infrastructure): "Project scaffold compiles and CI passes"
+      CORRECT slice (coordination): "Cross-team API contracts defined"
+      WRONG slice: "Backend 2FA API" (tech-stack lane, not a behavior)
+
+      - **Slice Dependency Graph**: Mermaid or ASCII diagram.
+      - **Global Acceptance Criteria**: Epic-level DoD spanning all slices.
+      - **Future Ideas**: Emergent ideas for future slices (feeds TODO.md).
+
+      Status derived by scanning `openspec/changes/`:
+      - `[ ]` if no change exists
+      - `[~]` if changes exist but not all archived
+      - `[x]` if all changes archived
+
+      Epic is "done" when all slices are `[x]`.
+      Completed epics remain as historical records.
+
+      Before creating, check `openspec/skills-profile.yaml`
+      for suggested skills (key: `epic.epic`).
+    requires: []
+
+apply:
+  requires: [epic]
+  tracks: null
+  instruction: >
+    Epics are planning artifacts, not implementation artifacts.
+
+    After creating the epic:
+    1. Verify slices are correctly decomposed as testable behaviors
+       (features, infrastructure, or coordination — not tech lanes)
+    2. Check each slice has a clear, testable DoD
+    3. Create vertical-slice changes for the first slice:
+       `openspec new change slice-<name> --schema vertical-slice`
+
+    The epic is "done" when all slices are `[x]`.
+    Refresh epic status via `/opsx:verify project-profile`.
+
+    ## Exploration and Scale Reminder
+
+    If the scope of this epic is unclear, use `/opsx:explore` first.
+    Explorer can be invoked at any time, at any scale, mid-project.
+    It concludes with a fit-level recommendation:
+    project-wide | new-epic | vertical-slice | simple-change
+
+    ## TODO.md Triage
+
+    When creating new slices or changes from this epic, scan
+    `openspec/project/TODO.md` and `openspec/epics/<name>/TODO.md`
+    for emergent ideas. Surface a triage prompt:
+    "You have N items in TODO.md. Promote to a slice/task or dismiss?"
+
+    ## UX Rule
+
+    When presenting choices (scale, fit-level, schema selection, TODO triage),
+    always include "Other — write your own" as the LAST option.
