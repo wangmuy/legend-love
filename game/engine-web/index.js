@@ -3,8 +3,6 @@
 
     /* ── 1. xterm.js ── */
     const term = new Terminal({
-        cols: 80,
-        rows: 24,
         cursorBlink: true,
         fontSize: 14,
         fontFamily: "'Courier New', 'Noto Sans SC', monospace",
@@ -25,6 +23,12 @@
         },
     });
     term.open(document.getElementById('terminal'));
+
+    /* ── 1b. FitAddon for auto-resize ── */
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    fitAddon.fit();
+    window.addEventListener('resize', () => fitAddon.fit());
 
     /* ── 2. Fengari ── */
     const { lua, lauxlib, lualib } = fengari;
