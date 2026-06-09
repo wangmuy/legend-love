@@ -5,16 +5,16 @@ builds/
 
 # opencode
 opencode.json
-.opencode/
+.opencode/*
 !.opencode/command/
 !.opencode/skills/
 
 # codex
-.codex/
+.codex/*
 !.codex/skills/
 
 # claude
-.claude/
+.claude/*
 !.claude/commands/
 !.claude/skills/
 
