@@ -111,12 +111,23 @@ local function main()
 
     local function extractPerson(i)
         local offset = personBase + i * CC.PersonSize
+        local attackAnimFrames = {}
+        local attackAnimDelays = {}
+        local soundDelays = {}
+        for ai = 1, 5 do
+            attackAnimFrames[ai] = readField(grpData, offset, CC.Person_S["出招动画帧数" .. ai])
+            attackAnimDelays[ai] = readField(grpData, offset, CC.Person_S["出招动画延迟" .. ai])
+            soundDelays[ai] = readField(grpData, offset, CC.Person_S["武功音效延迟" .. ai])
+        end
         return {
             id = readField(grpData, offset, CC.Person_S["代号"]),
             name = readField(grpData, offset, CC.Person_S["姓名"]),
             title = readField(grpData, offset, CC.Person_S["外号"]),
+            headId = readField(grpData, offset, CC.Person_S["头像代号"]),
             sex = readField(grpData, offset, CC.Person_S["性别"]),
             level = readField(grpData, offset, CC.Person_S["等级"]),
+            hpGrowth = readField(grpData, offset, CC.Person_S["生命增长"]),
+            exp = readField(grpData, offset, CC.Person_S["经验"]),
             hp = readField(grpData, offset, CC.Person_S["生命"]),
             maxHp = readField(grpData, offset, CC.Person_S["生命最大值"]),
             mp = readField(grpData, offset, CC.Person_S["内力"]),
@@ -127,22 +138,30 @@ local function main()
             medical = readField(grpData, offset, CC.Person_S["医疗能力"]),
             poison = readField(grpData, offset, CC.Person_S["用毒能力"]),
             antiPoison = readField(grpData, offset, CC.Person_S["解毒能力"]),
+            antiPoisonResist = readField(grpData, offset, CC.Person_S["抗毒能力"]),
             fist = readField(grpData, offset, CC.Person_S["拳掌功夫"]),
             sword = readField(grpData, offset, CC.Person_S["御剑能力"]),
             blade = readField(grpData, offset, CC.Person_S["耍刀技巧"]),
             special = readField(grpData, offset, CC.Person_S["特殊兵器"]),
             hidden = readField(grpData, offset, CC.Person_S["暗器技巧"]),
+            martialKnowledge = readField(grpData, offset, CC.Person_S["武学常识"]),
             morality = readField(grpData, offset, CC.Person_S["品德"]),
-            aptitude = readField(grpData, offset, CC.Person_S["资质"]),
+            poisonAttack = readField(grpData, offset, CC.Person_S["攻击带毒"]),
             doubleAttack = readField(grpData, offset, CC.Person_S["左右互搏"]),
+            fame = readField(grpData, offset, CC.Person_S["声望"]),
+            aptitude = readField(grpData, offset, CC.Person_S["资质"]),
             wounded = readField(grpData, offset, CC.Person_S["受伤程度"]),
             poisoned = readField(grpData, offset, CC.Person_S["中毒程度"]),
             stamina = readField(grpData, offset, CC.Person_S["体力"]),
             innerType = readField(grpData, offset, CC.Person_S["内力性质"]),
+            practicePoints = readField(grpData, offset, CC.Person_S["物品修炼点数"]),
             weapon = readField(grpData, offset, CC.Person_S["武器"]),
             armour = readField(grpData, offset, CC.Person_S["防具"]),
             trainingItem = readField(grpData, offset, CC.Person_S["修炼物品"]),
             trainingPoints = readField(grpData, offset, CC.Person_S["修炼点数"]),
+            attackAnimFrames = attackAnimFrames,
+            attackAnimDelays = attackAnimDelays,
+            soundDelays = soundDelays,
             skills = {},
             items = {},
         }
@@ -150,12 +169,68 @@ local function main()
 
     local function extractThing(i)
         local offset = thingBase + i * CC.ThingSize
+        local craftItems = {}
+        local craftCounts = {}
+        for ci = 1, 5 do
+            craftItems[ci] = readField(grpData, offset, CC.Thing_S["练出物品" .. ci])
+            craftCounts[ci] = readField(grpData, offset, CC.Thing_S["需要物品数量" .. ci])
+        end
         return {
             id = readField(grpData, offset, CC.Thing_S["代号"]),
             name = readField(grpData, offset, CC.Thing_S["名称"]),
+            name2 = readField(grpData, offset, CC.Thing_S["名称2"]),
             desc = readField(grpData, offset, CC.Thing_S["物品说明"]),
-            itemType = readField(grpData, offset, CC.Thing_S["类型"]),
+            learnedSkill = readField(grpData, offset, CC.Thing_S["练出武功"]),
+            throwAnim = readField(grpData, offset, CC.Thing_S["暗器动画编号"]),
+            user = readField(grpData, offset, CC.Thing_S["使用人"]),
             equipType = readField(grpData, offset, CC.Thing_S["装备类型"]),
+            displayDesc = readField(grpData, offset, CC.Thing_S["显示物品说明"]),
+            itemType = readField(grpData, offset, CC.Thing_S["类型"]),
+            unknown5 = readField(grpData, offset, CC.Thing_S["未知5"]),
+            unknown6 = readField(grpData, offset, CC.Thing_S["未知6"]),
+            unknown7 = readField(grpData, offset, CC.Thing_S["未知7"]),
+            addHp = readField(grpData, offset, CC.Thing_S["加生命"]),
+            addMaxHp = readField(grpData, offset, CC.Thing_S["加生命最大值"]),
+            addPoison = readField(grpData, offset, CC.Thing_S["加中毒解毒"]),
+            addStamina = readField(grpData, offset, CC.Thing_S["加体力"]),
+            changeInnerType = readField(grpData, offset, CC.Thing_S["改变内力性质"]),
+            addMp = readField(grpData, offset, CC.Thing_S["加内力"]),
+            addMaxMp = readField(grpData, offset, CC.Thing_S["加内力最大值"]),
+            addAttack = readField(grpData, offset, CC.Thing_S["加攻击力"]),
+            addSpeed = readField(grpData, offset, CC.Thing_S["加轻功"]),
+            addDefence = readField(grpData, offset, CC.Thing_S["加防御力"]),
+            addMedical = readField(grpData, offset, CC.Thing_S["加医疗能力"]),
+            addPoisonSkill = readField(grpData, offset, CC.Thing_S["加用毒能力"]),
+            addAntiPoison = readField(grpData, offset, CC.Thing_S["加解毒能力"]),
+            addAntiPoisonResist = readField(grpData, offset, CC.Thing_S["加抗毒能力"]),
+            addFist = readField(grpData, offset, CC.Thing_S["加拳掌功夫"]),
+            addSword = readField(grpData, offset, CC.Thing_S["加御剑能力"]),
+            addBlade = readField(grpData, offset, CC.Thing_S["加耍刀技巧"]),
+            addSpecial = readField(grpData, offset, CC.Thing_S["加特殊兵器"]),
+            addHidden = readField(grpData, offset, CC.Thing_S["加暗器技巧"]),
+            addMartialKnowledge = readField(grpData, offset, CC.Thing_S["加武学常识"]),
+            addMorality = readField(grpData, offset, CC.Thing_S["加品德"]),
+            addAttackCount = readField(grpData, offset, CC.Thing_S["加攻击次数"]),
+            addPoisonAttack = readField(grpData, offset, CC.Thing_S["加攻击带毒"]),
+            practiceUser = readField(grpData, offset, CC.Thing_S["仅修炼人物"]),
+            needInnerType = readField(grpData, offset, CC.Thing_S["需内力性质"]),
+            needMp = readField(grpData, offset, CC.Thing_S["需内力"]),
+            needAttack = readField(grpData, offset, CC.Thing_S["需攻击力"]),
+            needSpeed = readField(grpData, offset, CC.Thing_S["需轻功"]),
+            needPoisonSkill = readField(grpData, offset, CC.Thing_S["需用毒能力"]),
+            needMedical = readField(grpData, offset, CC.Thing_S["需医疗能力"]),
+            needAntiPoison = readField(grpData, offset, CC.Thing_S["需解毒能力"]),
+            needFist = readField(grpData, offset, CC.Thing_S["需拳掌功夫"]),
+            needSword = readField(grpData, offset, CC.Thing_S["需御剑能力"]),
+            needBlade = readField(grpData, offset, CC.Thing_S["需耍刀技巧"]),
+            needSpecial = readField(grpData, offset, CC.Thing_S["需特殊兵器"]),
+            needHidden = readField(grpData, offset, CC.Thing_S["需暗器技巧"]),
+            needAptitude = readField(grpData, offset, CC.Thing_S["需资质"]),
+            needExp = readField(grpData, offset, CC.Thing_S["需经验"]),
+            craftNeedExp = readField(grpData, offset, CC.Thing_S["练出物品需经验"]),
+            needMaterial = readField(grpData, offset, CC.Thing_S["需材料"]),
+            craftItems = craftItems,
+            craftCounts = craftCounts,
             effect = {},
         }
     end
@@ -163,19 +238,40 @@ local function main()
     local function extractWugong(i)
         local offset = wugongBase + i * CC.WugongSize
         local powers = {}
+        local moveRange = {}
+        local damageRange = {}
+        local addMp = {}
+        local killMp = {}
         for lvl = 1, 10 do
             local key = "攻击力" .. lvl
             if CC.Wugong_S[key] then
                 powers[lvl] = readField(grpData, offset, CC.Wugong_S[key])
             end
+            moveRange[lvl] = readField(grpData, offset, CC.Wugong_S["移动范围" .. lvl])
+            damageRange[lvl] = readField(grpData, offset, CC.Wugong_S["杀伤范围" .. lvl])
+            addMp[lvl] = readField(grpData, offset, CC.Wugong_S["加内力" .. lvl])
+            killMp[lvl] = readField(grpData, offset, CC.Wugong_S["杀内力" .. lvl])
         end
         return {
             id = readField(grpData, offset, CC.Wugong_S["代号"]),
             name = readField(grpData, offset, CC.Wugong_S["名称"]),
+            unknown1 = readField(grpData, offset, CC.Wugong_S["未知1"]),
+            unknown2 = readField(grpData, offset, CC.Wugong_S["未知2"]),
+            unknown3 = readField(grpData, offset, CC.Wugong_S["未知3"]),
+            unknown4 = readField(grpData, offset, CC.Wugong_S["未知4"]),
+            unknown5 = readField(grpData, offset, CC.Wugong_S["未知5"]),
+            soundEffect = readField(grpData, offset, CC.Wugong_S["出招音效"]),
             skillType = readField(grpData, offset, CC.Wugong_S["武功类型"]),
+            animEffect = readField(grpData, offset, CC.Wugong_S["武功动画&音效"]),
+            damageType = readField(grpData, offset, CC.Wugong_S["伤害类型"]),
             range = readField(grpData, offset, CC.Wugong_S["攻击范围"]),
             mpCost = readField(grpData, offset, CC.Wugong_S["消耗内力点数"]),
+            poison = readField(grpData, offset, CC.Wugong_S["敌人中毒点数"]),
             powers = powers,
+            moveRange = moveRange,
+            damageRange = damageRange,
+            addMp = addMp,
+            killMp = killMp,
         }
     end
 
@@ -303,8 +399,11 @@ local function main()
             id = p.id,
             name = p.name,
             title = p.title,
+            headId = p.headId,
             sex = p.sex,
             level = p.level,
+            hpGrowth = p.hpGrowth,
+            exp = p.exp,
             hp = p.hp,
             maxHp = p.maxHp,
             mp = p.mp,
@@ -315,22 +414,30 @@ local function main()
             medical = p.medical,
             poison = p.poison,
             antiPoison = p.antiPoison,
+            antiPoisonResist = p.antiPoisonResist,
             fist = p.fist,
             sword = p.sword,
             blade = p.blade,
             special = p.special,
             hidden = p.hidden,
+            martialKnowledge = p.martialKnowledge,
             morality = p.morality,
-            aptitude = p.aptitude,
+            poisonAttack = p.poisonAttack,
             doubleAttack = p.doubleAttack,
+            fame = p.fame,
+            aptitude = p.aptitude,
             wounded = p.wounded,
             poisoned = p.poisoned,
             stamina = p.stamina,
             innerType = p.innerType,
+            practicePoints = p.practicePoints,
             weapon = p.weapon,
             armour = p.armour,
             trainingItem = p.trainingItem,
             trainingPoints = p.trainingPoints,
+            attackAnimFrames = p.attackAnimFrames,
+            attackAnimDelays = p.attackAnimDelays,
+            soundDelays = p.soundDelays,
         }
         local skillArr = {}
         for _, s in ipairs(p.skills) do
@@ -349,9 +456,59 @@ local function main()
         local entry = {
             id = it.id,
             name = it.name,
+            name2 = it.name2,
             desc = it.desc,
+            learnedSkill = it.learnedSkill,
+            throwAnim = it.throwAnim,
+            user = it.user,
             itemType = it.itemType,
             equipType = it.equipType,
+            displayDesc = it.displayDesc,
+            unknown5 = it.unknown5,
+            unknown6 = it.unknown6,
+            unknown7 = it.unknown7,
+            addHp = it.addHp,
+            addMaxHp = it.addMaxHp,
+            addPoison = it.addPoison,
+            addStamina = it.addStamina,
+            changeInnerType = it.changeInnerType,
+            addMp = it.addMp,
+            addMaxMp = it.addMaxMp,
+            addAttack = it.addAttack,
+            addSpeed = it.addSpeed,
+            addDefence = it.addDefence,
+            addMedical = it.addMedical,
+            addPoisonSkill = it.addPoisonSkill,
+            addAntiPoison = it.addAntiPoison,
+            addAntiPoisonResist = it.addAntiPoisonResist,
+            addFist = it.addFist,
+            addSword = it.addSword,
+            addBlade = it.addBlade,
+            addSpecial = it.addSpecial,
+            addHidden = it.addHidden,
+            addMartialKnowledge = it.addMartialKnowledge,
+            addMorality = it.addMorality,
+            addAttackCount = it.addAttackCount,
+            addPoisonAttack = it.addPoisonAttack,
+            practiceUser = it.practiceUser,
+            needInnerType = it.needInnerType,
+            needMp = it.needMp,
+            needAttack = it.needAttack,
+            needSpeed = it.needSpeed,
+            needPoisonSkill = it.needPoisonSkill,
+            needMedical = it.needMedical,
+            needAntiPoison = it.needAntiPoison,
+            needFist = it.needFist,
+            needSword = it.needSword,
+            needBlade = it.needBlade,
+            needSpecial = it.needSpecial,
+            needHidden = it.needHidden,
+            needAptitude = it.needAptitude,
+            needExp = it.needExp,
+            craftNeedExp = it.craftNeedExp,
+            needMaterial = it.needMaterial,
+            craftItems = it.craftItems,
+            craftCounts = it.craftCounts,
         }
         return entry
     end
@@ -360,9 +517,18 @@ local function main()
         local entry = {
             id = sk.id,
             name = sk.name,
+            unknown1 = sk.unknown1,
+            unknown2 = sk.unknown2,
+            unknown3 = sk.unknown3,
+            unknown4 = sk.unknown4,
+            unknown5 = sk.unknown5,
+            soundEffect = sk.soundEffect,
             skillType = sk.skillType,
+            animEffect = sk.animEffect,
+            damageType = sk.damageType,
             range = sk.range,
             mpCost = sk.mpCost,
+            poison = sk.poison,
         }
         if sk.powers and next(sk.powers) then
             local p = {}
@@ -370,6 +536,34 @@ local function main()
                 p[i] = v
             end
             entry.powers = p
+        end
+        if sk.moveRange and next(sk.moveRange) then
+            local mr = {}
+            for i, v in ipairs(sk.moveRange) do
+                mr[i] = v
+            end
+            entry.moveRange = mr
+        end
+        if sk.damageRange and next(sk.damageRange) then
+            local dr = {}
+            for i, v in ipairs(sk.damageRange) do
+                dr[i] = v
+            end
+            entry.damageRange = dr
+        end
+        if sk.addMp and next(sk.addMp) then
+            local am = {}
+            for i, v in ipairs(sk.addMp) do
+                am[i] = v
+            end
+            entry.addMp = am
+        end
+        if sk.killMp and next(sk.killMp) then
+            local km = {}
+            for i, v in ipairs(sk.killMp) do
+                km[i] = v
+            end
+            entry.killMp = km
         end
         return entry
     end
