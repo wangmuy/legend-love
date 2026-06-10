@@ -5,53 +5,33 @@
 ```
 engine-web-core  ──┐
 web-data-loader  ──┤  (无依赖，可并行)
-                   │
+                    │
 web-frontend-shell ─┘  (依赖 engine-web-core + web-data-loader)
-                   │
+                    │
 engine-web-tests   ───  (依赖 web-frontend-shell)
+                    │
+engine-web-state-persistence ─── (依赖 engine-web-core + web-data-loader + web-frontend-shell)
 ```
 
-engine-web-core 和 web-data-loader 可并行开发。
-web-frontend-shell 需要等两者完成后再集成。
-engine-web-tests 需要 web-frontend-shell 就绪后再编写（测试跑在完整页面上）。
-
 ## Change Assignments
-
-### 1. engine-web-core
-
-| 字段 | 值 |
-|------|-----|
-| Scope | 实现 37 个 EngineAPI 函数的 Web 版本 |
-| Responsibility | 所有 render.*、input.*、sprite.*、map.*、audio.*、time.*、file.*、script.*、font.*、color.*、debug.*、coroutine.*、app.* |
-| Depends on | 无（独立实现，不依赖其他 change） |
-| Status | [x] Created |
-
-### 2. web-data-loader
-
-| 字段 | 值 |
-|------|-----|
-| Scope | JSON 数据包加载到 Lua 运行环境 |
-| Responsibility | 实现数据加载逻辑：fetch JSON → 解析 → 存入 Lua 全局表 |
-| Depends on | 无 |
-| Status | [x] Created |
-
-### 3. web-frontend-shell
-
-| 字段 | 值 |
-|------|-----|
-| Scope | HTML 页面 + xterm.js + Fengari bootstrap + JS-Lua 桥接 |
-| Responsibility | index.html、index.js、style.css、xterm.js 配置、Fengari 加载、事件队列、requestAnimationFrame 循环 |
-| Depends on | engine-web-core, web-data-loader（需要在 Lua VM 中加载两者的实现） |
-| Status | [x] Created |
 
 ### 4. engine-web-tests
 
 | 字段 | 值 |
 |------|-----|
 | Scope | Playwright E2E 测试 + Lua 单元测试覆盖 engine-web 全部行为 |
-| Responsibility | 44 条测试用例，8 个层次：页面加载、Lua VM、API 表面/功能、数据完整性、跨文件引用、交互流程、错误场景 |
+| Responsibility | 50 条测试用例，8 个层次：页面加载、Lua VM、API 表面/功能、数据完整性、跨文件引用、交互流程、错误场景 |
 | Depends on | web-frontend-shell（需要完整页面环境运行测试） |
-| Status | [ ] Created |
+| Status | [x] Created |
+
+### 5. engine-web-state-persistence
+
+| 字段 | 值 |
+|------|-----|
+| Scope | 字段名映射 + 游戏状态持久化（IndexedDB） |
+| Responsibility | 实现英文↔中文键名映射、loadGameState/saveGameState、JSBridge IndexedDB 存储接口 |
+| Depends on | engine-web-core, web-data-loader, web-frontend-shell |
+| Status | [ ] Draft |
 
 ## Shared Contracts
 
@@ -60,6 +40,11 @@ engine-web-tests 需要 web-frontend-shell 就绪后再编写（测试跑在完�
 | _G.EngineAPI | 全局 EngineAPI 表，engine_web.lua 写入 |
 | _G.lib | 全局 lib 别名，指向 EngineAPI 的兼容包装 |
 | _G.dataCache | 预加载 JSON 数据的全局表，格式同 JSON 结构 |
+| _G.JY | 游戏状态表，中文键名，通过 loadGameState/saveGameState 管理 |
+| _G.fieldMap | 英文↔中文键名映射表，按数据结构分组 |
+| JSBridge.save(key, json) | 将 JSON 字符串存入 IndexedDB |
+| JSBridge.load(key) | 从 IndexedDB 读取 JSON 字符串 |
+| JSBridge.listSaves() | 列出所有存档槽位状态 |
 | JSBridge.onLuaOutput(ansiStr) | JS 侧函数，engine_web 输出 ANSI 到 xterm |
 | JSBridge.onLuaPrompt() | JS 侧函数，聚焦输入框等待用户输入 |
 | JSBridge.onLuaReady() | JS 侧函数，Lua VM 初始化完成通知 |
