@@ -6,15 +6,20 @@
   "scripts": {
     "prebuild": "rm -rf dist",
     "build": "node scripts/build.js",
-    "start": "cd dist && python3 -m http.server 8080",
-    "deploy": "npx gh-pages -d dist"
+    "dev": "npx serve . -p 8088 --no-clipboard",
+    "start": "npx serve dist -p 8088 --no-clipboard",
+    "deploy": "npx gh-pages -d dist",
+    "test": "node scripts/start-test-server.js & npx playwright test; kill %1 2>/dev/null; wait",
+    "test:ui": "node scripts/start-test-server.js & npx playwright test --ui; kill %1 2>/dev/null; wait"
   },
   "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "agent-browser": "^0.27.1",
     "fengari-web": "^0.1.4",
-    "xterm": "^5.3.0",
-    "@xterm/addon-fit": "^0.11.0"
+    "xterm": "^5.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.52.0",
     "gh-pages": "^6.0.0"
   }
 }

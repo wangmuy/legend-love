@@ -22,6 +22,8 @@
 </html>
 ```
 
+> 开发模式通过 CDN 加载；`npm run build` 将 CDN 引用替换为本地 `lib/` 路径，产出到 `dist/`。
+
 ## JS ↔ Lua 桥接
 
 ```javascript
@@ -126,5 +128,5 @@ document.getElementById('command-input').addEventListener('keydown', (e) => {
 | 风险 | 缓解 |
 |------|------|
 | Fengari 加载大量 Lua 代码的性能 | 先加载 engine_web.lua，游戏脚本按需加载 |
-| xterm.js CJK 字符宽度 | 接受小偏差，不安装 addon-fit |
+| xterm.js CJK 字符宽度 | 使用 FitAddon 自适应，小偏差仍可接受 |
 | 输入法中文字符 | input type="text" 原生支持 |

@@ -13,9 +13,20 @@ game/engine-web/
 │           └── processEventQueue()
 ├── engine_web.lua
 ├── data_loader.lua
-├── data-web/*.json
-├── lib/
-└── style.css
+├── style.css
+├── package.json
+├── scripts/build.js
+├── .gitignore
+├── data-web/*.json          ← 提取数据 (gitignored)
+├── node_modules/            ← npm 依赖 (gitignored)
+├── lib/                     ← 运行时库 (CDN 引用)
+└── dist/                    ← 构建产物 (gitignored)
+      ├── index.html         ← CDN→本地路径改写
+      ├── lib/
+      ├── engine_web.lua
+      ├── data_loader.lua
+      ├── data-web/*.json
+      └── style.css
 ```
 
 ## 事件循环

@@ -14,10 +14,10 @@ cd game/engine-web && npm install
 # 3. 构建（复制文件到 dist/）
 npm run build
 
-# 4. 启动本地服务器
+# 4. 启动本地服务器（提供 dist/ 目录）
 npm start
 
-# 5. 打开浏览器访问 http://localhost:8080
+# 5. 打开浏览器访问 http://localhost:8088
 ```
 
 ## 工作流
@@ -26,10 +26,10 @@ npm start
 
 ```bash
 cd game && lua tools/extract_web_data.lua
-cd game/engine-web && python3 -m http.server 8080
+cd game/engine-web && npm run dev
 ```
 
-`index.html` 默认引用 CDN 版本，无需 `node_modules`。
+`index.html` 默认引用 CDN 版本，无需 `node_modules`。`npm run dev` 启动当前目录的 HTTP 服务器（通过 `npx serve`）。
 
 ### 构建部署（本地 lib 模式）
 
@@ -61,10 +61,13 @@ engine-web/
 ├── index.js             ← Fengari 引导 + xterm.js + JS↔Lua 桥接
 ├── engine_web.lua       ← EngineAPI 的 Web 实现（37 个函数）
 ├── data_loader.lua      ← JSON 解析器 + 数据缓存
-├── data-web/            ← 精简数据包（提取脚本生成，gitignored）
+├── data-web/            ← 精简数据包（提取脚本生成，gitignored）*
 ├── dist/                ← 构建产物（gitignored）
+│   ├── lib/             ← 第三方库拷贝
+│   └── data-web/        ← data-web/ 的构建副本
 ├── node_modules/        ← npm 依赖（gitignored）
-└── lib/                 ← 第三方库（构建时复制）
+
+> `*` `dist/data-web/` 由构建脚本从 `data-web/` 复制生成，非独立维护。
 ```
 
 ## 命令参考
@@ -72,6 +75,7 @@ engine-web/
 | 命令 | 说明 |
 |------|------|
 | `npm install` | 安装 xterm、fengari-web 等依赖 |
+| `npm run dev` | 开发服务器（CDN 模式，提供当前目录） |
 | `npm run build` | 构建到 `dist/` |
 | `npm start` | 启动 `dist/` 目录的 HTTP 服务器 |
 | `npm run deploy` | 发布 `dist/` 到 GitHub Pages |

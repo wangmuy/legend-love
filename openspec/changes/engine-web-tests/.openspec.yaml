@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-06-08
+parent_epic: web-mud-text-version
+parent_slice: slice-web-mud-frontend-engine

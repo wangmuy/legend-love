@@ -7,10 +7,13 @@ engine-web-core  ──┐
 web-data-loader  ──┤  (无依赖，可并行)
                    │
 web-frontend-shell ─┘  (依赖 engine-web-core + web-data-loader)
+                   │
+engine-web-tests   ───  (依赖 web-frontend-shell)
 ```
 
 engine-web-core 和 web-data-loader 可并行开发。
 web-frontend-shell 需要等两者完成后再集成。
+engine-web-tests 需要 web-frontend-shell 就绪后再编写（测试跑在完整页面上）。
 
 ## Change Assignments
 
@@ -41,6 +44,15 @@ web-frontend-shell 需要等两者完成后再集成。
 | Depends on | engine-web-core, web-data-loader（需要在 Lua VM 中加载两者的实现） |
 | Status | [x] Created |
 
+### 4. engine-web-tests
+
+| 字段 | 值 |
+|------|-----|
+| Scope | Playwright E2E 测试 + Lua 单元测试覆盖 engine-web 全部行为 |
+| Responsibility | 44 条测试用例，8 个层次：页面加载、Lua VM、API 表面/功能、数据完整性、跨文件引用、交互流程、错误场景 |
+| Depends on | web-frontend-shell（需要完整页面环境运行测试） |
+| Status | [ ] Created |
+
 ## Shared Contracts
 
 | 约定 | 规则 |
@@ -60,3 +72,10 @@ web-frontend-shell 需要等两者完成后再集成。
 4. JSON 数据加载完成，显示 "Data loaded: 7 files, 0.6 MB"
 5. 终端显示 "金庸群侠传 Web MUD v0.1"
 6. 输入框可用，输入 `help` 显示 "Available commands: none (game not loaded)"
+
+### 自动化测试
+
+1. Playwright 打开 Chromium → 页面加载完全
+2. 44 条测试用例自动执行（8 个 spec 文件）
+3. 覆盖页面加载、Lua VM、API 功能、数据完整性、交互流程、错误场景
+4. `npm test` 一键运行
