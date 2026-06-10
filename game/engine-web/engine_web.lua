@@ -165,7 +165,7 @@ EngineAPI.file = {}
 
 function EngineAPI.file.open(filename, mode)
     if mode and mode:sub(1, 1) == "r" then
-        local content = _G.dataCache and _G.dataCache[filename]
+        local content = _G.rawDataCache and _G.rawDataCache[filename]
         if content then
             local handle = {
                 _content = content,
@@ -220,7 +220,7 @@ end
 function EngineAPI.file.remove(filename) end
 
 function EngineAPI.file.getSize(filename)
-    local content = _G.dataCache and _G.dataCache[filename]
+    local content = _G.rawDataCache and _G.rawDataCache[filename]
     if content then
         return #content
     end
@@ -228,12 +228,12 @@ function EngineAPI.file.getSize(filename)
 end
 
 function EngineAPI.file.exists(filename)
-    return _G.dataCache and _G.dataCache[filename] ~= nil
+    return _G.rawDataCache and _G.rawDataCache[filename] ~= nil
 end
 
 function EngineAPI.file.read(filename)
-    if _G.dataCache then
-        return _G.dataCache[filename]
+    if _G.rawDataCache then
+        return _G.rawDataCache[filename]
     end
     return nil
 end
@@ -241,7 +241,7 @@ end
 function EngineAPI.file.write(filename, content, mode) end
 
 function EngineAPI.file.lines(filename)
-    local content = _G.dataCache and _G.dataCache[filename]
+    local content = _G.rawDataCache and _G.rawDataCache[filename]
     if not content then
         return function() return nil end
     end
