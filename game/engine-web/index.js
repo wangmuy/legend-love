@@ -56,6 +56,79 @@
         }
     });
 
+    /* ── 3b. IndexedDB storage ── */
+    let dbInstance = null;
+    const DB_NAME = 'jyLegendWebMud';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'saves';
+    const saveCache = {};
+
+    function openDatabase() {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(STORE_NAME)) {
+                    db.createObjectStore(STORE_NAME, { keyPath: 'key' });
+                }
+            };
+            req.onsuccess = function(e) {
+                dbInstance = e.target.result;
+                resolve();
+            };
+            req.onerror = function(e) {
+                reject(e.target.error);
+            };
+        });
+    }
+
+    async function loadAllSavesToCache() {
+        if (!dbInstance) return;
+        return new Promise((resolve, reject) => {
+            const tx = dbInstance.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.getAll();
+            req.onsuccess = function(e) {
+                const records = e.target.result || [];
+                for (const rec of records) {
+                    saveCache[rec.key] = rec.value;
+                }
+                resolve();
+            };
+            req.onerror = function(e) {
+                reject(e.target.error);
+            };
+        });
+    }
+
+    function dbSave(key, value) {
+        saveCache[key] = value;
+        if (!dbInstance) return;
+        const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.put({ key: key, value: value });
+    }
+
+    function dbLoad(key) {
+        return saveCache[key] || null;
+    }
+
+    function dbDelete(key) {
+        delete saveCache[key];
+        if (!dbInstance) return;
+        const tx = dbInstance.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.delete(key);
+    }
+
+    function dbListKeys() {
+        const keys = [];
+        for (const k of Object.keys(saveCache)) {
+            if (k.startsWith('save_')) keys.push(k);
+        }
+        return keys.sort();
+    }
+
     /* ── 4. JSBridge injection ── */
     function injectJSBridge() {
         lua.lua_pushstring(L, 'JSBridge');
@@ -90,6 +163,48 @@
         lua.lua_pushstring(L, 'getEventCount');
         lua.lua_pushcfunction(L, function(state) {
             lua.lua_pushnumber(state, eventQueue.length);
+            return 1;
+        });
+        lua.lua_settable(L, -3);
+
+        lua.lua_pushstring(L, 'save');
+        lua.lua_pushcfunction(L, function(state) {
+            const key = fengari.to_jsstring(lua.lua_tolstring(state, 1));
+            const val = fengari.to_jsstring(lua.lua_tolstring(state, 2));
+            dbSave(key, val);
+            return 0;
+        });
+        lua.lua_settable(L, -3);
+
+        lua.lua_pushstring(L, 'load');
+        lua.lua_pushcfunction(L, function(state) {
+            const key = fengari.to_jsstring(lua.lua_tolstring(state, 1));
+            const val = dbLoad(key);
+            if (val !== null) {
+                lua.lua_pushstring(state, val);
+            } else {
+                lua.lua_pushnil(state);
+            }
+            return 1;
+        });
+        lua.lua_settable(L, -3);
+
+        lua.lua_pushstring(L, 'delete');
+        lua.lua_pushcfunction(L, function(state) {
+            const key = fengari.to_jsstring(lua.lua_tolstring(state, 1));
+            dbDelete(key);
+            return 0;
+        });
+        lua.lua_settable(L, -3);
+
+        lua.lua_pushstring(L, 'listSaves');
+        lua.lua_pushcfunction(L, function(state) {
+            const keys = dbListKeys();
+            lua.lua_newtable(state);
+            for (let i = 0; i < keys.length; i++) {
+                lua.lua_pushstring(state, keys[i]);
+                lua.lua_rawseti(state, -2, i + 1);
+            }
             return 1;
         });
         lua.lua_settable(L, -3);
@@ -171,6 +286,12 @@
         await loadLuaModule('data_loader.lua', loaderSource);
         term.write('  Data loader: ready\r\n');
 
+        term.write('Loading state_manager.lua...\r\n');
+        const stateResp = await fetch('state_manager.lua');
+        const stateSource = await stateResp.text();
+        await loadLuaModule('state_manager.lua', stateSource);
+        term.write('  State manager: ready\r\n');
+
         const procQSrc = [
             'function processEventQueue(timestamp)',
             '    -- Called every frame by JS game loop',
@@ -179,6 +300,11 @@
         ].join('\n');
         fengari.load(procQSrc, 'processEventQueue')(L);
         term.write('  processEventQueue: ready\r\n');
+
+        term.write('Opening IndexedDB...\r\n');
+        await openDatabase();
+        await loadAllSavesToCache();
+        term.write('  IndexedDB: ready (' + Object.keys(saveCache).length + ' cached keys)\r\n');
 
         term.write('Loading game data...\r\n');
         await loadDataFiles();
