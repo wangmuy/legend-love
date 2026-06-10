@@ -3,6 +3,8 @@
 -- Runs inside Fengari Lua VM (Lua 5.3)
 
 _G.dataCache = {}
+_G.rawDataCache = {}
+_G.rawDataCache = {}
 
 function parseJSON(str)
     local pos = 1
@@ -132,13 +134,14 @@ function loadJSON(cacheKey, jsonString)
         return false, result
     end
     _G.dataCache[cacheKey] = result
+    _G.rawDataCache[cacheKey] = jsonString
     totalDataSize = totalDataSize + #jsonString
     return true
 end
 
 function finalizeDataLoad()
     _G.dataCache._loaded = true
-    _G.dataCache._fileCount = 7
+    _G.dataCache._fileCount = 10
     _G.dataCache._totalSize = totalDataSize
     initDataCompat()
 end
@@ -176,6 +179,9 @@ function initDataCompat()
         ["data-web/skills.json"] = "skills",
         ["data-web/entrances.json"] = "entrances",
         ["data-web/wmap.json"] = "wmap",
+        ["data-web/events.json"] = "events",
+        ["data-web/config.json"] = "config",
+        ["data-web/shops.json"] = "shops",
     }
 end
 

@@ -138,17 +138,18 @@ local function readSceneHead(data, offset)
         for j = 0, 2 do
             local ex = readU16(data, offset + 42 + j * 2)
             local ey = readU16(data, offset + 48 + j * 2)
-            local tjx = readU16(data, offset + 54 + j * 2)
-            local tjy = readU16(data, offset + 56 + j * 2)
             if ex ~= 65535 and ey ~= 65535 then
-                table.insert(exitData, {
+                local entry = {
                     dir = "jump",
                     toSceneId = exitScene,
                     x = ex,
                     y = ey,
-                    targetX = tjx,
-                    targetY = tjy
-                })
+                }
+                if j < 2 then
+                    entry.targetX = readU16(data, offset + 54 + j * 2)
+                    entry.targetY = readU16(data, offset + 56 + j * 2)
+                end
+                table.insert(exitData, entry)
             end
         end
     end
@@ -161,6 +162,11 @@ local function readSceneHead(data, offset)
         entranceY = readU16(data, offset + 40),
         mapX = readU16(data, offset + 30),
         mapY = readU16(data, offset + 32),
+        mapX2 = readU16(data, offset + 34),
+        mapY2 = readU16(data, offset + 36),
+        exitMusic = readU16(data, offset + 22),
+        enterMusic = readU16(data, offset + 24),
+        enterCondition = readU16(data, offset + 28),
     }
 end
 
@@ -188,7 +194,10 @@ function extract.run(dataDir, outputFile)
                 width = 64,
                 height = 64,
                 exits = sh.exitData,
-                entrance = { mapX = sh.mapX, mapY = sh.mapY },
+                entrance = { mapX = sh.mapX, mapY = sh.mapY, mapX2 = sh.mapX2, mapY2 = sh.mapY2 },
+                exitMusic = sh.exitMusic,
+                enterMusic = sh.enterMusic,
+                enterCondition = sh.enterCondition,
                 npc = {},
                 items = {},
                 events = {},
