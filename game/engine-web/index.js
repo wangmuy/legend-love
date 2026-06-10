@@ -23,6 +23,7 @@
         },
     });
     term.open(document.getElementById('terminal'));
+    window.__xterm = term;  // 暴露给测试框架
 
     /* ── 1b. FitAddon for auto-resize ── */
     const fitAddon = new FitAddon.FitAddon();
@@ -32,8 +33,7 @@
 
     /* ── 2. Fengari ── */
     const { lua, lauxlib, lualib } = fengari;
-    const L = lauxlib.luaL_newstate();
-    lualib.luaL_openlibs(L);
+    const L = fengari.L;  // pre-created Lua state
 
     /* ── 3. Event queue & input ── */
     const eventQueue = [];
@@ -58,10 +58,10 @@
 
     /* ── 4. JSBridge injection ── */
     function injectJSBridge() {
-        lauxlib.lua_pushstring(L, 'JSBridge');
+        lua.lua_pushstring(L, 'JSBridge');
         lua.lua_newtable(L);
 
-        lauxlib.lua_pushstring(L, 'write');
+        lua.lua_pushstring(L, 'write');
         lua.lua_pushcfunction(L, function(state) {
             const str = lua.lua_tostring(state, -1);
             term.write(str);
@@ -69,7 +69,7 @@
         });
         lua.lua_settable(L, -3);
 
-        lauxlib.lua_pushstring(L, 'getEvent');
+        lua.lua_pushstring(L, 'getEvent');
         lua.lua_pushcfunction(L, function(state) {
             const ev = eventQueue.shift();
             if (ev) {
@@ -87,7 +87,7 @@
         });
         lua.lua_settable(L, -3);
 
-        lauxlib.lua_pushstring(L, 'getEventCount');
+        lua.lua_pushstring(L, 'getEventCount');
         lua.lua_pushcfunction(L, function(state) {
             lua.lua_pushnumber(state, eventQueue.length);
             return 1;
@@ -98,25 +98,51 @@
     }
 
     /* ── 5. Lua module loader ── */
-    async function loadLuaModule(path, source) {
-        const result = lauxlib.luaL_loadstring(L, source);
-        if (result !== 0) {
-            const err = lauxlib.lua_tostring(L, -1);
-            lua.lua_pop(L, 1);
-            throw new Error('Failed to load ' + path + ': ' + err);
+    function loadLuaModule(path, source) {
+        const fn = fengari.load(source, path);
+        fn(L);
+    }
+
+    /* ── 5b. JS-to-Lua value converter ── */
+    function pushJsValue(state, val) {
+        const lua = fengari.lua;
+        if (val === null || val === undefined) {
+            lua.lua_pushnil(state);
+        } else if (typeof val === 'boolean') {
+            lua.lua_pushboolean(state, val);
+        } else if (typeof val === 'number') {
+            lua.lua_pushnumber(state, val);
+        } else if (typeof val === 'string') {
+            lua.lua_pushstring(state, val);
+        } else if (Array.isArray(val)) {
+            lua.lua_newtable(state);
+            for (let i = 0; i < val.length; i++) {
+                pushJsValue(state, val[i]);
+                lua.lua_rawseti(state, -2, i + 1);
+            }
+        } else if (typeof val === 'object') {
+            lua.lua_newtable(state);
+            for (const key of Object.keys(val)) {
+                lua.lua_pushstring(state, key);
+                pushJsValue(state, val[key]);
+                lua.lua_settable(state, -3);
+            }
         }
-        const pcallResult = lua.lua_pcall(L, 0, 0, 0);
-        if (pcallResult !== 0) {
-            const err = lauxlib.lua_tostring(L, -1);
-            lua.lua_pop(L, 1);
-            throw new Error('Lua error in ' + path + ': ' + err);
-        }
+    }
+
+    function injectParsedJson(cacheKey, jsonString) {
+        const obj = JSON.parse(jsonString);
+        lua.lua_getglobal(L, 'dataCache');
+        lua.lua_pushstring(L, cacheKey);
+        pushJsValue(L, obj);
+        lua.lua_settable(L, -3);
+        lua.lua_pop(L, 1);
     }
 
     /* ── 6. Data files ── */
     const dataFiles = {};
     async function loadDataFiles() {
-        const files = ['dialogues', 'scenes', 'chars', 'items', 'skills', 'entrances', 'wmap'];
+        const files = ['dialogues', 'scenes', 'chars', 'items', 'skills', 'entrances', 'wmap', 'events', 'config', 'shops'];
         for (const name of files) {
             const response = await fetch('data-web/' + name + '.json');
             const text = await response.text();
@@ -151,20 +177,20 @@
             '    -- EngineAPI.input.getKey handles individual events',
             'end',
         ].join('\n');
-        const r1 = lauxlib.luaL_loadstring(L, procQSrc);
-        if (r1 === 0) lua.lua_pcall(L, 0, 0, 0);
+        fengari.load(procQSrc, 'processEventQueue')(L);
         term.write('  processEventQueue: ready\r\n');
 
         term.write('Loading game data...\r\n');
         await loadDataFiles();
 
-        const fileList = ['dialogues', 'scenes', 'chars', 'items', 'skills', 'entrances', 'wmap'];
+        const fileList = ['dialogues', 'scenes', 'chars', 'items', 'skills', 'entrances', 'wmap', 'config', 'shops'];
+        const fastParse = ['events'];
         for (const name of fileList) {
-            lauxlib.lua_getglobal(L, 'loadJSON');
+            lua.lua_getglobal(L, 'loadJSON');
             lua.lua_pushstring(L, name);
             lua.lua_pushstring(L, dataFiles[name]);
             if (lua.lua_pcall(L, 2, 1, 0) !== 0) {
-                const err = lauxlib.lua_tostring(L, -1);
+                const err = lua.lua_tostring(L, -1);
                 lua.lua_pop(L, 1);
                 term.write('  ' + name + ': FAILED (' + err + ')\r\n');
             } else {
@@ -173,8 +199,13 @@
                 term.write('  ' + name + ': ' + (ok ? 'OK' : 'FAILED') + '\r\n');
             }
         }
+        for (const name of fastParse) {
+            term.write('  ' + name + ': parsing...\r\n');
+            injectParsedJson(name, dataFiles[name]);
+            term.write('  ' + name + ': OK\r\n');
+        }
 
-        lauxlib.lua_getglobal(L, 'finalizeDataLoad');
+        lua.lua_getglobal(L, 'finalizeDataLoad');
         lua.lua_pcall(L, 0, 0, 0);
 
         term.write('\r\n');
@@ -185,7 +216,7 @@
 
     /* ── 8. Game loop ── */
     function gameLoop(timestamp) {
-        lauxlib.lua_getglobal(L, 'processEventQueue');
+        lua.lua_getglobal(L, 'processEventQueue');
         if (lua.lua_type(L, -1) === lua.LUA_TFUNCTION) {
             lua.lua_pushnumber(L, timestamp);
             const result = lua.lua_pcall(L, 1, 0, 0);
