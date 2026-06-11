@@ -43,6 +43,47 @@ end
 
 local OUTPUT_FILE = "engine-web/data-web/shops.json"
 
+-- Generic JSON encoder
+local function encode(v, indent)
+    indent = indent or ""
+    local t = type(v)
+    if t == "nil" then return "null"
+    elseif t == "boolean" then return tostring(v)
+    elseif t == "number" then return tostring(v)
+    elseif t == "string" then return '"' .. escapeJSON(v) .. '"'
+    elseif t == "table" then
+        local isArray = true
+        local maxIdx = 0
+        for k in pairs(v) do
+            if type(k) ~= "number" or k < 1 then isArray = false; break end
+            if k > maxIdx then maxIdx = k end
+        end
+        if isArray and maxIdx > 0 then
+            local parts = {}
+            for i = 1, maxIdx do
+                parts[i] = indent .. "  " .. encode(v[i], indent .. "  ")
+            end
+            return "[\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "]"
+        elseif isArray then
+            return "[]"
+        else
+            local parts = {}
+            local keys = {}
+            for k in pairs(v) do keys[#keys + 1] = k end
+            table.sort(keys)
+            for _, k in ipairs(keys) do
+                local val = v[k]
+                if val ~= nil then
+                    parts[#parts + 1] = indent .. '  "' .. escapeJSON(k) .. '": ' .. encode(val, indent .. "  ")
+                end
+            end
+            return "{\n" .. table.concat(parts, ",\n") .. "\n" .. indent .. "}"
+        end
+    else
+        return tostring(v)
+    end
+end
+
 local function main()
     local idxPath = "data/ranger.idx"
     local grpPath = "data/ranger.grp"
@@ -85,29 +126,15 @@ local function main()
         shops[i + 1] = { ["店铺代号"] = i, ["物品"] = items }
     end
 
-    -- Build JSON
-    local lines = {}
-    lines[#lines + 1] = "{"
-    lines[#lines + 1] = '  "version": "1.0",'
-    lines[#lines + 1] = '  "extracted": "' .. os.date("%Y-%m-%d") .. '",'
-    lines[#lines + 1] = '  "total": ' .. numShops .. ','
-    lines[#lines + 1] = '  "shops": ['
+    -- Build full result table and auto-encode
+    local result = {
+        ["版本"] = "1.0",
+        ["提取时间"] = os.date("%Y-%m-%d"),
+        ["总数"] = numShops,
+        ["shops"] = shops,  -- wrapper key 保持 "shops" 与 data_loader 兼容
+    }
 
-    local entries = {}
-    for i, shop in ipairs(shops) do
-        local comma = (i < #shops) and "," or ""
-        local itemParts = {}
-        for _, it in ipairs(shop["物品"]) do
-            itemParts[#itemParts + 1] = '{"代号":' .. it["代号"] .. ',"数量":' .. it["数量"] .. '}'
-        end
-        local itemsStr = "[" .. table.concat(itemParts, ",") .. "]"
-        entries[#entries + 1] = '    {"店铺代号":' .. shop["店铺代号"] .. ',"物品":' .. itemsStr .. '}' .. comma
-    end
-    lines[#lines + 1] = table.concat(entries, "\n")
-    lines[#lines + 1] = "  ]"
-    lines[#lines + 1] = "}"
-
-    local json = table.concat(lines, "\n")
+    local json = encode(result) .. "\n"
     local f = io.open(OUTPUT_FILE, "w")
     if not f then
         os.execute("mkdir -p engine-web/data-web")
