@@ -106,14 +106,14 @@ function initGameState()
     JY.Shop = {}
     if dc.shops then
         for i, rec in ipairs(dc.shops) do
-            local sid = rec.id or (i - 1)
+            local sid = rec["店铺代号"] or (i - 1)
             local shop = {}
-            if rec.items then
-                for j, item in ipairs(rec.items) do
+            if rec["物品"] then
+                for j, item in ipairs(rec["物品"]) do
                     if j <= 5 then
-                        shop["物品" .. j] = item.id or 0
-                        shop["物品数量" .. j] = item.count or 0
-                        shop["物品价格" .. j] = item.price or 0
+                        shop["物品" .. j] = item["代号"] or 0
+                        shop["物品数量" .. j] = item["数量"] or 0
+                        shop["物品价格" .. j] = item["价格"] or 0
                     end
                 end
             end
