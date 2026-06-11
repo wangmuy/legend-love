@@ -41,44 +41,106 @@ cd game/engine-web && npm install && npm run build
 构建产物在 `dist/` 目录，所有第三方库从 `node_modules/` 复制到 `dist/lib/`，
 `index.html` 自动切换为本地引用。
 
-### 部署到 GitHub Pages
+### 测试
 
 ```bash
-npm run build
-npm run deploy
+npm test
 ```
 
-`dist/` 目录内容发布到 `gh-pages` 分支。
+Playwright E2E 测试，59 条用例覆盖页面加载、Lua VM、API、数据完整性、状态持久化。
+
+## 数据流
+
+```
+提取管线 (extract_*.lua)
+    │  原版二进制 → 中文 key JSON
+    ▼
+data-web/*.json             ← 只读初始数据（git 跟踪）
+    │  index.js fetch
+    ▼
+dataCache（Lua 表）          ← 只读引用
+    │  initGameState()
+    ▼
+JY.* 表（Lua 表）            ← 游戏状态唯一源头
+    │  saveGameState()  ↓  ↑  loadGameState()
+    ▼
+JSBridge → IndexedDB       ← 持久化层
+```
+
+**关键原则**：Lua 的 `JY.*` 表是游戏状态的唯一持有者。JS 只提供 I/O 和存储管道，不碰游戏状态。
+
+## 数据文件
+
+data-web/ 目录由提取管线生成，全部为**只读初始数据/模板**，游戏运行时不改写：
+
+| 文件 | 内容 | 说明 |
+|------|------|------|
+| `chars.json` | 人物初始属性（攻击力、武功、携带物品等） | 全部使用中文 key，匹配 CC.Person_S |
+| `items.json` | 物品定义（名称、效果、需求、配方） | 中文 key，匹配 CC.Thing_S |
+| `skills.json` | 武功定义（类型、伤害范围、消耗） | 中文 key，匹配 CC.Wugong_S |
+| `scenes.json` | 场景配置（入口/出口坐标、NPC、事件） | 嵌套结构，`initGameState()` 展平 |
+| `config.json` | 初始状态（主角位置、物品栏、队伍） | 嵌套结构，`initGameState()` 展平 |
+| `shops.json` | 商店物品清单 | 中文 key |
+| `events.json` | D* 场景事件（20000 条） | JS JSON.parse 加速加载 |
+| `dialogues.json` | NPC 对话文本 | 原版格式 |
+| `entrances.json` | 场景入口查找表 | 引擎内部使用 |
+| `wmap.json` | 战斗事件配置 | 引擎内部使用 |
+
+提取管线使用 CC.*_S（jyconst.lua）中定义的结构体偏移量解析二进制文件。
+任何对原版游戏数据的修改，只需重新运行 `lua tools/extract_web_data.lua` 即可同步。
+
+## 状态持久化
+
+`state_manager.lua` 管理游戏存档：
+
+- `initGameState()` — dataCache → JY.* 初始化（场景展平、结构转换）
+- `saveGameState(slotId)` — 序列化 JY.* 到 JSON → JSBridge → IndexedDB
+- `loadGameState(slotId)` — IndexedDB → JSON → JSBridge → JY.* 恢复
+- `listSaveSlots()` / `deleteSaveSlot()` — 存档管理
+- 4 个槽位：槽 0 自动存档 + 槽 1~3 手动存档
+
+存档格式使用中文 key，与游戏脚本读写一致，无需映射。
 
 ## 文件结构
 
 ```
 engine-web/
-├── package.json         ← npm 依赖和脚本
-├── scripts/build.js     ← 构建脚本
-├── index.html           ← 页面入口（默认 CDN 引用）
-├── style.css            ← 暗色终端主题
-├── index.js             ← Fengari 引导 + xterm.js + JS↔Lua 桥接
-├── engine_web.lua       ← EngineAPI 的 Web 实现（37 个函数）
-├── data_loader.lua      ← JSON 解析器 + 数据缓存
-├── data-web/            ← 精简数据包（提取脚本生成，gitignored）*
-├── dist/                ← 构建产物（gitignored）
-│   ├── lib/             ← 第三方库拷贝
-│   └── data-web/        ← data-web/ 的构建副本
-├── node_modules/        ← npm 依赖（gitignored）
-
-> `*` `dist/data-web/` 由构建脚本从 `data-web/` 复制生成，非独立维护。
+├── package.json              ← npm 依赖和脚本
+├── playwright.config.js      ← E2E 测试配置
+├── scripts/build.js          ← 构建脚本
+├── scripts/start-test-server.js  ← 测试用 HTTP 服务器
+├── index.html                ← 页面入口（默认 CDN 引用）
+├── style.css                 ← 暗色终端主题
+├── index.js                  ← Fengari 引导 + xterm.js + JSBridge + IndexedDB
+├── engine_web.lua            ← EngineAPI Web 实现（45 个函数）
+├── data_loader.lua           ← JSON 解析器 + 数据缓存
+├── state_manager.lua         ← 状态持久化 + initGameState
+├── data-web/                 ← 数据包（提取生成，git 跟踪）
+├── dist/                     ← 构建产物（gitignored）
+│   ├── lib/                  ← 第三方库拷贝
+│   └── data-web/             ← data-web 的构建副本
+├── tests/                    ← Playwright E2E 测试
+│   ├── helpers/              ← 测试辅助（luaEval, waitForPageReady）
+│   ├── page-load.spec.js     ← 页面加载基础
+│   ├── lua-vm.spec.js        ← Lua VM 初始化
+│   ├── engine-api.spec.js    ← API 表面 + 功能
+│   ├── data-integrity.spec.js← 数据完整性校验
+│   ├── interaction.spec.js   ← 交互流程
+│   ├── error-handling.spec.js← 错误场景
+│   └── state-persistence.spec.js ← 状态持久化
+└── node_modules/             ← npm 依赖（gitignored）
 ```
 
 ## 命令参考
 
 | 命令 | 说明 |
 |------|------|
-| `npm install` | 安装 xterm、fengari-web 等依赖 |
+| `npm install` | 安装依赖（xterm、fengari-web、playwright 等） |
 | `npm run dev` | 开发服务器（CDN 模式，提供当前目录） |
 | `npm run build` | 构建到 `dist/` |
 | `npm start` | 启动 `dist/` 目录的 HTTP 服务器 |
 | `npm run deploy` | 发布 `dist/` 到 GitHub Pages |
+| `npm test` | 启动测试服务器 + Playwright E2E 测试 |
 
 ## 技术栈
 
@@ -86,6 +148,8 @@ engine-web/
 |------|------|
 | Fengari | 浏览器内 Lua 5.3 VM |
 | xterm.js | 终端模拟器 + FitAddon 自适应 |
+| IndexedDB | 浏览器持久化存储 |
+| Playwright | E2E 自动化测试 |
 | Love2D EngineAPI | 游戏引擎抽象接口 |
 | game/framework/* | 游戏框架（与 Love2D 版共用） |
 | game/script/* | 游戏脚本（与 Love2D 版共用） |
