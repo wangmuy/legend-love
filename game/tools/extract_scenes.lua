@@ -140,14 +140,14 @@ local function readSceneHead(data, offset)
             local ey = readU16(data, offset + 48 + j * 2)
             if ex ~= 65535 and ey ~= 65535 then
                 local entry = {
-                    dir = "jump",
-                    toSceneId = exitScene,
-                    x = ex,
-                    y = ey,
+                    ["方向"] = "跳转",
+                    ["目标场景"] = exitScene,
+                    ["X"] = ex,
+                    ["Y"] = ey,
                 }
                 if j < 2 then
-                    entry.targetX = readU16(data, offset + 54 + j * 2)
-                    entry.targetY = readU16(data, offset + 56 + j * 2)
+                    entry["目标X"] = readU16(data, offset + 54 + j * 2)
+                    entry["目标Y"] = readU16(data, offset + 56 + j * 2)
                 end
                 table.insert(exitData, entry)
             end
@@ -187,20 +187,19 @@ function extract.run(dataDir, outputFile)
         local sh = readSceneHead(data, offset)
         if sh then
             local entry = {
-                id = sh.id,
-                idStr = sh.name .. "_" .. sh.id,
-                name = sh.name,
-                type = inferType(sh.name),
-                width = 64,
-                height = 64,
-                exits = sh.exitData,
-                entrance = { mapX = sh.mapX, mapY = sh.mapY, mapX2 = sh.mapX2, mapY2 = sh.mapY2 },
-                exitMusic = sh.exitMusic,
-                enterMusic = sh.enterMusic,
-                enterCondition = sh.enterCondition,
-                npc = {},
-                items = {},
-                events = {},
+                ["代号"] = sh.id,
+                ["名称"] = sh.name,
+                ["类型"] = inferType(sh.name),
+                ["宽度"] = 64,
+                ["高度"] = 64,
+                ["出口"] = sh.exitData,
+                ["入口"] = { ["地图X"] = sh.mapX, ["地图Y"] = sh.mapY, ["地图X2"] = sh.mapX2, ["地图Y2"] = sh.mapY2 },
+                ["出口音乐"] = sh.exitMusic,
+                ["入口音乐"] = sh.enterMusic,
+                ["进入条件"] = sh.enterCondition,
+                ["NPC"] = {},
+                ["物品"] = {},
+                ["事件"] = {},
             }
             table.insert(scenes, entry)
         end

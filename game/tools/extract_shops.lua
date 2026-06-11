@@ -79,10 +79,10 @@ local function main()
                     if j < 5 then
                         count = get16(data, offset + 20 + j * 2)
                     end
-                    items[#items + 1] = { id = itemId, count = count }
+                    items[#items + 1] = { ["代号"] = itemId, ["数量"] = count }
                 end
         end
-        shops[i + 1] = { shopId = i, items = items }
+        shops[i + 1] = { ["店铺代号"] = i, ["物品"] = items }
     end
 
     -- Build JSON
@@ -97,11 +97,11 @@ local function main()
     for i, shop in ipairs(shops) do
         local comma = (i < #shops) and "," or ""
         local itemParts = {}
-        for _, it in ipairs(shop.items) do
-            itemParts[#itemParts + 1] = '{"id":' .. it.id .. ',"count":' .. it.count .. '}'
+        for _, it in ipairs(shop["物品"]) do
+            itemParts[#itemParts + 1] = '{"代号":' .. it["代号"] .. ',"数量":' .. it["数量"] .. '}'
         end
         local itemsStr = "[" .. table.concat(itemParts, ",") .. "]"
-        entries[#entries + 1] = '    {"shopId":' .. shop.shopId .. ',"items":' .. itemsStr .. '}' .. comma
+        entries[#entries + 1] = '    {"店铺代号":' .. shop["店铺代号"] .. ',"物品":' .. itemsStr .. '}' .. comma
     end
     lines[#lines + 1] = table.concat(entries, "\n")
     lines[#lines + 1] = "  ]"
