@@ -8,19 +8,19 @@ DATA_DIR = "engine-web/data-web"
 FILTERS = {
     "chars.json": {
         "record_key": "chars",
-        "remove": ["headId", "attackAnimFrames", "attackAnimDelays", "soundDelays"],
+        "remove": ["头像代号", "出招动画帧数", "出招动画延迟", "武功音效延迟"],
     },
     "items.json": {
         "record_key": "items",
-        "remove": ["throwAnim", "displayDesc"],
+        "remove": ["暗器动画编号", "显示物品说明"],
     },
     "skills.json": {
         "record_key": "skills",
-        "remove": ["soundEffect", "animEffect", "unknown1", "unknown2", "unknown3", "unknown4", "unknown5"],
+        "remove": ["出招音效", "武功动画&音效", "未知1", "未知2", "未知3", "未知4", "未知5"],
     },
     "scenes.json": {
         "record_key": "scenes",
-        "remove": ["exitMusic", "enterMusic"],
+        "remove": ["出口音乐", "入口音乐"],
     },
 }
 

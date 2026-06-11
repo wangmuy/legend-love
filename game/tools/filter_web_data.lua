@@ -22,23 +22,23 @@ end
 -- field filters per data type: keys to REMOVE from each record
 local FILTERS = {
     chars = {
-        "headId",           -- 头像图片ID
-        "attackAnimFrames", -- 出招动画帧数
-        "attackAnimDelays", -- 出招动画延迟
-        "soundDelays",      -- 武功音效延迟
+        "头像代号",
+        "出招动画帧数",
+        "出招动画延迟",
+        "武功音效延迟",
     },
     items = {
-        "throwAnim",        -- 暗器动画编号
-        "displayDesc",      -- 显示物品说明标志
+        "暗器动画编号",
+        "显示物品说明",
     },
     skills = {
-        "soundEffect",      -- 出招音效
-        "animEffect",       -- 武功动画&音效
-        "unknown1", "unknown2", "unknown3", "unknown4", "unknown5",
+        "出招音效",
+        "武功动画&音效",
+        "未知1", "未知2", "未知3", "未知4", "未知5",
     },
     scenes = {
-        "exitMusic",        -- 出门音乐
-        "enterMusic",       -- 进门音乐
+        "出口音乐",
+        "入口音乐",
     },
 }
 
