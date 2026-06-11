@@ -60,14 +60,14 @@ test.describe('数据完整性', () => {
     expect(ok).toBe(true);
   });
 
-  test('场景 NPC 引用在 chars 中存在', async ({ page }) => {
+test('场景 NPC 引用在 chars 中存在', async ({ page }) => {
     const ok = await luaEval(page, [
       'local scenes = dataCache.scenes',
       'local chars = dataCache.chars',
       'for _, s in pairs(scenes) do',
-      '  if type(s) == "table" and s.npc then',
-      '    for _, npc in ipairs(s.npc) do',
-      '      local id = tostring(npc.id or npc)',
+      '  if type(s) == "table" and s["NPC"] then',
+      '    for _, npc in ipairs(s["NPC"]) do',
+      '      local id = tostring(npc["代号"] or npc)',
       '      if not chars[id] then return false end',
       '    end',
       '  end',
@@ -115,7 +115,7 @@ test.describe('数据完整性', () => {
   test('config 包含主角位置', async ({ page }) => {
     const ok = await luaEval(page, [
       'local cfg = dataCache.config',
-      'return cfg ~= nil and cfg.my ~= nil and type(cfg.my.px) == "number"',
+      'return cfg ~= nil and cfg["玩家"] ~= nil and type(cfg["玩家"]["X"]) == "number"',
     ].join('\n'));
     expect(ok).toBe(true);
   });
@@ -127,10 +127,10 @@ test.describe('数据完整性', () => {
       'if not shops then return "no shops" end',
       'for i = 1, #shops do',
       '  local shop = shops[i]',
-      '  for j = 1, #shop.items do',
-      '    local it = shop.items[j]',
-      '    local itemId = tostring(it.id)',
-      '    if it.id > 0 and not items[itemId] then return false end',
+      '  for j = 1, #shop["物品"] do',
+      '    local it = shop["物品"][j]',
+      '    local itemId = tostring(it["代号"])',
+      '    if it["代号"] > 0 and not items[itemId] then return false end',
       '  end',
       'end',
       'return true',
