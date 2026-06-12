@@ -4,7 +4,7 @@ Web MUD 需要一个 EngineAPI 的 Web 实现，将图形/音频/输入等操作
 
 ## 变更内容
 
-- 新增 `game/engine-web/engine_web.lua`，实现所有 37 个 EngineAPI 函数
+- 新增 `game/engine-web/engine_web.lua`，实现所有 45 个 EngineAPI 函数（13 个模块）
 - 所有 sprite/map/audio 函数为 no-op
 - render 函数输出 ANSI 转义码
 - input 函数通过 JS 桥接读取键盘输入

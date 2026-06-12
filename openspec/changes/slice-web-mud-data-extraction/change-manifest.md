@@ -21,7 +21,7 @@ extract-complete-binary ── (依赖前 5 个完成，做全字段审计与补
 | 字段 | 值 |
 |------|-----|
 | Scope | 从 oldtalk.grp/.idx 提取对话文本 |
-| Responsibility | 读取 idx 偏移量 → 按偏移截取 grp 文本 → 写入 JSON |
+| Responsibility | 读取 idx 偏移量 → 按偏移截取 grp 文本 → 提取 speaker/text → 写入 JSON |
 | Depends on | 无 |
 | Status | [x] Created |
 
@@ -78,20 +78,20 @@ extract-complete-binary ── (依赖前 5 个完成，做全字段审计与补
 |------|------|
 | 文件位置 | `game/engine-web/data-web/` |
 | 顶层字段 | 必须包含 `version`、`extracted`、`total` |
-| 文件名 | 固定：dialogues.json, scenes.json, chars.json, items.json, skills.json, entrances.json, wmap.json, events.json |
+| 文件名 | 固定：dialogues.json, scenes.json, chars.json, items.json, skills.json, entrances.json, wmap.json, events.json, shops.json, config.json |
 | 编码 | UTF-8，无 BOM |
-| 加载方式 | Lua 中 `local data = getData("<name>")` via data_loader.lua |
+| 加载方式 | data_loader.lua 的 `loadJSONChunk()` 注入到 `_G.dataCache[key]`，JS 侧 fetch 后逐个注入 |
 
 ## Integration Test Plan
 
 验证脚本 `tools/verify_web_data.lua` 会：
 1. 加载所有 JSON 文件
 2. 检查每个文件的格式完整性（version、total 字段）
-3. 检查跨文件引用（场景中的 NPC ID 在 chars.json 中存在）
+3. 检查跨文件引用（entrances 场景 ID → scenes、shops 物品 ID → items、D* 事件场景 ID → scenes）
 4. 输出统计报告（场景数、对话数、物品数等）
 5. 确认总大小 ≤ 15MB
 
 Playwright E2E 测试（`game/engine-web/tests/data-integrity.spec.js`）会：
 1. 验证 Lua VM 中 dataCache 加载完整
-2. 验证所有 8 个 JSON 文件在浏览器中可用
-3. 验证跨数据引用完整性
+2. 验证所有 10 个 JSON 文件在浏览器中可用
+3. 验证跨数据引用完整性（entrances→scenes、D* 事件→scenes、shops 物品→items）

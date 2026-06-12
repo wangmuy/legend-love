@@ -1,39 +1,34 @@
 ## 上下文
 
-对话数据是 Web MUD 的核心叙事内容。Slice 2（engine_web）需要加载 dialogues.json 来支持 `talk` 命令。
+对话数据是 Web MUD 的核心叙事内容。对话从 `script/oldtalk.grp/.idx` 提取（对话不存储在 ranger.grp 中）。
 
 ## oldtalk 二进制格式
 
 ```
 oldtalk.idx:
-  每条记录 4 字节 (int32 little-endian)
-  记录数 = 文件大小 / 4
-  每条记录 = 该对话在 oldtalk.grp 中的起始偏移量
+   每条记录 4 字节 (int32 little-endian)
+   记录数 = 文件大小 / 4
+   每条记录 = 该对话在 oldtalk.grp 中的起始偏移量
 
 oldtalk.grp:
-  连续存储的对话文本
-  每条对话以 '\n' 或 '\0' 结尾（需要确认）
-  编码: GBK（原版）或 UTF-8（本项目已转码）
+   连续存储的对话文本
+   每条对话以 '\n' 结尾
+   编码: GBK（原版）→ 提取时转为 UTF-8
 ```
 
 ## 提取逻辑
 
 ```lua
 local function extractDialogues()
-    -- 读取 idx 文件，获取每条对话的偏移量列表
-    local idxData = LoadToTable16("data/oldtalk.idx")
+    local idxData = readFile("script/oldtalk.idx")
     -- idx 文件中每条记录是 4 字节偏移量
-    
-    -- 读取 grp 文件
-    local grpData = LoadFile("data/oldtalk.grp")
-    
+    local grpData = readFile("script/oldtalk.grp")
     -- 按偏移量切分对话
     for i = 1, #offsets do
         local startOffset = offsets[i]
         local endOffset = offsets[i+1] or #grpData
         local text = grpData:sub(startOffset+1, endOffset)
-        -- 去除末尾分隔符，处理编码
-        dialogues[i] = { id = i - 1, text = cleanText(text) }
+        dialogues[i] = { 说话人 = "", 内容 = cleanText(text) }
     end
 end
 ```
@@ -44,10 +39,10 @@ end
 {
   "version": "1.0",
   "extracted": "2026-06-07",
-  "total": 5120,
+  "total": 2977,
   "dialogues": [
-    { "id": 0, "text": "对话内容第一行\n对话内容第二行" },
-    { "id": 1, "text": "..." }
+    { "说话人": "胡斐", "内容": "你来了..." },
+    { "说话人": "", "内容": "对话内容第二行" }
   ]
 }
 ```
