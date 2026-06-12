@@ -1,6 +1,6 @@
 ## 为什么
 
-Slice 1 产出了 7 个 JSON 数据包，但 Web MUD 需要在浏览器中将这些 JSON
+Slice 1 产出了 10 个 JSON 数据包，但 Web MUD 需要在浏览器中将这些 JSON
 加载到 Lua 运行环境。Fengari 无法直接读取文件系统，需要 JS fetch 加载
 JSON 字符串 → 传入 Lua → 解析为 Lua 表。
 

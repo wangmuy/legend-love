@@ -6,7 +6,7 @@ game/engine-web/
 │     └── xterm.js (终端渲染)
 ├── index.js
 │     ├── 加载 fengari-web.js
-│     ├── bootstrap Lua VM
+│     ├── bootstrap Lua VM（使用 fengari.load()，lauxlib.luaL_loadstring 在 0.1.4 不可用）
 │     ├── dofile("engine_web.lua")   ← EngineAPI 实现
 │     ├── dofile("data_loader.lua")  ← 加载 JSON
 │     └── requestAnimationFrame 循环
@@ -17,7 +17,7 @@ game/engine-web/
 ├── package.json
 ├── scripts/build.js
 ├── .gitignore
-├── data-web/*.json          ← 提取数据 (gitignored)
+├── data-web/*.json          ← 提取数据 (gitignored 但 git add -f 追踪，构建关键产物)
 ├── node_modules/            ← npm 依赖 (gitignored)
 ├── lib/                     ← 运行时库 (CDN 引用)
 └── dist/                    ← 构建产物 (gitignored)
@@ -61,12 +61,12 @@ requestAnimationFrame(timestamp)
 | input.waitForKey | yield，JS 输入事件入队后恢复 |
 | audio.* | 全部 no-op |
 | time.sleep | yield + return（无真实时间等待） |
-| time.getTime | os.clock() * 1000 |
-| file.* | 从预加载的 `_G.dataCache` 表读取 |
-| script.load | 从预加载的 `_G.scriptCache` 加载，或 fetch |
+| time.getTime | os.clock()（返回秒数） |
+| file.* | 从预加载的 `_G.dataCache` / `_G.rawDataCache` 表读取 |
+| script.load | 通过 fetch 加载 + `fengari.load()` 执行 |
 | font.* | 返回存根（xterm.js 处理字体） |
-| color.* | 正常实现（用于 ANSI 颜色映射） |
-| debug.log | JS console.log |
+| color.* | 正常实现（用于 ANSI 颜色映射 + colorToAnsi 函数） |
+| debug.log | JSBridge.write 输出到 xterm 终端 |
 | coroutine.* | Fengari 原生支持 |
 | app.quit | 无操作 |
 
@@ -100,11 +100,12 @@ const term = new Terminal({
     allowTransparency: true,
     theme: { background: '#0a0a0a', foreground: '#c0c0c0' },
 });
+const fitAddon = new FitAddon();
+term.loadAddon(fitAddon);
 ```
 
-注意：CJK 字符宽度问题。xterm.js 默认对中文字符宽度处理不完美，
-但作为 MUD 游戏终端，可接受宽度偏差。不安装 xterm-addon-fit，
-固定 80×24 尺寸。
+注意：CJK 字符宽度问题。使用 FitAddon 自适应终端尺寸。
+作为 MUD 游戏终端，CJK 宽度的小偏差可接受。
 
 ## 输出文件结构
 
@@ -112,21 +113,28 @@ const term = new Terminal({
 game/engine-web/
 ├── index.html                 ← 页面入口
 ├── index.js                   ← 前端逻辑
-├── engine_web.lua             ← EngineAPI 37 函数实现
+├── engine_web.lua             ← EngineAPI 45 函数实现
 ├── data_loader.lua            ← JSON → Lua 表加载
-├── data-web/                  ← 从提取脚本产出
-│   └── *.json
+├── state_manager.lua          ← 游戏状态管理器（save/load）
+├── data-web/                  ← 从提取脚本产出 (git add -f 追踪)
+│   └── *.json (10 个文件)
 ├── lib/
 │   ├── fengari-web.js         ← Fengari Lua VM
 │   └── xterm.js               ← 终端模拟器
-└── style.css                  ← 页面样式
+├── style.css                  ← 页面样式
+├── tests/                     ← Playwright E2E 测试 (59 条)
+├── package.json               ← npm 依赖
+├── scripts/build.js           ← 构建脚本
+├── playwright.config.js       ← 测试配置
+└── .gitignore
 ```
 
 ## 风险
 
 | 风险 | 缓解 |
 |------|------|
-| Fengari 与 Lua 5.1 兼容性问题 | 先用简单 Lua 脚本测试 Fengari 加载 |
-| xterm.js CJK 宽度问题 | 固定 80×24，接受小偏差 |
-| JSON 加载顺序 | data_loader.lua 用同步 fetch 顺序加载 |
-| JS ↔ Lua 大量数据传递 | 一次加载到 Lua 内存，之后 Lua 内部访问 |
+| Fengari 与 Lua 5.3 兼容性问题 | 先用简单 Lua 脚本测试 Fengari 加载 |
+| xterm.js CJK 宽度问题 | 使用 FitAddon 自适应，接受小偏差 |
+| JSON 加载速度 | 3.5MB events.json 使用 JS JSON.parse（`injectParsedJson()`）绕过 Lua 解析器 |
+| `lauxlib.luaL_loadstring` 在 fengari-web 0.1.4 不可用 | 使用 `fengari.load()` 替代 |
+| JS ↔ Lua 大量数据传递 | `lua_tolstring()` + `to_jsstring()` 避免 WASM 指针问题 |

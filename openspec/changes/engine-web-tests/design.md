@@ -2,16 +2,17 @@
 
 ```
 tests/
-├── playwright.config.js        ← 浏览器配置（Chromium headless）
+├── playwright.config.js        ← 浏览器配置（Chromium headless，1 worker）
 ├── helpers/
-│   ├── setup.js                ← startServer() + waitForPageReady()
-│   └── term-reader.js          ← readTermLine(N) 封装 buffer API
-├── page-load.spec.js           ← Layer 1: 页面加载基础
-├── lua-vm.spec.js              ← Layer 2: Lua VM 初始化
-├── engine-api.spec.js          ← Layer 3-4: API 表面 + 功能
-├── data-integrity.spec.js      ← Layer 5-6: 数据 + 引用
-├── interaction.spec.js         ← Layer 7: 交互流程
-└── error-handling.spec.js      ← Layer 8: 错误场景
+│   ├── setup.js                ← waitForPageReady() + luaEval() + getLuaGlobal()
+│   └── term-reader.js          ← readTermLine(N) + readAllTermLines()
+├── page-load.spec.js           ← 页面加载基础（4 条）
+├── lua-vm.spec.js              ← Lua VM 初始化（4 条）
+├── engine-api.spec.js          ← API 表面 + 功能（16 条）
+├── data-integrity.spec.js      ← 数据 + 引用（12 条）
+├── interaction.spec.js         ← 交互流程（2 条）
+├── error-handling.spec.js      ← 错误场景（5 条）
+└── state-persistence.spec.js   ← 状态持久化（9 条）
 ```
 
 ## 运行方式
@@ -37,7 +38,7 @@ npm test
   │
   ├─ 1. 启动 HTTP 服务器 (Node.js, 端口 8088, 无缓存)
   ├─ 2. Playwright 打开 Chromium → localhost:8088
-  ├─ 3. 等待终端显示 "System ready" (最长 15s)
+  ├─ 3. 等待终端显示 "System ready" (最长 30s)
   ├─ 4. 逐条执行测试用例
   │    ├─ page.evaluate() 查询 DOM
   │    ├─ page.evaluate() 调 fengari API 检查 Lua 状态
@@ -54,7 +55,6 @@ xterm.js 渲染在 canvas/grid 中，不能用 DOM querySelector 可靠读取。
 // helpers/term-reader.js
 export async function readTermLine(page, lineIndex) {
   return page.evaluate((n) => {
-    // 通过 fengari 获取 term 对象的引用
     const term = window.__xterm;
     if (!term) return null;
     return term.buffer.active.getLine(n)?.translateToString(true) || '';
@@ -75,7 +75,7 @@ export async function readAllTermLines(page) {
 }
 ```
 
-在 `index.js` 中将 term 暴露为 `window.__xterm`。
+term-reader.js 使用 CommonJS（`module.exports`），通过 `page.evaluate` 直接在浏览器中运行。在 `index.js` 中将 term 暴露为 `window.__xterm`。
 
 ### 示例：验证输入回显
 
@@ -117,34 +117,27 @@ test('lib 表存在（metatable 代理）', async ({ page }) => { ... });
 test('dataCache._loaded == true', async ({ page }) => { ... });
 ```
 
-### engine-api.spec.js (15 条)
+### engine-api.spec.js (16 条)
 
 通过 `page.evaluate()` 调用 fengari Lua API，验证：
 
 ```javascript
 // color.pack/unpack 往返测试
 test('color.pack/unpack', async ({ page }) => {
-  const result = await page.evaluate(() => {
-    const L = fengari.L, lua = fengari.lua;
-    const code = [
-      'local c = EngineAPI.color',
-      'local packed = c.pack(255, 0, 0)',
-      'local r, g, b = c.unpack(packed)',
-      // 浮点精度容忍
-      'return math.abs(r - 1) < 0.01 and math.abs(g) < 0.01 and math.abs(b) < 0.01'
-    ].join('; ');
-    const fn = fengari.load('return ' .. code, 'test');
-    fn(L);
-    return fengari.to_jsstring(lua.lua_tostring(L, -1)); // 但这里是 Lua boolean，需要处理
-  });
-  expect(result).toBe(true);
+  const ok = await luaEval(page, [
+    'local c = EngineAPI.color',
+    'local p = c.pack(255, 0, 0)',
+    'local r, g, b = c.unpack(p)',
+    'return math.abs(r - 1) < 0.01 and math.abs(g) < 0.01 and math.abs(b) < 0.01',
+  ].join('; '));
+  expect(ok).toBe(true);
 });
 ```
 
-### data-integrity.spec.js (10 条)
+### data-integrity.spec.js (12 条)
 
 ```javascript
-test('7 个数据文件全部加载', async ({ page }) => { ... });
+test('10 个数据文件全部加载', async ({ page }) => { ... });
 test('dialogues 非空', async ({ page }) => { ... });
 // ... 每个 key 一条
 test('场景 NPC 引用在 chars 中存在', async ({ page }) => { ... });
@@ -190,8 +183,9 @@ test('Lua 侧能消费输入事件', async ({ page }) => {
 });
 ```
 
-### error-handling.spec.js (5 条)
+### error-handling.spec.js + state-persistence.spec.js
 
+error-handling.spec.js:
 ```javascript
 test('file.open 不存在文件返回 nil', async ({ page }) => { ... });
 test('script.load 不存在脚本返回 nil,error', async ({ page }) => { ... });
@@ -199,10 +193,22 @@ test('parseJSON 非法字符串抛错误', async ({ page }) => { ... });
 test('控制台无 error/warning', async ({ page }) => {
   const errors = [];
   page.on('console', msg => errors.push(msg));
-  // ... 等页面加载完
   expect(errors.filter(m => m.type() === 'error')).toHaveLength(0);
 });
 test('网络请求无失败', async ({ page }) => { ... });
+```
+
+state-persistence.spec.js (9 条):
+```javascript
+test('encodeSimpleJSON 往返正确', async ({ page }) => { ... });
+test('restoreNumericKeys 恢复 0 键', async ({ page }) => { ... });
+test('initGameState 从 dataCache 初始化 JY', async ({ page }) => { ... });
+test('save 后 load 往返正确', async ({ page }) => { ... });
+test('存档槽隔离', async ({ page }) => { ... });
+test('delete 删除存档', async ({ page }) => { ... });
+test('保存大表 (>700KB) 无阻塞', async ({ page }) => { ... });
+test('listSaves 显示槽位信息', async ({ page }) => { ... });
+test('多个游戏周期后存档一致性', async ({ page }) => { ... });
 ```
 
 ## 验证工具
@@ -216,16 +222,11 @@ test('网络请求无失败', async ({ page }) => { ... });
 function luaEval(code) {
   // 返回 Lua 执行结果（自动处理类型转换）
   return page.evaluate((c) => {
-    const fn = fengari.load('return ' .. c, 'eval');
-    fn(fengari.L);
-    const lua = fengari.lua;
-    const t = lua.lua_type(fengari.L, -1);
-    let result;
-    if (t === lua.LUA_TBOOLEAN) result = lua.lua_toboolean(fengari.L, -1);
-    else if (t === lua.LUA_TNUMBER) result = lua.lua_tonumber(fengari.L, -1);
-    else if (t === lua.LUA_TSTRING) result = fengari.to_jsstring(lua.lua_tostring(fengari.L, -1));
-    else result = 'type=' + t;
-    lua.lua_pop(fengari.L, 1);
+    const f = window.fengari;
+    const lua = f.lua;
+    const fn = f.load(c, 'eval');
+    const result = fn();
+    const t = typeof result;
     return result;
   }, code);
 }
@@ -236,8 +237,8 @@ function luaEval(code) {
 ```json
 {
   "scripts": {
-    "test": "node scripts/start-test-server.js & npx playwright test; kill %1",
-    "test:ui": "node scripts/start-test-server.js & npx playwright test --ui; kill %1"
+    "test": "node scripts/start-test-server.js & npx playwright test; kill %1 2>/dev/null; wait",
+    "test:ui": "node scripts/start-test-server.js & npx playwright test --ui; kill %1 2>/dev/null; wait"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0"
@@ -251,7 +252,8 @@ function luaEval(code) {
 
 | 风险 | 缓解 |
 |------|------|
-| fengari 字符串需 luastring 转换 | 封装 `luaEval()` 工具函数统一处理 |
+| fengari 字符串需 luastring 转换 | 封装 `luaEval()` 工具函数统一处理，使用 `lua_tolstring()` + `to_jsstring()` |
 | page.evaluate 中 Lua 代码太长 | 拆成多个小测试，每个只测一个行为 |
 | Playwright 安装 Chromium 较大 (300MB+) | CI 中缓存，本地只需安装一次 |
-| 服务器端口被占 | 随机端口 + 获取实际端口 |
+| 服务器端口被占 | `lsof -i :8088` 检查后 kill，或使用随机端口 |
+| 多个 worker 共享 Fengari 状态导致测试干扰 | 使用 1 个 worker（`workers: 1`） |

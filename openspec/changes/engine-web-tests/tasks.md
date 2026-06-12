@@ -44,8 +44,8 @@
 
 ## 5. 数据完整性测试 (data-integrity.spec.js)
 
-- [x] 5.1 _fileCount == 7
-- [x] 5.2-5.8 逐个检查 7 个 key 存在且非空
+- [x] 5.1 _fileCount == 10
+- [x] 5.2-5.11 逐个检查 10 个 key 存在且非空
 - [x] 5.9 dataCachePaths 兼容映射
 - [x] 5.10 场景 NPC 引用在 chars 中存在
 - [x] 5.11 D* 事件引用的场景 ID 在 scenes 中存在（events.json 引用校验）

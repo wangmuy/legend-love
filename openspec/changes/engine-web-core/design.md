@@ -29,14 +29,18 @@ EngineAPI.render.text = function(x, y, str, color, size)
     -- x,y = 像素坐标 → 在终端模式下忽略
     -- color = {r,g,b} 0-1 → 转换为 ANSI 颜色码
     -- str → 追加到 ANSI 缓冲区
-    local ansiColor = ansiColorMap(color)
-    ansiBuffer[#ansiBuffer + 1] = ansiColor .. str .. "\027[0m"
+    local ansiColor = colorToAnsi(color)
+    local lines = {}
+    for line in str:gmatch("[^\n]+") do
+        lines[#lines + 1] = ansiColor .. line .. "\027[0m"
+    end
+    ansiBuffer[#ansiBuffer + 1] = table.concat(lines, "\n")
     bufferLen = bufferLen + 1
 end
 
 EngineAPI.render.present = function()
     if bufferLen == 0 then return end
-    local output = table.concat(ansiBuffer, "\n")
+    local output = table.concat(ansiBuffer, "")
     ansiBuffer = {}
     bufferLen = 0
     if _G.JSBridge and _G.JSBridge.write then
@@ -48,50 +52,97 @@ end
 ## 输入模型
 
 ```lua
--- JS 侧: 用户输入 → pushEvent({type="input", key=keyCode})
--- Lua 侧: 事件队列 → 消费 → 恢复协程
+-- JS 侧: 用户输入 → JSBridge.pushEvent({type="input", data=text})
+-- Lua 侧: JSBridge.getEvent() → 消费 → 恢复协程
 
-local eventQueue = {}
-
--- 被 JS 调用的函数
-function _G.pushLuaEvent(event)
-    eventQueue[#eventQueue + 1] = event
+function _G.pollEvents()
+    while true do
+        local ev = _G.JSBridge.getEvent()
+        if not ev then break end
+        table.insert(eventQueue, ev)
+    end
 end
 
 EngineAPI.input.getKey = function()
+    pollEvents()
     if #eventQueue == 0 then return -1 end
     local ev = table.remove(eventQueue, 1)
-    if ev.type == "input" then
-        return ev.key
+    -- 输入事件返回按键字符串的首字符 ASCII 码
+    if ev.type == "input" and ev.data and #ev.data > 0 then
+        return ev.data:byte(1)
     end
     return -1
 end
 
 EngineAPI.input.waitForKey = function()
-    while #eventQueue == 0 do
+    while true do
+        pollEvents()
+        if #eventQueue > 0 then
+            local ev = table.remove(eventQueue, 1)
+            if ev.type == "input" and ev.data and #ev.data > 0 then
+                return ev.data:byte(1)
+            end
+        end
         coroutine.yield()
     end
-    local ev = table.remove(eventQueue, 1)
-    return ev.key
 end
 ```
 
 ## 文件模型
 
 ```lua
--- 所有文件数据预加载到 _G.dataCache 中
--- file.open → 从 dataCache 读取，不访问磁盘
+-- 所有文件数据预加载到 _G.dataCache (解析后) 和 _G.rawDataCache (原始 JSON 字符串) 中
+-- file.open → 从 rawDataCache 按文件名读取原始字符串
 
-_G.dataCache = {}
+_G.rawDataCache = {}
 
 EngineAPI.file.open = function(filename, mode)
-    if mode == "r" or mode == "rb" then
-        local content = _G.dataCache[filename]
-        if content then
-            return StringReader:new(content)
-        end
+    if mode ~= "r" and mode ~= "rb" then
+        return nil
     end
-    return nil
+    local content = _G.rawDataCache[filename]
+    if not content then
+        return nil
+    end
+    -- 返回一个文件句柄：{read, seek, close}
+    local pos = 1
+    return {
+        read = function(self, count)
+            if not count then return content:sub(pos) end
+            local s = content:sub(pos, pos + count - 1)
+            pos = pos + count
+            return s
+        end,
+        seek = function(self, whence, offset)
+            if whence == "set" then pos = offset + 1
+            elseif whence == "cur" then pos = pos + offset
+            elseif whence == "end" then pos = #content + offset + 1
+            end
+        end,
+        close = function() end
+    }
+end
+
+EngineAPI.file.exists = function(filename)
+    return _G.rawDataCache[filename] ~= nil
+end
+
+EngineAPI.file.lines = function(filename)
+    local content = _G.rawDataCache[filename]
+    if not content then return function() end end
+    local pos = 1
+    return function()
+        if pos > #content then return nil end
+        local nextPos = content:find("\n", pos, true)
+        if nextPos then
+            local line = content:sub(pos, nextPos - 1)
+            pos = nextPos + 1
+            return line
+        end
+        local line = content:sub(pos)
+        pos = #content + 1
+        return line
+    end
 end
 ```
 
@@ -110,7 +161,7 @@ C_BLACK  = RGB(0,0,0)          \027[30m  黑
 
 ## 验证
 
-- 所有 37 个函数签名与 engine_api.lua 一致
+- 所有 45 个函数签名与 engine_api.lua 一致
 - render.text 产出正确的 ANSI 转义码
 - input.waitForKey 正确 yield 和恢复
 - time.sleep 立即 yield + return
