@@ -42,13 +42,18 @@ game/
 
 | 产出文件 | 内容 | 原始来源 |
 |----------|------|----------|
-| `game/engine-web/data-web/dialogues.json` | 对话文本（原版 5000+ 条） | `oldtalk.grp/.idx` |
-| `game/engine-web/data-web/scenes.json` | 场景结构 + NPC/物品坐标 + 出口 | `allsin.grp/.idx`、`s*.grp/.idx`、`d*.grp/.idx` |
-| `game/engine-web/data-web/chars.json` | 人物数据（初始状态、属性） | `jyconst.lua` + 二进制验证 |
-| `game/engine-web/data-web/items.json` | 物品数据 | `jyconst.lua` + 二进制验证 |
-| `game/engine-web/data-web/skills.json` | 武功数据 | `jyconst.lua` + 二进制验证 |
-| `game/engine-web/data-web/entrances.json` | 大地图场景入口坐标 → 场景 ID 映射 | `mmap.grp/.idx` |
-| `game/engine-web/data-web/wmap.json` | 遇敌信息（地图 → 敌人列表） | 原版遇敌配置 |
+| `game/engine-web/data-web/dialogues.json` | 对话文本（2977 条） | `oldtalk.grp/.idx` |
+| `game/engine-web/data-web/scenes.json` | 场景元数据（名称、出口、入口坐标、进入条件） | `ranger.grp`（Scene_S 段） |
+| `game/engine-web/data-web/chars.json` | 人物数据（187 人，67 字段） | `ranger.grp`（Person_S 段） |
+| `game/engine-web/data-web/items.json` | 物品数据（199 物，54 字段） | `ranger.grp`（Thing_S 段） |
+| `game/engine-web/data-web/skills.json` | 武功数据（100 武功，38 字段） | `ranger.grp`（Wugong_S 段） |
+| `game/engine-web/data-web/entrances.json` | 大地图场景入口坐标 → 场景 ID 映射 | `ranger.grp`（Scene_S 段，外景入口字段） |
+| `game/engine-web/data-web/wmap.json` | 遇敌信息（11 战斗地图 + 146 遇敌配置） | `war.sta` + `fight*.grp` + `warfld.*` |
+| `game/engine-web/data-web/events.json` | D* 事件定义（16800 条，每场景 200 地砖） | `alldef.grp` |
+| `game/engine-web/data-web/config.json` | 基础游戏配置（主角位置、队伍、物品栏） | `ranger.grp` 头部 |
+| `game/engine-web/data-web/shops.json` | 商店商品列表（5 个商店，每店 5 个货架） | `ranger.grp`（Shop_S 段） |
+
+> 数据源说明：场景元数据（Scene_S 结构体，62 字节/场景）只存储在 ranger.grp 中。`allsin.grp` 是场景贴图数据（64×64×6 层 int16），`mmap.grp` 是瓦片图形数据（RLE/PNG），均不包含结构化元数据。chars/items/skills 数据在 DOS 原版中嵌于可执行文件，Love2D 项目将其提取到 ranger.grp，没有其他独立源文件。参见 Slice 1 design.md 第 4 节"数据源架构辨析"。
 
 **DoD**：在 Love2D 环境中运行提取脚本 `tools/extract_web_data.lua`，产出所有 JSON 文件。每份 JSON 可以被 Lua 直接 `require` 加载。JSON 总大小 ≤ 15MB。
 
@@ -59,7 +64,7 @@ game/
 
 ### Slice 2: 前端骨架 + EngineAPI Web 实现
 
-搭建静态网页壳子，实现 `engine_web.lua` 的 37 个 EngineAPI 函数，加载精简数据包。
+搭建静态网页壳子，实现 `engine_web.lua` 的 45 个 EngineAPI 函数（13 个模块），加载精简数据包。
 
 **业务价值**：建立完整的运行环境——浏览器里能跑 Lua 游戏脚本了。
 
@@ -70,8 +75,8 @@ game/
 | 组件 | 说明 |
 |------|------|
 | `index.html` | 页面骨架：输出区 (#output, xterm.js) + 输入区 (#input, `<input>`) |
-| `index.js` | Fengari bootstrap、JS ↔ Lua 桥接、事件队列、xterm.js 配置 |
-| `engine_web.lua` | EngineAPI 37 个函数的 Web 实现 |
+| `index.js` | Fengari bootstrap、JS ↔ Lua 桥接（使用 fengari.load()，lauxlib 在 0.1.4 不可用）、事件队列、xterm.js 配置（含 FitAddon） |
+| `engine_web.lua` | EngineAPI 45 个函数的 Web 实现 |
 
 **engine_web.lua 关键映射**：
 
@@ -93,7 +98,7 @@ game/
 | `script.load` | 从预加载的 script 表加载，或 fetch |
 | `font.*` | 返回存根（字体由 xterm.js 处理） |
 | `color.*` | 正常实现（用于 ANSI 色彩转换） |
-| `debug.log` | 输出到浏览器 console |
+| `debug.log` | 通过 JSBridge.write 输出到 xterm 终端 |
 | `coroutine.*` | 正常实现（Fengari 原生支持协程） |
 | `app.quit` | 无操作（浏览器不能自己退出） |
 
@@ -369,7 +374,7 @@ _G.sceneState = {
 | `saves` | MMAP, SMAP | 无 | 列出所有存档 |
 | `help` | 全部 | `[命令名]` | 帮助信息 |
 
-**存档系统**：使用 `localStorage`（浏览器持久化），不涉及服务器。
+**存档系统**：使用 IndexedDB（浏览器持久化 + 同步 saveCache 内存缓存），不涉及服务器。
 
 **场景描述增强**：
 - 逐步将 Slice 4 的自动模板替换为人工编写的场景描述
@@ -414,6 +419,6 @@ S4 (场景交互:     S5 (战斗系统:
 - [ ] JSON 数据包总大小 ≤ 15MB
 - [ ] 单页应用，无需服务器，静态部署可用
 - [ ] ANSI 彩色输出（xterm.js 渲染）
-- [ ] 存档使用浏览器 localStorage 持久化
+- [ ] 存档使用浏览器 IndexedDB 持久化（4 槽位：槽 0 自动 + 槽 1~3 手动）
 - [ ] 命令上下文感知——错误状态下的命令给出明确的拒绝提示
 - [ ] `sleep` 在文字版中为 yield-only，不消耗真实时间

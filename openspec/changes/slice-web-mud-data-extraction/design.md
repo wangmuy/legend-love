@@ -27,7 +27,9 @@ Slice 1 是整个 Web MUD 的数据基础。后续所有 slice 都依赖本 slic
 
 ### 3. JSON 格式
 
-每条记录的 key 使用英文，value 使用原始数据的类型（number/string/boolean）：
+**关键决策：使用中文键名**。所有 JSON 的字段名直接使用 CC.*_S 定义的中文键名（如 `代号`、`姓名`、`攻击力`），不使用英文键名。
+
+这样 dataCache 和 JY.* 运行时表使用相同键名，`initGameState()` 直接赋值无需字段名映射。
 
 ```json
 {
@@ -35,49 +37,48 @@ Slice 1 是整个 Web MUD 的数据基础。后续所有 slice 都依赖本 slic
   "extracted": "2026-06-07",
   "scenes": [
     {
-      "id": 70,
-      "idStr": "heke_inn",
-      "name": "河洛客栈",
-      "exits": [
-        {"dir": "南", "toSceneId": 1, "toX": 15, "toY": 19}
-      ],
-      "npc": [
-        {"id": 137, "x": 13, "y": 8}
-      ],
-      "items": [
-        {"id": 47, "x": 4, "y": 6, "count": 1}
-      ],
-      "events": [
-        {"x": 13, "y": 8, "eventId": 70, "flag": 0}
-      ]
+      "代号": 70,
+      "名称": "河洛客栈",
+      "外景入口X1": 357, "外景入口Y1": 235,
+      "出口X1": 15, "出口Y1": 19,
+      "跳转口X1": 1, "跳转口Y1": 1,
+      "NPC1": 137, "NPCX1": 13, "NPCY1": 8,
+      "物品1": 47, "物品X1": 4, "物品Y1": 6
     }
   ]
 }
 ```
 
-每种数据类型的顶层字段统一包含 `version` 和 `extracted` 元信息，便于后续数据版本校验。
+顶层字段统一包含 `version` 和 `extracted` 元信息，便于后续数据版本校验。
 
-### 4. idStr 生成规则
+提取后通过 `tools/filter_web_data.py` 过滤掉仅图形/音效使用的字段（如头像代号、出招动画帧数、武功音效等），最终 JSON 不含图形相关数据。
 
-每个场景需要一个人类可读的唯一字符串标识。生成规则：
+### 4. 数据源架构辨析
 
-```
-规则：场景名拼音首字母 + 下划线 + 编号
-  河洛客栈 → heke_inn_70
-  少林寺 → shaolin_12
-  悦来客栈 → yuelai_inn_5
+提取初期曾疑问：为何不从 `allsin.grp`/`mmap.grp` 等独立文件读取场景和入口数据？
+实际调研 Love2D 版完整数据流后确认各文件职责：
 
-或者直接使用编号（场景名映射表在加载时由 Lua 处理）：
-  用 idStr = tostring(id) 作为默认值
-  后续在 scenes.json 中手工添加特殊场景的 idStr
+| 文件 | 实际内容 | 包含场景元数据？ |
+|------|---------|-----------------|
+| `data/ranger.grp` | 游戏初始数据存档（6 段索引：Base/Person/Thing/**Scene**/Wugong/Shop） | ✅ **Scene_S 结构体**（62 字节/场景）是场景元数据的唯一来源 |
+| `data/allsin.grp` | 场景贴图数据（每场景 64×64×6 层 = 49152 个 int16 瓦片值） | ❌ 不含场景名称、出口等结构化数据 |
+| `data/s*.grp` | 存档槽位对应的场景贴图数据（与 allsin.grp 同格式） | ❌ 同上 |
+| `data/mmap.grp/.idx` | 主地图瓦片图形（RLE/PNG 编码的像素数据） | ❌ 纯图形文件 |
+| `data/earth.002`~`buildy.002` | 主地图 480×480 网格（地形/建筑物贴图编号） | ❌ 不编码入口信息 |
+| `script/oldtalk.grp/.idx` | 对话文本 | ✅ 对话数据 |
+| `data/alldef.grp` | D* 事件定义（每场景 200 地砖 × 11 int16 字段） | ✅ 事件数据 |
+| `data/war.sta` + `fight*.grp` + `warfld.*` | 战斗地图和遇敌配置 | ✅ 战斗数据 |
 
-更简单的方案:
-  idStr = string.format("%s_%d", sceneName, sceneId)
-  例如: "河洛客栈_70", "少林寺_12"
-  这样不需要拼音映射，也不需要额外查询表
-```
+**关键发现**：
+1. `mmap.grp` 及其 companion 文件（earth.002 / building.002 等）只用于**主地图瓦片渲染**，不编码入口坐标。
+2. `allsin.grp` 只存场景贴图数据（覆盖层/地面层等 6 层瓦片映射），不含场景名称、出口等元数据。
+3. **Scene_S 结构体**（62 字节/场景，存于 ranger.grp 第 3 段）是场景元数据的**唯一源**——包含名称、出口坐标、跳转目标、入口坐标、进入条件等所有结构化字段。
+4. 入口坐标检测函数 `Cal_EnterSceneXY()`（jymain.lua:614-625）直接从 `JY.Scene[id]["外景入口X1/Y1"]` 构建入口查找表——这正好是 Scene_S 的字段。
+5. `data/ranger.grp` 在 Love2D 项目中和 `allsin.grp` / `mmap.grp` 一样是**随游戏发布的源文件**（存在 `data/` 目录），不是用户生成的存档。存档文件（`r1.grp` / `s1.grp` 等）被写入游戏保存目录。
 
-采用方案三：`"<场景名>_<ID>"`，最直接，无歧义。
+### 5. 场景标识
+
+场景使用中文名称作为标识（如 `河洛客栈`），因为所有场景名在游戏中是唯一的。`entrances.json` 中通过场景名匹配场景数据，无需额外 idStr 字段。
 
 ## 输出数据定义
 
@@ -86,68 +87,129 @@ Slice 1 是整个 Web MUD 的数据基础。后续所有 slice 都依赖本 slic
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | version | string | 格式版本号 |
-| dialogues | array | [{id, text}] 对话条目 |
-| total | number | 对话总数 |
+| dialogues | array | [{说话人, 内容}] 对话条目，中文键名 |
+| total | number | 对话总数 (2977) |
+
+**数据源**：`script/oldtalk.idx` + `script/oldtalk.grp`
 
 ### scenes.json
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | version | string | 格式版本号 |
-| scenes | array | 场景数组 |
-| scenes[].id | number | 场景编号 |
-| scenes[].idStr | string | 唯一标识: `<场景名>_<ID>` |
-| scenes[].name | string | 场景名称 |
-| scenes[].type | string | 场景类型: inn/shop/cave/temple/outdoor/... |
-| scenes[].width/height | number | 场景尺寸 |
-| scenes[].exits | array | 出口列表 [{dir, toSceneId, x, y}] |
-| scenes[].npc | array | NPC 坐标 [{id, x, y}] |
-| scenes[].items | array | 物品坐标 [{id, x, y, count}] |
-| scenes[].events | array | 事件触发点 [{x, y, eventId, flag}] |
+| scenes | array | 场景数组，中文键名，结构对应 CC.Scene_S |
+| scenes[].代号 | number | 场景编号 (0-83) |
+| scenes[].名称 | string | 场景名称 |
+| scenes[].外景入口X1/Y1 | number | 大地图入口坐标1 |
+| scenes[].外景入口X2/Y2 | number | 大地图入口坐标2（备用） |
+| scenes[].入口X/Y | number | 场景内进入点 |
+| scenes[].出口X1-3/Y1-3 | number | 3 个出口目标坐标 |
+| scenes[].跳转口X1-2/Y1-2 | number | 前 2 个出口的跳转目标场景 ID |
+| scenes[].跳转场景 | number | 出口跳转目标场景 ID |
+| scenes[].进入条件 | number | 0=开放 1=上锁 2=需轻功 |
+| scenes[].出门音乐/进门音乐 | number | 音乐 ID（被 filter 删除） |
+
+场景数据不包含 NPC/物品坐标——游戏场景中的 NPC 和物品位置由 oldevent 事件脚本在运行时动态设定（`instruct_*` 调用），不由静态 JSON 定义。
+NPC 的"初始存在于某场景"信息存储在 CC.*_S 结构的额外字段中（超出 62 字节基础 Scene_S 的部分），当前未提取；未来可从 ranger.grp 的场景扩展数据段解析。
+
+**数据源**：`data/ranger.grp`（Scene_S 段，62 字节/条 × 84 条）。
 
 ### chars.json
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | version | string | 格式版本号 |
-| chars | array | 人物数组（仅含初始状态） |
+| chars | array | 人物数组（中文键名，结构对应 CC.Char_S，filter 后保留约 50 个字段） |
+
+**数据源**：`data/ranger.grp`（Person_S 段，通过 ranger.idx[1] 定位）
 
 ### items.json
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | version | string | 格式版本号 |
-| items | array | 物品数组 |
+| items | array | 物品数组（中文键名，结构对应 CC.Thing_S，filter 后保留约 42 个字段） |
+
+**数据源**：`data/ranger.grp`（Thing_S 段，通过 ranger.idx[2] 定位）
 
 ### skills.json
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | version | string | 格式版本号 |
-| skills | array | 武功数组 |
+| skills | array | 武功数组（中文键名，结构对应 CC.Wugong_S，filter 后保留约 22 个字段） |
+
+**数据源**：`data/ranger.grp`（Wugong_S 段，通过 ranger.idx[4] 定位）
 
 ### entrances.json
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | version | string | 格式版本号 |
-| entrances | array | [{mapX, mapY, sceneId}] |
+| entrances | array | [{sceneId, mapX, mapY, name}] 场景在大地图的入口坐标 |
+| entrances[].sceneId | number | 场景编号 |
+| entrances[].mapX/mapY | number | 大地图入口格子坐标 |
+| entrances[].name | string | 场景名称 |
+
+**数据源**：`data/ranger.grp`（Scene_S 段，从 `外景入口X1/Y1` / `外景入口X2/Y2` 字段提取）。
+入口坐标是 Scene_S 结构的一部分（偏移 30-36），读取方式与场景元数据一致。
+不来自 `mmap.grp`/`earth.002`/`building.002`——这些是瓦片图形和网格数据，不包含入口编码信息。
 
 ### wmap.json
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | version | string | 格式版本号 |
-| encounters | array | 遇敌配置 |
+| warMaps | array | 战斗地图列表 [{id, name, count, walkable}] |
+| encounters | array | 遇敌配置列表（146 条 × 17 个字段，含 prob、levels、敌人 ID 等） |
+
+**数据源**：`data/war.sta`（遇敌配置）+ `data/fight*.grp`（战斗地图）+ `data/warfld.*`
+
+### events.json
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| version | number | 格式版本号 |
+| events | array | 每个场景 200 个地砖事件（84 × 200 = 16800 条） |
+| events[].sceneId | number | 所属场景 ID |
+| events[].通行标志 | number | 0=可通行 |
+| events[].空格触发事件 | number | 空格键触发的事件号 (-1=无) |
+| events[].经过触发事件 | number | 走到此格触发的事件号 |
+| events[].坐标X/Y | number | 场景内地砖坐标 |
+
+**数据源**：`data/alldef.grp`（84 场景 × 200 地砖 × 11 int16 字段）
+
+### config.json
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| version | number | 格式版本号 |
+| base | table | 基础配置（中文键）：人X/Y、船X/Y、队伍1-6、物品1-30 等 |
+| scenes | table | 场景配置（中文键，CC.Scene_S 结构） |
+
+**数据源**：`data/ranger.grp` 前 836 字节（CC.Base_S 结构）
+
+### shops.json
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| version | number | 格式版本号 |
+| shops | array | 5 个商店，每个 30 字节 |
+| shops[].物品1-5 | number | 5 个货架物品 ID |
+| shops[].物品数量1-5 | number | 对应库存数量 |
+| shops[].物品价格1-5 | number | 对应价格 |
+
+**数据源**：`data/ranger.grp`（Shop_S 段，5 条 × 30 字节）
 
 ## 风险
 
 | 风险 | 缓解措施 |
 |------|----------|
-| 某些二进制格式解析不完整 | 使用 Love2D 版已验证的 lib_Byte.lua |
-| JSON 体积过大 | 控制提取范围，只提取文字版需要的字段 |
+| 某些二进制格式解析不完整 | 使用 Love2D 版已验证的 lib_Byte.lua + verify_web_data.lua 完整性检查 |
+| JSON 体积过大 | 控制提取范围，只提取文字版需要的字段；filter_web_data.py 过滤图形/音效字段 |
 | 中文编码问题 | jyconst.lua 已是 UTF-8，保持统一 |
 | oldevent 事件脚本路径依赖 | oldevent 不改动，直接复制 |
+| 中文键名导致字段名歧义 | 键名直接复用 CC.*_S 定义，已在 Love2D 版验证过 |
 
 ---
 
@@ -484,15 +546,17 @@ ranger.idx 包含 6 个 uint32 LE 偏移量，将 ranger.grp 划分为区域。
 
 ### 11. 文件 - 提取脚本映射
 
-| 结构体 | 源文件 | 记录数 | 输出 JSON | 提取脚本 |
-|---|---|---|---|---|
-| Base_S | ranger.grp 头部 | 1 | config.json | extract_base.lua |
-| Person_S | ranger.grp idx[1] | 320 | chars.json | extract_runtime.lua |
-| Thing_S | ranger.grp idx[2] | 200 | items.json | extract_runtime.lua |
-| Scene_S | ranger.grp idx[3] | 84 | scenes.json | extract_scenes.lua |
-| Wugong_S | ranger.grp idx[4] | 93 | skills.json | extract_runtime.lua |
-| Shop_S | ranger.grp idx[5] | 5 | shops.json | extract_shops.lua |
-| 入口（Scene_S派生） | ranger.grp idx[3] | 95 | entrances.json | extract_entrances.lua |
-| D* 事件 | alldef.grp | 20000 | events.json | extract_events.lua |
-| 战斗遭遇 | war.sta | 140 | wmap.json | extract_encounters.lua |
-| 对话 | oldtalk.idx/.grp | 2977 | dialogues.json | extract_dialogues.lua |
+| 结构体 | 源文件 | 记录数 | 输出 JSON | 提取脚本 | 说明 |
+|---|---|---|---|---|---|---|
+| Base_S | ranger.grp 头部 | 1 | config.json | extract_base.lua | 初始存档模板，唯一源 |
+| Person_S | ranger.grp idx[1] | 187 | chars.json | extract_runtime.lua | 无独立源文件（数据原嵌于 DOS 可执行文件） |
+| Thing_S | ranger.grp idx[2] | 199 | items.json | extract_runtime.lua | 同上 |
+| Scene_S | ranger.grp idx[3] | 84 | scenes.json | extract_scenes.lua | 场景元数据唯一源 |
+| Wugong_S | ranger.grp idx[4] | 100 | skills.json | extract_runtime.lua | 无独立源文件 |
+| Shop_S | ranger.grp idx[5] | 5 | shops.json | extract_shops.lua | 无独立源文件（数据原嵌于可执行文件） |
+| 入口（Scene_S派生） | ranger.grp idx[3] | 84 | entrances.json | extract_entrances.lua | 从 Scene_S 入口坐标字段提取 |
+| D* 事件 | alldef.grp | 16800 | events.json | extract_events.lua | ✅ 源文件 |
+| 战斗地图 + 遇敌配置 | war.sta + fight*.grp + warfld.* | 146 遇敌 + 11 地图 | wmap.json | extract_encounters.lua | ✅ 源文件 |
+| 对话 | oldtalk.idx/.grp | 2977 | dialogues.json | extract_dialogues.lua | ✅ 源文件 |
+
+提取脚本统一由 `extract_web_data.lua` 按顺序调用，产出后由 `filter_web_data.py` 过滤无用字段。

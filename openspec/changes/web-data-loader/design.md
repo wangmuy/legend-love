@@ -5,37 +5,30 @@
 ```
 1. JS fetch("data-web/dialogues.json")
      → 得到 JSON 字符串
-     → 传入 Lua: data_loader.load("dialogues", jsonString)
+     → events.json (3.5MB): 使用 JS JSON.parse 后注入 Lua (injectParsedJson)
+     → 其他文件: 传入 Lua data_loader.loadJSONChunk(key, jsonString)
 
 2. Lua data_loader.lua:
-     local jsonData = parseJSON(jsonString)  -- 用 Lua 解析
-     _G.dataCache["dialogues"] = jsonData.dialogues
-     _G.dataCache["dialogues_total"] = jsonData.total
+     local ok, data = pcall(parseJSON, jsonString)  -- 用 Lua 递归下降解析
+     _G.dataCache[key] = data                       -- 直接存储整个解析结果
 
-3. 重复 7 次（每个 JSON 文件一次）
+3. 对 events.json:
+     JS 侧 JSON.parse → 遍历事件数组 → 逐个注入 Lua dataCache
 
-4. 加载完成后:
+4. 重复 10 次（每个 JSON 文件一次）
+
+5. 加载完成后（finalizeDataLoad）:
      _G.dataCache["_loaded"] = true
-     _G.dataCache["_fileCount"] = 7
-     _G.dataCache["_totalSize"] = 676077
+     _G.dataCache["_fileCount"] = 10
+     _G.dataCache["_totalSize"] = totalBytes
 ```
 
 ### JSON 解析
 
-Fengari 没有内置 JSON 解析器。有两种选择：
+Fengari 没有内置 JSON 解析器。采用方案 A（纯 Lua 解析器）+ 方案 B 混合：
 
-**方案 A：Lua 侧实现 JSON 解析器**
-- 实现一个简单的 JSON 解析器（递归下降，处理 string/number/boolean/array/object）
-- 足够解析已知结构的 JSON 数据
-- 不需要依赖
-- 不处理所有 JSON 边缘情况（如转义序列、科学计数法）
-
-**方案 B：JS 侧解析后传表**
-- JS 用 `JSON.parse()` 解析
-- 通过 Fengari 的 JS 互操作接口传入 Lua
-- 更可靠，但依赖 Fengari JS 互操作
-
-采用**方案 A**：纯 Lua 解析器，避免 JS 互操作的复杂性。
+- **3.5MB events.json**：使用 JS `JSON.parse()` 加速（`injectParsedJson()`），避免 Lua 解析器成为瓶颈
+- **其余文件**（< 1MB）：使用纯 Lua 递归下降解析器 `parseJSON()`
 
 ### 加载到 Lua 表的映射
 
@@ -44,7 +37,7 @@ Fengari 没有内置 JSON 解析器。有两种选择：
 
 _G.dataCache = {}
 
-function loadFromJSON(cacheKey, jsonStr)
+function loadJSONChunk(cacheKey, jsonStr)
     local ok, data = pcall(parseJSON, jsonStr)
     if not ok then
         _G.dataCache[cacheKey] = nil
@@ -54,16 +47,8 @@ function loadFromJSON(cacheKey, jsonStr)
     return true
 end
 
-function getTotalSize()
-    local total = 0
-    for _, name in ipairs{
-        "dialogues", "scenes", "chars",
-        "items", "skills", "entrances", "wmap"
-    } do
-        local path = "data-web/" .. name .. ".json"
-        -- 从 dataCache 获取，或由 JS 预先计算传入
-    end
-    return total
+function injectParsedJson(cacheKey, data)
+    _G.dataCache[cacheKey] = data
 end
 ```
 
@@ -99,6 +84,8 @@ end
 
 ## 验证
 
-- 加载 dialogue.json → 2977 条记录正确
-- 加载 chars.json → 320 个人物正确
+- 加载 dialogues.json → 2977 条记录正确
+- 加载 chars.json → 187 个人物正确
 - 跨文件引用检查（scene NPC ID → chars 表中有对应记录）
+- events.json 通过 JS JSON.parse 加载后 dataCache["events"] 可访问
+- 10 个文件全部加载后 dataCache._loaded == true
