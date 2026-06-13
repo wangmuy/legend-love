@@ -20,12 +20,45 @@ mkdir(DIST);
 console.log('[1/4] Copying frontend files...');
 const frontendFiles = [
     'index.html', 'style.css', 'index.js',
-    'engine_web.lua', 'data_loader.lua',
+    'engine_web.lua', 'data_loader.lua', 'state_manager.lua',
+    'web_game_bridge.lua',
 ];
 for (const f of frontendFiles) {
     const srcPath = path.join(ROOT, f);
     if (fs.existsSync(srcPath)) {
         fs.copyFileSync(srcPath, path.join(DIST, f));
+        console.log(`  ${f}`);
+    }
+}
+
+// 1b. Framework modules
+console.log('[1b/4] Copying framework modules...');
+const frameworkDir = path.resolve(ROOT, '..', 'framework');
+if (fs.existsSync(frameworkDir)) {
+    const distFwDir = path.join(DIST, 'framework');
+    mkdir(distFwDir);
+    const fwFiles = fs.readdirSync(frameworkDir);
+    for (const f of fwFiles) {
+        if (f.endsWith('.lua')) {
+            fs.copyFileSync(path.join(frameworkDir, f), path.join(distFwDir, f));
+            console.log(`  framework/${f}`);
+        }
+    }
+}
+
+// 1c. Script modules
+console.log('[1c/4] Copying script modules...');
+const scriptDir = path.resolve(ROOT, '..', 'script');
+if (fs.existsSync(scriptDir)) {
+    const distScDir = path.join(DIST, 'script');
+    mkdir(distScDir);
+    const scriptFiles = ['jymain.lua', 'jyconst.lua', 'jymodify.lua'];
+    for (const f of scriptFiles) {
+        const srcPath = path.join(scriptDir, f);
+        if (fs.existsSync(srcPath)) {
+            fs.copyFileSync(srcPath, path.join(distScDir, f));
+            console.log(`  script/${f}`);
+        }
     }
 }
 
