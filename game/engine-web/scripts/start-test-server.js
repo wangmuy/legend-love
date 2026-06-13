@@ -1,7 +1,11 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const dir = path.resolve(__dirname, '..');
+const ROOT = path.resolve(__dirname, '..');
+
+// Try dist/ first (built version), fall back to ROOT
+const DIST = path.join(ROOT, 'dist');
+const dir = fs.existsSync(DIST) ? DIST : ROOT;
 
 const mime = {
   '.html': 'text/html',

@@ -47,6 +47,7 @@ function EngineAPI.render.drawBackground(x1, y1, x2, y2, brightness)
 end
 
 function EngineAPI.render.setClip(x1, y1, x2, y2) end
+EngineAPI.render.SetClip = EngineAPI.render.setClip
 
 function EngineAPI.render.present()
     local output = table.concat(renderBuffer, "\n") .. "\027[0m"
@@ -60,6 +61,31 @@ function EngineAPI.render.presentAndWait(delay)
     EngineAPI.render.present()
     pcall(coroutine.yield)
 end
+
+-- Compatibility stubs for JY game engine functions
+function EngineAPI.render.FillColor(x1, y1, x2, y2, color) end
+function EngineAPI.render.Cls(x1, y1, x2, y2) 
+    EngineAPI.render.setClip(x1 or 0, y1 or 0, x2 or 0, y2 or 0)
+    EngineAPI.render.drawBackground(x1 or 0, y1 or 0, x2 or 0, y2 or 0, 0)
+end
+function EngineAPI.render.DrawString(x, y, str, color, size)
+    EngineAPI.render.text(x, y, str, color, size)
+end
+function EngineAPI.render.DrawStr(x, y, str, color, size, font)
+    EngineAPI.render.text(x, y, str, color, size)
+end
+function EngineAPI.render.ShowScreen()
+    EngineAPI.render.present()
+end
+function EngineAPI.render.ShowSurface(flag)
+    EngineAPI.render.present()
+end
+function EngineAPI.render.LoadPicture(filename, x, y) end
+function EngineAPI.render.DrawMMap(playerX, playerY, playerPic) end
+function EngineAPI.render.PicInit(paletteFilename) end
+function EngineAPI.render.ShowSlow(delaytime, flag) end
+function EngineAPI.render.PlayMIDI(filename) end
+function EngineAPI.render.PlayMPEG(filename, escKey) end
 
 --------------------------------------------------------------------------------
 -- sprite - no-op
@@ -108,6 +134,17 @@ function EngineAPI.input.getKey()
         if evt then
             if type(evt) == "number" then return evt end
             if type(evt) == "string" then return tonumber(evt) or evt:byte() end
+            if type(evt) == "table" and evt.type == "input" and evt.data then
+                local cmd, arg = evt.data:match("^(%S+)%s*(.-)$")
+                cmd = cmd and cmd:lower() or ""
+                if cmd == "choose" then
+                    local n = tonumber(arg)
+                    if n == 1 then return 13 end
+                    if n == 2 then return 27 end
+                    return 13
+                end
+                return 13
+            end
             return -1
         end
     end
@@ -266,6 +303,9 @@ EngineAPI.script = {}
 function EngineAPI.script.load(path)
     local source = _G.dataCache and _G.dataCache[path]
     if not source then
+        source = _G.FrameworkSources and _G.FrameworkSources[path]
+    end
+    if not source then
         return nil, "Script not found: " .. tostring(path)
     end
     local chunk, err = load(source, path)
@@ -306,6 +346,8 @@ end
 EngineAPI.debug = {}
 
 function EngineAPI.debug.log(...)
+    -- MUD 模式下启动后抑制 per-frame 调试输出
+    if _G.__quiet then return end
     local parts = {}
     for i = 1, select("#", ...) do
         local v = select(i, ...)
@@ -361,6 +403,20 @@ _G.lib = setmetatable({}, {
         if key == "Debug" then return EngineAPI.debug.log end
         if key == "GetTime" then return EngineAPI.time.getTime end
         if key == "Delay" then return EngineAPI.time.sleep end
+        if key == "GetKey" then return EngineAPI.input.getKey end
+        if key == "EnableKeyRepeat" then return EngineAPI.input.setKeyRepeat end
+        if key == "SetClip" then return EngineAPI.render.setClip end
+        if key == "FillColor" then return EngineAPI.render.FillColor end
+        if key == "DrawStr" then return EngineAPI.render.DrawStr end
+        if key == "ShowSurface" then return EngineAPI.render.ShowSurface end
+        if key == "LoadPicture" then return EngineAPI.render.LoadPicture end
+        if key == "DrawMMap" then return EngineAPI.render.DrawMMap end
+        if key == "PicInit" then return EngineAPI.render.PicInit end
+        if key == "ShowSlow" then return EngineAPI.render.ShowSlow end
+        if key == "PlayMIDI" then return EngineAPI.render.PlayMIDI end
+        if key == "PlayMPEG" then return EngineAPI.render.PlayMPEG end
+        if key == "Background" then return EngineAPI.render.FillColor end
+        if key == "DrawRect" then return EngineAPI.render.FillColor end
         for _, mod in pairs(EngineAPI) do
             if type(mod) == "table" and mod[key] then
                 return mod[key]
