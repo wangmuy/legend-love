@@ -292,14 +292,87 @@
         await loadLuaModule('state_manager.lua', stateSource);
         term.write('  State manager: ready\r\n');
 
-        const procQSrc = [
-            'function processEventQueue(timestamp)',
-            '    -- Called every frame by JS game loop',
-            '    -- EngineAPI.input.getKey handles individual events',
-            'end',
-        ].join('\n');
-        fengari.load(procQSrc, 'processEventQueue')(L);
-        term.write('  processEventQueue: ready\r\n');
+        term.write('Loading web_game_bridge.lua...\r\n');
+        const bridgeResp = await fetch('web_game_bridge.lua');
+        const bridgeSource = await bridgeResp.text();
+        await loadLuaModule('web_game_bridge.lua', bridgeSource);
+        term.write('  Web game bridge: ready\r\n');
+
+        term.write('Loading framework modules...\r\n');
+        const frameworkFiles = [
+            'framework/coroutine_scheduler.lua',
+            'framework/state_machine.lua',
+            'framework/input_manager.lua',
+            'framework/game_states.lua',
+            'framework/event_bridge.lua',
+            'framework/event_executor.lua',
+            'framework/menu_async.lua',
+            'framework/menu_state_machine.lua',
+            'framework/async_dialog.lua',
+            'framework/async_message_box.lua',
+            'framework/async_globals.lua',
+            'framework/async_wrapper.lua',
+            'framework/input_async.lua',
+            'framework/jymain_adapter.lua',
+            'framework/jymain_async.lua',
+            'framework/talk_async.lua',
+            'framework/war_async.lua',
+            'framework/item_async.lua',
+            'framework/person_status_async.lua',
+            'framework/perf_log.lua',
+            'framework/lib_file.lua',
+            'framework/lib_Byte.lua',
+            'framework/lib_log.lua',
+            'framework/luabit.lua',
+            'framework/config.lua',
+            'framework/script_loader.lua',
+        ];
+        const frameworkSources = {};
+        for (const fwFile of frameworkFiles) {
+            try {
+                const resp = await fetch(fwFile);
+                if (resp.ok) {
+                    frameworkSources[fwFile.replace('.lua', '').replace('/', '.')] = await resp.text();
+                }
+            } catch (e) {
+                term.write('  [WARN] ' + fwFile + ' not found\r\n');
+            }
+        }
+
+        // Register all framework modules in package.preload
+        for (const [name, source] of Object.entries(frameworkSources)) {
+            lua.lua_getglobal(L, 'registerFrameworkModule');
+            lua.lua_pushstring(L, name);
+            lua.lua_pushstring(L, source);
+            lua.lua_pcall(L, 2, 0, 0);
+        }
+        term.write('  Framework modules: ' + Object.keys(frameworkSources).length + ' registered\r\n');
+
+        term.write('Loading game scripts...\r\n');
+        const scriptFiles = [
+            'script/jymain.lua',
+            'script/jyconst.lua',
+            'script/jymodify.lua',
+        ];
+        const scriptSources = {};
+        for (const sFile of scriptFiles) {
+            try {
+                const resp = await fetch(sFile);
+                if (resp.ok) {
+                    const src = await resp.text();
+                    // Register as framework source but NOT via package.preload (scripts don't use require)
+                    lua.lua_getglobal(L, 'FrameworkSources');
+                    lua.lua_pushstring(L, sFile);
+                    lua.lua_pushstring(L, src);
+                    lua.lua_settable(L, -3);
+                    lua.lua_pop(L, 1);
+                    scriptSources[sFile] = src;
+                }
+            } catch (e) {
+                term.write('  [WARN] ' + sFile + ' not found\r\n');
+            }
+        }
+        term.write('  Game scripts: ' + Object.keys(scriptSources).length + ' loaded\r\n');
 
         term.write('Opening IndexedDB...\r\n');
         await openDatabase();
@@ -334,6 +407,10 @@
         lua.lua_getglobal(L, 'finalizeDataLoad');
         lua.lua_pcall(L, 0, 0, 0);
 
+        term.write('\r\nInitializing game framework...\r\n');
+        lua.lua_getglobal(L, 'initWebFramework');
+        lua.lua_pcall(L, 0, 0, 0);
+
         term.write('\r\n');
         term.write('\x1b[32mSystem ready. Type help to start.\x1b[0m\r\n');
 
@@ -347,7 +424,9 @@
             lua.lua_pushnumber(L, timestamp);
             const result = lua.lua_pcall(L, 1, 0, 0);
             if (result !== 0) {
+                const err = lua.lua_tostring(L, -1);
                 lua.lua_pop(L, 1);
+                term.write('\x1b[31m[gameLoop error] ' + (err || '?') + '\x1b[0m\r\n');
             }
         } else {
             lua.lua_pop(L, 1);
