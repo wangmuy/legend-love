@@ -185,6 +185,24 @@ processEventQueue():
 
 ---
 
+### 架构重构: Web Worker 引擎隔离
+
+将 Fengari Lua VM 从浏览器主线程移入 Web Worker，使 Lua 执行不阻塞 UI。
+
+**业务价值**：加载和运行 Lua 时界面不卡顿；架构更接近 Love2D 的渲染/逻辑分离，也更容易映射到真正 MUD server。
+
+| 字段 | 值 |
+|------|-----|
+| Change | `openspec/changes/web-worker-engine/` |
+| 内容 | `worker.js`, 简化 `index.js`, 调整 `index.html` |
+| 类型 | 架构重构 |
+| 依赖 | Slice 3（搬运已有代码，不依赖新功能） |
+| 阻塞 | Slice 4（后续 slice 受益于不卡的 UI） |
+
+**影响领域**：all（跨切面）
+
+---
+
 ### Slice 4: 场景交互
 
 完善场景 [GAME_SMAP] 内的交互——NPC 对话、事件触发、物品操作。
@@ -398,6 +416,9 @@ S2 (前端骨架 + engine_web)
   │
   ▼
 S3 (大地图漫游: list/go/look/where)
+  │
+  ▼
+WR (Web Worker 引擎隔离)    ← 架构重构，不阻塞 S4/S5
   │
   ├──────────────┐
   ▼              ▼

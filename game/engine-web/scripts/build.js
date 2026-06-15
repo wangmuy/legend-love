@@ -19,7 +19,7 @@ mkdir(DIST);
 // 1. Frontend files
 console.log('[1/4] Copying frontend files...');
 const frontendFiles = [
-    'index.html', 'style.css', 'index.js',
+    'index.html', 'style.css', 'index.js', 'worker.js',
     'engine_web.lua', 'data_loader.lua', 'state_manager.lua',
     'web_game_bridge.lua', 'web_command_engine.lua', 'mmap_smap_handlers.lua',
 ];
@@ -112,6 +112,18 @@ html = html.replace(
     'xterm.css"'
 );
 fs.writeFileSync(htmlPath, html);
+
+// 4b. worker.js: switch CDN → local lib refs for fengari
+const workerPath = path.join(DIST, 'worker.js');
+if (fs.existsSync(workerPath)) {
+    let workerSrc = fs.readFileSync(workerPath, 'utf-8');
+    workerSrc = workerSrc.replace(
+        /https:\/\/cdn\.jsdelivr\.net\/npm\/fengari-web@0\.1\.4\/dist\/fengari-web\.js/g,
+        'lib/fengari-web.js'
+    );
+    fs.writeFileSync(workerPath, workerSrc);
+    console.log('  worker.js: CDN→local');
+}
 
 console.log('');
 console.log('Build complete: dist/');
