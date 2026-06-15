@@ -310,11 +310,13 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('开始菜单 choose 0 (ESC) 重新显示开始菜单', async ({ page }) => {
+    await page.waitForTimeout(2000);
     await typeCmd(page, 'choose 0');
     await page.waitForTimeout(3000);
 
     let lines = await getTermLines(page);
     const text = lines.join('\n');
+    // Web MUD: showStartMenuCoroutine 用 WebUI.write 输出 "1. 重新开始" 等
     expect(text).toContain('重新开始');
     expect(text).toContain('载入进度');
     expect(text).toContain('离开游戏');

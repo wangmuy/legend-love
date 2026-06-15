@@ -31,7 +31,9 @@ local function colorToAnsi(color)
 end
 
 function EngineAPI.render.text(x, y, str, color, size)
-    table.insert(renderBuffer, colorToAnsi(color) .. tostring(str) .. "\027[0m")
+    -- Worker 模式下 ANSI escape 通过 postMessage 会损坏，改用直接文本输出
+    local w = rawget(_G, "WebUI")
+    if w then w.write(tostring(str)) end
 end
 
 function EngineAPI.render.fillRect(x1, y1, x2, y2, color) end
@@ -39,24 +41,15 @@ function EngineAPI.render.fillRect(x1, y1, x2, y2, color) end
 function EngineAPI.render.rectOutline(x1, y1, x2, y2, color) end
 
 function EngineAPI.render.drawBackground(x1, y1, x2, y2, brightness)
-    -- Web MUD: text-terminal incremental output, do NOT clear screen (\027[2J)
-    -- Love2D frame-based clearing is handled by the presentation layer
-    if not brightness or brightness == 0 then
-        table.insert(renderBuffer, "\027[40m")
-    else
-        table.insert(renderBuffer, "\027[40m")
-    end
+    -- Worker 模式下不做 ANSI 输出
 end
 
 function EngineAPI.render.setClip(x1, y1, x2, y2) end
 EngineAPI.render.SetClip = EngineAPI.render.setClip
 
 function EngineAPI.render.present()
-    local output = table.concat(renderBuffer, "\n") .. "\027[0m"
+    -- Worker 模式下 renderBuffer 为空（text 已直接写 WebUI），present 不做操作
     renderBuffer = {}
-    if _G.JSBridge and _G.JSBridge.write then
-        _G.JSBridge.write(output)
-    end
 end
 
 function EngineAPI.render.presentAndWait(delay)

@@ -45,7 +45,10 @@ function JYMainAdapter.init()
     -- 使用协程执行初始化流程
     local scheduler = CoroutineScheduler.getInstance()
     initCoroutine = scheduler:create(function()
-        JYMainAdapter.initCoroutine()
+        -- 通过 _G.JYMainAdapter 访问，这样外部覆写能生效
+        -- （模块内的 local JYMainAdapter 已被闭包捕获，外部修改不影响）
+        local m = rawget(_G, "JYMainAdapter") or JYMainAdapter
+        m.initCoroutine()
     end, "init")
     
     scheduler:start(initCoroutine)
