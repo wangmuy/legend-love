@@ -4,6 +4,7 @@ module.exports = defineConfig({
   testDir: './tests',
   timeout: 30000,
   expect: { timeout: 10000 },
+  globalTeardown: require.resolve('./scripts/global-teardown'),
   use: {
     baseURL: 'http://localhost:8088',
     headless: true,
@@ -15,6 +16,6 @@ module.exports = defineConfig({
   webServer: {
     command: 'node scripts/start-test-server.js',
     port: 8088,
-    reuseExistingServer: true,
+    reuseExistingServer: false,
   },
 });

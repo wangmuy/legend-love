@@ -1,0 +1,457 @@
+const { test, expect } = require('@playwright/test');
+const { waitForPageReady } = require('./helpers/setup');
+
+// Helper: set game state to MMAP with player at default position
+async function setMmapState(page) {
+  return page.evaluate(() => {
+    const f = window.fengari;
+    const lua = f.lua;
+    // Ensure JY exists
+    lua.lua_getglobal(f.L, 'JY');
+    if (lua.lua_type(f.L, -1) === lua.LUA_TNIL) {
+      lua.lua_pop(f.L, 1);
+      lua.lua_newtable(f.L);
+      lua.lua_setglobal(f.L, 'JY');
+      lua.lua_getglobal(f.L, 'JY');
+    }
+    // Set JY.Base
+    lua.lua_pushstring(f.L, 'Base');
+    lua.lua_newtable(f.L);
+    lua.lua_pushstring(f.L, '人X1');
+    lua.lua_pushinteger(f.L, 358);
+    lua.lua_settable(f.L, -3);
+    lua.lua_pushstring(f.L, '人Y1');
+    lua.lua_pushinteger(f.L, 228);
+    lua.lua_settable(f.L, -3);
+    lua.lua_settable(f.L, -3);
+    // Set JY.Status = GAME_MMAP (2)
+    lua.lua_pushstring(f.L, 'Status');
+    lua.lua_pushinteger(f.L, 2);
+    lua.lua_settable(f.L, -3);
+    lua.lua_pop(f.L, 1);
+    return true;
+  });
+}
+
+// Helper: set game state to SMAP with a known scene ID
+// 河洛客棧 is a well-known scene with exits in the default data
+async function setSmapState(page, sceneId) {
+  sceneId = sceneId || '58';  // 河洛客棧
+  return page.evaluate((sid) => {
+    const f = window.fengari;
+    const lua = f.lua;
+    const L = f.L;
+
+    // Ensure JY exists
+    lua.lua_getglobal(L, 'JY');
+    if (lua.lua_type(L, -1) === lua.LUA_TNIL) {
+      lua.lua_pop(L, 1);
+      lua.lua_newtable(L);
+      lua.lua_setglobal(L, 'JY');
+      lua.lua_getglobal(L, 'JY');
+    }
+    // Set JY.Base
+    lua.lua_pushstring(L, 'Base');
+    lua.lua_newtable(L);
+    lua.lua_pushstring(L, '人X1');
+    lua.lua_pushinteger(L, 0);
+    lua.lua_settable(L, -3);
+    lua.lua_pushstring(L, '人Y1');
+    lua.lua_pushinteger(L, 0);
+    lua.lua_settable(L, -3);
+    lua.lua_settable(L, -3);
+    // Set SubScene (use numeric key for the scene)
+    lua.lua_pushstring(L, 'SubScene');
+    lua.lua_pushinteger(L, parseInt(sid, 10) || 58);
+    lua.lua_settable(L, -3);
+    // Set JY.Status = GAME_SMAP (4)
+    lua.lua_pushstring(L, 'Status');
+    lua.lua_pushinteger(L, 4);
+    lua.lua_settable(L, -3);
+    lua.lua_pop(L, 1);
+    return true;
+  }, sceneId);
+}
+
+async function getTerminalText(page) {
+  return page.evaluate(() => {
+    const t = window.__xterm;
+    if (!t) return '(no xterm)';
+    const lines = [];
+    for (let y = 0; y < t.buffer.active.length; y++) {
+      const l = t.buffer.active.getLine(y)?.translateToString(true) || '';
+      if (l.trim()) lines.push(l);
+    }
+    return lines.join('\n');
+  });
+}
+
+async function hasNoGameErrors(page) {
+  return page.evaluate(() => {
+    const term = window.__xterm;
+    if (!term) return true;
+    for (let y = 0; y < term.rows; y++) {
+      const text = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      if (text.includes('[gameLoop error]')) return false;
+    }
+    return true;
+  });
+}
+
+test.describe('MMAP/SMAP 命令（程序化设状态后 E2E）', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+    await setMmapState(page);
+  });
+
+  test('look 显示当前位置', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('look');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== LOOK OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('当前位置');
+    expect(termText).toContain('坐标');
+  });
+
+  test('look 显示坐标和方位（原 where 功能合并到 look）', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('look');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== LOOK WITH POSITION OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('当前位置');
+    expect(termText).toContain('方位');
+    expect(termText).toContain('相对中心');
+  });
+
+  test('list 显示可去场景', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('list');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== LIST OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('可去场景');
+  });
+
+  test('未知命令（已移除的 go/where）显示提示', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('go 不存在');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== GO INVALID OUTPUT ===');
+    console.log(termText);
+    // go 在 MMAP 已移除，应提示未知命令
+    expect(termText).toContain('未知命令');
+  });
+
+  test('where 命令（已从 MMAP 合并到 look）显示未知命令提示', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+
+    await input.fill('where');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== WHERE (REMOVED FROM MMAP) OUTPUT ===');
+    console.log(termText);
+    // where 在 MMAP 已移除，应提示未知命令
+    expect(termText).toContain('未知命令');
+  });
+
+  test('help 在 MMAP 状态显示 MMAP 命令', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('help');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== HELP MMAP OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('list');
+    expect(termText).toContain('look');
+    expect(termText).toContain('quit');
+    // go 和 where 已从 MMAP 移除
+    expect(termText).not.toContain('go');
+    expect(termText).not.toContain('where');
+  });
+
+  test('quit → choose 2 取消后重新显示大地图', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+
+    // 输入 quit
+    await input.fill('quit');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    let termText = await getTerminalText(page);
+    console.log('=== AFTER QUIT ===');
+    console.log(termText);
+    expect(termText).toContain('确定退出吗');
+
+    // 取消
+    await input.fill('choose 2');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    termText = await getTerminalText(page);
+    console.log('=== AFTER QUIT CANCEL ===');
+    console.log(termText);
+    // 应重新显示大地图信息
+    expect(termText).toContain('当前位置');
+    expect(termText).toContain('坐标');
+    expect(termText).toContain('输入 list 查看可去场景，quit 退出游戏');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('quit → choose 1 确认后返回开始菜单', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+
+    // 输入 quit
+    await input.fill('quit');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    let termText = await getTerminalText(page);
+    console.log('=== AFTER QUIT ===');
+    console.log(termText);
+    expect(termText).toContain('确定退出吗');
+
+    // 确认退出
+    await input.fill('choose 1');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    termText = await getTerminalText(page);
+    console.log('=== AFTER QUIT CONFIRM ===');
+    console.log(termText);
+    expect(termText).toContain('已返回开始菜单');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+});
+
+test.describe('SMAP 命令（程序化设状态后 E2E）', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+    await setSmapState(page, '12');  // 明教分舵（有出口）
+  });
+
+  test('look 显示场景描述', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('look');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP LOOK OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('明教分舵');
+    // 有出口的场景应显示出口和提示
+    expect(termText).toContain('出口');
+    expect(termText).toContain('输入 exits 查看出口详情，leave 回到大地图');
+  });
+
+  test('exits 显示出口编号列表', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('exits');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP EXITS OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('出口');
+    // 出口列表应包含编号
+    expect(termText).toMatch(/\d+\./);
+  });
+
+  test('leave 返回大地图', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('leave');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP LEAVE OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('回到了大地图');
+    expect(termText).toContain('当前位置');
+  });
+
+  test('go <编号> 通过出口编号离开场景', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+
+    // 先查看出口确认有出口
+    await input.fill('exits');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(2000);
+
+    // 选择第一个出口
+    await input.fill('go 1');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP GO 1 OUTPUT ===');
+    console.log(termText);
+    // 应进入新场景（进入了 XXX）或回到大地图
+    expect(termText).toContain('进入了');
+  });
+
+  test('go <编号> 进入新场景后 look 正常', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+
+    // 选择第一个出口
+    await input.fill('go 1');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    // 现在在新场景中，输入 look
+    await input.fill('look');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP GO 1 THEN LOOK OUTPUT ===');
+    console.log(termText);
+    // 应显示新场景的描述
+    expect(termText).toContain('输入 exits 查看出口详情，leave 回到大地图');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('go 无效出口编号显示提示', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+
+    await input.fill('go 999');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP GO INVALID OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('未找到出口');
+  });
+
+  test('help 在 SMAP 状态显示 SMAP 命令', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('help');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP HELP OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('exits');
+    expect(termText).toContain('leave');
+    expect(termText).toContain('go');
+    expect(termText).toContain('look');
+  });
+});
+
+test.describe('SMAP 无出口场景（河洛客棧 ID=1）', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+    await setSmapState(page, '1');  // 河洛客棧，无出口
+  });
+
+  test('look 不显示出口信息', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('look');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP NOEXIT LOOK OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('河洛客棧');
+    // 无出口场景不应显示出口
+    expect(termText).not.toContain('出口:');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('exits 显示"此场景没有出口"', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('exits');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP NOEXIT EXITS OUTPUT ===');
+    console.log(termText);
+    expect(termText).toContain('此场景没有出口');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+});
+
+test.describe('quit 顺序流程', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+    await setMmapState(page);
+  });
+
+  test('quit → cancel → quit → confirm 顺序正常', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+
+    // 第一次 quit → cancel
+    await input.fill('quit');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(2000);
+    await input.fill('choose 2');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(2000);
+
+    let termText = await getTerminalText(page);
+    console.log('=== AFTER FIRST QUIT CANCEL ===');
+    console.log(termText);
+    expect(termText).toContain('已取消');
+    expect(termText).toContain('当前位置');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+
+    // 第二次 quit → confirm
+    await input.fill('quit');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(2000);
+    await input.fill('choose 1');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    termText = await getTerminalText(page);
+    console.log('=== AFTER SECOND QUIT CONFIRM ===');
+    console.log(termText);
+    expect(termText).toContain('已返回开始菜单');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+});

@@ -6,7 +6,7 @@
 local SAVE_KEY_PREFIX = "save_"
 
 function initGameState()
-    if not _G.JY then _G.JY = {} end
+    if not rawget(_G, "JY") then rawset(_G, "JY", {}) end
     local dc = _G.dataCache
     if not dc then return end
 
@@ -176,7 +176,7 @@ function loadGameState(slotId)
         return false
     end
 
-    if not _G.JY then _G.JY = {} end
+    if not rawget(_G, "JY") then rawset(_G, "JY", {}) end
     local restoreMap = {
         base = "Base",
         persons = "Person",
