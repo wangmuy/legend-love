@@ -329,6 +329,9 @@ function _G.initWebFramework()
     end
 
     local ok, err = pcall(function()
+        -- JYMainAdapter.init() 启动协程后会立即输出大量 [DEBUG] 信息，
+        -- 在 init 完成前先抑制调试输出，保持终端界面整洁
+        _G.__quiet = true
         JYMainAdapter.init()
     end)
     if not ok then
