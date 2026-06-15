@@ -161,7 +161,15 @@ function _G.initWebFramework()
     -- init() 会设置 setmetatable(_G, {__index=error, __newindex=error})，
     -- 因此覆写函数体内必须使用 rawget/rawset 访问 _G
     local JYMainAdapter = require("framework.jymain_adapter")
-    local startNewGameAdapter = JYMainAdapter  -- 模块表引用
+    -- 确保 initCoroutine 中的 JYMainAdapter 引用也看到覆写
+    -- 直接从 package.loaded 获取并写入
+    local target = package.loaded["framework.jymain_adapter"]
+    if not target then target = JYMainAdapter end
+    local startNewGameAdapter = target  -- 模块表引用
+
+    -- 保存原始函数引用，覆写后替换
+    -- 用 rawset 直接写入 _G，因为 initCoroutine 中 JYMainAdapter 是全局引用
+    rawset(_G, "JYMainAdapter", target)
 
     -- 覆写 loadGame：Web MUD 无二进制存档文件
     startNewGameAdapter.loadGame = function()
@@ -303,7 +311,7 @@ function _G.initWebFramework()
             if not MenuAsync or not CC then
                 break
             end
-            -- Web MUD: 每次循环输出输入提示（菜单项由 draw() 渲染，通过 lastDrawState=nil 触发）
+            -- Web MUD: 每次循环输出输入提示（菜单项由主线程 ready 事件输出）
             local WebUI = rawget(_G, "WebUI")
             if WebUI then
                 WebUI.write("输入 choose 1 开始新游戏，choose 2 载入进度，choose 3 离开")
@@ -329,6 +337,8 @@ function _G.initWebFramework()
     end
 
     local ok, err = pcall(function()
+        -- 设置 _G.JYMainAdapter 指向模块表，init 协程通过它访问可看到覆写
+        rawset(_G, "JYMainAdapter", JYMainAdapter)
         JYMainAdapter.init()
     end)
     if not ok then
@@ -428,7 +438,9 @@ end
 
 local function determineDrawState()
     local AsyncDialog = _G.AsyncDialog or (package.loaded["framework.async_dialog"])
-    if AsyncDialog and AsyncDialog.getInstance():hasDialog() then return "dialog" end
+    if AsyncDialog and AsyncDialog.getInstance():hasDialog() then
+        return "dialog"
+    end
     local MenuAsync = _G.MenuAsync or (package.loaded["framework.menu_async"])
     if MenuAsync and MenuAsync.hasActiveMenu and MenuAsync.hasActiveMenu() then
         return "menu"

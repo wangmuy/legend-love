@@ -145,10 +145,13 @@
             } else if (msg.type === 'ready') {
                 workerReady = true;
                 window.__workerReady = true;
-                // 显示欢迎辞（由主线程输出，避免在 worker 中用 term）
-                term.write('\r\n欢迎来到金庸群侠传 Web MUD 文字版！\r\n');
+                // 由主线程直接输出开始菜单和欢迎辞，避免 Worker 消息队列延迟
+                term.write('欢迎来到金庸群侠传 Web MUD 文字版！\r\n');
                 term.write('\r\n');
                 term.write('\x1b[32mSystem ready. Type help to start.\x1b[0m\r\n');
+                term.write('1. 重新开始\r\n');
+                term.write('2. 载入进度\r\n');
+                term.write('3. 离开游戏\r\n');
                 term.write('输入 choose 1 开始新游戏，choose 2 载入进度，choose 3 离开\r\n');
             } else if (msg.type === 'db_save') {
                 dbSave(msg.key, msg.value);
