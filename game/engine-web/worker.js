@@ -1,9 +1,9 @@
 /* ── Web Worker: 金庸群侠传 Web MUD Lua Engine ── */
-'use strict';
 
 /* ── 1. 加载 Fengari Lua VM ── */
 // Worker 中没有 window，但 fengari-web.js 依赖它。
-self.window = self;
+// 用 Object.defineProperty 设置 window 别名（self 是只读 getter）。
+Object.defineProperty(self, 'window', { value: self, writable: true, configurable: true });
 
 self.importScripts(
   'https://cdn.jsdelivr.net/npm/fengari-web@0.1.4/dist/fengari-web.js'
@@ -169,9 +169,28 @@ function gameLoop() {
       self.postMessage({ type: 'log', text: '\x1b[31m[gameLoop error] ' + err + '\x1b[0m' });
     }
   } else {
+    // processEventQueue is not defined yet — skip this frame
+    self.postMessage({ type: 'log', text: '\x1b[33m[gameLoop] processEventQueue not ready\x1b[0m' });
     lua.lua_pop(L, 1);
   }
-  self.setTimeout(gameLoop, 16);
+}
+
+function startGameLoop() {
+  try {
+    gameLoop();              // 第一帧同步执行（绘制菜单等）
+  } catch (ex) {
+    self.postMessage({ type: 'log', text: '\x1b[31m[first frame error] ' + (ex.message || String(ex)) + '\x1b[0m' });
+  }
+  self.postMessage({ type: 'ready' });  // 通知主线程：菜单已渲染
+  // 后续帧异步调度
+  (function nextFrame() {
+    self.setTimeout(function() {
+      try { gameLoop(); } catch (ex) {
+        self.postMessage({ type: 'log', text: '\x1b[31m[frame error] ' + (ex.message || String(ex)) + '\x1b[0m' });
+      }
+      nextFrame();
+    }, 16);
+  })();
 }
 
 /* ── 6. 消息处理 ── */
@@ -279,11 +298,8 @@ self.onmessage = function(e) {
         self.postMessage({ type: 'log', text: '\x1b[31mFramework init FAILED: ' + err + '\x1b[0m' });
         return;
       }
-      // 先跑一帧 gameLoop 让菜单渲染，再通知主线程 ready
-      self.setTimeout(function() {
-        gameLoop();
-        self.postMessage({ type: 'ready' });
-      }, 16);
+      // 第一帧同步渲染菜单，然后通知主线程就绪
+      startGameLoop();
     }
 
     if (msg.type === 'input') {
