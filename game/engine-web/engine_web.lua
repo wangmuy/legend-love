@@ -39,10 +39,12 @@ function EngineAPI.render.fillRect(x1, y1, x2, y2, color) end
 function EngineAPI.render.rectOutline(x1, y1, x2, y2, color) end
 
 function EngineAPI.render.drawBackground(x1, y1, x2, y2, brightness)
+    -- Web MUD: text-terminal incremental output, do NOT clear screen (\027[2J)
+    -- Love2D frame-based clearing is handled by the presentation layer
     if not brightness or brightness == 0 then
-        table.insert(renderBuffer, "\027[2J\027[40m")
+        table.insert(renderBuffer, "\027[40m")
     else
-        table.insert(renderBuffer, "\027[2J\027[40m")
+        table.insert(renderBuffer, "\027[40m")
     end
 end
 
@@ -417,6 +419,15 @@ _G.lib = setmetatable({}, {
         if key == "PlayMPEG" then return EngineAPI.render.PlayMPEG end
         if key == "Background" then return EngineAPI.render.FillColor end
         if key == "DrawRect" then return EngineAPI.render.FillColor end
+        -- Stubs for functions called by game_state.lua but not needed in MUD mode:
+        if key == "LoadMMap" then return function() end end
+        if key == "GetMMap" then return function() return 0 end end
+        if key == "UnloadMMap" then return function() end end
+        if key == "PicLoadFile" then return function() end end
+        if key == "GetS" then return function() return -1 end end
+        if key == "SetS" then return function() end end
+        if key == "GetD" then return function() return 0 end end
+        if key == "SetD" then return function() end end
         for _, mod in pairs(EngineAPI) do
             if type(mod) == "table" and mod[key] then
                 return mod[key]

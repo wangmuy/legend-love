@@ -2,7 +2,7 @@ const { test, expect } = require('@playwright/test');
 const { waitForPageReady, luaEval } = require('./helpers/setup');
 
 const MODULES = {
-  render: 7, input: 3, time: 3, file: 9, script: 1,
+  render: 20, input: 3, time: 3, file: 9, script: 1,
   font: 1, color: 2, debug: 1, coroutine: 3,
   sprite: 4, map: 7, audio: 3, app: 1,
 };
@@ -74,7 +74,7 @@ test.describe('EngineAPI 表面 + 功能', () => {
     const termText = await page.evaluate(() => {
       const term = window.__xterm;
       const found = [];
-      for (let y = 0; y < term.rows; y++) {
+      for (let y = 0; y < term.buffer.active.length; y++) {
         const text = term.buffer.active.getLine(y)?.translateToString(true) || '';
         for (const label of ['CLR_RED', 'CLR_WHT', 'CLR_BLK', 'CLR_YEL']) {
           if (text.includes(label) && !found.includes(label)) found.push(label);
@@ -90,7 +90,7 @@ test.describe('EngineAPI 表面 + 功能', () => {
     await page.waitForTimeout(100);
     const text = await page.evaluate(() => {
       const term = window.__xterm;
-      for (let y = 0; y < term.rows; y++) {
+      for (let y = 0; y < term.buffer.active.length; y++) {
         const t = term.buffer.active.getLine(y)?.translateToString(true) || '';
         if (t.includes('PRESENT_TEST')) return t;
       }
@@ -142,11 +142,11 @@ test.describe('EngineAPI 表面 + 功能', () => {
   });
 
   test('debug.log 写入内容', async ({ page }) => {
-    await luaEval(page, 'EngineAPI.debug.log("TEST_MSG", 42)');
+    await luaEval(page, '_G.__quiet = false; EngineAPI.debug.log("TEST_MSG", 42)');
     await page.waitForTimeout(100);
     const text = await page.evaluate(() => {
       const term = window.__xterm;
-      for (let y = 0; y < term.rows; y++) {
+      for (let y = 0; y < term.buffer.active.length; y++) {
         const t = term.buffer.active.getLine(y)?.translateToString(true) || '';
         if (t.includes('[DEBUG]') && t.includes('TEST_MSG')) return t;
       }

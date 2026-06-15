@@ -20,7 +20,7 @@ engine_web.lua 和 data_loader.lua 已实现，但缺乏自动化测试保障。
 ## 能力
 
 ### 新增能力
-- `engine-web-tests`: 59 条自动化测试用例覆盖 7 个 spec 文件（含状态持久化 9 条）
+- `engine-web-tests`: 59+ 条自动化测试用例覆盖 7+ 个 spec 文件（含状态持久化 9 条、Slice 3 集成测试 7 条、MMAP/SMAP 命令 9 条）
 
 ### 修改的能力
 - 无

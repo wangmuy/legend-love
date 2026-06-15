@@ -58,9 +58,9 @@ test.describe('State persistence', () => {
 
   test('saveGameState → loadGameState 往返', async ({ page }) => {
     const result = await luaEval(page, [
-      'if not _G.JY then _G.JY = {} end',
-      '_G.JY.Base = { ["人X"] = 100, ["人Y"] = 200, ["乘船"] = 0 }',
-      '_G.JY.Person = { [0] = { ["代号"] = 0, ["姓名"] = "测试", ["攻击力"] = 50 } }',
+      'if not rawget(_G, "JY") then rawset(_G, "JY", {}) end',
+      'rawget(_G, "JY").Base = { ["人X"] = 100, ["人Y"] = 200, ["乘船"] = 0 }',
+      'rawget(_G, "JY").Person = { [0] = { ["代号"] = 0, ["姓名"] = "测试", ["攻击力"] = 50 } }',
       'local ok = saveGameState(0)',
       'if not ok then return "save_failed" end',
       'local raw = JSBridge.load("save_0")',
@@ -68,11 +68,12 @@ test.describe('State persistence', () => {
       'local parsed_ok, parsed = pcall(parseJSON, raw)',
       'if not parsed_ok then return "parse_fail:" .. tostring(parsed) end',
       'if not parsed.base then return "no_base_in_save:" .. raw:sub(1,80) end',
-      '_G.JY = nil',
+      'rawset(_G, "JY", nil)',
       'local loaded = loadGameState(0)',
       'if not loaded then return "load_failed" end',
-      'local bx = _G.JY.Base and _G.JY.Base["人X"]',
-      'local pn = _G.JY.Person and _G.JY.Person[0] and _G.JY.Person[0]["姓名"]',
+      'local jy = rawget(_G, "JY")',
+      'local bx = jy and jy.Base and jy.Base["人X"]',
+      'local pn = jy and jy.Person and jy.Person[0] and jy.Person[0]["姓名"]',
       'return tostring(bx) .. "|" .. tostring(pn)',
     ].join('; '));
     expect(result).toBe('100|测试');
@@ -80,17 +81,19 @@ test.describe('State persistence', () => {
 
   test('存档槽独立: save_1 不影响 save_2', async ({ page }) => {
     const result = await luaEval(page, [
-      'if not _G.JY then _G.JY = {} end',
-      '_G.JY.Base = { ["人X"] = 1, ["人Y"] = 2 }',
+      'if not rawget(_G, "JY") then rawset(_G, "JY", {}) end',
+      'rawget(_G, "JY").Base = { ["人X"] = 1, ["人Y"] = 2 }',
       'saveGameState(1)',
-      '_G.JY.Base = { ["人X"] = 99, ["人Y"] = 88 }',
+      'rawget(_G, "JY").Base = { ["人X"] = 99, ["人Y"] = 88 }',
       'saveGameState(2)',
-      '_G.JY = nil',
+      'rawset(_G, "JY", nil)',
       'loadGameState(1)',
-      'local x1 = _G.JY.Base["人X"]',
-      '_G.JY = nil',
+      'local jy1 = rawget(_G, "JY")',
+      'local x1 = jy1 and jy1.Base and jy1.Base["人X"]',
+      'rawset(_G, "JY", nil)',
       'loadGameState(2)',
-      'local x2 = _G.JY.Base["人X"]',
+      'local jy2 = rawget(_G, "JY")',
+      'local x2 = jy2 and jy2.Base and jy2.Base["人X"]',
       'return tostring(x1) .. "|" .. tostring(x2)',
     ].join('; '));
     expect(result).toBe('1|99');
@@ -98,8 +101,8 @@ test.describe('State persistence', () => {
 
   test('deleteSaveSlot 删除存档', async ({ page }) => {
     const result = await luaEval(page, [
-      'if not _G.JY then _G.JY = {} end',
-      '_G.JY.Base = { ["人X"] = 1 }',
+      'if not rawget(_G, "JY") then rawset(_G, "JY", {}) end',
+      'rawget(_G, "JY").Base = { ["人X"] = 1 }',
       'local ok = saveGameState(3)',
       'if not ok then return "save_failed" end',
       'local saves = listSaveSlots()',

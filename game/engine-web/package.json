@@ -9,8 +9,8 @@
     "dev": "npx serve . -p 8088 --no-clipboard",
     "start": "npx serve dist -p 8088 --no-clipboard",
     "deploy": "npx gh-pages -d dist",
-    "test": "node scripts/start-test-server.js & npx playwright test; kill %1 2>/dev/null; wait",
-    "test:ui": "node scripts/start-test-server.js & npx playwright test --ui; kill %1 2>/dev/null; wait"
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.11.0",

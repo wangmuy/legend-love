@@ -38,3 +38,10 @@ const PORT = parseInt(process.env.PORT || '8088', 10);
 server.listen(PORT, () => {
   console.log(`TEST_SERVER_READY:${PORT}`);
 });
+
+function shutdown() {
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 3000).unref();
+}
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

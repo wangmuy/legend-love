@@ -4,6 +4,7 @@
     /* ── 1. xterm.js ── */
     const term = new Terminal({
         cursorBlink: true,
+        convertEol: true,
         fontSize: 14,
         fontFamily: "'Courier New', 'Noto Sans SC', monospace",
         theme: {
@@ -298,6 +299,18 @@
         await loadLuaModule('web_game_bridge.lua', bridgeSource);
         term.write('  Web game bridge: ready\r\n');
 
+        term.write('Loading web_command_engine.lua...\r\n');
+        const cmdResp = await fetch('web_command_engine.lua');
+        const cmdSource = await cmdResp.text();
+        await loadLuaModule('web_command_engine.lua', cmdSource);
+        term.write('  Web command engine: ready\r\n');
+
+        term.write('Loading mmap_smap_handlers.lua...\r\n');
+        const mmapResp = await fetch('mmap_smap_handlers.lua');
+        const mmapSource = await mmapResp.text();
+        await loadLuaModule('mmap_smap_handlers.lua', mmapSource);
+        term.write('  MMAP/SMAP handlers: ready\r\n');
+
         term.write('Loading framework modules...\r\n');
         const frameworkFiles = [
             'framework/coroutine_scheduler.lua',
@@ -409,8 +422,15 @@
 
         term.write('\r\nInitializing game framework...\r\n');
         lua.lua_getglobal(L, 'initWebFramework');
-        lua.lua_pcall(L, 0, 0, 0);
+        const initResult = lua.lua_pcall(L, 0, 0, 0);
+        if (initResult !== 0) {
+            const err = lua.lua_tostring(L, -1);
+            lua.lua_pop(L, 1);
+            term.write('\r\n\x1b[31mFramework init FAILED: ' + err + '\x1b[0m\r\n');
+        }
 
+        term.write('\r\n');
+        term.write('欢迎来到金庸群侠传 Web MUD 文字版！\r\n');
         term.write('\r\n');
         term.write('\x1b[32mSystem ready. Type help to start.\x1b[0m\r\n');
 

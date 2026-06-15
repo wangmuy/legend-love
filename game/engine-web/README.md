@@ -44,10 +44,39 @@ cd game/engine-web && npm install && npm run build
 ### 测试
 
 ```bash
+# 运行所有测试（自动启动 HTTP 服务器，端口 8088）
 npm test
+
+# 运行单个测试文件（推荐用于调试）
+npx playwright test tests/s3-integration.spec.js
+
+# 运行单个用例（指定行号）
+npx playwright test tests/s3-integration.spec.js:218
 ```
 
-Playwright E2E 测试，59 条用例覆盖页面加载、Lua VM、API、数据完整性、状态持久化。
+Playwright E2E 测试覆盖页面加载、Lua VM、API、数据完整性、状态持久化、交互流程。
+
+**注意事项**：
+
+- **Worker 数量**：默认 `workers=1`（`playwright.config.js` 中配置）。集成测试涉及 Lua 协程 + IndexedDB 状态，
+  并行执行会导致 IndexedDB 共享冲突或协程交错，务必使用单 worker。
+- **超时设置**：完整流程测试（开始→属性确认→MMAP→场景）需 30s 以上。单用例超时已设为 30s，本地慢时可临时调大：
+  ```bash
+  # 例：单用例超时 60s
+  npx playwright test tests/s3-integration.spec.js --timeout=60000
+  ```
+- **顺序执行**：如果持续超时，可以逐个用例运行排查：
+  ```bash
+  # 按行号运行，一次一个
+  npx playwright test tests/s3-integration.spec.js:46
+  npx playwright test tests/s3-integration.spec.js:109
+  npx playwright test tests/s3-integration.spec.js:242
+  ```
+- **端口冲突**：测试服务器使用 8088 端口，如果上次运行未正常退出，先释放端口：
+  ```bash
+  fuser -k 8088/tcp
+  ```
+- **构建前置**：运行测试前需确保 `npm run build` 已执行，否则服务器会回退到源码目录。`npm test` 不自动构建。|
 
 ## 数据流
 

@@ -6,24 +6,24 @@
 _G.WebUI = {}
 
 function _G.WebUI.write(text)
-    EngineAPI.render.text(0, 0, tostring(text) .. "\n")
-    EngineAPI.render.present()
+    if _G.JSBridge and _G.JSBridge.write then
+        _G.JSBridge.write(tostring(text) .. "\n")
+    end
 end
 
 function _G.WebUI.writeLine(text)
-    EngineAPI.render.text(0, 0, tostring(text))
-    EngineAPI.render.present()
+    if _G.JSBridge and _G.JSBridge.write then
+        _G.JSBridge.write(tostring(text))
+    end
 end
 
 function _G.WebUI.separator()
-    EngineAPI.render.text(0, 0, string.rep("─", 40) .. "\n")
-    EngineAPI.render.present()
+    _G.JSBridge.write(string.rep("─", 40) .. "\n")
 end
 
 function _G.WebUI.title(text)
-    EngineAPI.render.text(0, 0, "\n" .. tostring(text) .. "\n")
-    EngineAPI.render.text(0, 0, string.rep("═", #tostring(text)) .. "\n")
-    EngineAPI.render.present()
+    _G.JSBridge.write("\n" .. tostring(text) .. "\n")
+    _G.JSBridge.write(string.rep("═", #tostring(text)) .. "\n")
 end
 
 -- io 桩函数（浏览器环境无文件系统）
@@ -99,6 +99,9 @@ function _G.__debug_coro_state()
     return r
 end
 
+-- 绘制状态跟踪（必须在前，returnToStartMenu 需要访问）
+local lastDrawState = nil
+
 -- 初始化框架
 function _G.initWebFramework()
     -- 0. 先加载 config 确保 CONFIG 全局变量存在
@@ -139,20 +142,289 @@ function _G.initWebFramework()
     _G.MenuAsync = require("framework.menu_async")
     _G.CoroutineScheduler = require("framework.coroutine_scheduler")
     _G.AsyncDialog = require("framework.async_dialog")
+    -- CommandEngine already loaded as global via loadLuaModule in index.js
+    if not _G.CommandEngine then
+        _G.CommandEngine = require("web_command_engine")
+    end
+    -- 注册内置命令（对所有状态生效）
+    local CE = _G.CommandEngine
+    local builtInCmds = {
+        help = { handler = function(args) CE.showHelp(args) end, description = "显示帮助信息" },
+        choose = { handler = function(args) CE.handleChoose(args) end, description = "选择菜单项: choose <编号>" },
+    }
+    for _, stateId in ipairs({0, 1, 2, 3, 4}) do
+        CE.registerCommands(stateId, builtInCmds)
+    end
+
+    -- 在 init() 之前覆写 JYMainAdapter 的方法
+    -- 注意：init() 内部会调用 showStartMenuCoroutine，所以必须在之前覆写
+    -- init() 会设置 setmetatable(_G, {__index=error, __newindex=error})，
+    -- 因此覆写函数体内必须使用 rawget/rawset 访问 _G
+    local JYMainAdapter = require("framework.jymain_adapter")
+    local startNewGameAdapter = JYMainAdapter  -- 模块表引用
+
+    -- 覆写 loadGame：Web MUD 无二进制存档文件
+    startNewGameAdapter.loadGame = function()
+        local WebUI = rawget(_G, "WebUI")
+        if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始游戏\n") end
+    end
+
+    -- 覆写 startNewGame：Web MUD 无法读取 R*.idx/grp 文件，直接创建默认数据
+    startNewGameAdapter.startNewGame = function(menux)
+        local JY = rawget(_G, "JY")
+        if not JY then JY = {}; rawset(_G, "JY", JY) end
+        JY.Base = JY.Base or {}
+        JY.Person = JY.Person or {}
+        JY.Person[0] = JY.Person[0] or {}
+
+        local P0 = JY.Person[0]
+        local CC = rawget(_G, "CC")
+        P0["姓名"] = CC and CC.NewPersonName or "小虾米"
+        P0["头像"] = 1
+        P0["体力最大值"] = 100
+        P0["体力"] = 100
+        P0["经验"] = 0
+        P0["等级"] = 1
+        P0["声望"] = 0
+        P0["品德"] = 50
+        P0["第一项武功"] = 0
+        P0["武功数量"] = 0
+        P0["人X"] = 364
+        P0["人Y"] = 284
+        P0["人朝向"] = 0
+
+        local function generateWebAttrs()
+            local P0 = JY.Person[0]
+            P0["内力性质"] = math.random(0, 2)
+            P0["内力最大值"] = math.random(20) + 21
+            P0["攻击力"] = math.random(10) + 21
+            P0["防御力"] = math.random(10) + 21
+            P0["轻功"] = math.random(10) + 21
+            P0["医疗能力"] = math.random(10) + 21
+            P0["用毒能力"] = math.random(10) + 21
+            P0["解毒能力"] = math.random(10) + 21
+            P0["抗毒能力"] = math.random(10) + 21
+            P0["拳掌"] = math.random(10) + 21
+            P0["御剑"] = math.random(10) + 21
+            P0["耍刀"] = math.random(10) + 21
+            P0["特殊武功"] = math.random(10) + 21
+            P0["暗器"] = math.random(10) + 21
+            P0["生命增长"] = math.random(5) + 3
+            P0["生命最大值"] = P0["生命增长"] * 3 + 29
+            local rate = math.random(0, 9)
+            if rate < 2 then
+                P0["资质"] = math.random(35) + 30
+            elseif rate <= 7 then
+                P0["资质"] = math.random(20) + 60
+            else
+                P0["资质"] = math.random(20) + 75
+            end
+            P0["生命"] = P0["生命最大值"]
+            P0["内力"] = P0["内力最大值"]
+        end
+
+        local satisfied = false
+        while not satisfied do
+            generateWebAttrs()
+
+            local WebUI = rawget(_G, "WebUI")
+            WebUI.write(string.format("生命:%d/%d  内力:%d/%d  体力:%d/%d",
+                P0["生命"], P0["生命最大值"],
+                P0["内力"], P0["内力最大值"],
+                P0["体力"], P0["体力最大值"]))
+            WebUI.write(string.format("攻击:%d  防御:%d  轻功:%d  资质:%d",
+                P0["攻击力"], P0["防御力"], P0["轻功"], P0["资质"]))
+            WebUI.write(string.format("拳掌:%d  御剑:%d  耍刀:%d  特殊:%d  暗器:%d",
+                P0["拳掌"], P0["御剑"], P0["耍刀"], P0["特殊武功"], P0["暗器"]))
+            WebUI.write(string.format("医疗:%d  用毒:%d  解毒:%d  抗毒:%d",
+                P0["医疗能力"], P0["用毒能力"], P0["解毒能力"], P0["抗毒能力"]))
+            WebUI.write(string.format("内力性质:%s  生命增长:%d",
+                P0["内力性质"] == 0 and "无" or P0["内力性质"] == 1 and "阳性" or "阴性",
+                P0["生命增长"]))
+
+            WebUI.write("输入 choose 1 (是) 或 choose 2 (否)，choose 0 返回开始菜单，输入 help 查看命令")
+            local menu = {
+                {"是 ", nil, 1},
+                {"否 ", nil, 2},
+            }
+            local MenuAsync = rawget(_G, "MenuAsync")
+            local ok = MenuAsync.ShowMenu2Coroutine(menu, 2, 0,
+                0, 0, 0, 0, 0, 1, CC.DefaultFont, rawget(_G, "C_RED"), rawget(_G, "C_WHITE"))
+
+            if ok == 1 then
+                satisfied = true
+            elseif ok == 0 then
+                local JSBridge = rawget(_G, "JSBridge")
+                if JSBridge then JSBridge.write("返回开始菜单\n") end
+                local CE = rawget(_G, "CommandEngine")
+                CE.registerCommands(0, {
+                    help = { handler = function(args) CE.showHelp(args) end, description = "显示帮助信息" },
+                    choose = { handler = function(args) CE.handleChoose(args) end, description = "选择菜单项: choose <编号>" },
+                })
+                local EventBridge = rawget(_G, "EventBridge")
+                EventBridge.getInstance():switchState(0)
+                return
+            end
+        end
+
+        JY.Base["人X1"] = 364
+        JY.Base["人Y1"] = 284
+        JY.Base["人X"] = 364
+        JY.Base["人Y"] = 284
+        JY.Base["人方向"] = 0
+        JY.Base["场景X"] = 0
+        JY.Base["场景Y"] = 0
+        JY.Base["场景宽度"] = 64
+        JY.Base["场景高度"] = 64
+
+        JY.Scene = JY.Scene or {}
+        JY.Scene[0] = JY.Scene[0] or {["名称"] = "小虾米居", ["进入条件"] = 0}
+        JY.SubScene = 0
+        JY.EnterSceneXY = JY.EnterSceneXY or {}
+        JY.Status = 2  -- GAME_MMAP
+        JY.MmapMusic = -1
+
+        local WebUI = rawget(_G, "WebUI")
+        WebUI.write("新游戏开始！你来到了金庸群侠传的世界。")
+        WebUI.write("输入 help 查看可用命令（go/list/look/where）")
+        local MmapHandlers = rawget(_G, "MmapHandlers")
+        if MmapHandlers then MmapHandlers.look({}) end
+    end
+
+    -- 覆写 showStartMenuCoroutine：loop 模式，每次循环都输出菜单文本和提示
+    startNewGameAdapter.showStartMenuCoroutine = function()
+        while true do
+            local JY = rawget(_G, "JY")
+            if JY and JY.Status ~= 0 then  -- GAME_START == 0
+                break
+            end
+            local MenuAsync = rawget(_G, "MenuAsync")
+            local CC = rawget(_G, "CC")
+            if not MenuAsync or not CC then
+                break
+            end
+            -- Web MUD: 每次循环输出输入提示（菜单项由 draw() 渲染，通过 lastDrawState=nil 触发）
+            local WebUI = rawget(_G, "WebUI")
+            if WebUI then
+                WebUI.write("输入 choose 1 开始新游戏，choose 2 载入进度，choose 3 离开")
+            end
+            local menu = {
+                {"重新开始", nil, 1},
+                {"载入进度", nil, 1},
+                {"离开游戏", nil, 1},
+            }
+            local menuReturn = MenuAsync.ShowMenuCoroutine(menu, 3, 0, 0, 0, 0, 0, 0, 1, CC.DefaultFont, rawget(_G, "C_RED"), rawget(_G, "C_WHITE"))
+            if menuReturn == 1 then
+                startNewGameAdapter.startNewGame(0)
+            elseif menuReturn == 2 then
+                startNewGameAdapter.loadGame()
+            elseif menuReturn == 3 then
+                -- Web MUD: choose 3 = no-op，显示提示后继续显示开始菜单
+                local WebUI = rawget(_G, "WebUI")
+                if WebUI then
+                    WebUI.write("游戏已退出。输入 choose 1 重新开始，choose 2 载入进度")
+                end
+            end
+        end
+    end
+
     local ok, err = pcall(function()
-        local JYMainAdapter = require("framework.jymain_adapter")
         JYMainAdapter.init()
     end)
     if not ok then
         EngineAPI.debug.log("JYMainAdapter.init 失败: " .. tostring(err))
     end
+
+    -- 覆写 Init_MMap/Init_SMap：Web MUD 无需加载贴图文件
+    rawset(_G, "Init_MMap", function()
+        JY.EnterSceneXY = nil
+        JY.oldMMapX = -1
+        JY.oldMMapY = -1
+    end)
+    rawset(_G, "Init_SMap", function(showname)
+        JY.oldSMapX = -1
+        JY.oldSMapY = -1
+        JY.SubSceneX = 0
+        JY.SubSceneY = 0
+        JY.OldDPass = -1
+        JY.D_Valid = nil
+    end)
+    rawset(_G, "CleanMemory", function() end)
+    -- 覆写 MMAP/SMAP 状态处理器：Web MUD 通过命令处理，无需 game_states 渲染/更新
+    local eb = _G.EventBridge and _G.EventBridge.getInstance()
+    if eb then
+        local noop = { enter = function() end, exit = function() end, update = function() end, draw = function() end }
+        eb:registerState(GAME_MMAP, noop)
+        eb:registerState(GAME_SMAP, noop)
+        eb:registerState(GAME_FIRSTMMAP, noop)
+    end
+
+    -- 注册 MMAP/SMAP 命令（仅在对应状态下可用）
+    if _G.MmapHandlers and _G.SmapHandlers then
+        local mmapCmds = {
+            list  = { handler = _G.MmapHandlers.list,  description = "列出可去场景并选择前往" },
+            look  = { handler = _G.MmapHandlers.look,  description = "查看当前位置、坐标和附近场景" },
+            quit  = { handler = _G.MmapHandlers.quit,  description = "退出当前游戏，返回开始菜单" },
+            help  = { handler = CE.showHelp,           description = "显示帮助信息" },
+            choose= { handler = CE.handleChoose,        description = "choose <编号> 选择菜单项" },
+        }
+        local smapCmds = {
+            look  = { handler = _G.SmapHandlers.look,  description = "查看场景描述" },
+            exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
+            go    = { handler = _G.SmapHandlers.go,    description = "go <编号> 前往出口" },
+            leave = { handler = _G.SmapHandlers.leave, description = "离开场景回到大地图" },
+            help  = { handler = CE.showHelp,           description = "显示帮助信息" },
+            choose= { handler = CE.handleChoose,        description = "choose <编号> 选择菜单项" },
+        }
+        CE.registerCommands(GAME_MMAP, mmapCmds)
+        CE.registerCommands(GAME_SMAP, smapCmds)
+    end
+
+    -- 全局函数：从游戏中返回开始菜单（由 MmapHandlers.quit 调用）
+    rawset(_G, "returnToStartMenu", function()
+        -- 重置游戏状态
+        local JY = rawget(_G, "JY")
+        if JY then
+            JY.Base = {}
+            JY.Person = {}
+            JY.Scene = {}
+            JY.Status = 0  -- GAME_START
+        end
+
+        -- 注册开始菜单命令
+        local CE = rawget(_G, "CommandEngine")
+        if CE then
+            CE.registerCommands(0, {
+                help = { handler = function(args) CE.showHelp(args) end, description = "显示帮助信息" },
+                choose = { handler = function(args) CE.handleChoose(args) end, description = "选择菜单项: choose <编号>" },
+            })
+        end
+
+        -- 清除活动菜单
+        local MenuAsync = rawget(_G, "MenuAsync")
+        if MenuAsync and MenuAsync.clear then MenuAsync.clear() end
+
+        -- 显示返回消息
+        local WebUI = rawget(_G, "WebUI")
+        if WebUI then WebUI.write("已返回开始菜单。") end
+
+        -- 强制重绘
+        lastDrawState = nil
+
+        -- 启动新的开始菜单协程
+        local CoroutineScheduler = rawget(_G, "CoroutineScheduler")
+        if CoroutineScheduler then
+            local scheduler = CoroutineScheduler.getInstance()
+            if scheduler then
+                local JYMainAdapter = require("framework.jymain_adapter")
+                scheduler:create(JYMainAdapter.showStartMenuCoroutine, "start-menu")
+            end
+        end
+    end)
+
+    -- 初始状态：保持游戏原有流程（开始菜单），玩家用 choose 1 开始新游戏
     _G.__quiet = true
 end
-
-
-
--- 显示状态跟踪（MUD 只需要在状态变化时重绘，无需每帧渲染）
-local lastDrawState = nil
 
 local function determineDrawState()
     local AsyncDialog = _G.AsyncDialog or (package.loaded["framework.async_dialog"])
@@ -186,6 +458,9 @@ function processEventQueue(timestamp)
                     local n = tonumber(arg)
                     if n then
                         MenuAsync.closeMenu(n)
+                        -- 菜单关闭后，协程可能立即重新创建菜单（如 showStartMenuCoroutine 循环）。
+                        -- 强制重绘，确保新菜单的文本能输出到终端。
+                        lastDrawState = nil
                     end
                 elseif rawget(_G, "CommandEngine") and rawget(_G, "CommandEngine").parseCommand then
                     local parsed = rawget(_G, "CommandEngine").parseCommand(text)
@@ -197,7 +472,6 @@ function processEventQueue(timestamp)
                         end
                     end
                 else
-                    -- CommandEngine 尚未加载，但至少提示用户
                     WebUI.write("未知命令: " .. cmd)
                     WebUI.write("当前可用命令: choose N (选择菜单项)")
                 end

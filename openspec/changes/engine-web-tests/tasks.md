@@ -63,3 +63,11 @@
 - [x] 7.3 parseJSON 非法 JSON 抛错误
 - [x] 7.4 控制台无 error/warning
 - [x] 7.5 网络请求无失败
+
+## 8. 测试基础设施优化
+
+- [x] 8.1 修复 interaction.spec.js：改用全 buffer 读取，移除不存在的 enqueueEvent 调用
+- [x] 8.2 新增 scripts/global-teardown.js：测试结束后 fuser -k 8088/tcp 清理端口
+- [x] 8.3 playwright.config.js 添加 globalTeardown 配置
+- [x] 8.4 scripts/start-test-server.js 添加 SIGINT/SIGTERM 信号处理
+- [x] 8.5 package.json 简化 test/test:ui 脚本（由 playwright webServer 管理服务器生命周期）
