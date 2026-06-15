@@ -428,9 +428,7 @@ end
 
 local function determineDrawState()
     local AsyncDialog = _G.AsyncDialog or (package.loaded["framework.async_dialog"])
-    if AsyncDialog and AsyncDialog.getInstance():hasDialog() then
-        return "dialog"
-    end
+    if AsyncDialog and AsyncDialog.getInstance():hasDialog() then return "dialog" end
     local MenuAsync = _G.MenuAsync or (package.loaded["framework.menu_async"])
     if MenuAsync and MenuAsync.hasActiveMenu and MenuAsync.hasActiveMenu() then
         return "menu"
