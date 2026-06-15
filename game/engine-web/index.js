@@ -433,6 +433,7 @@
         term.write('欢迎来到金庸群侠传 Web MUD 文字版！\r\n');
         term.write('\r\n');
         term.write('\x1b[32mSystem ready. Type help to start.\x1b[0m\r\n');
+        term.write('输入 choose 1 开始新游戏，choose 2 载入进度，choose 3 离开\r\n');
 
         requestAnimationFrame(gameLoop);
     }
