@@ -2,17 +2,19 @@
 
 ```
 tests/
-├── playwright.config.js        ← 浏览器配置（Chromium headless，1 worker）
+├── playwright.config.js        ← 浏览器配置（Chromium headless，1 worker，webServer 管理服务器生命周期）
 ├── helpers/
-│   ├── setup.js                ← waitForPageReady() + luaEval() + getLuaGlobal()
-│   └── term-reader.js          ← readTermLine(N) + readAllTermLines()
+│   └── setup.js                ← waitForPageReady() + luaEval() + getLuaGlobal()
 ├── page-load.spec.js           ← 页面加载基础（4 条）
 ├── lua-vm.spec.js              ← Lua VM 初始化（4 条）
 ├── engine-api.spec.js          ← API 表面 + 功能（16 条）
 ├── data-integrity.spec.js      ← 数据 + 引用（12 条）
 ├── interaction.spec.js         ← 交互流程（2 条）
 ├── error-handling.spec.js      ← 错误场景（5 条）
-└── state-persistence.spec.js   ← 状态持久化（9 条）
+├── state-persistence.spec.js   ← 状态持久化（9 条）
+├── mmap-smap.spec.js           ← MMAP/SMAP 命令（9 条）
+├── s3-integration.spec.js      ← Slice 3 完整流程集成（7 条）
+└── s3-menu-test.spec.js        ← 菜单选择测试（已合并到 s3-integration）
 ```
 
 ## 运行方式
@@ -49,33 +51,37 @@ npm test
 ## 读取终端文本
 
 xterm.js 渲染在 canvas/grid 中，不能用 DOM querySelector 可靠读取。
-使用 xterm.js buffer API 直接提取行数据：
+使用 xterm.js buffer API 直接提取行数据。`getTermLines` 和 `hasNoGameErrors` 等辅助函数直接内联在各 spec 文件中，而非独立模块：
 
 ```javascript
-// helpers/term-reader.js
-export async function readTermLine(page, lineIndex) {
-  return page.evaluate((n) => {
-    const term = window.__xterm;
-    if (!term) return null;
-    return term.buffer.active.getLine(n)?.translateToString(true) || '';
-  }, lineIndex);
-}
-
-export async function readAllTermLines(page) {
+// 在各 spec 文件中内联
+async function getTermLines(page) {
   return page.evaluate(() => {
     const term = window.__xterm;
     if (!term) return [];
     const lines = [];
-    for (let y = 0; y < term.rows; y++) {
+    for (let y = 0; y < term.buffer.active.length; y++) {
       const text = term.buffer.active.getLine(y)?.translateToString(true) || '';
-      if (text.trim()) lines.push(text);
+      if (text.trim()) lines.push(text.trimEnd());
     }
     return lines;
   });
 }
+
+async function hasNoGameErrors(page) {
+  return page.evaluate(() => {
+    const term = window.__xterm;
+    if (!term) return true;
+    for (let y = 0; y < term.rows; y++) {
+      const text = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      if (text.includes('[gameLoop error]')) return false;
+    }
+    return true;
+  });
+}
 ```
 
-term-reader.js 使用 CommonJS（`module.exports`），通过 `page.evaluate` 直接在浏览器中运行。在 `index.js` 中将 term 暴露为 `window.__xterm`。
+注意：使用 `term.buffer.active.length`（全缓冲区）而非 `term.rows`（可见区域），因为启动消息可能滚动出可见区域。在 `index.js` 中将 term 暴露为 `window.__xterm`。
 
 ### 示例：验证输入回显
 
@@ -237,8 +243,8 @@ function luaEval(code) {
 ```json
 {
   "scripts": {
-    "test": "node scripts/start-test-server.js & npx playwright test; kill %1 2>/dev/null; wait",
-    "test:ui": "node scripts/start-test-server.js & npx playwright test --ui; kill %1 2>/dev/null; wait"
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui"
   },
   "devDependencies": {
     "@playwright/test": "^1.52.0"
@@ -246,7 +252,7 @@ function luaEval(code) {
 }
 ```
 
-或更稳健的 startup 方式——在 Playwright 的 `globalSetup` 中启动服务器。
+服务器生命周期由 Playwright 的 `webServer` 配置管理（在 `playwright.config.js` 中配置），测试结束后通过 `globalTeardown` 脚本（`fuser -k 8088/tcp`）清理端口。
 
 ## 风险
 
