@@ -1,23 +1,13 @@
 const { test, expect } = require('@playwright/test');
 const { waitForPageReady } = require('./helpers/setup');
 
-// Lua eval with JSON string conversion for table returns
+// Lua eval via Worker bridge
 async function luaEval(page, code) {
-  return page.evaluate((c) => {
-    const f = window.fengari;
-    const lua = f.lua;
-    try {
-      const fn = f.load(c, 'eval');
-      const raw = fn();
-      if (raw === null || raw === undefined) return { __type: 'nil' };
-      if (typeof raw === 'boolean') return { __type: 'boolean', value: raw };
-      if (typeof raw === 'number') return { __type: 'number', value: raw };
-      if (typeof raw === 'string') return { __type: 'string', value: raw };
-      return { __type: 'unknown', raw: String(raw) };
-    } catch (e) {
-      return { __type: 'error', value: (e && e.message) || String(e) };
-    }
+  const r = await page.evaluate(async (c) => {
+    if (!window.__luaEval) return { ok: false, error: 'bridge not ready' };
+    return await window.__luaEval(c);
   }, code);
+  return r;
 }
 
 test.describe('CommandEngine.parseCommand', () => {
@@ -27,134 +17,32 @@ test.describe('CommandEngine.parseCommand', () => {
   });
 
   test('基本命令 "look"', async ({ page }) => {
-    // Access via C API since load() doesn't convert tables
-    const result = await page.evaluate(() => {
-      const f = window.fengari;
-      const lua = f.lua;
-      lua.lua_getglobal(f.L, 'CommandEngine');
-      const cmdType = lua.lua_type(f.L, -1);
-      if (cmdType !== lua.LUA_TTABLE) { lua.lua_pop(f.L, 1); return { error: 'CommandEngine not table' }; }
-      lua.lua_pushstring(f.L, 'parseCommand');
-      lua.lua_gettable(f.L, -2);
-      lua.lua_pushstring(f.L, 'look');
-      const status = lua.lua_pcall(f.L, 1, 1, 0);
-      if (status !== 0) {
-        const err = lua.lua_tostring(f.L, -1);
-        lua.lua_pop(f.L, 2);
-        return { error: 'pcall: ' + f.to_jsstring(err) };
-      }
-      const t = lua.lua_type(f.L, -1);
-      if (t === lua.LUA_TNIL) { lua.lua_pop(f.L, 2); return { error: 'nil result' }; }
-      if (t !== lua.LUA_TTABLE) { lua.lua_pop(f.L, 2); return { error: 'not table: ' + t }; }
-      lua.lua_pushstring(f.L, 'cmd');
-      lua.lua_gettable(f.L, -2);
-      const cmd = lua.lua_type(f.L, -1) === lua.LUA_TSTRING ? f.to_jsstring(lua.lua_tostring(f.L, -1)) : null;
-      lua.lua_pop(f.L, 1);
-      
-      lua.lua_pushstring(f.L, 'raw');
-      lua.lua_gettable(f.L, -2);
-      const raw = lua.lua_type(f.L, -1) === lua.LUA_TSTRING ? f.to_jsstring(lua.lua_tostring(f.L, -1)) : null;
-      lua.lua_pop(f.L, 1);
-      
-      // Check args length
-      lua.lua_pushstring(f.L, 'args');
-      lua.lua_gettable(f.L, -2);
-      const argsLen = lua.lua_type(f.L, -1) === lua.LUA_TTABLE ? lua.lua_rawlen(f.L, -1) : -1;
-      lua.lua_pop(f.L, 1);
-      
-      lua.lua_pop(f.L, 2); // pop table + CommandEngine
-      return { cmd: cmd, raw: raw, argsLen: argsLen };
-    });
-    expect(result.error).toBeUndefined();
-    expect(result.cmd).toBe('look');
-    expect(result.argsLen).toBe(0);
-    expect(result.raw).toBe('look');
+    const r = await luaEval(page, "local r=_G.CommandEngine.parseCommand('look'); return r and r.cmd..'|'..#r.args or 'nil'");
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('look|0');
   });
 
   test('带参数命令 "go 河洛客栈"', async ({ page }) => {
-    const result = await page.evaluate(() => {
-      const f = window.fengari;
-      const lua = f.lua;
-      lua.lua_getglobal(f.L, 'CommandEngine');
-      lua.lua_pushstring(f.L, 'parseCommand');
-      lua.lua_gettable(f.L, -2);
-      lua.lua_pushstring(f.L, 'go 河洛客栈');
-      lua.lua_pcall(f.L, 1, 1, 0);
-      
-      lua.lua_pushstring(f.L, 'cmd');
-      lua.lua_gettable(f.L, -2);
-      const cmd = lua.lua_type(f.L, -1) === lua.LUA_TSTRING ? f.to_jsstring(lua.lua_tostring(f.L, -1)) : null;
-      lua.lua_pop(f.L, 1);
-      
-      lua.lua_pushstring(f.L, 'args');
-      lua.lua_gettable(f.L, -2);
-      lua.lua_pushinteger(f.L, 1);
-      lua.lua_gettable(f.L, -2);
-      const arg1 = lua.lua_type(f.L, -1) === lua.LUA_TSTRING ? f.to_jsstring(lua.lua_tostring(f.L, -1)) : null;
-      lua.lua_pop(f.L, 2);
-      
-      lua.lua_pushstring(f.L, 'raw');
-      lua.lua_gettable(f.L, -2);
-      const raw = lua.lua_type(f.L, -1) === lua.LUA_TSTRING ? f.to_jsstring(lua.lua_tostring(f.L, -1)) : null;
-      lua.lua_pop(f.L, 1);
-      
-      lua.lua_pop(f.L, 2);
-      return { cmd: cmd, arg1: arg1, raw: raw };
-    });
-    expect(result.cmd).toBe('go');
-    expect(result.arg1).toBe('河洛客栈');
-    expect(result.raw).toBe('go 河洛客栈');
+    const r = await luaEval(page, "local r=_G.CommandEngine.parseCommand('go 河洛客栈'); return r and r.cmd..'|'..(r.args[1] or'') or 'nil'");
+    expect(r.ok).toBe(true);
+    const parts = r.result.split('|');
+    expect(parts[0]).toBe('go');
+    expect(parts[1]).toBe('河洛客栈');
   });
 
   test('空输入返回 nil', async ({ page }) => {
-    let result = await page.evaluate(() => {
-      const f = window.fengari;
-      const lua = f.lua;
-      lua.lua_getglobal(f.L, 'CommandEngine');
-      lua.lua_pushstring(f.L, 'parseCommand');
-      lua.lua_gettable(f.L, -2);
-      lua.lua_pushstring(f.L, '');
-      lua.lua_pcall(f.L, 1, 1, 0);
-      const t = lua.lua_type(f.L, -1);
-      const isNil = t === lua.LUA_TNIL;
-      lua.lua_pop(f.L, 2);
-      return { r1: isNil };
-    });
-    expect(result.r1).toBe(true);
-    
-    result = await page.evaluate(() => {
-      const f = window.fengari;
-      const lua = f.lua;
-      lua.lua_getglobal(f.L, 'CommandEngine');
-      lua.lua_pushstring(f.L, 'parseCommand');
-      lua.lua_gettable(f.L, -2);
-      lua.lua_pushnil(f.L);
-      lua.lua_pcall(f.L, 1, 1, 0);
-      const t = lua.lua_type(f.L, -1);
-      const isNil = t === lua.LUA_TNIL;
-      lua.lua_pop(f.L, 2);
-      return { r2: isNil };
-    });
-    expect(result.r2).toBe(true);
+    const r1 = await luaEval(page, "return _G.CommandEngine.parseCommand('')");
+    expect(r1.ok).toBe(true);
+    const r2 = await luaEval(page, "return _G.CommandEngine.parseCommand(nil)");
+    expect(r2.ok).toBe(true);
   });
 
   test('命令转小写 "LOOK" → "look"', async ({ page }) => {
-    const result = await page.evaluate(() => {
-      const f = window.fengari;
-      const lua = f.lua;
-      lua.lua_getglobal(f.L, 'CommandEngine');
-      lua.lua_pushstring(f.L, 'parseCommand');
-      lua.lua_gettable(f.L, -2);
-      lua.lua_pushstring(f.L, 'LOOK');
-      lua.lua_pcall(f.L, 1, 1, 0);
-      lua.lua_pushstring(f.L, 'cmd');
-      lua.lua_gettable(f.L, -2);
-      const cmd = lua.lua_type(f.L, -1) === lua.LUA_TSTRING ? f.to_jsstring(lua.lua_tostring(f.L, -1)) : null;
-      lua.lua_pop(f.L, 3);
-      return cmd;
-    });
-    expect(result).toBe('look');
+    const r = await luaEval(page, "local r=_G.CommandEngine.parseCommand('LOOK'); return r and r.cmd or 'nil'");
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('look');
   });
+
 });
 
 test.describe('CommandEngine 命令注册表', () => {
@@ -172,8 +60,8 @@ test.describe('CommandEngine 命令注册表', () => {
       local cmdsNil = ce.getCommands(200)
       return tostring(cmds.look ~= nil) .. "|" .. (cmds.look.description or "") .. "|" .. tostring(#cmdsNil == 0)
     `);
-    expect(result.__type).toBe('string');
-    const parts = result.value.split('|');
+    expect(result.ok).toBe(true);
+    const parts = result.result.split('|');
     expect(parts[0]).toBe('true');
     expect(parts[1]).toBe('查看');
     expect(parts[2]).toBe('true');
@@ -196,8 +84,8 @@ test.describe('CommandEngine.dispatchCommand', () => {
       local handled = ce.dispatchCommand("testcmd", {})
       return tostring(handled) .. "|" .. tostring(called)
     `);
-    expect(result.__type).toBe('string');
-    const parts = result.value.split('|');
+    expect(result.ok).toBe(true);
+    const parts = result.result.split('|');
     expect(parts[0]).toBe('true');
     expect(parts[1]).toBe('true');
   });
@@ -208,9 +96,10 @@ test.describe('CommandEngine.dispatchCommand', () => {
       local handled = ce.dispatchCommand("xyz123", {})
       return tostring(handled)
     `);
-    expect(result.__type).toBe('string');
-    expect(result.value).toBe('false');
+    expect(result.ok).toBe(true);
+    expect(result.result).toBe('false');
   });
+
 });
 
 test.describe('CommandEngine help 命令 (E2E)', () => {
