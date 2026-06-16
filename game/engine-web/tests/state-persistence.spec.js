@@ -58,26 +58,35 @@ test.describe('State persistence', () => {
   });
 
   test('JSBridge.save/load 往返', async ({ page }) => {
-    // Worker 模式下 JSBridge.load 是异步的（postMessage 等待主线程回复），
-    // 此处验证 save 能成功发送即可（load 通过 db_result 异步回调）
     const result = await luaEval(page, [
       'JSBridge.save("test_key", \'{"a":1}\')',
-      'return "save_ok"',
+      'local v = JSBridge.load("test_key")',
+      'return v',
     ].join('; '));
-    expect(result).toBe('save_ok');
+    expect(result).toBe('{"a":1}');
   });
 
   test('saveGameState → loadGameState 往返', async ({ page }) => {
-    // Worker 模式下保存成功即可（load 通过异步回调）
     const result = await luaEval(page, [
       'if not rawget(_G, "JY") then rawset(_G, "JY", {}) end',
       'rawget(_G, "JY").Base = { ["人X"] = 100, ["人Y"] = 200, ["乘船"] = 0 }',
       'rawget(_G, "JY").Person = { [0] = { ["代号"] = 0, ["姓名"] = "测试", ["攻击力"] = 50 } }',
       'local ok = saveGameState(0)',
       'if not ok then return "save_failed" end',
-      'return "save_ok"',
+      'local raw = JSBridge.load("save_0")',
+      'if not raw then return "no_raw_after_save" end',
+      'local parsed_ok, parsed = pcall(parseJSON, raw)',
+      'if not parsed_ok then return "parse_fail:" .. tostring(parsed) end',
+      'if not parsed.base then return "no_base_in_save:" .. raw:sub(1,80) end',
+      'rawset(_G, "JY", nil)',
+      'local loaded = loadGameState(0)',
+      'if not loaded then return "load_failed" end',
+      'local jy = rawget(_G, "JY")',
+      'local bx = jy and jy.Base and jy.Base["人X"]',
+      'local pn = jy and jy.Person and jy.Person[0] and jy.Person[0]["姓名"]',
+      'return tostring(bx) .. "|" .. tostring(pn)',
     ].join('; '));
-    expect(result).toBe('save_ok');
+    expect(result).toBe('100|测试');
   });
 
   test('存档槽独立: save_1 不影响 save_2', async ({ page }) => {
@@ -87,9 +96,17 @@ test.describe('State persistence', () => {
       'saveGameState(1)',
       'rawget(_G, "JY").Base = { ["人X"] = 99, ["人Y"] = 88 }',
       'saveGameState(2)',
-      'return "save_ok"',
+      'rawset(_G, "JY", nil)',
+      'loadGameState(1)',
+      'local jy1 = rawget(_G, "JY")',
+      'local x1 = jy1 and jy1.Base and jy1.Base["人X"]',
+      'rawset(_G, "JY", nil)',
+      'loadGameState(2)',
+      'local jy2 = rawget(_G, "JY")',
+      'local x2 = jy2 and jy2.Base and jy2.Base["人X"]',
+      'return tostring(x1) .. "|" .. tostring(x2)',
     ].join('; '));
-    expect(result).toBe('save_ok');
+    expect(result).toBe('1|99');
   });
 
   test('deleteSaveSlot 删除存档', async ({ page }) => {
@@ -98,9 +115,16 @@ test.describe('State persistence', () => {
       'rawget(_G, "JY").Base = { ["人X"] = 1 }',
       'local ok = saveGameState(3)',
       'if not ok then return "save_failed" end',
+      'local saves = listSaveSlots()',
+      'local before = 0',
+      'for _ in pairs(saves) do before = before + 1 end',
       'deleteSaveSlot(3)',
-      'return "delete_ok"',
+      'local after_raw = JSBridge.load("save_3")',
+      'local saves2 = listSaveSlots()',
+      'local after = 0',
+      'for _ in pairs(saves2) do after = after + 1 end',
+      'return tostring(before) .. "|" .. tostring(after) .. "|" .. tostring(after_raw == nil)',
     ].join('; '));
-    expect(result).toBe('delete_ok');
+    expect(result).toBe('1|0|true');
   });
 });
