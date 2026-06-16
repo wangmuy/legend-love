@@ -14,10 +14,9 @@ test.describe('错误场景', () => {
   });
 
   test('script.load 不存在脚本返回错误', async ({ page }) => {
-    // EngineAPI.script.load 在 Worker 中可能受元表影响，简化测试
-    const r = await luaEval(page, 'return EngineAPI.script.load("no_such.lua")');
-    // 应返回 nil（ok=true 表示 Lua 执行未抛异常）
+    const r = await luaEval(page, 'local a,b = EngineAPI.script.load("no_such.lua"); return tostring(a) .. "|" .. tostring(b)');
     expect(r.ok).toBe(true);
+    expect(r.result).toBe('nil|Script not found: no_such.lua');
   });
 
   test('parseJSON 非法 JSON 抛错误', async ({ page }) => {
