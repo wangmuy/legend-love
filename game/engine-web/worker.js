@@ -22,7 +22,8 @@ function injectWorkerJSBridge() {
 
   lua.lua_pushstring(L, 'write');
   lua.lua_pushcfunction(L, function(state) {
-    const str = lua.lua_tostring(state, -1);
+    const raw = lua.lua_tolstring(state, -1);
+    const str = typeof raw === 'string' ? raw : fengari.to_jsstring(raw);
     self.postMessage({ type: 'output', text: str + '\n' });
     return 0;
   });
@@ -304,6 +305,22 @@ self.onmessage = function(e) {
 
     if (msg.type === 'input') {
       eventQueue.push({ type: 'input', data: msg.data });
+    }
+
+    if (msg.type === 'lua_eval') {
+      // 执行 Lua 代码并将结果返回主线程（用于测试）
+      try {
+        const fn = fengari.load(msg.code, '@eval');
+        const result = fn();
+        const t = typeof result;
+        let serialized;
+        if (t === 'string') serialized = fengari.to_jsstring(result);
+        else if (t === 'number' || t === 'boolean') serialized = String(result);
+        else serialized = '[table]';
+        self.postMessage({ type: 'lua_result', id: msg.id, ok: true, result: serialized });
+      } catch (ex) {
+        self.postMessage({ type: 'lua_result', id: msg.id, ok: false, error: ex.message || String(ex) });
+      }
     }
 
   } catch (ex) {

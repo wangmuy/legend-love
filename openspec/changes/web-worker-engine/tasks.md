@@ -72,12 +72,14 @@ Traceability: [REQ-005]
     - [x] `waitForPageReady` 轮询 `window.__workerReady` 而非 `dataCache._loaded`
     - [x] 所有 Playwright 测试文件不用逐个修改
 
-- [ ] 4.2 运行全部 Playwright 测试并修复 Worker 引入的问题
-  Blast Radius: `["game/engine-web/tests/*.spec.js", "game/engine-web/tests/helpers/*"]`
+- [x] 4.2 运行全部 Playwright 测试并修复 Worker 引入的问题
+  Blast Radius: `["game/engine-web/tests/*.spec.js", "game/engine-web/tests/helpers/*", "game/engine-web/web_game_bridge.lua", "game/engine-web/worker.js", "game/framework/jymain_adapter.lua"]`
   DoD:
-    - [ ] 基于 Worker 的 Lua 渲染输出（DrawString→present→JSBridge.write→term.write）需要排查：
-      首次 gameLoop 帧的 present() 输出未到达测试终端。已确认 hasActiveMenu=true,
-      processEventQueue 正常执行, 但菜单项 ANSI 文本的 postMessage 未被测试捕获。
-      怀疑: translateToString(true) 参数含义或 xterm buffer line 索引偏移
-    - [ ] 依赖 luaEval 的测试（lua-vm, engine-api, data-integrity, command-engine）需改为
-      通过终端 I/O 验证或添加 Worker→main 的 eval 回传通道
+    - [x] 开始菜单显示正常（choose 0/2/3 交互可用）
+    - [x] startNewGame 在 Worker 中生效：属性生成 + ShowMenu2Coroutine 正常工作
+    - [x] 属性确认屏幕的 choose 1/2/0 交互
+    - [x] MMAP → SMAP 完整流程（list/choose/exits/leave）
+    - [x] 通过 luaEval 通道支持 Worker 内 Lua 代码执行（测试用）
+    - [x] lua_tostring → to_jsstring 修复中文渲染
+    - [x] interaction.spec.js: 移除依赖 window.fengari 的测试
+    - [x] s3-fixes.spec.js: 改用 waitForPageReady
