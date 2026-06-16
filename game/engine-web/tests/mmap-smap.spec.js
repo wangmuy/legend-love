@@ -1,76 +1,42 @@
 const { test, expect } = require('@playwright/test');
 const { waitForPageReady } = require('./helpers/setup');
 
+async function luaEval(page, code) {
+  const result = await page.evaluate(async (c) => {
+    if (!window.__luaEval) return { __error: 'luaEval not ready' };
+    return await window.__luaEval(c);
+  }, code);
+  return result;
+}
+
 // Helper: set game state to MMAP with player at default position
 async function setMmapState(page) {
-  return page.evaluate(() => {
-    const f = window.fengari;
-    const lua = f.lua;
-    // Ensure JY exists
-    lua.lua_getglobal(f.L, 'JY');
-    if (lua.lua_type(f.L, -1) === lua.LUA_TNIL) {
-      lua.lua_pop(f.L, 1);
-      lua.lua_newtable(f.L);
-      lua.lua_setglobal(f.L, 'JY');
-      lua.lua_getglobal(f.L, 'JY');
-    }
-    // Set JY.Base
-    lua.lua_pushstring(f.L, 'Base');
-    lua.lua_newtable(f.L);
-    lua.lua_pushstring(f.L, '人X1');
-    lua.lua_pushinteger(f.L, 358);
-    lua.lua_settable(f.L, -3);
-    lua.lua_pushstring(f.L, '人Y1');
-    lua.lua_pushinteger(f.L, 228);
-    lua.lua_settable(f.L, -3);
-    lua.lua_settable(f.L, -3);
-    // Set JY.Status = GAME_MMAP (2)
-    lua.lua_pushstring(f.L, 'Status');
-    lua.lua_pushinteger(f.L, 2);
-    lua.lua_settable(f.L, -3);
-    lua.lua_pop(f.L, 1);
-    return true;
-  });
+  const result = await luaEval(page, [
+    'local JY = rawget(_G, "JY")',
+    'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+    'JY.Base = JY.Base or {}',
+    'JY.Base["人X1"] = 358',
+    'JY.Base["人Y1"] = 228',
+    'JY.Status = 2',
+    'return "ok"',
+  ].join('; '));
+  return result;
 }
 
 // Helper: set game state to SMAP with a known scene ID
-// 河洛客棧 is a well-known scene with exits in the default data
 async function setSmapState(page, sceneId) {
-  sceneId = sceneId || '58';  // 河洛客棧
-  return page.evaluate((sid) => {
-    const f = window.fengari;
-    const lua = f.lua;
-    const L = f.L;
-
-    // Ensure JY exists
-    lua.lua_getglobal(L, 'JY');
-    if (lua.lua_type(L, -1) === lua.LUA_TNIL) {
-      lua.lua_pop(L, 1);
-      lua.lua_newtable(L);
-      lua.lua_setglobal(L, 'JY');
-      lua.lua_getglobal(L, 'JY');
-    }
-    // Set JY.Base
-    lua.lua_pushstring(L, 'Base');
-    lua.lua_newtable(L);
-    lua.lua_pushstring(L, '人X1');
-    lua.lua_pushinteger(L, 0);
-    lua.lua_settable(L, -3);
-    lua.lua_pushstring(L, '人Y1');
-    lua.lua_pushinteger(L, 0);
-    lua.lua_settable(L, -3);
-    lua.lua_settable(L, -3);
-    // Set SubScene (use numeric key for the scene)
-    lua.lua_pushstring(L, 'SubScene');
-    lua.lua_pushinteger(L, parseInt(sid, 10) || 58);
-    lua.lua_settable(L, -3);
-    // Set JY.Status = GAME_SMAP (4)
-    lua.lua_pushstring(L, 'Status');
-    lua.lua_pushinteger(L, 4);
-    lua.lua_settable(L, -3);
-    lua.lua_pop(L, 1);
-    return true;
-  }, sceneId);
+  sceneId = sceneId || '12';
+  const result = await luaEval(page,
+    'local JY = rawget(_G, "JY")' +
+    '; if not JY then JY = {}; rawset(_G, "JY", JY) end' +
+    '; JY.Base = JY.Base or {}' +
+    '; JY.Base["人X1"] = 0' +
+    '; JY.Base["人Y1"] = 0' +
+    '; JY.SubScene = ' + sceneId +
+    '; JY.Status = 4' +
+    '; return "ok"'
+  );
+  return result;
 }
 
 async function getTerminalText(page) {

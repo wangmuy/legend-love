@@ -163,9 +163,28 @@
             } else if (msg.type === 'db_list') {
                 const keys = dbListKeys();
                 worker.postMessage({ type: 'db_result', key: '__list', value: keys });
+            } else if (msg.type === 'lua_result') {
+                // 透传给等待的 luaEval 调用方
+                if (luaEvalCallbacks[msg.id]) {
+                    luaEvalCallbacks[msg.id](msg);
+                    delete luaEvalCallbacks[msg.id];
+                }
             }
         };
     }
+
+    // luaEval 回调注册表
+    let luaEvalIdCounter = 0;
+    const luaEvalCallbacks = {};
+
+    // 向 Worker 发送 Lua 代码执行请求，返回 Promise
+    window.__luaEval = function(code) {
+        return new Promise((resolve) => {
+            const id = ++luaEvalIdCounter;
+            luaEvalCallbacks[id] = (msg) => resolve(msg);
+            worker.postMessage({ type: 'lua_eval', id: id, code: code });
+        });
+    };
 
     /* ── 5. 向 Worker 发送初始化数据（单条批量消息） ── */
 
