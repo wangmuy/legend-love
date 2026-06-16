@@ -15,6 +15,9 @@ const L = fengari.L;
 /* ── 2. 事件队列（由 onmessage 填充，JSBridge.getEvent 消费） ── */
 const eventQueue = [];
 
+/* ── 2b. 本地存档缓存（避免异步 postMessage 延迟） ── */
+const luaSaveCache = {};
+
 /* ── 3. JSBridge ── 通过 postMessage 与主线程通信 ── */
 function injectWorkerJSBridge() {
   lua.lua_pushstring(L, 'JSBridge');
@@ -56,8 +59,11 @@ function injectWorkerJSBridge() {
 
   lua.lua_pushstring(L, 'save');
   lua.lua_pushcfunction(L, function(state) {
-    const key = lua.lua_tostring(state, 1);
-    const val = lua.lua_tostring(state, 2);
+    const keyRaw = lua.lua_tolstring(state, 1);
+    const valRaw = lua.lua_tolstring(state, 2);
+    const key = typeof keyRaw === 'string' ? keyRaw : fengari.to_jsstring(keyRaw);
+    const val = typeof valRaw === 'string' ? valRaw : fengari.to_jsstring(valRaw);
+    luaSaveCache[key] = val;
     self.postMessage({ type: 'db_save', key: key, value: val });
     return 0;
   });
@@ -65,16 +71,24 @@ function injectWorkerJSBridge() {
 
   lua.lua_pushstring(L, 'load');
   lua.lua_pushcfunction(L, function(state) {
-    const key = lua.lua_tostring(state, 1);
+    const keyRaw = lua.lua_tolstring(state, 1);
+    const key = typeof keyRaw === 'string' ? keyRaw : fengari.to_jsstring(keyRaw);
+    if (luaSaveCache[key] !== undefined) {
+      const cached = luaSaveCache[key];
+      lua.lua_pushstring(L, cached);
+      return 1;
+    }
     self.postMessage({ type: 'db_load', key: key });
-    lua.lua_pushnil(state);
+    lua.lua_pushnil(L);
     return 1;
   });
   lua.lua_settable(L, -3);
 
   lua.lua_pushstring(L, 'delete');
   lua.lua_pushcfunction(L, function(state) {
-    const key = lua.lua_tostring(state, 1);
+    const keyRaw = lua.lua_tolstring(state, 1);
+    const key = typeof keyRaw === 'string' ? keyRaw : fengari.to_jsstring(keyRaw);
+    delete luaSaveCache[key];
     self.postMessage({ type: 'db_delete', key: key });
     return 0;
   });
@@ -82,8 +96,13 @@ function injectWorkerJSBridge() {
 
   lua.lua_pushstring(L, 'listSaves');
   lua.lua_pushcfunction(L, function(state) {
-    self.postMessage({ type: 'db_list' });
+    // 列出本地缓存的存档键
+    const keys = Object.keys(luaSaveCache).filter(k => k.startsWith('save_'));
     lua.lua_newtable(state);
+    for (let i = 0; i < keys.length; i++) {
+      lua.lua_pushstring(L, keys[i]);
+      lua.lua_rawseti(L, -2, i + 1);
+    }
     return 1;
   });
   lua.lua_settable(L, -3);

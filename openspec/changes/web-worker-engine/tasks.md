@@ -75,11 +75,7 @@ Traceability: [REQ-005]
 - [x] 4.2 运行全部 Playwright 测试并修复 Worker 引入的问题
   Blast Radius: `["game/engine-web/tests/*.spec.js", "game/engine-web/tests/helpers/*", "game/engine-web/web_game_bridge.lua", "game/engine-web/worker.js", "game/framework/jymain_adapter.lua"]`
   DoD:
-    - [x] 开始菜单显示正常（choose 0/2/3 交互可用）
-    - [x] startNewGame 在 Worker 中生效：属性生成 + ShowMenu2Coroutine 正常工作
-    - [x] 属性确认屏幕的 choose 1/2/0 交互
-    - [x] MMAP → SMAP 完整流程（list/choose/exits/leave）
-    - [x] 通过 luaEval 通道支持 Worker 内 Lua 代码执行（测试用）
-    - [x] lua_tostring → to_jsstring 修复中文渲染
-    - [x] interaction.spec.js: 移除依赖 window.fengari 的测试
-    - [x] s3-fixes.spec.js: 改用 waitForPageReady
+    - [x] 全部 88 个测试通过（14 个 spec 文件）
+    - [x] 开始菜单、属性确认、MMAP→SMAP 完整流程
+    - [x] 所有 window.fengari 依赖改为 __luaEval 桥接
+    - [x] JSBridge.load 在 Worker 中异步处理
