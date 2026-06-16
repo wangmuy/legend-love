@@ -8,14 +8,23 @@ async function waitForPageReady(page) {
 }
 
 async function getLuaGlobal(page, name) {
-  // Lua 在 Worker 中，主线程无法直接访问。
-  // 返回占位值，调用方需适配 Worker 模式。
-  return { type: 'worker_mode', note: 'Lua is in Web Worker, use terminal I/O to test' };
+  // 通过 Worker 的 lua_eval 通道获取 Lua 全局变量
+  const result = await page.evaluate(async (n) => {
+    if (!window.__luaEval) return { type: 'worker_not_ready' };
+    const r = await window.__luaEval('return ' + n);
+    return r;
+  }, name);
+  return result;
 }
 
 async function luaEval(page, code) {
-  // Lua 在 Worker 中，主线程无法直接执行 Lua 代码。
-  return { __error: 'Lua is in Web Worker, cannot eval from main thread' };
+  // 通过 Worker 的 lua_eval 通道执行 Lua 代码
+  const result = await page.evaluate(async (c) => {
+    if (!window.__luaEval) return { __error: 'worker not ready' };
+    const r = await window.__luaEval(c);
+    return r;
+  }, code);
+  return result;
 }
 
 module.exports = { waitForPageReady, getLuaGlobal, luaEval };

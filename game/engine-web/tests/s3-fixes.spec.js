@@ -1,10 +1,12 @@
 const { test, expect } = require('@playwright/test');
+const { waitForPageReady } = require('./helpers/setup');
 
 test('welcome text + help shows only built-in commands', async ({ page }) => {
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto('/');
-  await page.waitForTimeout(6000);
+  await waitForPageReady(page);
+  await page.waitForTimeout(1000);
 
   const head = await page.evaluate(() => {
     const t = window.__xterm;
