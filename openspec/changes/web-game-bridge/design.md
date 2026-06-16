@@ -276,37 +276,32 @@ startNewGameAdapter.loadGame = function()
 end
 ```
 
-### 开始菜单覆写（loop 模式）
-
-`showStartMenuCoroutine` 被覆写为 `while true` 循环，确保 ESC（choose 0）重新显示开始菜单，而非递归调用：
+`showStartMenuCoroutine` 被覆写为 `while true` 循环。每次循环通过 `WebUI.write` 直接输出菜单文本，不依赖 `DrawString` → `present()` 管线：
 
 ```lua
 startNewGameAdapter.showStartMenuCoroutine = function()
     while true do
-        local menu = {
-            {"重新开始", nil, 1},
-            {"载入进度", nil, 1},
-            {"离开游戏", nil, 1},
-        }
+        WebUI.write("1. 重新开始")
+        WebUI.write("2. 载入进度")
+        WebUI.write("3. 离开游戏")
+        WebUI.write("输入 choose 1 开始新游戏，choose 2 载入进度，choose 3 离开")
+
         local menuReturn = MenuAsync.ShowMenuCoroutine(menu, 3, ...)
         if menuReturn == 1 then
             startNewGameAdapter.startNewGame(0)
         elseif menuReturn == 2 then
             startNewGameAdapter.loadGame()
         elseif menuReturn == 3 then
-            if JY then JY.Status = GAME_END end
-            break
+            -- no-op: 显示提示后继续循环
+            WebUI.write("游戏已退出。输入 choose 1 重新开始，choose 2 载入进度")
         end
-        -- menuReturn == 0 (ESC): 循环继续，重新显示菜单
     end
 end
 ```
 
-### 排版修复
-
-1. **xterm.js `\n` 不归零**：默认 `\n`（LF）只下移光标不回到列 0，导致后续输出累积缩进。修复：`convertEol: true` 使 `\n` 等价于 `\r\n`。
-2. **WebUI.title / WebUI.separator 使用 render 缓冲**：和 `WebUI.write` 输出路径不一致。修复：全部改用 `JSBridge.write` 直接写入终端。
-3. **idle 状态清屏**：drawBackground 在状态从 menu→idle 时清除屏幕，擦除了之前输出的文字。修复：跳过 idle 状态的 drawBackground。
+- choose 3（离开游戏）在 Web MUD 中为 no-op，仅显示提示
+- ESC（choose 0）继续循环重新显示菜单
+- `loadGame` 返回时循环自动重新显示菜单（不再递归调用）
 
 ## lib 桩函数（game_states 兼容）
 
