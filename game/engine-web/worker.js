@@ -312,11 +312,18 @@ self.onmessage = function(e) {
       try {
         const fn = fengari.load(msg.code, '@eval');
         const result = fn();
-        const t = typeof result;
         let serialized;
-        if (t === 'string') serialized = fengari.to_jsstring(result);
-        else if (t === 'number' || t === 'boolean') serialized = String(result);
-        else serialized = '[table]';
+        if (typeof result === 'string') {
+          serialized = result;
+        } else if (result && typeof result === 'object' && result.constructor && result.constructor.name === 'LuaString') {
+          serialized = fengari.to_jsstring(result);
+        } else if (typeof result === 'number' || typeof result === 'boolean') {
+          serialized = String(result);
+        } else if (result === null || result === undefined) {
+          serialized = 'nil';
+        } else {
+          serialized = '[table]';
+        }
         self.postMessage({ type: 'lua_result', id: msg.id, ok: true, result: serialized });
       } catch (ex) {
         self.postMessage({ type: 'lua_result', id: msg.id, ok: false, error: ex.message || String(ex) });
