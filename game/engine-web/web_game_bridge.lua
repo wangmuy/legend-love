@@ -400,15 +400,12 @@ function _G.initWebFramework()
             choose= { handler = CE.handleChoose,        description = "choose <编号> 选择菜单项" },
         }
         local smapCmds = {
-            look  = { handler = _G.SmapHandlers.look,  description = "查看场景描述" },
-            talk  = { handler = _G.SmapHandlers.talk,  description = "talk <NPC名> 与 NPC 对话" },
-            take  = { handler = _G.SmapHandlers.take,  description = "take <物品名> 拾取物品" },
-            give  = { handler = _G.SmapHandlers.give,  description = "give <物品名> <NPC名> 给予物品" },
+            look  = { handler = _G.SmapHandlers.look,  description = "查看场景并选择交互对象" },
             exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
             go    = { handler = _G.SmapHandlers.go,    description = "go <编号> 前往出口" },
             leave = { handler = _G.SmapHandlers.leave, description = "离开场景回到大地图" },
             help  = { handler = CE.showHelp,           description = "显示帮助信息" },
-            choose= { handler = CE.handleChoose,        description = "choose <编号> 选择菜单项" },
+            choose= { handler = CE.handleChoose,        description = "choose <编号> 选择交互对象" },
         }
         CE.registerCommands(GAME_MMAP, mmapCmds)
         CE.registerCommands(GAME_SMAP, smapCmds)
@@ -495,6 +492,28 @@ function processEventQueue(timestamp)
                         -- 菜单关闭后，协程可能立即重新创建菜单（如 showStartMenuCoroutine 循环）。
                         -- 强制重绘，确保新菜单的文本能输出到终端。
                         lastDrawState = nil
+                    end
+                elseif cmd == "choose" and not hasMenu then
+                    -- SMAP 状态无菜单时：choose N 选择交互对象
+                    local JY = rawget(_G, "JY")
+                    if JY and JY.Status == 4 then  -- GAME_SMAP
+                        local n = tonumber(arg)
+                        if n and n > 0 then
+                            local sh = rawget(_G, "SmapHandlers")
+                            if sh and sh.chooseInteraction then
+                                sh.chooseInteraction(n)
+                            end
+                        end
+                    else
+                        -- 非 SMAP 状态：走 CommandEngine dispatch
+                        local parsed = rawget(_G, "CommandEngine").parseCommand(text)
+                        if parsed then
+                            local handled = rawget(_G, "CommandEngine").dispatchCommand(parsed.cmd, parsed.args)
+                            if not handled then
+                                WebUI.write("未知命令: " .. cmd)
+                                WebUI.write("当前可用命令: choose N (选择菜单项)")
+                            end
+                        end
                     end
                 elseif rawget(_G, "CommandEngine") and rawget(_G, "CommandEngine").parseCommand then
                     local parsed = rawget(_G, "CommandEngine").parseCommand(text)
