@@ -156,6 +156,11 @@ function _G.initWebFramework()
         end
     end
 
+    -- 脚本加载后会覆盖 DrawSMap/DrawMMap（jymain.lua 定义了自己的版本），
+    -- 重新安装 Web MUD 空桩版本
+    _G.DrawMMap = function() end
+    _G.DrawSMap = function() end
+
     -- 2. 初始化游戏适配器
     require("framework.lib_log")
     _G.EventBridge = require("framework.event_bridge")
