@@ -115,7 +115,24 @@ Traceability: [REQ-001, REQ-002, REQ-003]
     - [ ] NPC 离场后 `look` 不再显示该 NPC
     - [ ] 物品拾取后 `look` 不再显示该物品
 
-### 4.5 回归测试
+### 4.5 Slice 4 完整流程集成测试
+
+- [ ] 4.5.1 创建 `tests/s4-integration.spec.js`：场景交互完整流程
+  Blast Radius: `["game/engine-web/tests/s4-integration.spec.js"]`
+  DoD:
+    - [ ] 进入场景 → look 显示编号列表（NPC/物品/出口）
+    - [ ] choose N → NPC 子菜单（对话/查看）
+    - [ ] choose N → 物品 → 拾取 → 背包验证
+    - [ ] 拾取后 look 不再显示该物品
+    - [ ] choose N → 出口 → 传送/leave 回到大地图
+    - [ ] 无 gameLoop error 贯穿全流程
+
+- [ ] 4.5.2 Web MUD 兼容性：SMAP 所有命令 help 显示
+  Blast Radius: `["game/engine-web/tests/s4-integration.spec.js"]`
+  DoD:
+    - [ ] SMAP help 显示 look/exits/go/leave/choose
+
+### 4.6 回归测试
 
 - [ ] 4.5 所有 slice3 测试通过
   Blast Radius: `["game/engine-web/tests/*"]`
