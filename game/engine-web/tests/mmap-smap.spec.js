@@ -483,6 +483,12 @@ test.describe('instruct 函数', () => {
     expect(r.ok).toBe(true);
     expect(r.result).toBe('true');
   });
+
+  test('WaitKey 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"WaitKey"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
 });
 
 test.describe('SMAP 菜单交互', () => {

@@ -106,6 +106,19 @@ rawset(_G, "instruct_1", function(talkId, headId)
     end
 end)
 
+-- WaitKey — 供 oldevent 脚本使用，等待用户输入后继续
+rawset(_G, "WaitKey", function()
+    local w = rawget(_G, "WebUI")
+    if w then w.write("按回车继续...") end
+    local CoroutineScheduler = rawget(_G, "CoroutineScheduler")
+    if CoroutineScheduler then
+        local cs = CoroutineScheduler.getInstance()
+        if cs and cs.waitForKey then
+            cs:waitForKey()
+        end
+    end
+end)
+
 -- 调试函数（在 setmetatable(_G) 之前定义，之后可调用）
 function _G.__debug_coro_state()
     local cs = package.loaded["framework.coroutine_scheduler"]

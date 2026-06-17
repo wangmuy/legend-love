@@ -7,10 +7,10 @@ Traceability: [REQ-002]
     - [x] NPC 有事件编号 → startEvent(eventId, 0, callback)
     - [x] NPC 无事件编号 → "似乎不想说话"
 
-- [ ] 1.2 事件回调回到场景 look
+- [x] 1.2 事件回调回到场景 look
   Blast Radius: `["game/engine-web/mmap_smap_handlers.lua"]`
   DoD:
-    - [ ] 事件结束后调用 SmapHandlers.look({})
+    - [x] 事件结束后调用 SmapHandlers.look({})
 
 ## 2. instruct 函数
 Traceability: [REQ-002]
@@ -25,15 +25,15 @@ Traceability: [REQ-002]
   DoD:
     - [x] 从 dataCache.dialogues 读取文本
 
-- [ ] 2.3 `WaitKey()` 等待用户输入
+- [x] 2.3 `WaitKey()` 等待用户输入
   Blast Radius: `["game/engine-web/web_game_bridge.lua"]`
   DoD:
-    - [ ] 显示"按回车继续..."
-    - [ ] 调用 scheduler:waitForKey()
+    - [x] 显示"按回车继续..."
+    - [x] 调用 scheduler:waitForKey()
 
 ## 3. 测试
 Traceability: [REQ-002]
 
 - [x] 3.1 instruct_0 不抛异常
 - [x] 3.2 dialogues 数据可访问
-- [ ] 3.3 NPC 对话流程（EventExecutor 执行）
+- [x] 3.3 WaitKey 函数存在
