@@ -531,4 +531,39 @@ test.describe('SMAP 菜单交互', () => {
     console.log(termText);
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
+
+  test('smapTakeItem 拾取物品逻辑', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      '_G.setItemCount("test_scene", "999", 0)',
+      'local avail = _G.itemAvailable("test_scene", "999")',
+      'JY.Base["物品1"] = 999',
+      'JY.Base["物品数量1"] = 1',
+      'return tostring(avail) .. "|" .. tostring(JY.Base["物品1"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    const parts = r.result.split('|');
+    expect(parts[0]).toBe('false');
+    expect(parts[1]).toBe('999');
+  });
+
+  test('NPC 离场状态过滤', async ({ page }) => {
+    const r = await luaEval(page, [
+      '_G.setNpcPresent("filter_test", "123", false)',
+      'return tostring(_G.isNpcPresent("filter_test", "123"))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('false');
+  });
+
+  test('物品拾取状态过滤', async ({ page }) => {
+    const r = await luaEval(page, [
+      '_G.setItemCount("filter_test", "456", 0)',
+      'return tostring(_G.itemAvailable("filter_test", "456"))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('false');
+  });
 });
