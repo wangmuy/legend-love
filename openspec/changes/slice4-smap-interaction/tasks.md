@@ -117,7 +117,7 @@ Traceability: [REQ-001, REQ-002, REQ-003]
 
 ### 4.5 Slice 4 完整流程集成测试
 
-- [ ] 4.5.1 创建 `tests/s4-integration.spec.js`：场景交互完整流程
+- [x] 4.5.1 创建 `tests/s4-integration.spec.js`：场景交互完整流程
   Blast Radius: `["game/engine-web/tests/s4-integration.spec.js"]`
   DoD:
     - [ ] 进入场景 → look 显示编号列表（NPC/物品/出口）
