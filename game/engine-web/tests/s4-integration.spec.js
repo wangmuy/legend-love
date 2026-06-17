@@ -45,19 +45,16 @@ test.describe('Slice 4 场景交互集成测试', () => {
 
   test('SMAP help 显示所有命令', async ({ page }) => {
     test.setTimeout(120000);
-    // 进入游戏 → MMAP
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
-    // 进入场景
     await typeCmd(page, 'list');
     await page.waitForTimeout(2000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
-    // SMAP help
     await typeCmd(page, 'help');
     await page.waitForTimeout(2000);
 
@@ -72,21 +69,18 @@ test.describe('Slice 4 场景交互集成测试', () => {
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
-  test('场景交互完整流程: look→choose→NPC对话→leave', async ({ page }) => {
+  test('场景交互完整流程: look→choose→leave', async ({ page }) => {
     test.setTimeout(120000);
-    // 进入游戏
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
-    // 进入场景
     await typeCmd(page, 'list');
     await page.waitForTimeout(2000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
-    // look 显示编号列表
     let lines = await getTermLines(page);
     let text = lines.join('\n');
     console.log('=== SCENE LOOK ===');
@@ -96,24 +90,59 @@ test.describe('Slice 4 场景交互集成测试', () => {
     expect(text).toContain('choose');
     expect(await hasNoGameErrors(page)).toBeTruthy();
 
-    // choose 1 — 选择第一个交互对象（NPC → 子菜单，或出口 → 传送）
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
 
-    lines = await getTermLines(page);
-    text = lines.join('\n');
-    console.log('=== AFTER CHOOSE 1 ===');
-    console.log(text);
-    // 不应报错
     expect(await hasNoGameErrors(page)).toBeTruthy();
 
-    // 回到大地图
     await typeCmd(page, 'leave');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
     lines = await getTermLines(page);
     text = lines.join('\n');
     expect(text).toContain('回到了大地图');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('初始位置附近有 主角的家', async ({ page }) => {
+    test.setTimeout(120000);
+    // 进入游戏
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    // MMAP look — 显示附近场景
+    await typeCmd(page, 'look');
+    await page.waitForTimeout(2000);
+
+    const lines = await getTermLines(page);
+    const text = lines.join('\n');
+    console.log('=== MMAP LOOK ===');
+    console.log(text);
+    // 主角在初始位置 (364,284)，主角的家在附近
+    expect(text).toContain('主角的家');
+    expect(text).toContain('步');
+    expect(text).toContain('list');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('list 包含 主角的家 场景', async ({ page }) => {
+    test.setTimeout(120000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    await typeCmd(page, 'list');
+    await page.waitForTimeout(3000);
+
+    const lines = await getTermLines(page);
+    const text = lines.join('\n');
+    console.log('=== LIST ===');
+    console.log(text);
+    // 主角的家应在场景列表中
+    expect(text).toContain('主角的家');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 });
