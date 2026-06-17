@@ -85,6 +85,27 @@ function _G.registerFrameworkModule(name, source)
     end
 end
 
+-- Slice 4: Web MUD 版 instruct 函数（供 oldevent 脚本使用）
+rawset(_G, "instruct_0", function()
+    local w = rawget(_G, "WebUI")
+    if w then w.separator() end
+end)
+
+rawset(_G, "instruct_1", function(talkId, headId)
+    local dc = rawget(_G, "dataCache")
+    if not dc then return end
+    local dlg = dc["dialogues"]
+    if not dlg then return end
+    local text = dlg[tostring(talkId)]
+    if type(text) == "table" then
+        text = text[tostring(headId or 1)]
+    end
+    if text then
+        local w = rawget(_G, "WebUI")
+        if w then w.write(tostring(text)) end
+    end
+end)
+
 -- 调试函数（在 setmetatable(_G) 之前定义，之后可调用）
 function _G.__debug_coro_state()
     local cs = package.loaded["framework.coroutine_scheduler"]
@@ -380,6 +401,9 @@ function _G.initWebFramework()
         }
         local smapCmds = {
             look  = { handler = _G.SmapHandlers.look,  description = "查看场景描述" },
+            talk  = { handler = _G.SmapHandlers.talk,  description = "talk <NPC名> 与 NPC 对话" },
+            take  = { handler = _G.SmapHandlers.take,  description = "take <物品名> 拾取物品" },
+            give  = { handler = _G.SmapHandlers.give,  description = "give <物品名> <NPC名> 给予物品" },
             exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
             go    = { handler = _G.SmapHandlers.go,    description = "go <编号> 前往出口" },
             leave = { handler = _G.SmapHandlers.leave, description = "离开场景回到大地图" },
