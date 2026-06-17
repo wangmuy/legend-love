@@ -94,6 +94,14 @@ WaitKey()          → "按回车继续..." → scheduler:waitForKey()
 - NPC 对话依赖 `EventExecutor.startEvent`，需要 oldevent 脚本在 Worker 环境中可运行。当前未测试完整 oldevent 执行路径。
 - `scheduler:waitForKey()` 需要在协程中调用，如果事件脚本不是通过 `EventExecutor` 启动的协程，`WaitKey` 会阻塞。
 
+## Review Checklist
+
+1. `look` 在 SMAP 状态输出编号列表（NPC/物品/出口），末尾有 `"输入 choose <编号> 选择交互对象"` 提示
+2. `choose N` → NPC → 子菜单包含对话/查看/给予物品
+3. `choose N` → 物品 → 子菜单包含拾取/查看
+4. `choose N` → 出口 → 直接传送，无 gameLoop error
+5. 场景状态：`setNpcPresent(id, false)` 后 `look` 不再显示该 NPC
+
 ## Migration Plan
 
 本 change 不涉及数据迁移。新增代码在 `mmap_smap_handlers.lua` 和 `web_game_bridge.lua` 中，不影响现有功能。SMAP 命令表已移除 `talk`/`take`/`give` 条目，`help` 中不再显示。
