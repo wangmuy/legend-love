@@ -70,9 +70,9 @@ NPC: 1. 胡斐  2. 田伯光
 ## Capabilities
 
 ### New Capabilities
-- `smap-menu-interaction`: `look` 输出编号列表 + `choose N` 级联菜单交互
-- `smap-npc-dialog`: NPC 对话 + oldevent 事件执行
-- `smap-scene-state`: 场景动态状态管理
+- `smap-menu-interaction` [REQ-001]: `look` 输出编号列表 + `choose N` 级联菜单交互
+- `smap-npc-dialog` [REQ-002]: NPC 对话 + oldevent 事件执行
+- `smap-scene-state` [REQ-003]: 场景动态状态管理
 
 ## Impact
 
