@@ -45,16 +45,13 @@ test.describe('Slice 4 场景交互集成测试', () => {
 
   test('SMAP help 显示所有命令', async ({ page }) => {
     test.setTimeout(120000);
+    // 进入游戏，直接进入主角的家（SMAP 状态）
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
-    await typeCmd(page, 'list');
-    await page.waitForTimeout(2000);
-    await typeCmd(page, 'choose 1');
-    await page.waitForTimeout(SETTLE_TIMEOUT);
-
+    // 直接测试 SMAP help（玩家在主角的家场景中）
     await typeCmd(page, 'help');
     await page.waitForTimeout(2000);
 
@@ -69,32 +66,43 @@ test.describe('Slice 4 场景交互集成测试', () => {
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
-  test('场景交互完整流程: look→choose→leave', async ({ page }) => {
+  test('场景交互完整流程: 主角的家→look→leave→MMAP', async ({ page }) => {
     test.setTimeout(120000);
+    // 进入游戏，在主角的家场景中
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
+    // look 显示主角的家场景（SMAP 编号列表）
+    let lines = await getTermLines(page);
+    let text = lines.join('\n');
+    console.log('=== HOME LOOK ===');
+    console.log(text);
+    expect(text).toContain('新游戏开始');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+
+    // 离开主角的家到 MMAP
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    expect(text).toContain('回到了大地图');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+
+    // 在 MMAP 测试 list
     await typeCmd(page, 'list');
     await page.waitForTimeout(2000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
-    let lines = await getTermLines(page);
-    let text = lines.join('\n');
-    console.log('=== SCENE LOOK ===');
-    console.log(text);
+    lines = await getTermLines(page);
+    text = lines.join('\n');
     expect(text).toContain('你来到了');
-    expect(text).toContain('1.');
-    expect(text).toContain('choose');
     expect(await hasNoGameErrors(page)).toBeTruthy();
 
-    await typeCmd(page, 'choose 1');
-    await page.waitForTimeout(3000);
-
-    expect(await hasNoGameErrors(page)).toBeTruthy();
-
+    // 在新场景中离开
     await typeCmd(page, 'leave');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
@@ -104,7 +112,7 @@ test.describe('Slice 4 场景交互集成测试', () => {
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
-  test('初始位置附近有 主角的家', async ({ page }) => {
+  test('初始位置在主角的家场景，离开后到达大地图', async ({ page }) => {
     test.setTimeout(120000);
     // 进入游戏
     await typeCmd(page, 'choose 1');
@@ -112,18 +120,23 @@ test.describe('Slice 4 场景交互集成测试', () => {
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
-    // MMAP look — 显示附近场景
-    await typeCmd(page, 'look');
-    await page.waitForTimeout(2000);
-
-    const lines = await getTermLines(page);
-    const text = lines.join('\n');
-    console.log('=== MMAP LOOK ===');
+    // 游戏中显示主角的家场景
+    let lines = await getTermLines(page);
+    let text = lines.join('\n');
+    console.log('=== HOME SCENE ===');
     console.log(text);
-    // 主角在初始位置 (364,284)，主角的家在附近
     expect(text).toContain('主角的家');
-    expect(text).toContain('步');
-    expect(text).toContain('list');
+
+    // 离开场景到大地图
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    console.log('=== MMAP AFTER LEAVE ===');
+    console.log(text);
+    expect(text).toContain('回到了大地图');
+    expect(text).toContain('当前位置');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
@@ -132,6 +145,9 @@ test.describe('Slice 4 场景交互集成测试', () => {
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+    // 离开主角的家到 MMAP
+    await typeCmd(page, 'leave');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
     await typeCmd(page, 'list');

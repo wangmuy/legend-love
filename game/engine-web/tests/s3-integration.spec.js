@@ -60,9 +60,14 @@ test.describe('Slice 3 完整流程集成测试', () => {
     const text = lines.join('\n');
     expect(text).toContain('新游戏开始');
     expect(text).toContain('输入 help 查看可用命令');
-    expect(text).toContain('当前位置');
-    expect(text).toContain('坐标');
     expect(await hasNoGameErrors(page)).toBeTruthy();
+
+    // 新游戏从主角的家场景开始，先离开到大地图
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    lines = await getTermLines(page);
+    expect(lines.join('\n')).toContain('当前位置');
 
     await typeCmd(page, 'look');
     await page.waitForTimeout(2000);
@@ -113,6 +118,9 @@ test.describe('Slice 3 完整流程集成测试', () => {
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
+    // 从主角的家离开到 MMAP
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
 
     // 使用 list → choose 1 进入场景（go 命令已从 MMAP 移除）
     await typeCmd(page, 'list');
@@ -141,6 +149,8 @@ test.describe('Slice 3 完整流程集成测试', () => {
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
 
     await typeCmd(page, 'list');
     await page.waitForTimeout(2000);
@@ -160,6 +170,8 @@ test.describe('Slice 3 完整流程集成测试', () => {
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
 
     await typeCmd(page, 'help');
     await page.waitForTimeout(2000);
@@ -178,6 +190,8 @@ test.describe('Slice 3 完整流程集成测试', () => {
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(SETTLE_TIMEOUT);
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
 
     await typeCmd(page, 'xyzunknown');
     await page.waitForTimeout(2000);
@@ -192,6 +206,9 @@ test.describe('Slice 3 完整流程集成测试', () => {
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+    // 从主角的家离开到 MMAP
+    await typeCmd(page, 'leave');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
     for (let i = 0; i < 3; i++) {
@@ -251,6 +268,10 @@ test.describe('Slice 3 完整流程集成测试', () => {
     expect(text).toContain('新游戏开始');
     expect(text).toContain('输入 help 查看可用命令');
     expect(await hasNoGameErrors(page)).toBeTruthy();
+
+    // 从主角的家离开到 MMAP
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
 
     // 进入 MMAP 后验证基本命令
     await typeCmd(page, 'look');

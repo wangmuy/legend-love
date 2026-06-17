@@ -326,16 +326,19 @@ function _G.initWebFramework()
 
         JY.Scene = JY.Scene or {}
         JY.Scene[0] = JY.Scene[0] or {["名称"] = "小虾米居", ["进入条件"] = 0}
-        JY.SubScene = 0
+        JY.SubScene = 70  -- 主角的家（原版 CC.NewGameSceneID）
         JY.EnterSceneXY = JY.EnterSceneXY or {}
-        JY.Status = 2  -- GAME_MMAP
+        -- 新游戏从主角的家场景开始，非大地图
+        JY.Base["人X1"] = 19
+        JY.Base["人Y1"] = 20
+        JY.Status = 4  -- GAME_SMAP
         JY.MmapMusic = -1
 
         local WebUI = rawget(_G, "WebUI")
         WebUI.write("新游戏开始！你来到了金庸群侠传的世界。")
-        WebUI.write("输入 help 查看可用命令（go/list/look/where）")
-        local MmapHandlers = rawget(_G, "MmapHandlers")
-        if MmapHandlers then MmapHandlers.look({}) end
+        WebUI.write("输入 help 查看可用命令，choose 查看交互对象")
+        local SmapHandlers = rawget(_G, "SmapHandlers")
+        if SmapHandlers then SmapHandlers.look({}) end
     end
 
     -- 覆写 showStartMenuCoroutine：loop 模式，每次循环都输出菜单文本和提示
