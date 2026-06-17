@@ -234,9 +234,9 @@ test.describe('SMAP 命令（程序化设状态后 E2E）', () => {
     console.log('=== SMAP LOOK OUTPUT ===');
     console.log(termText);
     expect(termText).toContain('明教分舵');
-    // 有出口的场景应显示出口和提示
-    expect(termText).toContain('出口');
-    expect(termText).toContain('输入 exits 查看出口详情，leave 回到大地图');
+    // 新菜单模式：出口显示为"→ 明教地道"而非"出口:"文字
+    expect(termText).toContain('明教地道');
+    expect(termText).toContain('输入 choose <编号> 选择交互对象');
   });
 
   test('exits 显示出口编号列表', async ({ page }) => {

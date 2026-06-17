@@ -80,7 +80,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
     lines = await getTermLines(page);
     const sceneText = lines.join('\n');
     expect(sceneText).toContain('你来到了');
-    expect(sceneText).toContain('输入 exits 查看出口详情，leave 回到大地图');
+    expect(sceneText).toContain('choose');
     expect(await hasNoGameErrors(page)).toBeTruthy();
 
     await typeCmd(page, 'exits');
