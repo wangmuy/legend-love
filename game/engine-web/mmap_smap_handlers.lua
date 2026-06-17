@@ -556,6 +556,20 @@ end
 function SmapHandlers.leave(args)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
+    -- 离开场景时恢复到该场景在世界地图上的入口坐标
+    local sceneId = tostring(JY.SubScene or 0)
+    local entrances = getEntrances()
+    if entrances then
+        for _, entry in ipairs(entrances) do
+            if tostring(entry.sceneId) == sceneId then
+                if JY.Base then
+                    JY.Base["人X1"] = entry.mapX or JY.Base["人X1"]
+                    JY.Base["人Y1"] = entry.mapY or JY.Base["人Y1"]
+                end
+                break
+            end
+        end
+    end
     JY.Status = 2  -- GAME_MMAP
     w("你离开了当前场景，回到了大地图。\n")
     MmapHandlers.look({})
