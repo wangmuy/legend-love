@@ -421,3 +421,108 @@ test.describe('quit 顺序流程', () => {
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 });
+
+// ============================================================
+// Slice 4: 场景交互单元测试
+// ============================================================
+
+test.describe('sceneState API', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+  });
+
+  test('默认状态 NPC 存在', async ({ page }) => {
+    const r = await luaEval(page, 'return tostring(rawget(_G,"isNpcPresent") and _G.isNpcPresent("1","100") or "missing")');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true');
+  });
+
+  test('setNpcPresent 后状态正确', async ({ page }) => {
+    const r = await luaEval(page, [
+      '_G.setNpcPresent("99", "42", false)',
+      'return tostring(_G.isNpcPresent("99", "42"))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('false');
+  });
+
+  test('itemAvailable 默认可用', async ({ page }) => {
+    const r = await luaEval(page, 'return tostring(rawget(_G,"itemAvailable") and _G.itemAvailable("1","50") or "missing")');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true');
+  });
+
+  test('setItemCount 后状态正确', async ({ page }) => {
+    const r = await luaEval(page, [
+      '_G.setItemCount("99", "77", 0)',
+      'return tostring(_G.itemAvailable("99", "77"))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('false');
+  });
+});
+
+test.describe('instruct 函数', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+  });
+
+  test('instruct_0 不抛异常', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_0(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('dialogues 数据可访问', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local dc = rawget(_G, "dataCache")',
+      'local dlg = dc and dc["dialogues"]',
+      'return tostring(type(dlg) == "table")',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true');
+  });
+});
+
+test.describe('SMAP 菜单交互', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+    await setSmapState(page, '1');
+  });
+
+  test('look 显示编号列表和提示', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill('look');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== SMAP MENU LOOK ===');
+    console.log(termText);
+    expect(termText).toContain('河洛客棧');
+    expect(termText).toContain('1.');
+    expect(termText).toContain('choose');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('choose N 不报错', async ({ page }) => {
+    const input = page.locator('#command-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+
+    await input.fill('look');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(2000);
+
+    await input.fill('choose 1');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(3000);
+
+    const termText = await getTerminalText(page);
+    console.log('=== AFTER CHOOSE 1 IN SMAP ===');
+    console.log(termText);
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+});
