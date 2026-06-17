@@ -298,9 +298,10 @@ local function getCharsIndex()
 end
 
 -- SMAP 命令
+-- 场景交互对象列表（由 look 填充，供 choose 使用）
+local smapEntityList = {}
 
 function SmapHandlers.look(args)
-    local targetName = args and args[1]
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     local sceneId = tostring(JY.SubScene or 0)
@@ -312,117 +313,223 @@ function SmapHandlers.look(args)
         return
     end
 
-    -- 有参 look：查看具体对象（NPC 或物品）
-    if targetName then
-        local charsIndex = getCharsIndex()
-        local npcs = scene["NPC"]
-        if npcs then
-            for _, npc in ipairs(npcs) do
-                local charId = tostring(npc["代号"] or npc)
-                local char = charsIndex and charsIndex[charId]
-                local charName = char and char["姓名"]
-                if charName == targetName then
-                    if not _G.isNpcPresent(sceneId, charId) then
-                        w(charName .. " 不在这里。")
-                        return
-                    end
-                    w("你看着 " .. charName .. "。")
-                    if char and char["描述"] then
-                        w(char["描述"])
-                    else
-                        w("看起来是个普通人。")
-                    end
-                    return
-                end
-            end
-        end
-        local items = scene["物品"]
-        if items then
-            for _, item in ipairs(items) do
-                local itemId = tostring(item["代号"] or "")
-                local itemName = getItemName(itemId) or item["名称"]
-                if itemName == targetName then
-                    if not _G.itemAvailable(sceneId, itemId) then
-                        w(itemName .. " 已经被拿走了。")
-                        return
-                    end
-                    w("你看着 " .. itemName .. "。")
-                    local itemsData = g(_G, "dataCache")
-                    if itemsData then
-                        local itemDef = itemsData["items"] and itemsData["items"][itemId]
-                        if itemDef and itemDef["描述"] then
-                            w(itemDef["描述"])
-                        else
-                            w("看起来是个普通的物品。")
-                        end
-                    end
-                    return
-                end
-            end
-        end
-        w("这里没有叫 " .. targetName .. " 的。")
-        return
-    end
-
-    -- 无参 look：场景总体描述
     local name = scene["名称"] or "未知场景"
     
     wt(name)
     w(getSceneTemplate(scene))
     ws()
     
-    -- NPC 列表（过滤已离场）
-    local hasVisibleNpc = false
+    -- 构建交互对象列表（NPC → 物品 → 出口）
+    local entityIndex = 0
+    smapEntityList = {}
+    
+    -- NPC 列表
     local npcs = scene["NPC"]
     if npcs and #npcs > 0 then
         local charsIndex = getCharsIndex()
-        local npcNames = {}
         for _, npc in ipairs(npcs) do
-            local charId = tostring(npc["代号"] or npc)
-            if _G.isNpcPresent(sceneId, charId) then
-                local char = charsIndex and charsIndex[charId]
-                local charName = char and char["姓名"] or ("NPC?" .. charId)
-                table.insert(npcNames, charName)
-                hasVisibleNpc = true
+            local charIdStr = tostring(npc["代号"] or npc)
+            if _G.isNpcPresent(sceneId, charIdStr) then
+                local char = charsIndex and charsIndex[charIdStr]
+                local charName = char and char["姓名"] or ("NPC?" .. charIdStr)
+                entityIndex = entityIndex + 1
+                smapEntityList[entityIndex] = { type = "npc", charId = charIdStr, name = charName, npcData = npc }
+                w(string.format("%d. %s", entityIndex, charName))
             end
         end
-        if #npcNames > 0 then
-            w("NPC: " .. table.concat(npcNames, ", "))
-        end
-    end
-    if not hasVisibleNpc then
-        w("这里空无一人。")
     end
     
-    -- 物品列表（过滤已拾取）
+    -- 物品列表
     local items = scene["物品"]
     if items and #items > 0 then
-        local itemNames = {}
         for _, item in ipairs(items) do
-            local itemId = tostring(item["代号"] or "")
-            if _G.itemAvailable(sceneId, itemId) then
-                local itemName = getItemName(itemId) or item["名称"]
-                if itemName then table.insert(itemNames, itemName) end
+            local itemIdStr = tostring(item["代号"] or "")
+            if _G.itemAvailable(sceneId, itemIdStr) then
+                local itemName = getItemName(itemIdStr) or item["名称"]
+                entityIndex = entityIndex + 1
+                smapEntityList[entityIndex] = { type = "item", itemId = itemIdStr, name = itemName }
+                w(string.format("%d. %s", entityIndex, itemName))
             end
-        end
-        if #itemNames > 0 then
-            w("物品: " .. table.concat(itemNames, ", "))
         end
     end
     
+    -- 出口列表
     local exits = scene["出口"]
     if exits and #exits > 0 then
-        local exitDirs = {}
         for _, exit in ipairs(exits) do
             local targetSceneId = tostring(exit["目标场景"] or "")
             local targetScene = scenes and scenes[targetSceneId]
             local targetName = targetScene and targetScene["名称"] or "?"
-            table.insert(exitDirs, targetName)
+            entityIndex = entityIndex + 1
+            smapEntityList[entityIndex] = { type = "exit", targetSceneId = targetSceneId, name = targetName }
+            w(string.format("%d. → %s", entityIndex, targetName))
         end
-        w("出口: " .. table.concat(exitDirs, ", "))
     end
     
-    w("输入 exits 查看出口详情，leave 回到大地图，talk 与 NPC 对话")
+    if entityIndex == 0 then
+        w("这里什么都没有。")
+        return
+    end
+    
+    w("输入 choose <编号> 选择交互对象")
+end
+
+-- SMAP choose 处理（由 CommandEngine 调度或 processEventQueue 调用）
+function SmapHandlers.chooseInteraction(idx)
+    if idx < 1 or idx > #smapEntityList then
+        w("无效的选择。")
+        return
+    end
+    
+    local ent = smapEntityList[idx]
+    if not ent then
+        w("无效的选择。")
+        return
+    end
+    
+    local JY = g(_G, "JY")
+    if not JY then JY = {}; rawset(_G, "JY", JY) end
+    local sceneId = tostring(JY.SubScene or 0)
+    
+    if ent.type == "npc" then
+        -- NPC 子菜单
+        local CE = g(_G, "CommandEngine")
+        if CE then
+            CE.showMenu(
+                { {name="对话"}, {name="查看"}, {name="给予物品"} },
+                ent.name,
+                function(actionIdx)
+                    if actionIdx == 1 then
+                        -- 对话
+                        smapNpcTalk(sceneId, ent)
+                    elseif actionIdx == 2 then
+                        -- 查看
+                        local charsIndex = getCharsIndex()
+                        local char = charsIndex and charsIndex[ent.charId]
+                        if char then
+                            w(ent.name)
+                            if char["描述"] then w(char["描述"]) end
+                        end
+                        SmapHandlers.look({})
+                    elseif actionIdx == 3 then
+                        -- 给予物品
+                        smapGiveToNpc(sceneId, ent)
+                    end
+                end
+            )
+        end
+    elseif ent.type == "item" then
+        -- 物品子菜单
+        local CE = g(_G, "CommandEngine")
+        if CE then
+            CE.showMenu(
+                { {name="拾取"}, {name="查看"} },
+                ent.name,
+                function(actionIdx)
+                    if actionIdx == 1 then
+                        smapTakeItem(sceneId, ent)
+                    elseif actionIdx == 2 then
+                        local itemsData = g(_G, "dataCache")
+                        if itemsData then
+                            local itemDef = itemsData["items"] and itemsData["items"][ent.itemId]
+                            if itemDef and itemDef["描述"] then
+                                w(ent.name .. " - " .. itemDef["描述"])
+                            end
+                        end
+                        SmapHandlers.look({})
+                    end
+                end
+            )
+        end
+    elseif ent.type == "exit" then
+        -- 出口：直接传送
+        SmapHandlers.go({tostring(idx)})
+    end
+end
+
+-- NPC 对话
+function smapNpcTalk(sceneId, ent)
+    local eventId = ent.npcData["事件编号"] or ent.npcData["触发事件"] or 0
+    if tonumber(eventId) == 0 then
+        w(ent.name .. " 似乎不想说话。")
+        SmapHandlers.look({})
+        return
+    end
+    w("你与 " .. ent.name .. " 交谈。")
+    local EventExecutor = g(_G, "EventExecutor")
+    if EventExecutor then
+        EventExecutor.startEvent(tonumber(eventId), 0, function()
+            w("交谈结束。")
+            smapEntityList = {}
+            SmapHandlers.look({})
+        end)
+    else
+        w("事件系统不可用。")
+    end
+end
+
+-- 拾取物品
+function smapTakeItem(sceneId, ent)
+    if not _G.itemAvailable(sceneId, ent.itemId) then
+        w(ent.name .. " 已经被拿走了。")
+        return
+    end
+    local JY = g(_G, "JY")
+    if not JY then JY = {}; rawset(_G, "JY", JY) end
+    JY.Base = JY.Base or {}
+    for i = 1, 30 do
+        if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
+            JY.Base["物品" .. i] = tonumber(ent.itemId) or 0
+            JY.Base["物品数量" .. i] = 1
+            break
+        end
+    end
+    _G.setItemCount(sceneId, ent.itemId, 0)
+    w("你获得了 " .. ent.name .. "。")
+    smapEntityList = {}
+    SmapHandlers.look({})
+end
+
+-- 给予物品
+function smapGiveToNpc(sceneId, ent)
+    local JY = g(_G, "JY")
+    if not JY then JY = {}; rawset(_G, "JY", JY) end
+    JY.Base = JY.Base or {}
+    
+    -- 列出背包物品
+    local backpack = {}
+    for i = 1, 30 do
+        local id = JY.Base["物品" .. i]
+        if id and id ~= 0 then
+            local name = getItemName(tostring(id))
+            if name then
+                table.insert(backpack, {slot = i, id = id, name = name})
+            end
+        end
+    end
+    
+    if #backpack == 0 then
+        w("你身上没有可以给予的物品。")
+        return
+    end
+    
+    local CE = g(_G, "CommandEngine")
+    if CE then
+        local items = {}
+        for _, bi in ipairs(backpack) do
+            table.insert(items, {name = bi.name})
+        end
+        CE.showMenu(items, "选择要给予的物品", function(itemIdx)
+            if itemIdx and itemIdx > 0 and itemIdx <= #backpack then
+                local bi = backpack[itemIdx]
+                JY.Base["物品" .. bi.slot] = 0
+                JY.Base["物品数量" .. bi.slot] = 0
+                w("你将 " .. bi.name .. " 交给了 " .. ent.name .. "。")
+                smapEntityList = {}
+                SmapHandlers.look({})
+            end
+        end)
+    end
 end
 
 function SmapHandlers.exits(args)
