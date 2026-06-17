@@ -22,3 +22,6 @@ NPC 对话和物品拾取会改变场景状态。如果不跟踪这些状态，`
 - `scene-state-npc`: NPC 状态 API
 - `scene-state-item`: 物品状态 API
 - `scene-state-filter`: `look` 输出过滤
+
+## Traceability
+- [REQ-001]: SMAP 菜单驱动交互 (slice4)

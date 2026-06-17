@@ -36,3 +36,10 @@ function itemAvailable(sceneId, itemId) → boolean  -- count > 0
 - `setNpcPresent(id, false)` → `isNpcPresent` 返回 false
 - `itemAvailable` 默认返回 true
 - `setItemCount(id, 0)` → `itemAvailable` 返回 false
+
+## Review Checklist
+
+1. 所有单元测试通过
+2. 无 gameLoop error
+3. look 输出格式正确
+4. choose N 不报错

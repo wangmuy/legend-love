@@ -35,3 +35,10 @@ choose N → smapEntityList[N] → type=npc → showMenu → smapNpcTalk
 - `look` 显示编号列表（程序化 SMAP 状态）
 - `chooseInteraction` NPC/物品/出口路由
 - choose N → 出口 → 无 gameLoop error
+
+## Review Checklist
+
+1. 所有单元测试通过
+2. 无 gameLoop error
+3. look 输出格式正确
+4. choose N 不报错

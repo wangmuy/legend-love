@@ -33,3 +33,10 @@ if text then WebUI.write(tostring(text)) end
 - `instruct_0()` 不抛异常
 - `dataCache.dialogues` 可访问
 - NPC 有事件编号 → EventExecutor 被调用
+
+## Review Checklist
+
+1. 所有单元测试通过
+2. 无 gameLoop error
+3. look 输出格式正确
+4. choose N 不报错

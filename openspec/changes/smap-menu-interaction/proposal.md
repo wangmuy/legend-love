@@ -38,3 +38,6 @@ SMAP 场景交互需要统一的菜单驱动模式——玩家 `look` 后看到�
 - `smap-menu-look`: 增强的 `look` 命令输出编号列表
 - `smap-choose-interaction`: `choose N` 路由到 NPC/物品/出口子菜单
 - `smap-entity-list`: 场景实体列表管理
+
+## Traceability
+- [REQ-001]: SMAP 菜单驱动交互 (slice4)

@@ -22,3 +22,6 @@ NPC 对话是 oldevent 驱动的核心交互。玩家选择"对话"后，系统�
 - `smap-instruct-1`: 对话文本输出
 - `smap-instruct-0`: 清屏替代
 - `smap-waitkey`: 等待用户输入
+
+## Traceability
+- [REQ-001]: SMAP 菜单驱动交互 (slice4)
