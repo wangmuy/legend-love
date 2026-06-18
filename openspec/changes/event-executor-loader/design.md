@@ -2,6 +2,8 @@
 
 EventExecutor 依赖链：`event_executor.lua` → `async_globals.lua` → `script_loader.lua` → `async_wrapper.lua`。这些模块通过 `require` 加载，使用 `package.preload` 中注册的 framework 模块。
 
+同时需要将 `_G.dataCache` 重命名为 `_G.initDataSource`，因为 `dataCache` 暗示可写入，实际角色是只读初始数据源。
+
 ## Decisions
 
 ### 加载时机
@@ -10,6 +12,15 @@ EventExecutor 依赖链：`event_executor.lua` → `async_globals.lua` → `scri
 
 ```lua
 _G.EventExecutor = require("framework.event_executor")
+```
+
+### dataCache → initDataSource 重命名
+
+`dataCache` 在 70+ 处引用，分布在 `data_loader.lua`、`state_manager.lua`、`engine_web.lua`、`web_game_bridge.lua`、`mmap_smap_handlers.lua`、`worker.js`、`index.js` 及测试文件。重命名为纯文本替换，无功能变化。
+
+```lua
+-- data_loader.lua
+_G.initDataSource = {}  -- 原 _G.dataCache = {}
 ```
 
 ### 与 Web MUD instruct 的兼容性
