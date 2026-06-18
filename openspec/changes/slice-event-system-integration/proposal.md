@@ -40,7 +40,8 @@ Slice 4 实现了 SMAP 菜单驱动交互，但 NPC 对话触发 `EventExecutor.
 ### In Scope
 - `EventExecutor` 模块加载
 - 全部 67 个 `instruct_*` 的 Web MUD 桩函数
-- `GetD`/`SetD`/`GetS`/`SetS` 基于 dataCache 的实现
+- `GetD`/`SetD`/`GetS`/`SetS` 基于 `initDataSource` + `JY.D{sceneId}` 实现
+- `dataCache` → `initDataSource` 重命名（明确只读初始数据源角色）
 - Game Flow Testing（4 个测试用例）
 - 旧事件系统（oldevent/*.lua）
 
@@ -62,11 +63,13 @@ Slice 4 实现了 SMAP 菜单驱动交互，但 NPC 对话触发 `EventExecutor.
 
 | 影响面 | 说明 |
 |--------|------|
+| `game/engine-web/*.lua` | `dataCache` → `initDataSource` 全局重命名（~70 处） |
 | `game/engine-web/web_game_bridge.lua` | 加载 EventExecutor + 注册 instruct 桩 |
 | `game/engine-web/mmap_smap_handlers.lua` | smapNpcTalk 事件调用修复 |
 | `game/framework/event_executor.lua` | 无需修改 |
 | `game/script/oldevent/*.lua` | 无需修改 |
-| `tests/` | 新增 event-flow-tests |
+| `game/engine-web/worker.js`, `index.js` | `dataCache` 引用更新 |
+| `tests/` | 新增 event-flow-tests + dataCache 引用更新 |
 
 ## Contract Adherence
 

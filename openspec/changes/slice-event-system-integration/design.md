@@ -81,3 +81,17 @@ end
 3. TC-01: 软体娃娃对话文本正确输出
 4. TC-02: 悦来客栈店小二对话可触发
 5. TC-03: 南贤对话可触发
+
+## 游戏数据归属审计
+
+| 数据 | 位置 | 说明 |
+|------|------|------|
+| `JY.*` 运行时状态 | Lua VM | ✅ 正确的 |
+| `initDataSource` 初始数据 | Lua `_G.initDataSource` | ✅ 只读数据源 |
+| `saveCache` 存档缓存 | `index.js` JS 变量 | ✅ 必要：IndexedDB 只读(主线程) |
+| `luaSaveCache` 存档镜像 | `worker.js` JS 变量 | ✅ 必要：同步 load 需要 |
+| `eventQueue` 输入队列 | `worker.js` JS 变量 | ✅ 必要：postMessage 入口 |
+| `JY.Scene["名称"]` 等 | Lua `JY.*` | ✅ 正确的 |
+| `CC.*` 游戏常量 | Lua `_G.CC` | ✅ 正确的 |
+
+**结论**：无游戏状态数据存留在 JS 端。JS 端仅作为 I/O 桥接层（输入转发 + 存档持久化）。
