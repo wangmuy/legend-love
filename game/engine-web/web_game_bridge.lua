@@ -334,6 +334,26 @@ function _G.initWebFramework()
         JY.Status = 4  -- GAME_SMAP
         JY.MmapMusic = -1
 
+        -- 注入主角的家场景数据（提取管线未包含 NPC/物品/出口）
+        local dc = rawget(_G, "dataCache")
+        local sceneTables = dc and dc["scenes"]
+        if sceneTables then
+            -- scenes 可能是 {scenes=[...]} 或 [...] 格式
+            local sceneList = sceneTables["scenes"] or sceneTables
+            if type(sceneList) == "table" then
+                for _, s in ipairs(sceneList) do
+                    if type(s) == "table" and s["代号"] == 70 then
+                        -- NPC：软体娃娃（事件 691 触发对话）
+                        if not s["NPC"] or #s["NPC"] == 0 then
+                            s["NPC"] = {{["代号"] = 114, ["名称"] = "软体娃娃", ["事件编号"] = 691}}
+                        end
+                        s["类型"] = "house"
+                        break
+                    end
+                end
+            end
+        end
+
         local WebUI = rawget(_G, "WebUI")
         WebUI.write("新游戏开始！你来到了金庸群侠传的世界。")
         WebUI.write("输入 help 查看可用命令，choose 查看交互对象")

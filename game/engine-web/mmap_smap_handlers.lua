@@ -331,7 +331,8 @@ function SmapHandlers.look(args)
             local charIdStr = tostring(npc["代号"] or npc)
             if _G.isNpcPresent(sceneId, charIdStr) then
                 local char = charsIndex and charsIndex[charIdStr]
-                local charName = char and char["姓名"] or ("NPC?" .. charIdStr)
+                -- 优先使用 NPC 条目中的名称字段，其次从 chars 数据查找
+                local charName = npc["名称"] or (char and char["姓名"]) or ("NPC?" .. charIdStr)
                 entityIndex = entityIndex + 1
                 smapEntityList[entityIndex] = { type = "npc", charId = charIdStr, name = charName, npcData = npc }
                 w(string.format("%d. %s", entityIndex, charName))
