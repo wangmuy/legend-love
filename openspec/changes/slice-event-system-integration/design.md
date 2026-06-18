@@ -10,7 +10,8 @@
 **Goals:**
 - 所有 1018 个 oldevent 脚本在 Web MUD 中不经修改即可加载执行
 - 67 个 `instruct_*` 函数全部有 Web MUD 版实现（no-op 或最小必要实现）
-- `GetD`/`SetD`/`GetS`/`SetS` 基于 `dataCache.events` 实现
+- `GetD`/`SetD` 操作 `JY.D{sceneId}` 运行时 Lua 表（非扫描 JSON）
+- `dataCache` 重命名为 `initDataSource`，明确其"只读初始数据源"角色
 - 完成 3 个游戏流程测试（软体娃娃、店小二、南贤）
 
 **Non-Goals:**
@@ -33,11 +34,12 @@
 - **Decision**: 采用 Game Flow Testing 方法——以玩家身份执行完整操作序列，验证终端输出。
 - **Consequences**: 测试更真实，但执行时间更长。
 
-### ADR-003: D* 数据从 dataCache.events 按需读取
+### ADR-003: D* 数据按场景加载到 JY.D，而非实时扫描 JSON
 
-- **Context**: 原始游戏用二进制 R*.idx/grp 文件存储 D* 数据。Web MUD 已提取为 events.json。
-- **Decision**: `GetD(sceneId, eventId, field)` 从 `dataCache.events` 的 20000 条记录中查找匹配。
-- **Consequences**: 无需额外数据加载，20000 条数据的线性查找在可接受范围内。
+- **Context**: 原版 `GetD/SetD` 操作 `JY.D{sceneId}` Lua 运行时表，数据来自二进制文件的一次性加载。Web MUD 的 `dataCache.events` 有 20000 条 JSON 记录。每次 `GetD` 线性扫描 20000 条数据性能差，且不遵循原版模式。
+- **Decision**: 首次访问某场景时，从 `initDataSource.events` 将该场景所有事件拷贝到 `JY.D{sceneId}` Lua 表。此后 `GetD/SetD` 直接操作 `JY.D{sceneId}`。`initDataSource` 是只读的初始数据源，运行时 `JY.*` 是唯一的状态源。
+- **Consequences**: 与存档机制一致——加载存档时从 IndexedDB 恢复 `JY.*`，不经过 `initDataSource`。`initDataSource` 在所有 `initGameState()` 完成后不再被修改。
+- **dataCache 重命名**: `_G.dataCache` → `_G.initDataSource`，强调其只读、仅初始化时使用的角色。
 
 ## D* 事件数据格式
 
