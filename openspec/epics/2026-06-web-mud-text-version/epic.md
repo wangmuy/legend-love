@@ -214,7 +214,7 @@ processEventQueue():
 
 | 字段 | 值 |
 |------|-----|
-| Change | `openspec/changes/event-system-integration/` |
+| Change | `openspec/changes/slice-event-system-integration/` |
 | 子 change | event-executor-loader, instruct-stubs, event-data-access, event-flow-tests |
 | 类型 | 横向 slice（跨架构层） |
 | 依赖 | Slice 4（场景交互菜单已就绪） |
