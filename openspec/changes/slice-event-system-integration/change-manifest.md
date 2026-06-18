@@ -7,7 +7,7 @@
 ## 依赖顺序
 
 ```
-event-system-integration (事件系统集成)
+slice-event-system-integration (事件系统集成)
         │
         ├── event-executor-loader   (加载 EventExecutor + 依赖模块)
         │
