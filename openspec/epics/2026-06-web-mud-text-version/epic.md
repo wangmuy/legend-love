@@ -206,6 +206,24 @@ processEventQueue():
 
 ---
 
+### 横向: 事件系统集成
+
+将事件执行器（EventExecutor）和全部 67 个 `instruct_*` 函数集成到 Web MUD，使 1018 个 oldevent 脚本不经修改即可运行。
+
+**业务价值**：NPC 对话不再是"系统不可用"——玩家可以与软体娃娃对话、触发剧情事件，驱动游戏流程。
+
+| 字段 | 值 |
+|------|-----|
+| Change | `openspec/changes/event-system-integration/` |
+| 子 change | event-executor-loader, instruct-stubs, event-data-access, event-flow-tests |
+| 类型 | 横向 slice（跨架构层） |
+| 依赖 | Slice 4（场景交互菜单已就绪） |
+| 不阻塞 | Slice 5（战斗系统可以并行开发） |
+
+**影响领域**：framework, event-executor, async-globals, script-loader
+
+---
+
 ### Slice 4: 场景交互
 
 完善场景 [GAME_SMAP] 内的交互——NPC 对话、事件触发、物品操作。
@@ -421,7 +439,10 @@ S2 (前端骨架 + engine_web)
 S3 (大地图漫游: list/go/look/where)
   │
   ▼
-WR (Web Worker 引擎隔离)    ← 架构重构，不阻塞 S4/S5
+WR (Web Worker 引擎隔离)    ← 架构重构
+  │
+  ▼
+EV (事件系统集成)            ← 横向: oldevent + instruct_*
   │
   ├──────────────┐
   ▼              ▼
