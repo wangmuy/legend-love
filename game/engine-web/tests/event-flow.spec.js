@@ -100,7 +100,7 @@ test.describe('事件流程测试', () => {
     }
   });
 
-  test('TC-02: 悦来客栈 场景导航', async ({ page }) => {
+  test('TC-05: 悦来客栈 场景导航', async ({ page }) => {
     test.setTimeout(120000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);

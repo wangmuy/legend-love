@@ -489,6 +489,47 @@ test.describe('instruct 函数', () => {
     expect(r.ok).toBe(true);
     expect(r.result).toBe('function');
   });
+
+  test('instruct_27 动画 no-op 不抛异常', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_27(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_40 设置方向', async ({ page }) => {
+    const r = await luaEval(page, [
+      'if not rawget(_G,"JY") then rawset(_G,"JY",{}) end',
+      'rawget(_G,"JY").Base = rawget(_G,"JY").Base or {}',
+      'instruct_40(1)',
+      'return tostring(rawget(_G,"JY").Base["人方向"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('1');
+  });
+
+  test('instruct_67 音效 no-op 不抛异常', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_67(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_3 事件修改 no-op 不抛异常', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_3(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_2 出口修改 no-op 不抛异常', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_2(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_13 菜单 no-op 不抛异常', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_13(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_32 物品操作 no-op 不抛异常', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_32(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
 });
 
 test.describe('SMAP 菜单交互', () => {
