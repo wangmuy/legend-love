@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "extracted": "2026-06-11",
+  "extracted": "2026-06-19",
   "total": 20000,
   "events": [
     {"sceneId":0,"tileIndex":0,"passable":1,"unknown1":1,"eventSpace":1,"eventTouch":10,"eventExtra":-1,"tileStart":5166,"tileEnd":5166,"tileCurrent":5166,"animDelay":10,"x":24,"y":19},

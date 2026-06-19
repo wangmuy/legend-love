@@ -181,6 +181,53 @@ function extract.run(dataDir, outputFile)
 
     local data = readGrp(grpPath, sceneStart, sceneEnd - sceneStart)
 
+    -- 读取 allsin.grp（场景 tile 数据，6层，layer 3=事件索引）
+    local allsinGrpPath = dataDir .. "/allsin.grp"
+    local allsinIdxPath = dataDir .. "/allsin.idx"
+    local allsinIdx = {}
+    do
+        local f = io.open(allsinIdxPath, "rb")
+        if f then
+            local idxData = f:read(500)
+            f:close()
+            for i = 0, 99 do
+                allsinIdx[i + 1] = readU16(idxData, i * 4) + readU16(idxData, i * 4 + 2) * 65536
+            end
+        end
+    end
+
+    -- 读取 events.json 建立 tileIndex → 事件映射
+    local eventMap = {}  -- eventMap[sceneId][tileIndex] = {eventTouch, tileCurrent, tileStart, tileEnd, x, y}
+    do
+        local f = io.open("engine-web/data-web/events.json", "rb")
+        if f then
+            local json = f:read("*a")
+            f:close()
+            -- 简易 JSON 解析: 提取 event 对象数组
+            for entry in json:gmatch('{[^}]+}') do
+                local sceneId = tonumber(entry:match('"sceneId"[%s:]*([0-9-]+)'))
+                local tileIndex = tonumber(entry:match('"tileIndex"[%s:]*([0-9-]+)'))
+                local eventTouch = tonumber(entry:match('"eventTouch"[%s:]*([0-9-]+)'))
+                local tileCurrent = tonumber(entry:match('"tileCurrent"[%s:]*([0-9-]+)'))
+                local tileStart = tonumber(entry:match('"tileStart"[%s:]*([0-9-]+)'))
+                local tileEnd = tonumber(entry:match('"tileEnd"[%s:]*([0-9-]+)'))
+                local x = tonumber(entry:match('"x"[%s:]*([0-9-]+)'))
+                local y = tonumber(entry:match('"y"[%s:]*([0-9-]+)'))
+                if sceneId then
+                    if not eventMap[sceneId] then eventMap[sceneId] = {} end
+                    eventMap[sceneId][tileIndex] = {
+                        eventTouch = eventTouch or 0,
+                        tileCurrent = tileCurrent or 0,
+                        tileStart = tileStart or 0,
+                        tileEnd = tileEnd or 0,
+                        x = x or 0,
+                        y = y or 0,
+                    }
+                end
+            end
+        end
+    end
+
     local scenes = {}
     for i = 0, sceneCount - 1 do
         local offset = i * 62
@@ -201,6 +248,41 @@ function extract.run(dataDir, outputFile)
                 ["物品"] = {},
                 ["事件"] = {},
             }
+
+            -- 从 allsin.grp layer 3 提取 NPC 放置数据
+            if allsinIdx[sh.id + 1] then
+                local grpF = io.open(allsinGrpPath, "rb")
+                if grpF then
+                    local sceneOffset = allsinIdx[sh.id + 1]
+                    grpF:seek("set", sceneOffset)
+                    local sceneData = grpF:read(49152)
+                    grpF:close()
+                    local layer3offset = 3 * 64 * 64 * 2  -- layer 3 = offset 24576
+                    local npcList = {}
+                    for y = 0, 63 do
+                        for x = 0, 63 do
+                            local tileOff = layer3offset + (y * 64 + x) * 2
+                            local eventIndex = readU16(sceneData, tileOff)
+                            if eventIndex > 0 and eventIndex < 200 then
+                                local ev = eventMap[sh.id] and eventMap[sh.id][eventIndex]
+                                -- NPC: tileCurrent>0 表示该位置有贴图对象(NPC/物品)
+                                if ev and ev.tileCurrent > 0 then
+                                    local charId = math.floor(ev.tileCurrent / 10)
+                                    table.insert(npcList, {
+                                        ["代号"] = charId,
+                                        ["X"] = x,
+                                        ["Y"] = y,
+                                        ["事件编号"] = ev.eventTouch,
+                                    })
+                                end
+                            end
+                        end
+                    end
+                    if #npcList > 0 then
+                        entry["NPC"] = npcList
+                    end
+                end
+            end
             table.insert(scenes, entry)
         end
     end
