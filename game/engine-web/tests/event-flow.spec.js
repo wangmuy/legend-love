@@ -100,4 +100,53 @@ test.describe('事件流程测试', () => {
       expect(r && r.result).toBe('true');
     }
   });
+
+  test('TC-02: 悦来客栈 场景导航', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'list'); await page.waitForTimeout(3000);
+    let text = await term(page);
+    expect(text).toContain('客棧');
+    expect(await ok(page)).toBeTruthy();
+    // 进入场景
+    for (const line of text.split('\n')) {
+      if (line.includes('客棧')) {
+        const n = line.match(/(\d+)\./);
+        if (n) {
+          await cmd(page, 'choose ' + n[1]);
+          await page.waitForTimeout(SETTLE);
+          text = await term(page);
+          expect(text).toContain('客栈' || '客棧');
+          break;
+        }
+      }
+    }
+    expect(await ok(page)).toBeTruthy();
+  });
+
+  test('TC-03: 南贤居 场景导航', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'list'); await page.waitForTimeout(3000);
+    let text = await term(page);
+    expect(text).toContain('南賢居');
+    expect(await ok(page)).toBeTruthy();
+    for (const line of text.split('\n')) {
+      if (line.includes('南賢居')) {
+        const n = line.match(/(\d+)\./);
+        if (n) {
+          await cmd(page, 'choose ' + n[1]);
+          await page.waitForTimeout(SETTLE);
+          text = await term(page);
+          expect(text).toContain('南賢居');
+          break;
+        }
+      }
+    }
+    expect(await ok(page)).toBeTruthy();
+  });
 });
