@@ -476,7 +476,7 @@ test.describe('instruct 函数', () => {
 
   test('dialogues 数据可访问', async ({ page }) => {
     const r = await luaEval(page, [
-      'local dc = rawget(_G, "dataCache")',
+      'local dc = rawget(_G, "initDataSource")',
       'local dlg = dc and dc["dialogues"]',
       'return tostring(type(dlg) == "table")',
     ].join('; '));

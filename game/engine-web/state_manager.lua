@@ -1,16 +1,16 @@
 -- state_manager.lua
 -- Game state persistence for Web MUD
 -- JY.* tables use Chinese keys matching CC.*_S in jyconst.lua
--- dataCache also uses Chinese keys (from extraction pipeline)
+-- initDataSource also uses Chinese keys (from extraction pipeline)
 
 local SAVE_KEY_PREFIX = "save_"
 
 function initGameState()
     if not rawget(_G, "JY") then rawset(_G, "JY", {}) end
-    local dc = _G.dataCache
+    local dc = _G.initDataSource
     if not dc then return end
 
-    -- Characters: dataCache.chars → JY.Person (copy directly, keys already Chinese)
+    -- Characters: initDataSource.chars → JY.Person (copy directly, keys already Chinese)
     JY.Person = {}
     if dc.chars then
         for _, rec in ipairs(dc.chars) do
@@ -18,7 +18,7 @@ function initGameState()
         end
     end
 
-    -- Items: dataCache.items → JY.Thing
+    -- Items: initDataSource.items → JY.Thing
     JY.Thing = {}
     if dc.items then
         for _, rec in ipairs(dc.items) do
@@ -26,7 +26,7 @@ function initGameState()
         end
     end
 
-    -- Skills: dataCache.skills → JY.Wugong
+    -- Skills: initDataSource.skills → JY.Wugong
     JY.Wugong = {}
     if dc.skills then
         for _, rec in ipairs(dc.skills) do
@@ -34,7 +34,7 @@ function initGameState()
         end
     end
 
-    -- Scenes: dataCache.scenes → JY.Scene (flatten nested structure)
+    -- Scenes: initDataSource.scenes → JY.Scene (flatten nested structure)
     JY.Scene = {}
     if dc.scenes then
         for _, rec in ipairs(dc.scenes) do
@@ -69,7 +69,7 @@ function initGameState()
         end
     end
 
-    -- Base: dataCache.config → JY.Base (flatten nested structure)
+    -- Base: initDataSource.config → JY.Base (flatten nested structure)
     JY.Base = {}
     if dc.config then
         local cfg = dc.config
@@ -102,7 +102,7 @@ function initGameState()
         end
     end
 
-    -- Shops: dataCache.shops → JY.Shop
+    -- Shops: initDataSource.shops → JY.Shop
     JY.Shop = {}
     if dc.shops then
         for i, rec in ipairs(dc.shops) do
