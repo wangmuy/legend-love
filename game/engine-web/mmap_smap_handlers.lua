@@ -856,5 +856,36 @@ function SmapHandlers.give(args)
     w("你将 " .. itemName .. " 交给了 " .. npcName .. "。")
 end
 
+function SmapHandlers.rest(args)
+    local JY = g(_G, "JY")
+    if not JY then JY = {}; rawset(_G, "JY", JY) end
+    JY.Base = JY.Base or {}
+    JY.Person = JY.Person or {}
+    JY.Person[0] = JY.Person[0] or {}
+    local scenes = getScenes()
+    local sceneId = tostring(JY.SubScene or 0)
+    local scene = scenes and scenes[sceneId]
+    local sceneType = scene and scene["类型"] or ""
+    if sceneType == "house" then
+        JY.Person[0]["生命"] = JY.Person[0]["生命最大值"]
+        JY.Person[0]["体力"] = 100
+        JY.Person[0]["内力"] = JY.Person[0]["内力最大值"]
+        w("你休息了一晚，体力完全恢复了。")
+    elseif sceneType == "inn" then
+        local money = JY.Base["金钱"] or 0
+        if money >= 100 then
+            JY.Base["金钱"] = money - 100
+            JY.Person[0]["生命"] = JY.Person[0]["生命最大值"]
+            JY.Person[0]["体力"] = 100
+            JY.Person[0]["内力"] = JY.Person[0]["内力最大值"]
+            w("你付了100两住了一晚，体力完全恢复了。")
+        else
+            w("住一晚要100两，你钱不够。")
+        end
+    else
+        w("这里不是休息的地方。")
+    end
+end
+
 rawset(_G, "MmapHandlers", MmapHandlers)
 rawset(_G, "SmapHandlers", SmapHandlers)

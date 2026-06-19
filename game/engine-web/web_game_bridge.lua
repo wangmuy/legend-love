@@ -575,6 +575,7 @@ function _G.initWebFramework()
         }
         local smapCmds = {
             look  = { handler = _G.SmapHandlers.look,  description = "查看场景并选择交互对象" },
+            rest  = { handler = _G.SmapHandlers.rest,  description = "休息恢复体力" },
             exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
             go    = { handler = _G.SmapHandlers.go,    description = "go <编号> 前往出口" },
             leave = { handler = _G.SmapHandlers.leave, description = "离开场景回到大地图" },
