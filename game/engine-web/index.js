@@ -291,6 +291,22 @@
             data: data,
             events: eventsJson,
         });
+
+        // 注册 oldevent 脚本（逐个发送，worker 累积到 FrameworkSources）
+        term.write('Loading oldevent scripts...\r\n');
+        for (let i = 0; i <= 1018; i++) {
+            const resp = await fetch('script/oldevent/oldevent_' + i + '.lua');
+            if (resp.ok) {
+                const source = await resp.text();
+                // 用 script_source 消息类型注册到 FrameworkSources
+                worker.postMessage({
+                    type: 'script_source',
+                    path: 'script/oldevent/oldevent_' + i + '.lua',
+                    source: source,
+                });
+            }
+        }
+        term.write('  oldevent scripts: registered\r\n');
     }
 
     /* ── 6. 启动 ── */

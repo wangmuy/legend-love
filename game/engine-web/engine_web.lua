@@ -191,7 +191,7 @@ function EngineAPI.time.getTimeSeconds()
 end
 
 --------------------------------------------------------------------------------
--- file - dataCache based read-only file system
+-- file - initDataSource based read-only file system
 --------------------------------------------------------------------------------
 EngineAPI.file = {}
 
@@ -291,12 +291,12 @@ end
 function EngineAPI.file.createDirectory(dirpath) end
 
 --------------------------------------------------------------------------------
--- script - load Lua code from dataCache
+-- script - load Lua code from initDataSource
 --------------------------------------------------------------------------------
 EngineAPI.script = {}
 
 function EngineAPI.script.load(path)
-    local source = _G.dataCache and _G.dataCache[path]
+    local source = _G.initDataSource and _G.initDataSource[path]
     if not source then
         source = _G.FrameworkSources and _G.FrameworkSources[path]
     end

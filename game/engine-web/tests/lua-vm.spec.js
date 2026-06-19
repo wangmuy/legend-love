@@ -35,8 +35,8 @@ test.describe('Lua VM 初始化', () => {
     expect(r && r.ok).toBe(true);
   });
 
-  test('dataCache._loaded == true', async ({ page }) => {
-    const r = await luaEval(page, 'local dc = rawget(_G, "dataCache"); return dc and tostring(dc["_loaded"]) or "false"');
+  test('initDataSource._loaded == true', async ({ page }) => {
+    const r = await luaEval(page, 'local dc = rawget(_G, "initDataSource"); return dc and tostring(dc["_loaded"]) or "false"');
     expect(r && r.ok).toBe(true);
     expect(r.result).toBe('true');
   });

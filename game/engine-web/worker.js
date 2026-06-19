@@ -128,7 +128,7 @@ function injectParsedJson(cacheKey, jsonString) {
   }
   // 将 JS 对象推入 Lua 表
   pushValueToLua(parsed);
-  lua.lua_getglobal(L, 'dataCache');
+  lua.lua_getglobal(L, 'initDataSource');
   lua.lua_pushstring(L, cacheKey);
   lua.lua_pushvalue(L, -3);
   lua.lua_settable(L, -3);

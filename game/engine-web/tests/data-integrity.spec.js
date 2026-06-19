@@ -18,21 +18,21 @@ test.describe('数据完整性', () => {
   });
 
   test('_fileCount == 10', async ({ page }) => {
-    const r = await luaEval(page, 'return tostring(rawget(_G, "dataCache") and rawget(_G, "dataCache")["_fileCount"] or 0)');
+    const r = await luaEval(page, 'return tostring(rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["_fileCount"] or 0)');
     expect(r.ok).toBe(true);
     expect(r.result).toBe('10');
   });
 
   for (const key of DATA_KEYS) {
     test(`${key} 存在且非空`, async ({ page }) => {
-      const r = await luaEval(page, `local dc=rawget(_G,"dataCache"); return dc and type(dc[${JSON.stringify(key)}]) or "nil"`);
+      const r = await luaEval(page, `local dc=rawget(_G,"initDataSource"); return dc and type(dc[${JSON.stringify(key)}]) or "nil"`);
       expect(r.ok).toBe(true);
       expect(r.result).toBe('table');
     });
   }
 
-  test('dataCachePaths 兼容映射', async ({ page }) => {
-    const r = await luaEval(page, 'local p=rawget(_G,"dataCachePaths"); return p and tostring(#p>0) or "false"');
+  test('initDataSourcePaths 兼容映射', async ({ page }) => {
+    const r = await luaEval(page, 'local p=rawget(_G,"initDataSourcePaths"); return p and tostring(#p>0) or "false"');
     expect(r.ok).toBe(true);
   });
 });
@@ -41,8 +41,8 @@ test('场景 NPC 引用在 chars 中存在', async ({ page }) => {
   await page.goto('/');
   await waitForPageReady(page);
   const r = await luaEval(page, [
-    'local scenes = rawget(_G, "dataCache") and rawget(_G, "dataCache")["scenes"]',
-    'local chars = rawget(_G, "dataCache") and rawget(_G, "dataCache")["chars"]',
+    'local scenes = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["scenes"]',
+    'local chars = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["chars"]',
     'if not scenes or not chars then return "missing data" end',
     'local charIndex = {}',
     'for i, c in ipairs(chars) do if type(c)=="table" then charIndex[tostring(c["代号"])]=true end end',
@@ -63,8 +63,8 @@ test('entrances 场景 ID 在 scenes 中存在', async ({ page }) => {
   await page.goto('/');
   await waitForPageReady(page);
   const r = await luaEval(page, [
-    'local scenes = rawget(_G, "dataCache") and rawget(_G, "dataCache")["scenes"]',
-    'local entrances = rawget(_G, "dataCache") and rawget(_G, "dataCache")["entrances"]',
+    'local scenes = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["scenes"]',
+    'local entrances = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["entrances"]',
     'if not scenes or not entrances then return "missing data" end',
     'for i = 1, #entrances do',
     '  local e = entrances[i]',
@@ -84,8 +84,8 @@ test('D* 事件引用的场景 ID 在 scenes 中存在', async ({ page }) => {
   await page.goto('/');
   await waitForPageReady(page);
   const r = await luaEval(page, [
-    'local scenes = rawget(_G, "dataCache") and rawget(_G, "dataCache")["scenes"]',
-    'local events = rawget(_G, "dataCache") and rawget(_G, "dataCache")["events"]',
+    'local scenes = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["scenes"]',
+    'local events = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["events"]',
     'if not scenes or not events then return "missing data" end',
     'local sceneIds = {}',
     'for _, s in pairs(scenes) do',
@@ -104,7 +104,7 @@ test('config 包含主角位置', async ({ page }) => {
   await page.goto('/');
   await waitForPageReady(page);
   const r = await luaEval(page, [
-    'local cfg = rawget(_G, "dataCache") and rawget(_G, "dataCache")["config"]',
+    'local cfg = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["config"]',
     'if not cfg then return "no config" end',
     'local pl = cfg["玩家"] or cfg["player"]',
     'return pl and tostring(pl["X"] ~= nil) or "false"',
@@ -116,8 +116,8 @@ test('shops 物品 ID 在 items 中存在', async ({ page }) => {
   await page.goto('/');
   await waitForPageReady(page);
   const r = await luaEval(page, [
-    'local items = rawget(_G, "dataCache") and rawget(_G, "dataCache")["items"]',
-    'local shops = rawget(_G, "dataCache") and rawget(_G, "dataCache")["shops"]',
+    'local items = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["items"]',
+    'local shops = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["shops"]',
     'if not items or not shops then return "missing data" end',
     'return "ok"',
   ].join('; '));
