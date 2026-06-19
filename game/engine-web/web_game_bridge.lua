@@ -119,6 +119,51 @@ rawset(_G, "WaitKey", function()
     end
 end)
 
+-- P0 instruct 函数 — 影响游戏流程的
+rawset(_G, "instruct_3", function(...)
+    -- 修改场景事件: oldevent 脚本执行时修改事件表
+    -- no-op: Web MUD 中运行时事件无需持久化
+end)
+
+rawset(_G, "instruct_2", function(...)
+    -- 修改场景出入口: no-op
+end)
+
+rawset(_G, "instruct_40", function(dir)
+    local JY = rawget(_G, "JY")
+    if JY then JY.Base["人方向"] = dir end
+end)
+
+rawset(_G, "instruct_27", function() end)  -- 动画, no-op
+rawset(_G, "instruct_67", function() end)  -- 音效, no-op
+
+rawset(_G, "instruct_13", function(...)
+    -- 菜单选择: 交给 MenuAsync 处理
+end)
+
+rawset(_G, "instruct_32", function(...)
+    -- 给/取物品: 操作 JY.Base["物品N"]
+end)
+
+rawset(_G, "instruct_37", function() end)  -- 场景音乐, no-op
+
+rawset(_G, "instruct_56", function(...)
+    -- 队伍: no-op
+end)
+
+rawset(_G, "instruct_26", function(...)
+    -- 修改角色属性: no-op
+end)
+
+-- 兜底: 所有未显式实现的 instruct_* 输出 debug 日志
+for i = 0, 66 do
+    if not rawget(_G, "instruct_" .. i) then
+        rawset(_G, "instruct_" .. i, function(...)
+            EngineAPI.debug.log("instruct_" .. i .. " 未实现(no-op)")
+        end)
+    end
+end
+
 -- 调试函数（在 setmetatable(_G) 之前定义，之后可调用）
 
 -- D* 事件数据访问（event-data-access）
