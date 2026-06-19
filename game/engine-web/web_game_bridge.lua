@@ -106,9 +106,9 @@ rawset(_G, "instruct_1", function(talkId, headId)
                 text = text[tostring(headId or 1)]
             end
             if text then
-                local w = rawget(_G, "WebUI")
-                if w then
-                    w.write(tostring(text))
+                local JSBridge = rawget(_G, "JSBridge")
+                if JSBridge and JSBridge.write then
+                    JSBridge.write(tostring(text) .. "\n")
                 end
             else
                 local w = rawget(_G, "WebUI")
@@ -274,6 +274,9 @@ function _G.initWebFramework()
     _G.__quiet = false
 
     -- 1. 加载脚本模块
+    -- 先保存我们的 instruct 函数，脚本加载会覆盖它们
+    local _our_instruct_0 = rawget(_G, "instruct_0")
+    local _our_instruct_1 = rawget(_G, "instruct_1")
     local scriptList = {
         "script/jymain.lua",
         "script/jyconst.lua",
@@ -302,6 +305,9 @@ function _G.initWebFramework()
     -- 重新安装 Web MUD 空桩版本
     _G.DrawMMap = function() end
     _G.DrawSMap = function() end
+    -- jymain.lua 也覆盖了 instruct_1，恢复 Web MUD 版本
+    _G.instruct_0 = _our_instruct_0 or _G.instruct_0
+    _G.instruct_1 = _our_instruct_1 or _G.instruct_1
 
     -- 2. 初始化游戏适配器
     require("framework.lib_log")
