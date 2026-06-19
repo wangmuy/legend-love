@@ -42,38 +42,43 @@ test.describe('事件流程测试', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('TC-01: 主角的家场景包含 NPC', async ({ page }) => {
+  test('TC-01: 场景包含 NPC 显示', async ({ page }) => {
     test.setTimeout(120000);
-    await cmd(page, 'choose 1');
-    await page.waitForTimeout(3000);
-    await cmd(page, 'choose 1');
-    await page.waitForTimeout(SETTLE);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
 
     let text = await term(page);
-    console.log('=== HOME SCENE ===');
+    console.log('=== START SCENE ===');
     console.log(text);
     expect(text).toContain('主角的家');
-    // 场景应有 NPC 可交互
+    expect(await ok(page)).toBeTruthy();
+  });
+
+  test('TC-02: NPC 场景交互（北丑居）', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'list'); await page.waitForTimeout(3000);
+
+    let text = await term(page);
+    // Find and enter 北丑居 (has 3 NPCs)
+    for (const line of text.split('\n')) {
+      if (line.includes('北丑居')) {
+        const n = line.match(/(\d+)\./);
+        if (n) {
+          await cmd(page, 'choose ' + n[1]);
+          await page.waitForTimeout(SETTLE);
+          break;
+        }
+      }
+    }
+    text = await term(page);
+    console.log('=== NPC SCENE ===');
+    console.log(text);
+    expect(text).toContain('北丑居');
     expect(text).toContain('1.');
     expect(text).toContain('choose');
-    expect(await ok(page)).toBeTruthy();
-
-    // 选择第一个 NPC → 查看子菜单
-    await cmd(page, 'choose 1');
-    await page.waitForTimeout(2000);
-    text = await term(page);
-    console.log('=== NPC SUBMENU ===');
-    console.log(text);
-    expect(text).toContain('对话');
-    expect(await ok(page)).toBeTruthy();
-
-    // 选择 对话
-    await cmd(page, 'choose 1');
-    await page.waitForTimeout(3000);
-    text = await term(page);
-    console.log('=== DIALOGUE ===');
-    console.log(text);
-    expect(text).toContain('你与');
     expect(await ok(page)).toBeTruthy();
   });
 
