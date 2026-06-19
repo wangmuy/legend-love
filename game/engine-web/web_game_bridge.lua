@@ -94,16 +94,31 @@ end)
 rawset(_G, "instruct_1", function(talkId, headId)
     local dc = rawget(_G, "initDataSource")
     if not dc then return end
-    local dlg = dc["dialogues"]
-    if not dlg then return end
-    local text = dlg[tostring(talkId)]
-    if type(text) == "table" then
-        text = text[tostring(headId or 1)]
+    local raw = dc["dialogues"]
+    if not raw then return end
+    -- dialogues 可能是 {dialogues=[...]} 或直接是列表
+    local dlg = raw["dialogues"] or raw
+    if type(dlg) ~= "table" then return end
+    for _, entry in ipairs(dlg) do
+        if entry.id == tonumber(talkId) then
+            local text = entry.text
+            if type(text) == "table" then
+                text = text[tostring(headId or 1)]
+            end
+            if text then
+                local w = rawget(_G, "WebUI")
+                if w then
+                    w.write(tostring(text))
+                end
+            else
+                local w = rawget(_G, "WebUI")
+                if w then w.write("[对话文本为空, talkId=" .. tostring(talkId) .. "]") end
+            end
+            return
+        end
     end
-    if text then
-        local w = rawget(_G, "WebUI")
-        if w then w.write(tostring(text)) end
-    end
+    local w = rawget(_G, "WebUI")
+    if w then w.write("[未找到对话, talkId=" .. tostring(talkId) .. "]") end
 end)
 
 -- WaitKey — 供 oldevent 脚本使用，等待用户输入后继续
