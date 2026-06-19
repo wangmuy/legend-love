@@ -25,7 +25,7 @@ Slice 4 实现了 SMAP 菜单驱动交互，但 NPC 对话触发 `EventExecutor.
 - `instruct_32` → 背包操作
 
 ### D* 数据访问
-- `GetD(sceneId, eventId, field)` → 从 `dataCache.events` 读取
+- `GetD`/`SetD` 操作 `JY.D{sceneId}` Lua 运行时表（首次访问时从 `initDataSource.events` 拷贝）
 - `SetD(sceneId, eventId, field, value)` → 写入 JY 运行时状态
 - `GetS`/`SetS` → 场景格子数据（Web MUD 中简化）
 
