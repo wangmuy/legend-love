@@ -43,3 +43,29 @@
 - [x] 6.7 更新 data-integrity 测试：跨文件引用验证
 - [x] 6.8 重新运行提取管线 + 验证 + 测试，全部通过
 - [x] 6.9 数据源调研确认：ranger.grp 是随游戏发布的源文件（非用户存档），Scene_S 是场景元数据唯一源
+
+### 6.10 从 thing.grp + allsin.grp 提取场景 NPC/物品放置数据
+
+调研发现：NPC 和物品在场景中的位置数据不在 ranger.grp 中，也不在 s1/s2/s3.grp 的 tile 数据中（tile 值仅为1-15的地形/墙体索引）。
+数据在 `thing.grp`（200 场景 × 1728 字节/场景）和 `allsin.grp`（100场景 × 49152字节/场景×6层）中。
+需要在 extract_scenes.lua 中新增解析器来提取这些数据。
+
+- [ ] 6.10.1 逆向 thing.grp 的每场景 1728 字节格式
+  Blast Radius: `["game/tools/extract_scenes.lua"]`
+  DoD:
+    - [ ] 确认每场景的 thing 记录数量（1728 字节 / 记录大小）
+    - [ ] 确认记录是否包含 {itemId, count, x, y} 或 NPC 引用
+    - [ ] 编写测试脚验证已知场景的数据正确性
+
+- [ ] 6.10.2 实现 NPC/物品提取并输出到 scenes.json
+  Blast Radius: `["game/tools/extract_scenes.lua"]`
+  DoD:
+    - [ ] scenes.json 中 NPC 数组不再为空（有数据的场景不复为空）
+    - [ ] scenes.json 中物品数组不再为空
+    - [ ] 重新运行 `lua tools/extract_web_data.lua` 成功
+
+- [ ] 6.10.3 验证与回归
+  Blast Radius: `["game/engine-web/tests/*"]`
+  DoD:
+    - [ ] data-integrity 测试全部通过
+    - [ ] 主角的家场景 NPC 包含软体娃娃
