@@ -41,23 +41,34 @@
 - **Consequences**: 与存档机制一致——加载存档时从 IndexedDB 恢复 `JY.*`，不经过 `initDataSource`。`initDataSource` 在所有 `initGameState()` 完成后不再被修改。
 - **dataCache 重命名**: `_G.dataCache` → `_G.initDataSource`，强调其只读、仅初始化时使用的角色。
 
-## D* 事件数据格式
+## D* 事件数据加载流程
 
 ```lua
--- dataCache.events: 20000 条记录
+-- initDataSource.events: 20000 条记录，只读
 -- [sceneId, layer, x, y, eventType, ...]
--- eventType: 1=对话, 2=物品, 3=路过, 5=跳转, ...
--- 对于 type=1 (对话) 的 event:
---   [sceneId, layer, x, y, 1, eventScriptId, talkId, itemId, ...]
 
-function GetD(sceneId, eventId, field)
-    local events = dataCache.events  -- 20000 条
-    for _, evt in ipairs(events) do
-        if evt[1] == sceneId and evt[2] == layer and ... then
-            return evt[field]
+-- 首次 GetD(sceneId, ...) 时从 initDataSource 拷贝到 JY.D
+local function ensureSceneDEvents(sceneId)
+    if JY.D[sceneId] then return end
+    JY.D[sceneId] = {}
+    for _, evt in ipairs(initDataSource.events) do
+        if evt[1] == sceneId then
+            table.insert(JY.D[sceneId], evt)
         end
     end
-    return 0
+end
+
+-- 此后 GetD/SetD 操作 JY.D，不再访问 initDataSource
+function GetD(sceneId, eventId, field)
+    ensureSceneDEvents(sceneId)
+    local evt = JY.D[sceneId][eventId]
+    return evt and evt[field] or 0
+end
+
+function SetD(sceneId, eventId, field, value)
+    ensureSceneDEvents(sceneId)
+    JY.D[sceneId][eventId] = JY.D[sceneId][eventId] or {}
+    JY.D[sceneId][eventId][field] = value
 end
 ```
 
