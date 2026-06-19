@@ -120,6 +120,75 @@ rawset(_G, "WaitKey", function()
 end)
 
 -- 调试函数（在 setmetatable(_G) 之前定义，之后可调用）
+
+-- D* 事件数据访问（event-data-access）
+-- 原版 GetD/SetD 操作 JY.D{sceneId} Lua 运行时表
+-- 首次访问某场景时，从 initDataSource.events 拷贝到 JY.D{sceneId}
+
+local function ensureSceneDEvents(sceneId)
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    JY.D = JY.D or {}
+    if JY.D[sceneId] then return end  -- 已加载
+    
+    local ds = rawget(_G, "initDataSource")
+    local events = ds and ds["events"]
+    if not events then
+        JY.D[sceneId] = {}
+        return
+    end
+    
+    -- 从 initDataSource.events 拷贝该场景的所有事件
+    local sceneEvents = {}
+    -- events 是 [sceneId, layer, x, y, eventType, ...] 的数组
+    for _, evt in ipairs(events) do
+        if evt[1] == sceneId then
+            table.insert(sceneEvents, evt)
+        end
+    end
+    JY.D[sceneId] = sceneEvents
+end
+
+rawset(_G, "GetD", function(sceneId, eventId, field)
+    sceneId = tonumber(sceneId) or sceneId
+    eventId = tonumber(eventId) or 0
+    field = tonumber(field) or 0
+    
+    ensureSceneDEvents(sceneId)
+    local JY = rawget(_G, "JY")
+    local sceneD = JY and JY.D and JY.D[sceneId]
+    if not sceneD then return 0 end
+    
+    local evt = sceneD[eventId]
+    if not evt then return 0 end
+    
+    local val = evt[field]
+    return val or 0
+end)
+
+rawset(_G, "SetD", function(sceneId, eventId, field, value)
+    sceneId = tonumber(sceneId) or sceneId
+    eventId = tonumber(eventId) or 0
+    field = tonumber(field) or 0
+    
+    ensureSceneDEvents(sceneId)
+    local JY = rawget(_G, "JY")
+    local sceneD = JY and JY.D and JY.D[sceneId]
+    if not sceneD then return end
+    
+    if not sceneD[eventId] then
+        sceneD[eventId] = {}
+    end
+    sceneD[eventId][field] = value
+end)
+
+rawset(_G, "GetS", function(id, x, y, level)
+    return 0  -- 场景格子数据在 MUD 中简化
+end)
+
+rawset(_G, "SetS", function(id, x, y, level, value)
+    -- no-op，MUD 中不需要
+end)
 function _G.__debug_coro_state()
     local cs = package.loaded["framework.coroutine_scheduler"]
     if not cs then return {} end
