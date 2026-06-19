@@ -111,7 +111,7 @@ test.describe('EngineAPI 表面 + 功能', () => {
     expect(ok).toBe('ok');
   });
 
-  test('file.open 读取 dataCache', async ({ page }) => {
+  test('file.open 读取 initDataSource', async ({ page }) => {
     const content = await luaEval(page, [
       'local handle = EngineAPI.file.open("dialogues", "r")',
       'if not handle then return "nil" end',

@@ -2,7 +2,7 @@
 -- JSON parser + data loader + cache for Web MUD
 -- Runs inside Fengari Lua VM (Lua 5.3)
 
-_G.dataCache = {}
+_G.initDataSource = {}
 _G.rawDataCache = {}
 _G.rawDataCache = {}
 
@@ -133,29 +133,29 @@ function loadJSON(cacheKey, jsonString)
     if not ok then
         return false, result
     end
-    _G.dataCache[cacheKey] = result
+    _G.initDataSource[cacheKey] = result
     _G.rawDataCache[cacheKey] = jsonString
     totalDataSize = totalDataSize + #jsonString
     return true
 end
 
 function finalizeDataLoad()
-    _G.dataCache._loaded = true
-    _G.dataCache._fileCount = 10
-    _G.dataCache._totalSize = totalDataSize
+    _G.initDataSource._loaded = true
+    _G.initDataSource._fileCount = 10
+    _G.initDataSource._totalSize = totalDataSize
     initDataCompat()
 end
 
 function getData(cacheKey)
-    return _G.dataCache[cacheKey]
+    return _G.initDataSource[cacheKey]
 end
 
-setmetatable(_G.dataCache, {
+setmetatable(_G.initDataSource, {
     __index = function(_, key)
         if type(key) == "string" then
             local baseKey = key:match("/(.-)%.json$")
             if baseKey then
-                return _G.dataCache[baseKey]
+                return _G.initDataSource[baseKey]
             end
         end
         return nil
@@ -164,14 +164,14 @@ setmetatable(_G.dataCache, {
 
 function getDataStatus()
     return {
-        loaded = _G.dataCache._loaded or false,
-        files = _G.dataCache._fileCount or 0,
-        size = _G.dataCache._totalSize or 0,
+        loaded = _G.initDataSource._loaded or false,
+        files = _G.initDataSource._fileCount or 0,
+        size = _G.initDataSource._totalSize or 0,
     }
 end
 
 function initDataCompat()
-    _G.dataCachePaths = {
+    _G.initDataSourcePaths = {
         ["data-web/dialogues.json"] = "dialogues",
         ["data-web/scenes.json"] = "scenes",
         ["data-web/chars.json"] = "chars",

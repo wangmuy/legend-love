@@ -39,7 +39,7 @@ local function getSceneTemplate(scene)
 end
 
 local function getEntrances()
-    local cache = g(_G, "dataCache")
+    local cache = g(_G, "initDataSource")
     if not cache then return nil end
     local raw = cache["entrances"]
     if not raw then return nil end
@@ -49,7 +49,7 @@ local function getEntrances()
 end
 
 local function getScenes()
-    local cache = g(_G, "dataCache")
+    local cache = g(_G, "initDataSource")
     if not cache then return nil end
     local raw = cache["scenes"]
     if not raw then return nil end
@@ -283,7 +283,7 @@ function MmapHandlers.where(args)
 end
 
 local function getCharsIndex()
-    local cache = g(_G, "dataCache")
+    local cache = g(_G, "initDataSource")
     if not cache then return nil end
     local raw = cache["chars"]
     if not raw then return nil end
@@ -430,7 +430,7 @@ function SmapHandlers.chooseInteraction(idx)
                     if actionIdx == 1 then
                         smapTakeItem(sceneId, ent)
                     elseif actionIdx == 2 then
-                        local itemsData = g(_G, "dataCache")
+                        local itemsData = g(_G, "initDataSource")
                         if itemsData then
                             local itemDef = itemsData["items"] and itemsData["items"][ent.itemId]
                             if itemDef and itemDef["描述"] then
@@ -656,9 +656,9 @@ function _G.itemAvailable(sceneId, itemId)
     return _G.getItemCount(sceneId, itemId) > 0
 end
 
--- 查找角色名称（从 dataCache.chars）
+-- 查找角色名称（从 initDataSource.chars）
 local function getCharName(charId)
-    local cache = g(_G, "dataCache")
+    local cache = g(_G, "initDataSource")
     if not cache then return nil end
     local chars = cache["chars"]
     if not chars then return nil end
@@ -672,9 +672,9 @@ local function getCharName(charId)
     return nil
 end
 
--- 查找物品名称（从 dataCache.items）
+-- 查找物品名称（从 initDataSource.items）
 local function getItemName(itemId)
-    local cache = g(_G, "dataCache")
+    local cache = g(_G, "initDataSource")
     if not cache then return nil end
     local items = cache["items"]
     if not items then return nil end

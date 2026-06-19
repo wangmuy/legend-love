@@ -92,7 +92,7 @@ rawset(_G, "instruct_0", function()
 end)
 
 rawset(_G, "instruct_1", function(talkId, headId)
-    local dc = rawget(_G, "dataCache")
+    local dc = rawget(_G, "initDataSource")
     if not dc then return end
     local dlg = dc["dialogues"]
     if not dlg then return end
@@ -181,6 +181,11 @@ function _G.initWebFramework()
     _G.MenuAsync = require("framework.menu_async")
     _G.CoroutineScheduler = require("framework.coroutine_scheduler")
     _G.AsyncDialog = require("framework.async_dialog")
+    -- 事件系统集成
+    require("framework.async_globals")
+    require("framework.script_loader")
+    require("framework.async_wrapper")
+    _G.EventExecutor = require("framework.event_executor")
     -- CommandEngine already loaded as global via loadLuaModule in index.js
     if not _G.CommandEngine then
         _G.CommandEngine = require("web_command_engine")
@@ -335,7 +340,7 @@ function _G.initWebFramework()
         JY.MmapMusic = -1
 
         -- 注入主角的家场景数据（提取管线未包含 NPC/物品/出口）
-        local dc = rawget(_G, "dataCache")
+        local dc = rawget(_G, "initDataSource")
         local sceneTables = dc and dc["scenes"]
         if sceneTables then
             -- scenes 可能是 {scenes=[...]} 或 [...] 格式
