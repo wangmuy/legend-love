@@ -106,10 +106,8 @@ rawset(_G, "instruct_1", function(talkId, headId)
                 text = text[tostring(headId or 1)]
             end
             if text then
-                local JSBridge = rawget(_G, "JSBridge")
-                if JSBridge and JSBridge.write then
-                    JSBridge.write(tostring(text) .. "\n")
-                end
+                local w = rawget(_G, "WebUI")
+                if w then w.write(tostring(text)) end
             else
                 local w = rawget(_G, "WebUI")
                 if w then w.write("[对话文本为空, talkId=" .. tostring(talkId) .. "]") end
