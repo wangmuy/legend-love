@@ -249,38 +249,23 @@ function extract.run(dataDir, outputFile)
                 ["事件"] = {},
             }
 
-            -- 从 allsin.grp layer 3 提取 NPC 放置数据
-            if allsinIdx[sh.id + 1] then
-                local grpF = io.open(allsinGrpPath, "rb")
-                if grpF then
-                    local sceneOffset = allsinIdx[sh.id + 1]
-                    grpF:seek("set", sceneOffset)
-                    local sceneData = grpF:read(49152)
-                    grpF:close()
-                    local layer3offset = 3 * 64 * 64 * 2  -- layer 3 = offset 24576
-                    local npcList = {}
-                    for y = 0, 63 do
-                        for x = 0, 63 do
-                            local tileOff = layer3offset + (y * 64 + x) * 2
-                            local eventIndex = readU16(sceneData, tileOff)
-                            if eventIndex > 0 and eventIndex < 200 then
-                                local ev = eventMap[sh.id] and eventMap[sh.id][eventIndex]
-                                -- NPC: tileCurrent>0 表示该位置有贴图对象(NPC/物品)
-                                if ev and ev.tileCurrent > 0 then
-                                    local charId = math.floor(ev.tileCurrent / 10)
-                                    table.insert(npcList, {
-                                        ["代号"] = charId,
-                                        ["X"] = x,
-                                        ["Y"] = y,
-                                        ["事件编号"] = ev.eventTouch,
-                                    })
-                                end
-                            end
-                        end
+            -- 从 events.json 提取 NPC（tileCurrent>0 + eventTouch>=10 的可交互对象）
+            local sceneEvents = eventMap[sh.id]
+            if sceneEvents then
+                local npcList = {}
+                for tileIdx, ev in pairs(sceneEvents) do
+                    if ev.tileCurrent > 0 and ev.eventTouch >= 10 then
+                        local charId = math.floor(ev.tileCurrent / 10)
+                        table.insert(npcList, {
+                            ["代号"] = charId,
+                            ["X"] = ev.x,
+                            ["Y"] = ev.y,
+                            ["事件编号"] = ev.eventTouch,
+                        })
                     end
-                    if #npcList > 0 then
-                        entry["NPC"] = npcList
-                    end
+                end
+                if #npcList > 0 then
+                    entry["NPC"] = npcList
                 end
             end
             table.insert(scenes, entry)
