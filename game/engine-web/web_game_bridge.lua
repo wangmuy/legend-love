@@ -273,8 +273,11 @@ function _G.initWebFramework()
 
     -- 1. 加载脚本模块
     -- 先保存我们的 instruct 函数，脚本加载会覆盖它们
-    local _our_instruct_0 = rawget(_G, "instruct_0")
-    local _our_instruct_1 = rawget(_G, "instruct_1")
+    local _our_instruct = {}
+    for i = 0, 66 do
+        local fn = rawget(_G, "instruct_" .. i)
+        if fn then _our_instruct[i] = fn end
+    end
     local scriptList = {
         "script/jymain.lua",
         "script/jyconst.lua",
@@ -303,9 +306,12 @@ function _G.initWebFramework()
     -- 重新安装 Web MUD 空桩版本
     _G.DrawMMap = function() end
     _G.DrawSMap = function() end
-    -- jymain.lua 也覆盖了 instruct_1，恢复 Web MUD 版本
-    _G.instruct_0 = _our_instruct_0 or _G.instruct_0
-    _G.instruct_1 = _our_instruct_1 or _G.instruct_1
+    -- script 加载后 jymain.lua 覆盖了 instruct 函数，恢复 Web MUD 版本
+    for i = 0, 66 do
+        if _our_instruct[i] then
+            _G["instruct_" .. i] = _our_instruct[i]
+        end
+    end
 
     -- 2. 初始化游戏适配器
     require("framework.lib_log")
