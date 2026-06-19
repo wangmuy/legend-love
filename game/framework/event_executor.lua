@@ -53,6 +53,10 @@ function EventExecutor.oldEventExecuteCoroutine(flag)
         eventnum = GetD(JY.SubScene, JY.CurrentD, 4)
     end
     
+    if eventnum == nil or eventnum <= 0 then
+        eventnum = JY.CurrentD  -- fallback: 直接用事件 ID
+    end
+    
     lib.Debug(string.format("oldEventExecuteCoroutine: eventnum=%d", eventnum or -1))
     
     if eventnum and eventnum > 0 then

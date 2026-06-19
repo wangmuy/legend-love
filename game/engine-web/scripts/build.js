@@ -87,6 +87,15 @@ for (const lib of libs) {
     }
 }
 
+// 3b. Copy oldevent scripts to dist/script/oldevent/
+const OLDSCRIPT = path.resolve(ROOT, '..', 'script', 'oldevent');
+if (fs.existsSync(OLDSCRIPT)) {
+    const DST_SCRIPT = path.join(DIST, 'script', 'oldevent');
+    fs.mkdirSync(DST_SCRIPT, { recursive: true });
+    fs.cpSync(OLDSCRIPT, DST_SCRIPT, { recursive: true, force: true });
+    console.log(`  oldevent/: ${fs.readdirSync(OLDSCRIPT).length} files`);
+}
+
 // 4. index.html: switch CDN → local lib refs
 console.log('[4/4] Updating index.html for local libs...');
 const htmlPath = path.join(DIST, 'index.html');
