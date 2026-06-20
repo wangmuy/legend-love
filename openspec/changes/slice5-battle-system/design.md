@@ -55,3 +55,10 @@ WMAP 交互流:
 2. move 命令能改变敌我距离
 3. attack 命令能在范围内攻击
 4. 敌回合 AI 能做出决策
+
+## Negative Constraints
+
+- 不引入随机遇敌（金庸群侠传原版无此设计）
+- 不修改 MMAP/SMAP 现有命令集
+- 不依赖图形渲染（纯文字交互）
+- 不改变 JY.Person 数据结构（仅运行时 JY.War 可控）
