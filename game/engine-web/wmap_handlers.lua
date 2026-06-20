@@ -3,10 +3,6 @@
 
 local WmapHandlers = {}
 
-local function rawget(t, k)
-    return t[k]
-end
-
 -- 当前战斗状态（choose N 的上下文）
 local wmapContext = {
     phase = nil,       -- "select_teammate", "select_action", "select_target", "select_martial", "select_item", "select_move"
