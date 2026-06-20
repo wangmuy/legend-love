@@ -40,13 +40,11 @@ Traceability: [REQ-003]
 
 ## 3. 测试
 
-- [ ] 3.1 GetD 测试
-  Blast Radius: `["game/engine-web/tests/*"]`
+- [x] 3.1 GetD 测试
   DoD:
-    - [ ] `GetD(70, 0, 19, 20, 5)` 返回有效值或 0
-    - [ ] 不崩溃
+    - [x] `GetD(70, 0, 5)` 返回有效值或 0
+    - [x] 不崩溃
 
-- [ ] 3.2 dataCache 重命名后无遗留引用
-  Blast Radius: `["game/engine-web/*"]`
+- [x] 3.2 dataCache 重命名后无遗留引用
   DoD:
-    - [ ] `grep "dataCache" game/engine-web/*.lua` 无输出
+    - [x] `grep "dataCache" game/engine-web/*.lua` 无输出
