@@ -167,4 +167,55 @@ test.describe('事件流程测试', () => {
     }
     expect(await ok(page)).toBeTruthy();
   });
+
+  test('TC-02b: 悦来客栈 店小二对话', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'list'); await page.waitForTimeout(3000);
+    let text = await term(page);
+    // Find and enter 悦来客栈
+    for (const line of text.split('\n')) {
+      if (line.includes('悦来客栈') || line.includes('悅來客棧')) {
+        const n = line.match(/(\d+)\./);
+        if (n) {
+          await cmd(page, 'choose ' + n[1]);
+          await page.waitForTimeout(SETTLE);
+          break;
+        }
+      }
+    }
+    // Talk to NPC in 悦来客栈 (NPC event 235 = 店小二)
+    text = await term(page);
+    await cmd(page, 'talk oldevent_235'); await page.waitForTimeout(4000);
+    text = await term(page);
+    expect(text).toContain('交谈');
+    expect(await ok(page)).toBeTruthy();
+  });
+
+  test('TC-03b: 南贤居 南贤对话', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+    await cmd(page, 'list'); await page.waitForTimeout(3000);
+    let text = await term(page);
+    // Find and enter 南贤居
+    for (const line of text.split('\n')) {
+      if (line.includes('南賢居') || line.includes('南贤居')) {
+        const n = line.match(/(\d+)\./);
+        if (n) {
+          await cmd(page, 'choose ' + n[1]);
+          await page.waitForTimeout(SETTLE);
+          break;
+        }
+      }
+    }
+    // Talk to 南贤 (NPC event 821)
+    await cmd(page, 'talk 南贤'); await page.waitForTimeout(4000);
+    text = await term(page);
+    expect(text).toContain('南贤');
+    expect(await ok(page)).toBeTruthy();
+  });
 });
