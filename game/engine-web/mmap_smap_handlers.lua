@@ -867,18 +867,16 @@ function SmapHandlers.rest(args)
     local scene = scenes and scenes[sceneId]
     local sceneType = scene and scene["类型"] or ""
     if sceneType == "house" then
-        JY.Person[0]["生命"] = JY.Person[0]["生命最大值"]
-        JY.Person[0]["体力"] = 100
-        JY.Person[0]["内力"] = JY.Person[0]["内力最大值"]
-        w("你休息了一晚，体力完全恢复了。")
+        local i12 = g(_G, "instruct_12")
+        if i12 then i12() end
     elseif sceneType == "inn" then
-        local money = JY.Base["金钱"] or 0
+        local i31 = g(_G, "instruct_31")
+        local money = rawget(_G, "JY") and rawget(_G, "JY").Base and rawget(_G, "JY").Base["金钱"] or 0
         if money >= 100 then
-            JY.Base["金钱"] = money - 100
-            JY.Person[0]["生命"] = JY.Person[0]["生命最大值"]
-            JY.Person[0]["体力"] = 100
-            JY.Person[0]["内力"] = JY.Person[0]["内力最大值"]
-            w("你付了100两住了一晚，体力完全恢复了。")
+            if i31 then i31(0, 100, 1) end
+            local i12 = g(_G, "instruct_12")
+            if i12 then i12() end
+            w("你付了100两住了一晚。")
         else
             w("住一晚要100两，你钱不够。")
         end
