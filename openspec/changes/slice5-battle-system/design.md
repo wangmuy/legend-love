@@ -1,6 +1,6 @@
 ## Context
 
-当前有 3 个游戏状态：GAME_START(0), GAME_MMAP(2), GAME_SMAP(4)。需要新增 GAME_WMAP(3) 用于战斗。
+当前有 4 个游戏状态：GAME_START(0), GAME_MMAP(2), GAME_SMAP(4)。需要新增 GAME_WMAP(5) 用于战斗。
 战斗基于 1D 线性距离模型，与 Love2D 原版的 war.sta 数据兼容。
 
 ## Decisions
@@ -8,7 +8,7 @@
 ### GAME_WMAP 状态
 
 ```lua
-JY.Status = 3  -- GAME_WMAP
+JY.Status = 5  -- GAME_WMAP
 ```
 
 ### 运行时战斗状态
