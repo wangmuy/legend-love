@@ -1,7 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const { waitForPageReady } = require('./helpers/setup');
 
-const DATA_KEYS = ['dialogues', 'scenes', 'chars', 'items', 'skills', 'entrances', 'wmap', 'events', 'config', 'shops'];
+const DATA_KEYS = ['dialogues', 'scenes', 'chars', 'items', 'skills', 'entrances', 'wmap', 'events', 'config', 'shops', 'wars'];
 
 async function luaEval(page, code) {
   const r = await page.evaluate(async (c) => {
