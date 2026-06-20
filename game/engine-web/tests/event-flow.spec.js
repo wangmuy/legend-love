@@ -54,6 +54,25 @@ test.describe('事件流程测试', () => {
     expect(await ok(page)).toBeTruthy();
   });
 
+  test('TC-01b: 软体娃娃对话流程', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
+
+    // look should show 软体娃娃
+    let text = await term(page);
+    expect(text).toContain('软体娃娃');
+
+    // talk to 软体娃娃
+    await cmd(page, 'talk 软体娃娃'); await page.waitForTimeout(5000);
+
+    text = await term(page);
+    expect(text).toContain('你与');
+    expect(text).toContain('软体娃娃');
+    expect(text).toContain('交谈');
+    expect(await ok(page)).toBeTruthy();
+  });
+
   test('TC-02: NPC 场景交互（北丑居）', async ({ page }) => {
     test.setTimeout(120000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(3000);

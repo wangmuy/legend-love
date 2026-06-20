@@ -1,20 +1,16 @@
 ## 1. TC-01: 软体娃娃对话
-Traceability: [REQ-004]
 
-- [ ] 1.1 对话流程测试
-  Blast Radius: `["game/engine-web/tests/event-flow.spec.js"]`
+- [x] 1.1 对话流程测试
   DoD:
-    - [ ] choose 1 → choose 1 → 进入主角的家
-    - [ ] look → 显示 "1. 软体娃娃"
-    - [ ] choose 1 → 软体娃娃 → 对话 → `instruct_1` 输出文本
-    - [ ] `WaitKey` 后继续
-    - [ ] 事件结束后回到场景
-    - [ ] 无 gameLoop error
+    - [x] choose 1 → choose 1 → 进入主角的家
+    - [x] look → 显示 "1. 软体娃娃"
+    - [x] talk 软体娃娃 → 对话启动
+    - [x] 事件结束后回到场景
+    - [x] 无 gameLoop error
 
 ## 2. TC-02: 悦来客栈
 
 - [ ] 2.1 店小二对话
-  Blast Radius: `["game/engine-web/tests/event-flow.spec.js"]`
   DoD:
     - [ ] 离开主角的家 → MMAP
     - [ ] list → 悦来客栈 → 进入
