@@ -496,11 +496,36 @@ test.describe('instruct 函数', () => {
     expect(r.result).toBe('function');
   });
 
-  test('instruct_40 设置方向', async ({ page }) => {
-    // instruct_40 在 save/restore 机制中恢复 Web MUD 版本
-    const r = await luaEval(page, 'return type(rawget(_G,"instruct_40"))');
+  test('instruct_40 设置方向并验证', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Base["人方向"] = 0',
+      'instruct_40(2)',
+      'return tostring(JY.Base["人方向"])',
+    ].join('; '));
     expect(r.ok).toBe(true);
-    expect(r.result).toBe('function');
+    expect(r.result).toBe('2');
+  });
+
+  test('instruct_1 对话文本输出', async ({ page }) => {
+    await page.evaluate(async () => {
+      if (!window.__luaEval) return;
+      await window.__luaEval('instruct_1(2520, 0, 1); return "ok"');
+    });
+    await page.waitForTimeout(2000);
+    const text = await page.evaluate(() => {
+      const t = window.__xterm;
+      const lines = [];
+      for (let y = Math.max(0, t.buffer.active.length - 5); y < t.buffer.active.length; y++) {
+        const l = t.buffer.active.getLine(y)?.translateToString(false) || '';
+        if (l.trim()) lines.push(l.trim());
+      }
+      return lines.join('\n');
+    });
+    expect(text).toContain('头好痛');
+    expect(text).toContain('金庸群侠传');
   });
 
   test('instruct_67 函数存在', async ({ page }) => {
