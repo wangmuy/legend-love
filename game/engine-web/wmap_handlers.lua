@@ -231,6 +231,8 @@ function WmapHandlers.chooseInteraction(idx)
         end
         if wmapContext.selectedAction == 1 then
             WmapHandlers.doAttack(target.index, target.isEnemy)
+        elseif wmapContext.selectedAction == 2 then
+            WmapHandlers.doMartial(target.index, target.isEnemy)
         end
         
     elseif wmapContext.phase == "select_martial" then
@@ -242,6 +244,14 @@ function WmapHandlers.chooseInteraction(idx)
     elseif wmapContext.phase == "select_move" then
         if idx == 1 then WmapHandlers.doMove(1)
         elseif idx == 2 then WmapHandlers.doMove(-1) end
+    elseif wmapContext.phase == "select_item" then
+        local item = wmapContext.validTargets[idx]
+        if item and item.type == "item" then
+            JY.Base["物品" .. item.slot] = 0
+            JY.Base["物品数量" .. item.slot] = 0
+            w("使用了物品。")
+            WmapHandlers.afterAction()
+        end
     end
 end
 
@@ -362,6 +372,25 @@ function WmapHandlers.doAttack(enemyIdx, isEnemy)
         w(string.format("%s被击败！", en.name or "?"))
     end
     
+    WmapHandlers.afterAction()
+end
+
+-- 执行武功（简化）
+function WmapHandlers.doMartial(enemyIdx, isEnemy)
+    local war = rawget(_G, "JY").War
+    local tm = war.teammates[wmapContext.selectedTeammate]
+    local en = war.enemies[enemyIdx]
+    if not tm or not en then return end
+    
+    local power = 50 + math.random(0, 20)
+    local dmg = math.floor(power - (en.defense or 0) / 3 + math.random(0, 10))
+    dmg = math.max(1, dmg)
+    en.hp = (en.hp or 0) - dmg
+    w(string.format("%s使出武功！伤害 %d！", tm.name or "?", dmg))
+    
+    if (en.hp or 0) <= 0 then
+        w(string.format("%s被击败！", en.name or "?"))
+    end
     WmapHandlers.afterAction()
 end
 
