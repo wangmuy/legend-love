@@ -9,25 +9,23 @@ function extract.run(dataDir, outputFile)
     f:close()
 
     local RECORD_SIZE = 186
-    local COUNT = #data / RECORD_SIZE
+    local COUNT = math.floor(#data / RECORD_SIZE)
     local wars = {}
-    for i = 0, COUNT - 1 do
-        local off = i * RECORD_SIZE
-        local id = data:byte(off + 1) + data:byte(off + 2) * 256
-        if id ~= 65535 then
+    for i = 0, (COUNT - 1) * RECORD_SIZE, RECORD_SIZE do
+        local id = data:byte(i + 1) + data:byte(i + 2) * 256
+        if id ~= 0 and id ~= 65535 then
             local name = ""
             for j = 1, 10 do
-                local b = data:byte(off + 2 + j) or 0
+                local b = data:byte(i + 2 + j) or 0
                 if b ~= 0 then name = name .. string.char(b) end
             end
             local entry = { ["代号"] = id, ["名称"] = name }
-            -- 敌人（20 个）
             local enemies = {}
             for j = 0, 19 do
-                local eid = data:byte(off + 68 + j * 2) + data:byte(off + 69 + j * 2) * 256
+                local eid = data:byte(i + 67 + j * 2) + data:byte(i + 68 + j * 2) * 256
                 if eid ~= 0 then
-                    local ex = data:byte(off + 108 + j * 2) + data:byte(off + 109 + j * 2) * 256
-                    local ey = data:byte(off + 148 + j * 2) + data:byte(off + 149 + j * 2) * 256
+                    local ex = data:byte(i + 107 + j * 2) + data:byte(i + 108 + j * 2) * 256
+                    local ey = data:byte(i + 147 + j * 2) + data:byte(i + 148 + j * 2) * 256
                     table.insert(enemies, { ["代号"] = eid, ["X"] = ex, ["Y"] = ey })
                 end
             end
@@ -36,10 +34,31 @@ function extract.run(dataDir, outputFile)
         end
     end
 
-    local json = require("extract_scenes").encodeJson or encodeJson
-    -- ... 写入 outputFile
-    print("Extracted " .. #wars .. " wars")
+    -- 手动 JSON 序列化
+    local parts = {}
+    for _, w in ipairs(wars) do
+        local en = {}
+        for _, e in ipairs(w["敌人"]) do
+            table.insert(en, '{"代号":' .. e["代号"] .. ',"X":' .. e["X"] .. ',"Y":' .. e["Y"] .. '}')
+        end
+        table.insert(parts, '{"代号":' .. w["代号"] .. ',"名称":"' .. (w["名称"] or "") .. '","敌人":[' .. table.concat(en, ",") .. ']}')
+    end
+
+    local json = '{"version":"1.0","total":' .. #wars .. ',"wars":[' .. table.concat(parts, ",") .. ']}'
+    local fout = io.open(outputFile, "w")
+    if fout then
+        fout:write(json)
+        fout:write("\n")
+        fout:close()
+    end
+    print("Extracted " .. #wars .. " wars to " .. outputFile)
     return wars
+end
+
+if arg and arg[0]:match("extract_war_sta%.lua$") then
+    local dataDir = arg[1] or "data"
+    local outputFile = arg[2] or "engine-web/data-web/wars.json"
+    extract.run(dataDir, outputFile)
 end
 
 return extract

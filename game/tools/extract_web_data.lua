@@ -40,7 +40,8 @@ dofile("tools/extract_shops.lua")
 
 -- 8b. War.sta (battle config)
 print("[8b/9] Extracting war config (war.sta)...")
-dofile("tools/extract_war_sta.lua")
+local extract_war = dofile("tools/extract_war_sta.lua")
+extract_war.run("data", "engine-web/data-web/wars.json")
 
 -- 9. Filter unnecessary fields
 print("[9/9] Filtering unnecessary fields (graphics/sound)...")
