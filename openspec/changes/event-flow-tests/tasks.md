@@ -10,26 +10,24 @@
 
 ## 2. TC-02: 悦来客栈
 
-- [ ] 2.1 店小二对话
+- [x] 2.1 店小二对话
   DoD:
-    - [ ] 离开主角的家 → MMAP
-    - [ ] list → 悦来客栈 → 进入
-    - [ ] look → 找到店小二 → 对话
-    - [ ] 无 gameLoop error
+    - [x] 离开主角的家 → MMAP
+    - [x] list → 悦来客栈 → 进入
+    - [x] talk oldevent_235 → 对话
+    - [x] 无 gameLoop error
 
 ## 3. TC-03: 南贤
 
-- [ ] 3.1 南贤对话
-  Blast Radius: `["game/engine-web/tests/event-flow.spec.js"]`
+- [x] 3.1 南贤对话
   DoD:
-    - [ ] MMAP → list → 南贤居 → 进入
-    - [ ] 南贤 → 对话
-    - [ ] 无 gameLoop error
+    - [x] MMAP → list → 南贤居 → 进入
+    - [x] talk 南贤 → 对话
+    - [x] 无 gameLoop error
 
 ## 4. TC-04: 泛化 oldevent 测试
 
-- [ ] 4.1 随机 oldevent 执行
-  Blast Radius: `["game/engine-web/tests/event-flow.spec.js"]`
+- [x] 4.1 随机 oldevent 执行
   DoD:
-    - [ ] 5 个随机 oldevent 脚本直接加载执行
-    - [ ] 不崩溃
+    - [x] 5 个随机 oldevent 脚本直接加载执行
+    - [x] 不崩溃
