@@ -38,6 +38,10 @@ dofile("tools/extract_base.lua")
 print("[8/8] Extracting shop data...")
 dofile("tools/extract_shops.lua")
 
+-- 8b. War.sta (battle config)
+print("[8b/9] Extracting war config (war.sta)...")
+dofile("tools/extract_war_sta.lua")
+
 -- 9. Filter unnecessary fields
 print("[9/9] Filtering unnecessary fields (graphics/sound)...")
 os.execute("python3 tools/filter_web_data.py")

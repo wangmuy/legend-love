@@ -19,6 +19,6 @@ Traceability: [REQ-002]
 ## 3. wmap-encounter
 Traceability: [REQ-003]
 
-- [ ] 3.1 从 war.sta 读取战斗配置
-- [ ] 3.2 随机遇敌触发
-- [ ] 3.3 战斗胜利/失败处理
+- [ ] 3.1 从 data-web/wars.json 读取战斗配置（由 slice1 提取管线生成）
+- [ ] 3.2 随机遇敌触发（MMAP 行走时）
+- [ ] 3.3 战斗胜利/失败处理（经验/金钱奖励）
