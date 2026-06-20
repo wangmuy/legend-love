@@ -168,6 +168,84 @@ rawset(_G, "instruct_26", function(...)
     -- 修改角色属性: no-op
 end)
 
+-- 功能性 instruct（instruct-game-logic）
+
+rawset(_G, "instruct_11", function()
+    -- 住宿询问
+    local w = rawget(_G, "WebUI")
+    if w then w.write("是否住宿？") end
+    local MenuAsync = rawget(_G, "MenuAsync")
+    if MenuAsync then
+        local ok = MenuAsync.ShowMenu2Coroutine({{"是", nil, 1}, {"否", nil, 2}}, 2, 0, 0, 0, 0, 0, 0, 1)
+        if ok and ok == 1 then
+            rawget(_G, "instruct_12")()
+        end
+    end
+end)
+
+rawset(_G, "instruct_12", function()
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[0] then
+        local p0 = JY.Person[0]
+        p0["生命"] = p0["生命最大值"]
+        p0["体力"] = 100
+        p0["内力"] = p0["内力最大值"]
+    end
+    local w = rawget(_G, "WebUI")
+    if w then w.write("体力完全恢复了。") end
+end)
+
+rawset(_G, "instruct_14", function()
+    local sh = rawget(_G, "SmapHandlers")
+    if sh and sh.look then sh.look({}) end
+end)
+
+rawset(_G, "instruct_19", function(x, y)
+    local JY = rawget(_G, "JY")
+    if JY then
+        JY.Base["人X1"] = x
+        JY.Base["人Y1"] = y
+    end
+end)
+
+rawset(_G, "instruct_31", function(itemId, count, flag)
+    local JY = rawget(_G, "JY")
+    if not JY then return -1 end
+    JY.Base = JY.Base or {}
+    if itemId == 0 then
+        local money = JY.Base["金钱"] or 0
+        if flag == 0 then return (money >= (count or 0)) and 1 or 0 end
+        if flag == 1 then JY.Base["金钱"] = math.max(0, money - (count or 0)); return 1 end
+        if flag == 2 then JY.Base["金钱"] = (money or 0) + (count or 0); return 1 end
+        return -1
+    end
+    -- 物品检查（非金钱）: 遍历背包
+    local total = 0
+    for i = 1, 30 do
+        if JY.Base["物品" .. i] == itemId then
+            total = total + (JY.Base["物品数量" .. i] or 1)
+        end
+    end
+    if flag == 0 then return (total >= (count or 1)) and 1 or 0 end
+    if flag == 1 then
+        local remain = count or 1
+        for i = 1, 30 do
+            if remain <= 0 then break end
+            if JY.Base["物品" .. i] == itemId then
+                local qty = JY.Base["物品数量" .. i] or 1
+                local take = math.min(qty, remain)
+                JY.Base["物品数量" .. i] = qty - take
+                remain = remain - take
+                if JY.Base["物品数量" .. i] <= 0 then
+                    JY.Base["物品" .. i] = 0
+                end
+            end
+        end
+        return (remain <= 0) and 1 or 0
+    end
+    return -1
+end)
+
 -- 兜底: 所有未显式实现的 instruct_* 输出 debug 日志
 for i = 0, 66 do
     if not rawget(_G, "instruct_" .. i) then
