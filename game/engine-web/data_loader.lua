@@ -141,7 +141,7 @@ end
 
 function finalizeDataLoad()
     _G.initDataSource._loaded = true
-    _G.initDataSource._fileCount = 10
+    _G.initDataSource._fileCount = 11
     _G.initDataSource._totalSize = totalDataSize
     initDataCompat()
 end
@@ -182,6 +182,7 @@ function initDataCompat()
         ["data-web/events.json"] = "events",
         ["data-web/config.json"] = "config",
         ["data-web/shops.json"] = "shops",
+        ["data-web/wars.json"] = "wars",
     }
 end
 

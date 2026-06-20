@@ -17,10 +17,10 @@ test.describe('数据完整性', () => {
     await waitForPageReady(page);
   });
 
-  test('_fileCount == 10', async ({ page }) => {
+  test('_fileCount == 11', async ({ page }) => {
     const r = await luaEval(page, 'return tostring(rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["_fileCount"] or 0)');
     expect(r.ok).toBe(true);
-    expect(r.result).toBe('10');
+    expect(r.result).toBe('11');
   });
 
   for (const key of DATA_KEYS) {
@@ -110,6 +110,22 @@ test('config 包含主角位置', async ({ page }) => {
     'return pl and tostring(pl["X"] ~= nil) or "false"',
   ].join('; '));
   expect(r.ok).toBe(true);
+});
+
+test('wars 战斗配置可解析', async ({ page }) => {
+  await page.goto('/');
+  await waitForPageReady(page);
+  const r = await luaEval(page, [
+    'local ds = rawget(_G, "initDataSource") and rawget(_G, "initDataSource")["wars"]',
+    'if not ds then return "no_wars" end',
+    'local list = ds["wars"] or ds',
+    'local count = #list',
+    'return tostring(count > 0) .. "|" .. tostring(count)',
+  ].join('; '));
+  expect(r.ok).toBe(true);
+  const parts = r.result.split('|');
+  expect(parts[0]).toBe('true');
+  expect(parseInt(parts[1])).toBeGreaterThan(100);
 });
 
 test('shops 物品 ID 在 items 中存在', async ({ page }) => {
