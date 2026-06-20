@@ -590,14 +590,69 @@ test.describe('SMAP 菜单交互', () => {
   });
 
   test('rest 在 house 场景不报错', async ({ page }) => {
-    // 程序化设置到一个 house 类型场景
     const input = page.locator('#command-input');
     await input.waitFor({ state: 'visible', timeout: 5000 });
     await input.fill('rest');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(3000);
-
     expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('rest 在 inn 场景扣钱恢复', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = JY.Person[0] or {}',
+      'JY.Person[0]["生命最大值"] = 100',
+      'JY.Person[0]["生命"] = 30',
+      'JY.Person[0]["体力"] = 50',
+      'JY.Person[0]["内力最大值"] = 50',
+      'JY.Person[0]["内力"] = 10',
+      'JY.Base["金钱"] = 200',
+      'local s = rawget(_G, "getScenes") and getScenes()',
+      'local sc = s and s[tostring(JY.SubScene or "1")]',
+      'if sc then sc["类型"] = "inn" end',
+      'local sh = rawget(_G, "SmapHandlers")',
+      'sh.rest({})',
+      'return tostring(JY.Base["金钱"]) .. "|" .. tostring(JY.Person[0]["生命"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    const parts = r.result.split('|');
+    expect(parseInt(parts[0])).toBe(100);
+    expect(parseInt(parts[1])).toBe(100);
+  });
+
+  test('rest 在 inn 钱不够', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Base["金钱"] = 50',
+      'local s = rawget(_G, "getScenes") and getScenes()',
+      'local sc = s and s[tostring(JY.SubScene or "1")]',
+      'if sc then sc["类型"] = "inn" end',
+      'local sh = rawget(_G, "SmapHandlers")',
+      'sh.rest({})',
+      'return tostring(JY.Base["金钱"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(parseInt(r.result)).toBe(50);
+  });
+
+  test('rest 非休息场景提示', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'local s = rawget(_G, "getScenes") and getScenes()',
+      'local sc = s and s[tostring(JY.SubScene or "1")]',
+      'if sc then sc["类型"] = "outdoor" end',
+      'local sh = rawget(_G, "SmapHandlers")',
+      'sh.rest({})',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
   });
 
   test('smapTakeItem 拾取物品逻辑', async ({ page }) => {

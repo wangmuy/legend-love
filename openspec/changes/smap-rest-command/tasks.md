@@ -22,13 +22,13 @@ Traceability: [REQ-001]
   DoD:
     - [x] 程序化设置 SMAP 状态 → help → 包含 rest
 
-- [ ] 2.2 客栈休息扣费验证
+- [x] 2.2 客栈休息扣费验证
   Blast Radius: `["game/engine-web/tests/mmap-smap.spec.js"]`
   DoD:
-    - [ ] 程序化设置 inn 场景 → rest → 检查金钱减少 + 体力恢复
-    - [ ] 程序化设置 inn 场景 + 金钱不足 → 显示"钱不够"
+    - [x] 程序化设置 inn 场景 → rest → 检查金钱减少 + 体力恢复
+    - [x] 程序化设置 inn 场景 + 金钱不足 → 显示"钱不够"
 
-- [ ] 2.3 不可休息场景提示验证
+- [x] 2.3 不可休息场景提示验证
   Blast Radius: `["game/engine-web/tests/mmap-smap.spec.js"]`
   DoD:
-    - [ ] 程序化设置非 house/inn 场景 → rest → 显示"这里不是休息的地方"
+    - [x] 程序化设置非 house/inn 场景 → rest → 显示"这里不是休息的地方"
