@@ -699,9 +699,8 @@ function SmapHandlers.talk(args)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     local sceneId = tostring(JY.SubScene or 0)
-    local scenes = g(_G, "getScenes")
-    if not scenes then scenes = getScenes end
-    local scene = scenes and scenes(sceneId)
+    local sceneIndex = getScenes()
+    local scene = sceneIndex and sceneIndex[sceneId]
 
     if not scene then
         w("无法获取场景信息")
@@ -717,7 +716,7 @@ function SmapHandlers.talk(args)
     -- 查找 NPC
     for _, npc in ipairs(npcs) do
         local charId = tostring(npc["代号"] or "")
-        local charName = getCharName(charId)
+        local charName = npc["名称"] or getCharName(charId)
         if charName == targetName then
             -- 检查状态
             if not _G.isNpcPresent(sceneId, charId) then
@@ -757,9 +756,8 @@ function SmapHandlers.take(args)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     local sceneId = tostring(JY.SubScene or 0)
-    local scenes = g(_G, "getScenes")
-    if not scenes then scenes = getScenes end
-    local scene = scenes and scenes(sceneId)
+    local sceneIndex = getScenes()
+    local scene = sceneIndex and sceneIndex[sceneId]
 
     if not scene then
         w("无法获取场景信息")
@@ -833,7 +831,7 @@ function SmapHandlers.give(args)
     -- 检查 NPC
     local scenes = g(_G, "getScenes")
     if not scenes then scenes = getScenes end
-    local scene = scenes and scenes(sceneId)
+    local scene = scenes and scenes[sceneId]
     local foundNpc = false
     if scene and scene["NPC"] then
         for _, npc in ipairs(scene["NPC"]) do

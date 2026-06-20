@@ -197,7 +197,7 @@ function extract.run(dataDir, outputFile)
     end
 
     -- 读取 events.json 建立 tileIndex → 事件映射
-    local eventMap = {}  -- eventMap[sceneId][tileIndex] = {eventTouch, tileCurrent, tileStart, tileEnd, x, y}
+    local eventMap = {}  -- eventMap[sceneId][tileIndex] = {eventTouch, eventSpace, tileCurrent, tileStart, tileEnd, x, y}
     do
         local f = io.open("engine-web/data-web/events.json", "rb")
         if f then
@@ -207,6 +207,7 @@ function extract.run(dataDir, outputFile)
             for entry in json:gmatch('{[^}]+}') do
                 local sceneId = tonumber(entry:match('"sceneId"[%s:]*([0-9-]+)'))
                 local tileIndex = tonumber(entry:match('"tileIndex"[%s:]*([0-9-]+)'))
+                local eventSpace = tonumber(entry:match('"eventSpace"[%s:]*([0-9-]+)'))
                 local eventTouch = tonumber(entry:match('"eventTouch"[%s:]*([0-9-]+)'))
                 local tileCurrent = tonumber(entry:match('"tileCurrent"[%s:]*([0-9-]+)'))
                 local tileStart = tonumber(entry:match('"tileStart"[%s:]*([0-9-]+)'))
@@ -216,6 +217,7 @@ function extract.run(dataDir, outputFile)
                 if sceneId then
                     if not eventMap[sceneId] then eventMap[sceneId] = {} end
                     eventMap[sceneId][tileIndex] = {
+                        eventSpace = eventSpace or 0,
                         eventTouch = eventTouch or 0,
                         tileCurrent = tileCurrent or 0,
                         tileStart = tileStart or 0,
@@ -249,19 +251,39 @@ function extract.run(dataDir, outputFile)
                 ["事件"] = {},
             }
 
-            -- 从 events.json 提取 NPC（tileCurrent>0 + eventTouch>=10 的可交互对象）
+            -- 从 events.json 提取 NPC（eventSpace>0 = 空格触发事件 = NPC 对话）
             local sceneEvents = eventMap[sh.id]
             if sceneEvents then
                 local npcList = {}
+                local seenNpcs = {}
                 for tileIdx, ev in pairs(sceneEvents) do
-                    if ev.tileCurrent > 0 and ev.eventTouch >= 10 then
-                        local charId = math.floor(ev.tileCurrent / 10)
-                        table.insert(npcList, {
-                            ["代号"] = charId,
-                            ["X"] = ev.x,
-                            ["Y"] = ev.y,
-                            ["事件编号"] = ev.eventTouch,
-                        })
+                    local evtSpace = ev.eventSpace
+                    if evtSpace and evtSpace > 0 then
+                        if not seenNpcs[evtSpace] then
+                            seenNpcs[evtSpace] = true
+                            -- 尝试从 oldevent 脚本第一行获取 NPC 名
+                            local npcName = nil
+                            local scriptPath = string.format("script/oldevent/oldevent_%d.lua", evtSpace)
+                            local f = io.open(scriptPath, "r")
+                            if f then
+                                -- 检查 instruct_51 (软体娃娃)
+                                local content = f:read("*a")
+                                f:close()
+                                if content:find("instruct_51") then
+                                    npcName = "软体娃娃"
+                                end
+                            end
+                            if not npcName then
+                                npcName = string.format("oldevent_%d", evtSpace)
+                            end
+                            table.insert(npcList, {
+                                ["代号"] = 0,
+                                ["名称"] = npcName,
+                                ["X"] = ev.x,
+                                ["Y"] = ev.y,
+                                ["事件编号"] = evtSpace,
+                            })
+                        end
                     end
                 end
                 if #npcList > 0 then
