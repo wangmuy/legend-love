@@ -2,7 +2,10 @@
 -- 1D 线性距离回合制战斗，菜单驱动交互
 
 local WmapHandlers = {}
-local w = g or function(t, k) return rawget(t, k) end
+
+local function rawget(t, k)
+    return t[k]
+end
 
 -- 当前战斗状态（choose N 的上下文）
 local wmapContext = {
