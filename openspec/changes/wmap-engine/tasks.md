@@ -6,4 +6,4 @@
 - [x] 1.5 伤害计算公式
 
 ## 2. 测试
-- [ ] 2.1 WMAP E2E 测试（initWar → look → choose → attack → 胜利）
+- [x] 2.1 WMAP E2E 测试（6 个测试覆盖 initWar → look → choose → attack → 胜利/奖励）
