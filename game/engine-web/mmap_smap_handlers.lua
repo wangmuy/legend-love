@@ -297,28 +297,6 @@ local function getCharsIndex()
     return index
 end
 
--- explore: 在当前区域探索，查看周围环境
-function MmapHandlers.explore(args)
-    local JY = g(_G, "JY")
-    if not JY then JY = {}; rawset(_G, "JY", JY) end
-    if not JY.Base then JY.Base = {} end
-    
-    local dirs = {"前方", "左方", "右方", "密林深处", "山道尽头", "溪流边", "古道上"}
-    local descs = {
-        "四周一片宁静，只有风吹过树梢的声音。",
-        "远处似乎有一座村庄，炊烟袅袅升起。",
-        "山林间鸟鸣阵阵，空气中弥漫着泥土的芳香。",
-        "你发现了一些野兽的足迹，但很快就消失了。",
-        "这里地势险要，易守难攻。",
-        "溪水潺潺流淌，清澈见底。",
-        "古道上荒草丛生，似乎很少有人经过。",
-    }
-    local dir = dirs[math.random(#dirs)]
-    local desc = descs[math.random(#descs)]
-    
-    w(string.format("你向%s探索。%s", dir, desc))
-end
-
 -- SMAP 命令
 -- 场景交互对象列表（由 look 填充，供 choose 使用）
 local smapEntityList = {}
