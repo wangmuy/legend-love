@@ -574,6 +574,30 @@ test.describe('instruct 函数', () => {
     const r = await luaEval(page, 'instruct_14(); return "ok"');
     expect(r.ok).toBe(true);
   });
+
+  test('instruct_26 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_26"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_37 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_37"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_56 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_56"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_11 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_11"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
 });
 
 test.describe('SMAP 菜单交互', () => {
