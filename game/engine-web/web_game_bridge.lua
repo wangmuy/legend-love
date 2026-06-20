@@ -653,7 +653,7 @@ function _G.initWebFramework()
         local mmapCmds = {
             list  = { handler = _G.MmapHandlers.list,  description = "列出可去场景并选择前往" },
             look  = { handler = _G.MmapHandlers.look,  description = "查看当前位置、坐标和附近场景" },
-            explore = { handler = _G.MmapHandlers.explore, description = "探索当前区域，可能遇敌" },
+            explore = { handler = _G.MmapHandlers.explore, description = "探索当前区域，查看周围环境" },
             quit  = { handler = _G.MmapHandlers.quit,  description = "退出当前游戏，返回开始菜单" },
             help  = { handler = CE.showHelp,           description = "显示帮助信息" },
             choose= { handler = CE.handleChoose,        description = "choose <编号> 选择菜单项" },
