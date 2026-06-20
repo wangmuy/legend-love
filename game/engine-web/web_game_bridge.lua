@@ -761,18 +761,21 @@ function processEventQueue(timestamp)
                         lastDrawState = nil
                     end
                 elseif cmd == "choose" and not hasMenu then
-                    -- SMAP 状态无菜单时：choose N 选择交互对象
+                    -- SMAP/WMAP 状态无菜单时：choose N 选择交互对象
                     local JY = rawget(_G, "JY")
-                    if JY and JY.Status == 4 then  -- GAME_SMAP
-                        local n = tonumber(arg)
-                        if n and n > 0 then
-                            local sh = rawget(_G, "SmapHandlers")
-                            if sh and sh.chooseInteraction then
-                                sh.chooseInteraction(n)
-                            end
+                    local n = tonumber(arg)
+                    if JY and JY.Status == 4 and n and n > 0 then  -- GAME_SMAP
+                        local sh = rawget(_G, "SmapHandlers")
+                        if sh and sh.chooseInteraction then
+                            sh.chooseInteraction(n)
+                        end
+                    elseif JY and JY.Status == 5 and n then  -- GAME_WMAP
+                        local wh = rawget(_G, "WmapHandlers")
+                        if wh and wh.chooseInteraction then
+                            wh.chooseInteraction(n)
                         end
                     else
-                        -- 非 SMAP 状态：走 CommandEngine dispatch
+                        -- 非 SMAP/WMAP 状态：走 CommandEngine dispatch
                         local parsed = rawget(_G, "CommandEngine").parseCommand(text)
                         if parsed then
                             local handled = rawget(_G, "CommandEngine").dispatchCommand(parsed.cmd, parsed.args)
