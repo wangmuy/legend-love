@@ -266,11 +266,19 @@ function extract.run(dataDir, outputFile)
                             local scriptPath = string.format("script/oldevent/oldevent_%d.lua", evtSpace)
                             local f = io.open(scriptPath, "r")
                             if f then
-                                -- 检查 instruct_51 (软体娃娃)
                                 local content = f:read("*a")
                                 f:close()
                                 if content:find("instruct_51") then
                                     npcName = "软体娃娃"
+                                else
+                                    -- 尝试从 instruct_1 的注释中提取 NPC 名: [南贤], [店小二]
+                                    -- 格式: instruct_1(talkId,headId,pos) -- N(N):[名称]说:
+                                    for commentName in content:gmatch("%[([^%]]+)%]说:") do
+                                        if commentName ~= "WWW" and commentName ~= "???" then
+                                            npcName = commentName
+                                            break
+                                        end
+                                    end
                                 end
                             end
                             if not npcName then
