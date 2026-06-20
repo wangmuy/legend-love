@@ -294,8 +294,50 @@ end
 
 -- 显示物品列表
 function WmapHandlers.showItems()
-    w("物品: (战斗中物品系统待实现)")
-    wmapContext.phase = "select_action"
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Base then
+        w("你没有物品。")
+        return
+    end
+    w("物品:")
+    wmapContext.validTargets = {}
+    local idx = 0
+    for i = 1, 30 do
+        local itemId = JY.Base["物品" .. i]
+        if itemId and itemId ~= 0 then
+            idx = idx + 1
+            local qty = JY.Base["物品数量" .. i] or 1
+            w(string.format("  %d. 物品ID=%d x%d", idx, itemId, qty))
+            table.insert(wmapContext.validTargets, {type = "item", slot = i, itemId = itemId, qty = qty})
+        end
+    end
+    if idx == 0 then
+        w("  背包中没有物品")
+        wmapContext.phase = "select_action"
+        return
+    end
+    w("输入 choose <编号> 使用物品")
+    wmapContext.phase = "select_item"
+end
+
+-- 查看状态
+function WmapHandlers.showTeammateStatus()
+    local war = rawget(_G, "JY").War
+    wmapContext.validTargets = {}
+    local idx = 0
+    for i, tm in ipairs(war.teammates) do
+        idx = idx + 1
+        local JY = rawget(_G, "JY")
+        local p = JY.Person and JY.Person[tm.personId]
+        local name = tm.name or "?"
+        local atk = p and p["攻击力"] or 0
+        local def = p and p["防御力"] or 0
+        local spd = p and p["轻功"] or 0
+        w(string.format("  %d. %s ATK:%d DEF:%d SPD:%d HP:%d/%d MP:%d/%d",
+            idx, name, atk, def, spd, tm.hp or 0, tm.maxHp or 0, tm.mp or 0, tm.maxMp or 0))
+        table.insert(wmapContext.validTargets, {type = "teammate", index = i})
+    end
+    w("输入 choose <编号> 查看详情")
 end
 
 -- 执行攻击
