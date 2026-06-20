@@ -623,6 +623,21 @@ test.describe('instruct 函数', () => {
     expect(r.ok).toBe(true);
     expect(r.result).toBe('function');
   });
+
+  test('回退函数 instruct_4 带参数不崩溃', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_4(0); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('回退函数 instruct_6 带参数不崩溃', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_6(0, 0, 0, 0); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('回退函数 instruct_15 带参数不崩溃', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_15(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
 });
 
 test.describe('SMAP 菜单交互', () => {
