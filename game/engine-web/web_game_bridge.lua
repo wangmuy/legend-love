@@ -246,6 +246,16 @@ rawset(_G, "instruct_31", function(itemId, count, flag)
     return -1
 end)
 
+-- instruct_51: 问软体娃娃 — 随机显示 18 条游戏提示之一
+rawset(_G, "instruct_51", function()
+    local Rnd = rawget(_G, "Rnd") or function(i) return math.random(i) - 1 end
+    local talkId = 2547 + Rnd(18)
+    local instruct_1 = rawget(_G, "instruct_1")
+    if instruct_1 then
+        instruct_1(talkId, 114, 0)
+    end
+end)
+
 -- 兜底: 所有未显式实现的 instruct_* 输出 debug 日志
 for i = 0, 66 do
     if not rawget(_G, "instruct_" .. i) then
