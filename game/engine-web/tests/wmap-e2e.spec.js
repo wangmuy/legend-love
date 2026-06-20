@@ -225,7 +225,7 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
-  test('MMAP 行走遇敌（直接验证 initWar 调用）', async ({ page }) => {
+  test('脚本触发战斗（initWar 直接调用）', async ({ page }) => {
     test.setTimeout(60000);
     await startNewGame(page);
 

@@ -297,87 +297,26 @@ local function getCharsIndex()
     return index
 end
 
--- 遇敌系统
-local encounterRate = 0.20  -- 20% 遇敌概率
-
-local function getWars()
-    local ds = g(_G, "initDataSource")
-    if not ds then return nil end
-    local raw = ds["wars"]
-    if not raw then return nil end
-    local list = raw["wars"] or raw
-    if type(list) ~= "table" or #list == 0 then return nil end
-    return list
-end
-
-local function getCharName(charId)
-    local ds = g(_G, "initDataSource")
-    if not ds then return nil end
-    local raw = ds["chars"]
-    if not raw then return nil end
-    local list = raw["chars"] or raw
-    if type(list) ~= "table" then return nil end
-    for _, c in ipairs(list) do
-        if type(c) == "table" and c["代号"] == charId then
-            return c["姓名"] or nil
-        end
-    end
-    return nil
-end
-
-local function selectRandomWar()
-    local wars = getWars()
-    if not wars then return nil end
-    local idx = math.random(1, #wars)
-    return wars[idx]
-end
-
--- explore: 在当前区域探索，随机遇敌
+-- explore: 在当前区域探索，查看周围环境
 function MmapHandlers.explore(args)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     if not JY.Base then JY.Base = {} end
     
-    local dirs = {"前方", "左方", "右方", "密林深处", "山道尽头"}
-    local descs = {"四处张望，周围一片宁静。", "草木丛生，似乎有动静。", "你仔细搜索着周围的环境。", "风吹过树梢，沙沙作响。"}
+    local dirs = {"前方", "左方", "右方", "密林深处", "山道尽头", "溪流边", "古道上"}
+    local descs = {
+        "四周一片宁静，只有风吹过树梢的声音。",
+        "远处似乎有一座村庄，炊烟袅袅升起。",
+        "山林间鸟鸣阵阵，空气中弥漫着泥土的芳香。",
+        "你发现了一些野兽的足迹，但很快就消失了。",
+        "这里地势险要，易守难攻。",
+        "溪水潺潺流淌，清澈见底。",
+        "古道上荒草丛生，似乎很少有人经过。",
+    }
     local dir = dirs[math.random(#dirs)]
     local desc = descs[math.random(#descs)]
     
     w(string.format("你向%s探索。%s", dir, desc))
-    
-    -- 随机遇敌判定
-    if math.random() < encounterRate then
-        local war = selectRandomWar()
-        if war and war["敌人"] and #war["敌人"] > 0 then
-            local enemies = {}
-            local usedCharIds = {}
-            for _, ed in ipairs(war["敌人"]) do
-                local charId = ed["代号"]
-                if charId and charId ~= 65535 and not usedCharIds[charId] then
-                    usedCharIds[charId] = true
-                    local name = getCharName(charId) or ("敌人" .. charId)
-                    table.insert(enemies, {
-                        name = name,
-                        hp = 30 + math.random(20),
-                        maxHp = 30 + math.random(20),
-                        mp = 10 + math.random(15),
-                        maxMp = 10 + math.random(15),
-                        x = math.random(3, 8),
-                        attack = 5 + math.random(15),
-                        defense = 2 + math.random(10),
-                    })
-                end
-            end
-            if #enemies > 0 then
-                w("突然，你遭遇了敌人！")
-                local WmapHandlers = g(_G, "WmapHandlers")
-                if WmapHandlers then
-                    WmapHandlers.initWar(enemies, 5 + math.random(5))
-                    return
-                end
-            end
-        end
-    end
 end
 
 -- SMAP 命令
