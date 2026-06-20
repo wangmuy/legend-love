@@ -659,6 +659,9 @@ function _G.initWebFramework()
         }
         local smapCmds = {
             look  = { handler = _G.SmapHandlers.look,  description = "查看场景并选择交互对象" },
+            talk  = { handler = _G.SmapHandlers.talk,  description = "talk <NPC名> 与 NPC 交谈" },
+            take  = { handler = _G.SmapHandlers.take,  description = "take <物品名> 拾取物品" },
+            give  = { handler = _G.SmapHandlers.give,  description = "give <物品名> <人名> 给予物品" },
             rest  = { handler = _G.SmapHandlers.rest,  description = "休息恢复体力" },
             exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
             go    = { handler = _G.SmapHandlers.go,    description = "go <编号> 前往出口" },
