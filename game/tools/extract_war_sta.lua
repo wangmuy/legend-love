@@ -17,7 +17,7 @@ function extract.run(dataDir, outputFile)
             local name = ""
             for j = 1, 10 do
                 local b = data:byte(i + 2 + j) or 0
-                if b ~= 0 then name = name .. string.char(b) end
+                if b >= 32 and b <= 126 then name = name .. string.char(b) end
             end
             local entry = { ["代号"] = id, ["名称"] = name }
             local enemies = {}
