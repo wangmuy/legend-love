@@ -70,6 +70,8 @@ test.describe('事件流程测试', () => {
     expect(text).toContain('你与');
     expect(text).toContain('软体娃娃');
     expect(text).toContain('交谈');
+    // Verify dialog text content is displayed (instruct_51 calls instruct_1)
+    expect(text).toContain('是不是' || '基本知识');
     expect(await ok(page)).toBeTruthy();
   });
 
