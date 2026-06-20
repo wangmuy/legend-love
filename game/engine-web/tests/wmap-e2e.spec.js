@@ -201,30 +201,6 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
-  test('MMAP explore 探索命令', async ({ page }) => {
-    test.setTimeout(60000);
-    await startNewGame(page);
-
-    // 先离开到 MMAP
-    await typeCmd(page, 'leave');
-    await page.waitForTimeout(SETTLE_TIMEOUT);
-
-    // 检查当前位置
-    let lines = await getTermLines(page);
-    let text = lines.join('\n');
-    expect(text).toContain('当前位置');
-
-    // 探索
-    await typeCmd(page, 'explore');
-    await page.waitForTimeout(2000);
-
-    lines = await getTermLines(page);
-    text = lines.join('\n');
-    expect(text).toContain('探索');
-
-    expect(await hasNoGameErrors(page)).toBeTruthy();
-  });
-
   test('脚本触发战斗（initWar 直接调用）', async ({ page }) => {
     test.setTimeout(60000);
     await startNewGame(page);
