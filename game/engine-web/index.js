@@ -225,6 +225,7 @@
         'web_game_bridge.lua',
         'web_command_engine.lua',
         'mmap_smap_handlers.lua',
+        'wmap_handlers.lua',
     ];
 
     const scriptFiles = [
