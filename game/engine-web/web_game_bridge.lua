@@ -668,6 +668,14 @@ function _G.initWebFramework()
         }
         CE.registerCommands(GAME_MMAP, mmapCmds)
         CE.registerCommands(GAME_SMAP, smapCmds)
+        -- Slice 5: WMAP 战斗命令
+        if _G.WmapHandlers then
+            local wmapCmds = {
+                look  = { handler = _G.WmapHandlers.look,  description = "查看战场态势" },
+                choose= { handler = CE.handleChoose,        description = "choose <编号> 选择行动" },
+            }
+            CE.registerCommands(GAME_WMAP, wmapCmds)
+        end
     end
 
     -- 全局函数：从游戏中返回开始菜单（由 MmapHandlers.quit 调用）

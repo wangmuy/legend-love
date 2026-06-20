@@ -21,7 +21,7 @@ console.log('[1/4] Copying frontend files...');
 const frontendFiles = [
     'index.html', 'style.css', 'index.js', 'worker.js',
     'engine_web.lua', 'data_loader.lua', 'state_manager.lua',
-    'web_game_bridge.lua', 'web_command_engine.lua', 'mmap_smap_handlers.lua',
+    'web_game_bridge.lua', 'web_command_engine.lua', 'mmap_smap_handlers.lua', 'wmap_handlers.lua',
 ];
 for (const f of frontendFiles) {
     const srcPath = path.join(ROOT, f);
