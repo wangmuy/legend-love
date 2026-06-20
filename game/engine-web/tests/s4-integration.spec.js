@@ -161,4 +161,41 @@ test.describe('Slice 4 场景交互集成测试', () => {
     expect(text).toContain('主角的家');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
+
+  test('talk 命令注册 + help 显示', async ({ page }) => {
+    test.setTimeout(60000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(6000);
+
+    // help 应显示 talk/take/give 命令
+    await typeCmd(page, 'help');
+    await page.waitForTimeout(2000);
+
+    const lines = await getTermLines(page);
+    const text = lines.join('\n');
+    expect(text).toContain('talk');
+    expect(text).toContain('take');
+    expect(text).toContain('give');
+    expect(text).toContain('rest');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('talk NPC 返回提示', async ({ page }) => {
+    test.setTimeout(60000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(6000);
+
+    // talk 命令（当前场景数据 NPC 数组为空，输出相应提示）
+    await typeCmd(page, 'talk 软体娃娃');
+    await page.waitForTimeout(3000);
+
+    const lines = await getTermLines(page);
+    const text = lines.join('\n');
+    expect(text).toContain('可以对话的 NPC');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
 });
