@@ -69,3 +69,19 @@
   DoD:
     - [ ] data-integrity 测试全部通过
     - [ ] 主角的家场景 NPC 包含软体娃娃
+
+### 6.11 提取战斗配置数据（war.sta）
+
+war.sta 是二进制战斗配置文件（186 字节/条，约 200 条战斗），包含敌我阵容和初始位置。
+
+- [ ] 6.11.1 解析 war.sta 二进制格式
+  Blast Radius: `["game/tools/extract_war_sta.lua"]`
+  DoD:
+    - [ ] 每条战斗记录含 20 个敌人 ID + 位置
+    - [ ] 输出到 engine-web/data-web/wars.json
+    - [ ] 集成到 extract_web_data.lua 管线（步骤 3b）
+
+- [ ] 6.11.2 验证
+  Blast Radius: `["game/engine-web/tests/*"]`
+  DoD:
+    - [ ] data-integrity 测试包含 wars 数据验证
