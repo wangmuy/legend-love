@@ -128,6 +128,43 @@ test('wars 战斗配置可解析', async ({ page }) => {
   expect(parseInt(parts[1])).toBeGreaterThan(100);
 });
 
+test('wars 敌方角色代号在 chars 中存在', async ({ page }) => {
+  await page.goto('/');
+  await waitForPageReady(page);
+  const r = await luaEval(page, [
+    'local ds = rawget(_G, "initDataSource")',
+    'local wars = ds and ds["wars"]',
+    'local chars = ds and ds["chars"]',
+    'if not wars or not chars then return "missing_data" end',
+    'local wlist = wars["wars"] or wars',
+    'local clist = chars["chars"] or chars',
+    'if type(wlist) ~= "table" or type(clist) ~= "table" then return "not_table" end',
+    'local charIds = {}',
+    'for _, c in ipairs(clist) do',
+    '  if type(c) == "table" and c["代号"] then',
+    '    charIds[c["代号"]] = true',
+    '  end',
+    'end',
+    'local missing = {}',
+    'for _, w in ipairs(wlist) do',
+    '  if type(w) == "table" and w["敌人"] then',
+    '    for _, en in ipairs(w["敌人"]) do',
+    '      if type(en) == "table" then',
+    '        local eid = en["代号"]',
+    '        if eid and eid ~= 65535 and not charIds[eid] then',
+    '          table.insert(missing, tostring(eid))',
+    '        end',
+    '      end',
+    '    end',
+    '  end',
+    'end',
+    'if #missing > 0 then return "missing:" .. table.concat(missing, ",") end',
+    'return "ok|" .. tostring(#wlist)',
+  ].join('; '));
+  expect(r.ok).toBe(true);
+  expect(r.result).toMatch(/^ok\|\d+$/);
+});
+
 test('shops 物品 ID 在 items 中存在', async ({ page }) => {
   await page.goto('/');
   await waitForPageReady(page);
