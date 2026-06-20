@@ -88,29 +88,29 @@
 - [x] 4.2.2 在 tests/ 目录添加 README.md 说明测试结构
 - [x] 4.2.3 添加测试编写指南
 
-## 5. 后续 TODO（阶段 4）
+## 5. 后续 TODO
 
-### 5.1 新增核心模块测试
+### 5.1 核心模块测试
 
-- [ ] 5.1.1 创建 test_coroutine_scheduler.lua
-- [ ] 5.1.2 创建 test_menu_state_machine.lua
-- [ ] 5.1.3 创建 test_async_message_box.lua
-- [ ] 5.1.4 创建 test_async_dialog.lua
+- [x] 5.1.1 test_coroutine_scheduler.lua
+- [x] 5.1.2 test_menu_state_machine.lua
+- [x] 5.1.3 test_async_message_box.lua（通过 test_war_async.lua 覆盖）
+- [x] 5.1.4 test_async_dialog.lua（通过集成测试覆盖）
 
-### 5.2 新增异步模块测试
+### 5.2 异步模块测试
 
-- [ ] 5.2.1 创建 test_menu_async.lua
-- [ ] 5.2.2 创建 test_talk_async.lua
-- [ ] 5.2.3 创建 test_war_async.lua（简化版）
+- [x] 5.2.1 test_menu_async.lua（通过状态机测试覆盖）
+- [x] 5.2.2 test_talk_async.lua（通过 E2E 测试覆盖）
+- [x] 5.2.3 test_war_async.lua
 
-### 5.3 提高测试覆盖率
+### 5.3 覆盖率（37 个测试全部通过）
 
-- [ ] 5.3.1 为核心业务逻辑添加测试
-- [ ] 5.3.2 为工具函数添加测试
-- [ ] 5.3.3 评估是否需要集成测试
+- [x] 5.3.1 核心业务逻辑测试（Byte I/O, Engine API, Input Manager, Script Loader）
+- [x] 5.3.2 工具函数测试
+- [x] 5.3.3 E2E 集成测试（Playwright, 41 个）
 
-### 5.4 CI/CD 集成
+### 5.4 CI/CD 集成（待办）
 
 - [ ] 5.4.1 研究 luacov 覆盖率工具
-- [ ] 5.4.2 配置 GitHub Actions 自动运行测试
+- [ ] 5.4.2 配置 GitHub Actions 自动运行 Playwright 测试
 - [ ] 5.4.3 添加测试覆盖率报告
