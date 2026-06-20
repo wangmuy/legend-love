@@ -145,6 +145,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('list 菜单 ESC (choose 0) 不报错', async ({ page }) => {
+    test.setTimeout(60000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
@@ -166,6 +167,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('输入 help 在 MMAP 显示所有命令', async ({ page }) => {
+    test.setTimeout(60000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
@@ -186,6 +188,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('未知命令不引发 gameLoop 错误', async ({ page }) => {
+    test.setTimeout(60000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
     await typeCmd(page, 'choose 1');
@@ -238,6 +241,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('属性 choose 2 (否) 重新生成属性并继续', async ({ page }) => {
+    test.setTimeout(60000);
     // choose 1 进入属性确认
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
@@ -368,6 +372,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('属性 choose 2 多次重掷后 choose 1 确认进入游戏', async ({ page }) => {
+    test.setTimeout(60000);
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
 

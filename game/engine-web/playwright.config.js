@@ -9,13 +9,13 @@ module.exports = defineConfig({
     baseURL: 'http://localhost:8088',
     headless: true,
     launchOptions: {
-      executablePath: process.env.HOME + '/.cache/ms-playwright/chrome-linux64/chrome',
+      executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',
       args: ['--no-sandbox', '--disable-gpu'],
     },
   },
   webServer: {
     command: 'node scripts/start-test-server.js',
     port: 8088,
-    reuseExistingServer: false,
+    reuseExistingServer: true,
   },
 });
