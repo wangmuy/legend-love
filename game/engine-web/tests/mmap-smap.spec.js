@@ -532,6 +532,48 @@ test.describe('instruct 函数', () => {
     expect(r.ok).toBe(true);
     expect(r.result).toBe('function');
   });
+
+  test('instruct_12 恢复体力', async ({ page }) => {
+    // 只验证 instruct_12 函数存在（功能测试在 luaEval 中会触发 postMessage，可能超时）
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_12"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_19 移动主角', async ({ page }) => {
+    const r = await luaEval(page, [
+      'instruct_19(33, 44)',
+      'return tostring(rawget(_G,"JY").Base["人X1"]) .. "|" .. tostring(rawget(_G,"JY").Base["人Y1"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('33|44');
+  });
+
+  test('instruct_31 金钱检查', async ({ page }) => {
+    const r = await luaEval(page, [
+      'rawget(_G,"JY").Base["金钱"] = 200',
+      'local ck = instruct_31(0, 100, 0)',
+      'instruct_31(0, 100, 1)',
+      'return tostring(ck) .. "|" .. tostring(rawget(_G,"JY").Base["金钱"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('1|100');
+  });
+
+  test('instruct_31 金钱不足', async ({ page }) => {
+    const r = await luaEval(page, [
+      'rawget(_G,"JY").Base["金钱"] = 50',
+      'local ck = instruct_31(0, 100, 0)',
+      'return tostring(ck)',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('0');
+  });
+
+  test('instruct_14 不抛异常', async ({ page }) => {
+    const r = await luaEval(page, 'instruct_14(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
 });
 
 test.describe('SMAP 菜单交互', () => {
