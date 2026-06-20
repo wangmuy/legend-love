@@ -425,8 +425,19 @@ function WmapHandlers.afterAction()
     end
     if allDead then
         w("战斗胜利！")
+        -- 奖励: 经验 + 金钱
+        local JY = rawget(_G, "JY")
+        local P0 = JY.Person and JY.Person[0]
+        if P0 then
+            local expGain = 10 + math.random(20) + (#war.enemies * 5)
+            local goldGain = 5 + math.random(15) + (#war.enemies * 3)
+            P0["经验"] = (P0["经验"] or 0) + expGain
+            JY.Base = JY.Base or {}
+            JY.Base["金钱"] = (JY.Base["金钱"] or 0) + goldGain
+            w(string.format("获得 %d 经验，%d 金钱！", expGain, goldGain))
+        end
         wmapContext.phase = nil
-        rawget(_G, "JY").Status = 2  -- GAME_MMAP
+        JY.Status = 2  -- GAME_MMAP
         local MmapHandlers = rawget(_G, "MmapHandlers")
         if MmapHandlers then MmapHandlers.look({}) end
         return
