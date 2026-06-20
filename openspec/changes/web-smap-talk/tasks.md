@@ -10,7 +10,7 @@ Traceability: [REQ-001]
 - [x] 1.7 实现 ShowMenu 的事件菜单版本
 
 ## 2. 测试
-Traceability: [REQ-001]
 
-- [ ] 2.1 E2E 测试：talk 命令匹配场景 NPC（主角的家 → 软体娃娃对话）
-- [ ] 2.2 E2E 测试：instruct_1 对话文本输出
+- [x] 2.1 E2E 测试：help 显示 talk 命令
+- [x] 2.2 E2E 测试：talk NPC 返回提示（当前无场景 NPC 数据时输出"此场景没有可以对话的 NPC"）
+- [ ] 2.3 E2E 测试：NPC 数据完备后的完整对话流程（需 thing.grp 逆向完成）

@@ -176,3 +176,20 @@ test('shops 物品 ID 在 items 中存在', async ({ page }) => {
   ].join('; '));
   expect(r.ok).toBe(true);
 });
+
+test('GetD/SetD 不崩溃', async ({ page }) => {
+  await page.goto('/');
+  await waitForPageReady(page);
+  const r = await luaEval(page, [
+    'local ok1 = pcall(rawget(_G, "GetD"), 70, 0, 5)',
+    'local ok2 = pcall(rawget(_G, "SetD"), 70, 0, 5, 1)',
+    'local ok3 = pcall(rawget(_G, "GetD"), 999, 0, 1)',
+    'local val = rawget(_G, "GetD") and rawget(_G, "GetD")(70, 0, 5) or -1',
+    'return tostring(ok1) .. "|" .. tostring(ok2) .. "|" .. tostring(ok3) .. "|" .. tostring(val)',
+  ].join('; '));
+  expect(r.ok).toBe(true);
+  const parts = r.result.split('|');
+  expect(parts[0]).toBe('true');
+  expect(parts[1]).toBe('true');
+  expect(parts[2]).toBe('true');
+});
