@@ -298,7 +298,7 @@ local function getCharsIndex()
 end
 
 -- 遇敌系统
-local encounterRate = 0.15  -- 15% 遇敌概率
+local encounterRate = 0.20  -- 20% 遇敌概率
 
 local function getWars()
     local ds = g(_G, "initDataSource")
@@ -332,35 +332,18 @@ local function selectRandomWar()
     return wars[idx]
 end
 
-function MmapHandlers.walk(args)
+-- explore: 在当前区域探索，随机遇敌
+function MmapHandlers.explore(args)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     if not JY.Base then JY.Base = {} end
     
-    local dir = args and args[1]
-    if not dir then
-        w("用法: walk <方向> (n/s/e/w)")
-        return
-    end
+    local dirs = {"前方", "左方", "右方", "密林深处", "山道尽头"}
+    local descs = {"四处张望，周围一片宁静。", "草木丛生，似乎有动静。", "你仔细搜索着周围的环境。", "风吹过树梢，沙沙作响。"}
+    local dir = dirs[math.random(#dirs)]
+    local desc = descs[math.random(#descs)]
     
-    dir = dir:lower()
-    local dx, dy = 0, 0
-    if dir == "n" or dir == "north" then dy = -1
-    elseif dir == "s" or dir == "south" then dy = 1
-    elseif dir == "e" or dir == "east" then dx = 1
-    elseif dir == "w" or dir == "west" then dx = -1
-    else
-        w("无效方向。用法: walk <方向> (n/s/e/w)")
-        return
-    end
-    
-    local x = (JY.Base["人X1"] or 364) + dx
-    local y = (JY.Base["人Y1"] or 284) + dy
-    JY.Base["人X1"] = x
-    JY.Base["人Y1"] = y
-    JY.Base["人方向"] = dir == "n" and 0 or dir == "s" and 1 or dir == "w" and 2 or 3
-    
-    w(string.format("你向%s移动了一步。(%d, %d)", ({n="北",s="南",e="东",w="西"})[dir] or dir, x, y))
+    w(string.format("你向%s探索。%s", dir, desc))
     
     -- 随机遇敌判定
     if math.random() < encounterRate then
@@ -386,11 +369,11 @@ function MmapHandlers.walk(args)
                 end
             end
             if #enemies > 0 then
-                w("你遭遇了敌人！战斗开始！")
+                w("突然，你遭遇了敌人！")
                 local WmapHandlers = g(_G, "WmapHandlers")
                 if WmapHandlers then
                     WmapHandlers.initWar(enemies, 5 + math.random(5))
-                    return  -- WMAP 接管流程，不再继续
+                    return
                 end
             end
         end

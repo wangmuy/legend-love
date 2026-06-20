@@ -201,7 +201,7 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
-  test('MMAP walk 行走命令', async ({ page }) => {
+  test('MMAP explore 探索命令', async ({ page }) => {
     test.setTimeout(60000);
     await startNewGame(page);
 
@@ -214,21 +214,13 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
     let text = lines.join('\n');
     expect(text).toContain('当前位置');
 
-    // 走一步
-    await typeCmd(page, 'walk n');
+    // 探索
+    await typeCmd(page, 'explore');
     await page.waitForTimeout(2000);
 
     lines = await getTermLines(page);
     text = lines.join('\n');
-    expect(text).toContain('移动了一步');
-
-    // 向下走回来
-    await typeCmd(page, 'walk s');
-    await page.waitForTimeout(2000);
-
-    lines = await getTermLines(page);
-    text = lines.join('\n');
-    expect(text).toContain('移动了一步');
+    expect(text).toContain('探索');
 
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
