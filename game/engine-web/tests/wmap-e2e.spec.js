@@ -200,4 +200,117 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
     expect(text).toContain('武功');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
+
+  test('MMAP walk 行走命令', async ({ page }) => {
+    test.setTimeout(60000);
+    await startNewGame(page);
+
+    // 先离开到 MMAP
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    // 检查当前位置
+    let lines = await getTermLines(page);
+    let text = lines.join('\n');
+    expect(text).toContain('当前位置');
+
+    // 走一步
+    await typeCmd(page, 'walk n');
+    await page.waitForTimeout(2000);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    expect(text).toContain('移动了一步');
+
+    // 向下走回来
+    await typeCmd(page, 'walk s');
+    await page.waitForTimeout(2000);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    expect(text).toContain('移动了一步');
+
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('MMAP 行走遇敌（直接验证 initWar 调用）', async ({ page }) => {
+    test.setTimeout(60000);
+    await startNewGame(page);
+
+    // 先离开到 MMAP
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    // 直接通过 lua 调用 initWar 模拟遇敌
+    const initResult = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'local P0 = JY.Person[0]',
+      'P0["生命"]=100; P0["生命最大值"]=100; P0["内力"]=50; P0["内力最大值"]=50',
+      'P0["攻击力"]=30; P0["防御力"]=20',
+      'local W = rawget(_G, "WmapHandlers")',
+      'W.initWar({{name="山贼",hp=30,maxHp=30,mp=0,maxMp=0,x=1,attack=15,defense=5}}, 5)',
+      'return "ok"',
+    ].join('; '));
+    expect(initResult.ok).toBe(true);
+
+    await page.waitForTimeout(1000);
+    await typeCmd(page, 'look');
+    await page.waitForTimeout(2000);
+
+    const lines = await getTermLines(page);
+    const text = lines.join('\n');
+    expect(text).toContain('战场态势');
+    expect(text).toContain('山贼');
+    expect(text).toContain('我方回合');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('战斗胜利奖励验证', async ({ page }) => {
+    test.setTimeout(60000);
+    await startNewGame(page);
+
+    // Init war with weak enemy, check rewards after kill
+    const init = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'local P0 = JY.Person[0]',
+      'P0["生命"]=100; P0["生命最大值"]=100; P0["内力"]=50; P0["内力最大值"]=50',
+      'P0["攻击力"]=60; P0["防御力"]=30',
+      'P0["经验"]=0',
+      'local W = rawget(_G, "WmapHandlers")',
+      'W.initWar({{name="山贼",hp=5,maxHp=5,mp=0,maxMp=0,x=0,attack=5,defense=1}}, 3)',
+      'return "ok"',
+    ].join('; '));
+    expect(init.ok).toBe(true);
+
+    await page.waitForTimeout(1000);
+    await typeCmd(page, 'look');
+    await page.waitForTimeout(2000);
+
+    // Kill enemy
+    for (let i = 0; i < 3; i++) {
+      await typeCmd(page, 'choose 1');
+      await page.waitForTimeout(1500);
+    }
+    await page.waitForTimeout(2000);
+
+    const lines = await getTermLines(page);
+    const text = lines.join('\n');
+    expect(text).toContain('战斗胜利');
+    expect(text).toContain('经验');
+    expect(text).toContain('金钱');
+
+    // Verify rewards in Lua state
+    const rewardCheck = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'local exp = JY.Person and JY.Person[0] and JY.Person[0]["经验"] or 0',
+      'local gold = JY.Base and JY.Base["金钱"] or 0',
+      'return tostring(exp) .. "|" .. tostring(gold)',
+    ].join('; '));
+    expect(rewardCheck.ok).toBe(true);
+    const parts = rewardCheck.result.split('|');
+    expect(parseInt(parts[0])).toBeGreaterThan(0);
+    expect(parseInt(parts[1])).toBeGreaterThan(0);
+
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
 });

@@ -297,6 +297,106 @@ local function getCharsIndex()
     return index
 end
 
+-- 遇敌系统
+local encounterRate = 0.15  -- 15% 遇敌概率
+
+local function getWars()
+    local ds = g(_G, "initDataSource")
+    if not ds then return nil end
+    local raw = ds["wars"]
+    if not raw then return nil end
+    local list = raw["wars"] or raw
+    if type(list) ~= "table" or #list == 0 then return nil end
+    return list
+end
+
+local function getCharName(charId)
+    local ds = g(_G, "initDataSource")
+    if not ds then return nil end
+    local raw = ds["chars"]
+    if not raw then return nil end
+    local list = raw["chars"] or raw
+    if type(list) ~= "table" then return nil end
+    for _, c in ipairs(list) do
+        if type(c) == "table" and c["代号"] == charId then
+            return c["姓名"] or nil
+        end
+    end
+    return nil
+end
+
+local function selectRandomWar()
+    local wars = getWars()
+    if not wars then return nil end
+    local idx = math.random(1, #wars)
+    return wars[idx]
+end
+
+function MmapHandlers.walk(args)
+    local JY = g(_G, "JY")
+    if not JY then JY = {}; rawset(_G, "JY", JY) end
+    if not JY.Base then JY.Base = {} end
+    
+    local dir = args and args[1]
+    if not dir then
+        w("用法: walk <方向> (n/s/e/w)")
+        return
+    end
+    
+    dir = dir:lower()
+    local dx, dy = 0, 0
+    if dir == "n" or dir == "north" then dy = -1
+    elseif dir == "s" or dir == "south" then dy = 1
+    elseif dir == "e" or dir == "east" then dx = 1
+    elseif dir == "w" or dir == "west" then dx = -1
+    else
+        w("无效方向。用法: walk <方向> (n/s/e/w)")
+        return
+    end
+    
+    local x = (JY.Base["人X1"] or 364) + dx
+    local y = (JY.Base["人Y1"] or 284) + dy
+    JY.Base["人X1"] = x
+    JY.Base["人Y1"] = y
+    JY.Base["人方向"] = dir == "n" and 0 or dir == "s" and 1 or dir == "w" and 2 or 3
+    
+    w(string.format("你向%s移动了一步。(%d, %d)", ({n="北",s="南",e="东",w="西"})[dir] or dir, x, y))
+    
+    -- 随机遇敌判定
+    if math.random() < encounterRate then
+        local war = selectRandomWar()
+        if war and war["敌人"] and #war["敌人"] > 0 then
+            local enemies = {}
+            local usedCharIds = {}
+            for _, ed in ipairs(war["敌人"]) do
+                local charId = ed["代号"]
+                if charId and charId ~= 65535 and not usedCharIds[charId] then
+                    usedCharIds[charId] = true
+                    local name = getCharName(charId) or ("敌人" .. charId)
+                    table.insert(enemies, {
+                        name = name,
+                        hp = 30 + math.random(20),
+                        maxHp = 30 + math.random(20),
+                        mp = 10 + math.random(15),
+                        maxMp = 10 + math.random(15),
+                        x = math.random(3, 8),
+                        attack = 5 + math.random(15),
+                        defense = 2 + math.random(10),
+                    })
+                end
+            end
+            if #enemies > 0 then
+                w("你遭遇了敌人！战斗开始！")
+                local WmapHandlers = g(_G, "WmapHandlers")
+                if WmapHandlers then
+                    WmapHandlers.initWar(enemies, 5 + math.random(5))
+                    return  -- WMAP 接管流程，不再继续
+                end
+            end
+        end
+    end
+end
+
 -- SMAP 命令
 -- 场景交互对象列表（由 look 填充，供 choose 使用）
 local smapEntityList = {}
