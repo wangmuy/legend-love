@@ -234,7 +234,7 @@
         'script/jymodify.lua',
     ];
 
-    const dataFilesList = ['dialogues', 'scenes', 'chars', 'items', 'skills', 'entrances', 'wmap', 'config', 'shops'];
+    const dataFilesList = ['dialogues', 'scenes', 'chars', 'items', 'skills', 'entrances', 'wmap', 'config', 'shops', 'wars'];
 
     async function sendInitData() {
         term.write('金庸群侠传 Web MUD v0.1\r\n');
