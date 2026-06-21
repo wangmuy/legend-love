@@ -329,13 +329,16 @@ function SmapHandlers.look(args)
         local charsIndex = getCharsIndex()
         for _, npc in ipairs(npcs) do
             local charIdStr = tostring(npc["代号"] or npc)
-            if _G.isNpcPresent(sceneId, charIdStr) then
-                local char = charsIndex and charsIndex[charIdStr]
-                -- 优先使用 NPC 条目中的名称字段，其次从 chars 数据查找
-                local charName = npc["名称"] or (char and char["姓名"]) or ("NPC?" .. charIdStr)
-                entityIndex = entityIndex + 1
-                smapEntityList[entityIndex] = { type = "npc", charId = charIdStr, name = charName, npcData = npc }
-                w(string.format("%d. %s", entityIndex, charName))
+            local npcName = npc["名称"] or "?"
+            -- 跳过非 NPC 事件触发器（oldevent_ 前缀名称）
+            if npcName and not npcName:match("^oldevent_") then
+                if _G.isNpcPresent(sceneId, charIdStr) then
+                    local char = charsIndex and charsIndex[charIdStr]
+                    local displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charIdStr)
+                    entityIndex = entityIndex + 1
+                    smapEntityList[entityIndex] = { type = "npc", charId = charIdStr, name = displayName, npcData = npc }
+                    w(string.format("%d. %s", entityIndex, displayName))
+                end
             end
         end
     end

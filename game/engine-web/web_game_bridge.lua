@@ -919,6 +919,11 @@ function _G.initWebFramework()
         end
 
         local WebUI = rawget(_G, "WebUI")
+        -- 执行新游戏开场事件（主角独白对话）
+        local EventExecutor = rawget(_G, "EventExecutor")
+        if EventExecutor and EventExecutor.oldCallEventCoroutine then
+            EventExecutor.oldCallEventCoroutine(CC.NewGameEvent)
+        end
         WebUI.write("新游戏开始！你来到了金庸群侠传的世界。")
         WebUI.write("输入 help 查看可用命令，choose 查看交互对象")
         local SmapHandlers = rawget(_G, "SmapHandlers")
