@@ -256,6 +256,343 @@ rawset(_G, "instruct_51", function()
     end
 end)
 
+-- === 以下 instruct_* 由 jymain.lua 定义但被 Web MUD 空桩覆盖 ===
+-- 由于 catch-all 循环会保存空桩并在 jymain.lua 加载后恢复，
+-- 此处提前实现真实逻辑，确保被 _our_instruct 保存。
+
+-- instruct_9: 是否要求加入队伍
+rawset(_G, "instruct_9", function()
+    local AsyncMessageBox = require("framework.async_message_box")
+    local ok = AsyncMessageBox.ShowYesNoCoroutine(-1, -1, "是否要求加入？", C_ORANGE, CC.DefaultFont)
+    return ok == 1
+end)
+
+-- instruct_10: 加入队员
+rawset(_G, "instruct_10", function(personid)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return end
+    for i = 2, CC.TeamNum do
+        if JY.Base["队伍" .. i] == nil or JY.Base["队伍" .. i] < 0 then
+            JY.Base["队伍" .. i] = personid
+            for j = 1, 4 do
+                local id = JY.Person[personid]["携带物品" .. j]
+                local num = JY.Person[personid]["携带物品数量" .. j]
+                if id and id > 0 then
+                    local instruct_32 = rawget(_G, "instruct_32")
+                    if instruct_32 then instruct_32(0, personid, id, 0) end
+                    instruct_31(id, num, 2)
+                end
+            end
+            return
+        end
+    end
+end)
+
+-- instruct_16: 队伍中是否有某人
+rawset(_G, "instruct_16", function(personid)
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    for i = 1, CC.TeamNum do
+        if JY.Base["队伍" .. i] == personid then return true end
+    end
+    return false
+end)
+
+-- instruct_18: 是否有某种物品
+rawset(_G, "instruct_18", function(thingid)
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    for i = 1, CC.MyThingNum or 30 do
+        if JY.Base["物品" .. i] == thingid then return true end
+    end
+    return false
+end)
+
+-- instruct_20: 判断队伍是否满
+rawset(_G, "instruct_20", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    return (JY.Base["队伍" .. CC.TeamNum] or 0) >= 0
+end)
+
+-- instruct_21: 离队
+rawset(_G, "instruct_21", function(personid)
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    local j = 0
+    for i = 1, CC.TeamNum do
+        if JY.Base["队伍" .. i] == personid then j = i; break end
+    end
+    if j == 0 then return end
+    for i = j + 1, CC.TeamNum do
+        JY.Base["队伍" .. i - 1] = JY.Base["队伍" .. i]
+    end
+    JY.Base["队伍" .. CC.TeamNum] = -1
+end)
+
+-- instruct_22: 内力降为0
+rawset(_G, "instruct_22", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    for i = 1, CC.TeamNum do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and JY.Person[pid] then
+            JY.Person[pid]["内力"] = 0
+        end
+    end
+end)
+
+-- instruct_23: 设置用毒
+rawset(_G, "instruct_23", function(personid, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[personid] then
+        JY.Person[personid]["用毒能力"] = value
+    end
+end)
+
+-- instruct_28: 判断品德
+rawset(_G, "instruct_28", function(personid, vmin, vmax)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return false end
+    local v = JY.Person[personid]["品德"] or 0
+    return v >= vmin and v <= vmax
+end)
+
+-- instruct_29: 判断攻击力
+rawset(_G, "instruct_29", function(personid, vmin, vmax)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return false end
+    local v = JY.Person[personid]["攻击力"] or 0
+    return v >= vmin and v <= vmax
+end)
+
+-- instruct_33: 学会武功
+rawset(_G, "instruct_33", function(personid, wugongid, flag)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return end
+    local added = false
+    for i = 1, 10 do
+        if JY.Person[personid]["武功" .. i] == 0 or not JY.Person[personid]["武功" .. i] then
+            JY.Person[personid]["武功" .. i] = wugongid
+            JY.Person[personid]["武功等级" .. i] = 0
+            added = true
+            break
+        end
+    end
+    if not added then
+        JY.Person[personid]["武功10"] = wugongid
+        JY.Person[personid]["武功等级10"] = 0
+    end
+end)
+
+-- instruct_34: 资质增加
+rawset(_G, "instruct_34", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["资质"] = (JY.Person[id]["资质"] or 0) + value
+    end
+end)
+
+-- instruct_35: 设置武功
+rawset(_G, "instruct_35", function(personid, idx, wugongid, wugonglevel)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return end
+    if idx and idx >= 0 then
+        JY.Person[personid]["武功" .. (idx + 1)] = wugongid
+        JY.Person[personid]["武功等级" .. (idx + 1)] = wugonglevel
+    else
+        for i = 1, 10 do
+            if not JY.Person[personid]["武功" .. i] or JY.Person[personid]["武功" .. i] == 0 then
+                JY.Person[personid]["武功" .. i] = wugongid
+                JY.Person[personid]["武功等级" .. i] = wugonglevel
+                return
+            end
+        end
+        JY.Person[personid]["武功1"] = wugongid
+        JY.Person[personid]["武功等级1"] = wugonglevel
+    end
+end)
+
+-- instruct_36: 判断主角性别
+rawset(_G, "instruct_36", function(sex)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[0] then return false end
+    return JY.Person[0]["性别"] == sex
+end)
+
+-- instruct_39: 打开场景
+rawset(_G, "instruct_39", function(sceneid)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Scene and JY.Scene[sceneid] then
+        JY.Scene[sceneid]["进入条件"] = 0
+    end
+end)
+
+-- instruct_41: 其他人员增加物品
+rawset(_G, "instruct_41", function(personid, thingid, num)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return end
+    local k = 0
+    for i = 1, 4 do
+        if JY.Person[personid]["携带物品" .. i] == thingid then
+            JY.Person[personid]["携带物品数量" .. i] = (JY.Person[personid]["携带物品数量" .. i] or 1) + num
+            k = i
+            break
+        end
+    end
+    if k == 0 then
+        for i = 1, 4 do
+            if not JY.Person[personid]["携带物品" .. i] or JY.Person[personid]["携带物品" .. i] <= 0 then
+                JY.Person[personid]["携带物品" .. i] = thingid
+                JY.Person[personid]["携带物品数量" .. i] = num
+                break
+            end
+        end
+    end
+end)
+
+-- instruct_42: 队伍中是否有女性
+rawset(_G, "instruct_42", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    for i = 1, CC.TeamNum do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and JY.Person and JY.Person[pid] and JY.Person[pid]["性别"] == 1 then
+            return true
+        end
+    end
+    return false
+end)
+
+-- instruct_43: 是否有某种物品（委托给 instruct_18）
+rawset(_G, "instruct_43", function(thingid)
+    local instruct_18 = rawget(_G, "instruct_18")
+    if instruct_18 then return instruct_18(thingid) end
+    return false
+end)
+
+-- instruct_45: 增加轻功
+rawset(_G, "instruct_45", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["轻功"] = (JY.Person[id]["轻功"] or 0) + value
+    end
+end)
+
+-- instruct_46: 增加内力
+rawset(_G, "instruct_46", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["内力最大值"] = (JY.Person[id]["内力最大值"] or 0) + value
+    end
+end)
+
+-- instruct_47: 增加攻击力
+rawset(_G, "instruct_47", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["攻击力"] = (JY.Person[id]["攻击力"] or 0) + value
+    end
+end)
+
+-- instruct_48: 增加生命
+rawset(_G, "instruct_48", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["生命最大值"] = (JY.Person[id]["生命最大值"] or 0) + value
+    end
+end)
+
+-- instruct_49: 设置内力属性
+rawset(_G, "instruct_49", function(personid, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[personid] then
+        JY.Person[personid]["内力性质"] = value
+    end
+end)
+
+-- instruct_50: 判断是否有5种物品
+rawset(_G, "instruct_50", function(id1, id2, id3, id4, id5)
+    local instruct_18 = rawget(_G, "instruct_18")
+    if not instruct_18 then return false end
+    local num = 0
+    for _, id in ipairs({id1, id2, id3, id4, id5}) do
+        if instruct_18(id) then num = num + 1 end
+    end
+    return num == 5
+end)
+
+-- instruct_52: 看品德
+rawset(_G, "instruct_52", function()
+    local JY = rawget(_G, "JY")
+    local morale = JY and JY.Person and JY.Person[0] and JY.Person[0]["品德"] or 0
+    local WebUI = rawget(_G, "WebUI")
+    if WebUI then WebUI.write(string.format("品德指数: %d", morale)) end
+end)
+
+-- instruct_53: 看声望
+rawset(_G, "instruct_53", function()
+    local JY = rawget(_G, "JY")
+    local rep = JY and JY.Person and JY.Person[0] and JY.Person[0]["声望"] or 0
+    local WebUI = rawget(_G, "WebUI")
+    if WebUI then WebUI.write(string.format("声望指数: %d", rep)) end
+end)
+
+-- instruct_54: 开放其他场景
+rawset(_G, "instruct_54", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    for i = 0, CC.SceneNum - 1 do
+        if JY.Scene[i] then JY.Scene[i]["进入条件"] = 0 end
+    end
+    if JY.Scene[2] then JY.Scene[2]["进入条件"] = 2 end   --云鹤崖
+    if JY.Scene[38] then JY.Scene[38]["进入条件"] = 2 end  --摩天崖
+    if JY.Scene[75] then JY.Scene[75]["进入条件"] = 1 end  --桃花岛
+    if JY.Scene[80] then JY.Scene[80]["进入条件"] = 1 end  --绝情谷底
+end)
+
+-- instruct_55: 判断D*编号的触发事件
+rawset(_G, "instruct_55", function(id, num)
+    local GetD = rawget(_G, "GetD")
+    if not GetD then return false end
+    local JY = rawget(_G, "JY")
+    local sceneId = JY and JY.SubScene or 0
+    return GetD(sceneId, id, 2) == num
+end)
+
+-- instruct_59: 全体队员离队
+rawset(_G, "instruct_59", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    local instruct_21 = rawget(_G, "instruct_21")
+    for i = CC.TeamNum, 2, -1 do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and instruct_21 then
+            instruct_21(pid)
+        end
+    end
+end)
+
+-- instruct_61: 判断是否放完14天书
+rawset(_G, "instruct_61", function()
+    local GetD = rawget(_G, "GetD")
+    if not GetD then return false end
+    local JY = rawget(_G, "JY")
+    local sceneId = JY and JY.SubScene or 0
+    for i = 11, 24 do
+        if GetD(sceneId, i, 5) ~= 4664 then return false end
+    end
+    return true
+end)
+
+-- instruct_63: 设置性别
+rawset(_G, "instruct_63", function(personid, sex)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[personid] then
+        JY.Person[personid]["性别"] = sex
+    end
+end)
+
 -- 兜底: 所有未显式实现的 instruct_* 输出 debug 日志
 for i = 0, 66 do
     if not rawget(_G, "instruct_" .. i) then
