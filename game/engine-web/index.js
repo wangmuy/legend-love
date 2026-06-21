@@ -295,7 +295,7 @@
 
         // 注册 oldevent 脚本（逐个发送，worker 累积到 FrameworkSources）
         term.write('Loading oldevent scripts...\r\n');
-        for (let i = 0; i <= 1018; i++) {
+        for (let i = 0; i <= 1017; i++) {
             const resp = await fetch('script/oldevent/oldevent_' + i + '.lua');
             if (resp.ok) {
                 const source = await resp.text();

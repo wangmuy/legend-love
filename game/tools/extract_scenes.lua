@@ -279,6 +279,28 @@ function extract.run(dataDir, outputFile)
                                             break
                                         end
                                     end
+                                    -- 如果注释中没有找到名字（[???]），尝试用 headId 映射
+                                    if not npcName then
+                                        local headId = nil
+                                        -- 提取第一个 instruct_1 调用的 headId
+                                        for h in content:gmatch("instruct_1%b()") do
+                                            -- instruct_1(talkId,headId,pos)
+                                            local id = tonumber(h:match(",(%d+),"))
+                                            if id and id ~= 0 then
+                                                headId = id
+                                                break
+                                            end
+                                        end
+                                        if headId then
+                                            local HEAD_MAP = {
+                                                [73] = "南贤", [74] = "北丑",
+                                                [105] = "掌柜", [106] = "店小二",
+                                                [111] = "韦小宝",
+                                                [114] = "软体娃娃",
+                                            }
+                                            npcName = HEAD_MAP[headId]
+                                        end
+                                    end
                                 end
                             end
                             if not npcName then
