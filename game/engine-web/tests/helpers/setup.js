@@ -8,7 +8,6 @@ async function waitForPageReady(page) {
 }
 
 async function getLuaGlobal(page, name) {
-  // 通过 Worker 的 lua_eval 通道获取 Lua 全局变量
   const result = await page.evaluate(async (n) => {
     if (!window.__luaEval) return { type: 'worker_not_ready' };
     const r = await window.__luaEval('return ' + n);
@@ -18,7 +17,6 @@ async function getLuaGlobal(page, name) {
 }
 
 async function luaEval(page, code) {
-  // 通过 Worker 的 lua_eval 通道执行 Lua 代码
   const result = await page.evaluate(async (c) => {
     if (!window.__luaEval) return { __error: 'worker not ready' };
     const r = await window.__luaEval(c);
@@ -27,4 +25,16 @@ async function luaEval(page, code) {
   return result;
 }
 
-module.exports = { waitForPageReady, getLuaGlobal, luaEval };
+async function waitForGameReady(page) {
+  await page.waitForFunction(() => {
+    const term = window.__xterm;
+    if (!term) return false;
+    for (let y = 0; y < term.buffer.active.length; y++) {
+      const text = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      if (text.includes('输入 choose 1 开始新游戏')) return true;
+    }
+    return false;
+  }, { timeout: 60000 });
+}
+
+module.exports = { waitForPageReady, getLuaGlobal, luaEval, waitForGameReady };
