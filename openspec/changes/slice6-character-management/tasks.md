@@ -24,10 +24,10 @@
 - [x] 3.1 显示背包物品列表（编号 + 名称 + 数量）
   Blast Radius: `["game/engine-web/mmap_smap_handlers.lua"]`
   DoD: 显示背包中所有非空物品
-- [ ] 3.2 物品使用（选择物品 → 选择目标 → 使用）
+- [x] 3.2 物品使用（选择物品 → 选择目标 → 使用）
   Blast Radius: `["game/engine-web/mmap_smap_handlers.lua"]`
   DoD: 选择物品后可使用，药品恢复HP/MP，暗器可投掷
-- [ ] 3.3 装备/卸下
+- [x] 3.3 装备/卸下
   Blast Radius: `["game/engine-web/mmap_smap_handlers.lua"]`
   DoD: 武器/防具类物品可装备到角色，可选择卸下
 
@@ -36,7 +36,7 @@
 - [x] 4.1 显示当前队伍成员列表
   Blast Radius: `["game/engine-web/mmap_smap_handlers.lua"]`
   DoD: 列出所有队员姓名/等级/HP/MP
-- [ ] 4.2 医疗/解毒（选择队员 → 消耗物品 → 恢复）
+- [x] 4.2 医疗/解毒（选择队员 → 消耗物品 → 恢复）
   Blast Radius: `["game/engine-web/mmap_smap_handlers.lua"]`
   DoD: 选择队员后可使用医疗/解毒物品，HP/中毒状态恢复
 
@@ -48,7 +48,7 @@
 - [x] 5.2 读档（槽位 1-3）
   Blast Radius: `["game/engine-web/state_manager.lua"]`
   DoD: 选择槽位后读档成功，回到游戏
-- [ ] 5.3 自动存档（场景切换时）
+- [x] 5.3 自动存档（场景切换时）
   Blast Radius: `["game/engine-web/state_manager.lua", "game/engine-web/web_game_bridge.lua"]`
   DoD: 进入/离开场景时自动保存到槽位 0
 
