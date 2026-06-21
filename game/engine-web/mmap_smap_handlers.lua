@@ -396,18 +396,18 @@ function SmapHandlers.chooseInteraction(idx)
     local sceneId = tostring(JY.SubScene or 0)
     
     if ent.type == "npc" then
-        -- NPC 子菜单
+        -- NPC 子菜单（与原版一致：对话，可查看人物信息，如有事件则触发）
         local CE = g(_G, "CommandEngine")
         if CE then
             CE.showMenu(
-                { {name="对话"}, {name="查看"}, {name="给予物品"} },
+                { {name="对话"}, {name="查看"} },
                 ent.name,
                 function(actionIdx)
                     if actionIdx == 1 then
                         -- 对话
                         smapNpcTalk(sceneId, ent)
                     elseif actionIdx == 2 then
-                        -- 查看
+                        -- 查看（仅显示人物基本信息，不添加原版没有的交互）
                         local charsIndex = getCharsIndex()
                         local char = charsIndex and charsIndex[ent.charId]
                         if char then
@@ -415,9 +415,6 @@ function SmapHandlers.chooseInteraction(idx)
                             if char["描述"] then w(char["描述"]) end
                         end
                         SmapHandlers.look({})
-                    elseif actionIdx == 3 then
-                        -- 给予物品
-                        smapGiveToNpc(sceneId, ent)
                     end
                 end
             )
@@ -496,48 +493,6 @@ function smapTakeItem(sceneId, ent)
     w("你获得了 " .. ent.name .. "。")
     smapEntityList = {}
     SmapHandlers.look({})
-end
-
--- 给予物品
-function smapGiveToNpc(sceneId, ent)
-    local JY = g(_G, "JY")
-    if not JY then JY = {}; rawset(_G, "JY", JY) end
-    JY.Base = JY.Base or {}
-    
-    -- 列出背包物品
-    local backpack = {}
-    for i = 1, 30 do
-        local id = JY.Base["物品" .. i]
-        if id and id ~= 0 then
-            local name = getItemName(tostring(id))
-            if name then
-                table.insert(backpack, {slot = i, id = id, name = name})
-            end
-        end
-    end
-    
-    if #backpack == 0 then
-        w("你身上没有可以给予的物品。")
-        return
-    end
-    
-    local CE = g(_G, "CommandEngine")
-    if CE then
-        local items = {}
-        for _, bi in ipairs(backpack) do
-            table.insert(items, {name = bi.name})
-        end
-        CE.showMenu(items, "选择要给予的物品", function(itemIdx)
-            if itemIdx and itemIdx > 0 and itemIdx <= #backpack then
-                local bi = backpack[itemIdx]
-                JY.Base["物品" .. bi.slot] = 0
-                JY.Base["物品数量" .. bi.slot] = 0
-                w("你将 " .. bi.name .. " 交给了 " .. ent.name .. "。")
-                smapEntityList = {}
-                SmapHandlers.look({})
-            end
-        end)
-    end
 end
 
 function SmapHandlers.exits(args)
