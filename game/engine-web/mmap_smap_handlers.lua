@@ -519,6 +519,11 @@ end
 function SmapHandlers.leave(args)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
+    
+    -- 自动存档到槽位 0
+    local saveGameState = g(_G, "saveGameState")
+    if saveGameState then pcall(saveGameState, 0) end
+    
     -- 离开场景时恢复到该场景在世界地图上的入口坐标
     local sceneId = tostring(JY.SubScene or 0)
     local entrances = getEntrances()
@@ -561,6 +566,10 @@ function SmapHandlers.go(args)
         local exit = scene["出口"][n]
         local targetSceneId = exit["目标场景"]
         if targetSceneId then
+            -- 自动存档到槽位 0
+            local saveGameState = g(_G, "saveGameState")
+            if saveGameState then pcall(saveGameState, 0) end
+            
             JY.SubScene = targetSceneId
             local targetScene = scenes and scenes[tostring(targetSceneId)]
             if targetScene then
@@ -851,7 +860,9 @@ rawset(_G, "SmapHandlers", SmapHandlers)
 -- ============================================================
 -- Slice 6: 角色管理菜单（通过 look → choose N 访问）
 -- ============================================================
-local roleMenuPhase = nil  -- nil=不在菜单中, "main","status","bag","team","save"
+local roleMenuPhase
+local bagCache = {}   -- 缓存当前列表的物品/队员选择
+local roleMenuSelectedItem  -- 缓存当前选择的物品 = nil  -- nil=不在菜单中, "main","status","bag","team","save"
 
 -- 显示角色管理主菜单
 local function showRoleMenu()
@@ -933,8 +944,133 @@ local function showBag()
     if count == 0 then w("背包是空的") end
     roleMenuPhase = nil
     ws()
+    w("1. 使用物品")
+    w("2. 装备物品")
     w("0. 返回")
     roleMenuPhase = "bag"
+end
+
+-- 获取物品定义
+local function getItemDef(itemId)
+    local JY = g(_G, "JY")
+    return JY and JY.Thing and JY.Thing[itemId]
+end
+
+-- 获取人物姓名
+local function getPersonName(pid)
+    local JY = g(_G, "JY")
+    local p = JY and JY.Person and JY.Person[pid]
+    return (p and p["姓名"]) or "?" 
+end
+
+-- 获取 CC 物品名
+local function getCCItemName(itemId)
+    local CC = g(_G, "CC")
+    return (CC and CC["物品" .. itemId]) or ("物品" .. itemId)
+end
+
+-- 列出背包中指定类型的物品
+local function filterBagItems(filterFn)
+    local JY = g(_G, "JY")
+    if not JY or not JY.Base then return {} end
+    local result = {}
+    for i = 1, 30 do
+        local itemId = JY.Base["物品" .. i]
+        if itemId and itemId ~= 0 and filterFn(itemId) then
+            table.insert(result, {slot = i, id = itemId, qty = JY.Base["物品数量" .. i] or 1})
+        end
+    end
+    return result
+end
+
+-- 列出可使用的物品（药品/暗器类）
+local function showUsableItems()
+    local items = filterBagItems(function(id)
+        local def = getItemDef(id)
+        return def and (def["类型"] == 3 or def["类型"] == 4)
+    end)
+    if #items == 0 then w("没有可使用的物品。"); return nil end
+    w("选择要使用的物品：")
+    bagCache = {}
+    for idx, it in ipairs(items) do
+        table.insert(bagCache, it)
+        local def = getItemDef(it.id)
+        local desc = ""
+        if def["加生命"] and def["加生命"] > 0 then desc = desc .. " +生命" .. def["加生命"] end
+        if def["加内力"] and def["加内力"] > 0 then desc = desc .. " +内力" .. def["加内力"] end
+        if def["加体力"] and def["加体力"] > 0 then desc = desc .. " +体力" .. def["加体力"] end
+        w(string.format("%d. %s%s", idx, getCCItemName(it.id), desc))
+    end
+    w("0. 返回")
+    return items
+end
+
+-- 列出可装备的物品（武器/防具）
+local function showEquipableItems()
+    local items = filterBagItems(function(id)
+        local def = getItemDef(id)
+        return def and def["装备类型"] ~= nil and def["装备类型"] >= 0
+    end)
+    if #items == 0 then w("没有可装备的物品。"); return nil end
+    w("选择要装备的物品：")
+    bagCache = {}
+    for idx, it in ipairs(items) do
+        table.insert(bagCache, it)
+        local def = getItemDef(it.id)
+        local slotName = (def["装备类型"] == 0) and "武器" or "防具"
+        w(string.format("%d. %s [%s]", idx, getCCItemName(it.id), slotName))
+    end
+    w("0. 返回")
+    return items
+end
+
+-- 列出队伍成员
+local function showTeamTargets()
+    local JY = g(_G, "JY")
+    if not JY then return nil end
+    local members = {}
+    local idx = 0
+    for i = 1, CC.TeamNum or 6 do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+            idx = idx + 1
+            local p = JY.Person[pid]
+            table.insert(members, {slot = i, pid = pid, p = p})
+            w(string.format("%d. %s HP:%d/%d MP:%d/%d",
+                idx, p["姓名"] or "?", p["生命"] or 0, p["生命最大值"] or 0,
+                p["内力"] or 0, p["内力最大值"] or 0))
+        end
+    end
+    if #members == 0 then w("队伍为空"); return nil end
+    w("0. 返回")
+    return members
+end
+
+-- 执行物品使用效果
+local function applyItemEffect(target, itemId)
+    local def = getItemDef(itemId)
+    if not def then return end
+    local p = target.p
+    local hpHeal = def["加生命"] or 0
+    local mpHeal = def["加内力"] or 0
+    local stHeal = def["加体力"] or 0
+    if hpHeal > 0 then
+        local old = p["生命"] or 0
+        local maxHp = p["生命最大值"] or old
+        p["生命"] = math.min(maxHp, old + hpHeal)
+        w(string.format("%s 生命恢复 %d 点。", target.name or "?", p["生命"] - old))
+    end
+    if mpHeal > 0 then
+        local old = p["内力"] or 0
+        local maxMp = p["内力最大值"] or old
+        p["内力"] = math.min(maxMp, old + mpHeal)
+        w(string.format("%s 内力恢复 %d 点。", target.name or "?", p["内力"] - old))
+    end
+    if stHeal > 0 then
+        local old = p["体力"] or 100
+        p["体力"] = math.min(100, old + stHeal)
+        w(string.format("%s 体力恢复 %d 点。", target.name or "?", p["体力"] - old))
+    end
 end
 
 -- 显示队伍
@@ -956,6 +1092,7 @@ local function showTeam()
     if memberCount == 0 then w("队伍为空") end
     roleMenuPhase = nil
     ws()
+    w("1. 医疗/解毒")
     w("0. 返回")
     roleMenuPhase = "team"
 end
@@ -1012,16 +1149,116 @@ function RoleMenu_handleChoose(n)
         return true
     elseif roleMenuPhase == "status" then
         if n == 0 then showRoleMenu()
-        elseif n == 1 then -- 查看队员（简化：直接显示队伍）
+        elseif n == 1 then
             showTeam()
             roleMenuPhase = "team"
         end
         return true
     elseif roleMenuPhase == "bag" then
-        if n == 0 then showRoleMenu() end
+        if n == 0 then showRoleMenu()
+        elseif n == 1 then  -- 使用物品
+            roleMenuPhase = "bag_use_select_item"
+            bagCache = {}
+            showUsableItems()
+        elseif n == 2 then  -- 装备物品
+            roleMenuPhase = "bag_equip_select_item"
+            bagCache = {}
+            showEquipableItems()
+        end
+        return true
+    elseif roleMenuPhase == "bag_use_select_item" then
+        if n == 0 then showBag(); return true end
+        local item = bagCache[n]
+        if not item then w("无效选择。"); return true end
+        roleMenuPhase = "bag_use_select_target"
+        roleMenuSelectedItem = item
+        w("选择目标：")
+        showTeamTargets()
+        return true
+    elseif roleMenuPhase == "bag_use_select_target" then
+        if n == 0 then showBag(); return true end
+        local members = {}
+        local JY = g(_G, "JY")
+        for i = 1, CC.TeamNum or 6 do
+            local pid = JY.Base["队伍" .. i]
+            if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                table.insert(members, {slot = i, pid = pid, p = JY.Person[pid], name = JY.Person[pid]["姓名"]})
+            end
+        end
+        local target = members[n]
+        if not target then w("无效目标。"); return true end
+        -- 执行使用
+        applyItemEffect(target, roleMenuSelectedItem.id)
+        -- 消耗物品
+        JY.Base["物品" .. roleMenuSelectedItem.slot] = 0
+        JY.Base["物品数量" .. roleMenuSelectedItem.slot] = 0
+        roleMenuSelectedItem = nil
+        roleMenuPhase = nil
+        ws()
+        showBag()
+        return true
+    elseif roleMenuPhase == "bag_equip_select_item" then
+        if n == 0 then showBag(); return true end
+        local item = bagCache[n]
+        if not item then w("无效选择。"); return true end
+        local def = getItemDef(item.id)
+        if not def then w("无法装备此物品。"); return true end
+        local JY = g(_G, "JY")
+        local p0 = JY.Person and JY.Person[0]
+        if not p0 then w("角色数据异常。"); return true end
+        local slotName = (def["装备类型"] == 0) and "武器" or "防具"
+        local equipSlot = (def["装备类型"] == 0) and "武器" or "防具"
+        local oldItem = p0[equipSlot] or 0
+        -- 装备新物品
+        p0[equipSlot] = item.id
+        JY.Base["物品" .. item.slot] = oldItem
+        JY.Base["物品数量" .. item.slot] = (oldItem > 0) and 1 or 0
+        w(string.format("装备了 %s [%s]。", getCCItemName(item.id), slotName))
+        if oldItem and oldItem > 0 then
+            w(string.format("卸下了 %s。", getCCItemName(oldItem)))
+        end
+        roleMenuPhase = nil
+        ws()
+        showBag()
         return true
     elseif roleMenuPhase == "team" then
-        if n == 0 then showRoleMenu() end
+        if n == 0 then showRoleMenu()
+        elseif n == 1 then  -- 医疗/解毒
+            roleMenuPhase = "team_heal_select_item"
+            bagCache = {}
+            w("选择药品：")
+            showUsableItems()
+        end
+        return true
+    elseif roleMenuPhase == "team_heal_select_item" then
+        if n == 0 then showTeam(); return true end
+        local item = bagCache[n]
+        if not item then w("无效选择。"); return true end
+        roleMenuPhase = "team_heal_select_target"
+        roleMenuSelectedItem = item
+        w("选择目标队员：")
+        showTeamTargets()
+        return true
+    elseif roleMenuPhase == "team_heal_select_target" then
+        if n == 0 then showTeam(); return true end
+        local members = {}
+        local JY = g(_G, "JY")
+        for i = 1, CC.TeamNum or 6 do
+            local pid = JY.Base["队伍" .. i]
+            if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                table.insert(members, {slot = i, pid = pid, p = JY.Person[pid], name = JY.Person[pid]["姓名"]})
+            end
+        end
+        local target = members[n]
+        if not target then w("无效目标。"); return true end
+        applyItemEffect(target, roleMenuSelectedItem.id)
+        -- 消耗物品
+        JY.Base["物品" .. roleMenuSelectedItem.slot] = 0
+        JY.Base["物品数量" .. roleMenuSelectedItem.slot] = 0
+        roleMenuSelectedItem = nil
+        roleMenuPhase = nil
+        ws()
+        showTeam()
         return true
     elseif roleMenuPhase == "save" then
         if n >= 1 and n <= 3 then doSave(n)
