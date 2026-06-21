@@ -318,4 +318,65 @@ test.describe('事件流程测试', () => {
     expect(healOk).toBe(true);
     expect(await ok(page)).toBeTruthy();
   });
+
+  test('TC-04b: 全部 68 个 instruct 函数无崩溃', async ({ page }) => {
+    test.setTimeout(120000);
+    // 先进入游戏
+    await cmd(page, 'choose 1'); await page.waitForTimeout(4000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE + 4000);
+
+    // 逐个验证 instruct_0~67 存在且不导致崩溃
+    // 部分函数（如 instruct_9 使用 MenuAsync）需要协程上下文，
+    // 在协程外调用时会 yield 错误——这是预期的，不是崩溃
+    let missingCount = 0;
+    let crashCount = 0;
+    for (let i = 0; i <= 67; i++) {
+      const result = await luaEval(page, `
+        local fn = rawget(_G, "instruct_${i}")
+        if not fn then return "MISSING" end
+        local ok, err = pcall(fn)
+        if ok then return "OK" end
+        -- Cannot yield from outside a coroutine is expected when calling
+        -- async instruct functions outside a coroutine context
+        if tostring(err):find("Cannot yield") then return "OK_YIELD" end
+        -- Any other error is a real crash
+        return tostring(err)
+      `);
+      expect(result.ok).toBe(true);
+      expect(result.result).not.toBe('MISSING');
+      if (result.result === 'MISSING') missingCount++;
+      else if (result.result !== 'OK' && result.result !== 'OK_YIELD') {
+        console.log('instruct_' + i + ': ❌ ' + result.result);
+        crashCount++;
+      }
+    }
+    console.log('All 68 instruct functions (0-67) covered ✓');
+    expect(crashCount).toBe(0);
+    expect(await ok(page)).toBeTruthy();
+  });
+
+  test('TC-04c: GetD/SetD/GetS/SetS 数据访问', async ({ page }) => {
+    test.setTimeout(60000);
+    // 进入游戏
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
+
+    // 验证 GetD/SetD/GetS/SetS 存在且无崩溃
+    const result = await luaEval(page, `
+      local GetD = rawget(_G, "GetD")
+      local SetD = rawget(_G, "SetD")
+      local GetS = rawget(_G, "GetS")
+      local SetS = rawget(_G, "SetS")
+      if not GetD or not SetD or not GetS or not SetS then return "MISSING" end
+      local ok1 = pcall(GetD, 70, 11, 5)
+      local ok2 = pcall(SetD, 70, 11, 5, 1)
+      local ok3 = pcall(GetS, 1, 1, 1, 1)
+      local ok4 = pcall(SetS, 1, 1, 1, 1, 0)
+      if not ok1 or not ok2 or not ok3 or not ok4 then return "FAIL" end
+      return "OK"
+    `);
+    expect(result.ok).toBe(true);
+    expect(result.result).toBe('OK');
+    console.log('GetD/SetD/GetS/SetS ✓');
+  });
 });
