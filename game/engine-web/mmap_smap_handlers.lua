@@ -1077,12 +1077,11 @@ function RoleMenu_handleChoose(n)
     return false
 end
 
--- 在 look 输出后追加角色管理菜单入口
+-- 在 look 输出后追加角色管理菜单入口（原版 ESC 主菜单的文字替代）
+-- 原版游戏按 ESC 打开主选单：系统/物品/武功/状态/存挡/读挡
 local function appendRoleMenuEntry()
     ws()
-    w("--- 角色管理 ---")
-    w("输入 choose <编号> 选择操作")
-    roleMenuPhase = "main"
+    w("输入 menu 打开主选单（系统/物品/武功/状态/存挡）")
 end
 
 -- 覆写 SmapHandlers.look 以追加角色管理菜单
@@ -1092,9 +1091,20 @@ SmapHandlers.look = function(args)
     appendRoleMenuEntry()
 end
 
--- 覆写 MmapHandlers.look 以追加角色管理菜单
-local _origMmapLook = MmapHandlers.look
-MmapHandlers.look = function(args)
-    _origMmapLook(args)
-    appendRoleMenuEntry()
+-- menu 命令：原版 ESC 主选单的文字替代
+-- 显示：系统/物品/武功/状态/存挡/读挡
+function SmapHandlers.menu(args)
+    roleMenuPhase = "main"
+    ws()
+    w("--- 主选单 ---")
+    w("1. 状态")
+    w("2. 物品")
+    w("3. 武功")
+    w("4. 系统（存档/读档）")
+    w("0. 返回")
+    w("输入 choose <编号> 选择操作")
+end
+
+function MmapHandlers.menu(args)
+    SmapHandlers.menu(args)
 end
