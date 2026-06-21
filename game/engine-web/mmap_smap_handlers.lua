@@ -462,11 +462,15 @@ function smapNpcTalk(sceneId, ent)
     w("你与 " .. ent.name .. " 交谈。")
     local EventExecutor = g(_G, "EventExecutor")
     if EventExecutor then
-        EventExecutor.startEvent(tonumber(eventId), 0, function()
-            w("交谈结束。")
-            smapEntityList = {}
-            SmapHandlers.look({})
-        end)
+        -- 直接调用 oldCallEventCoroutine，绕过协程包装
+        -- 在 Web MUD 中 olEvent 脚本无异步操作，可同步执行
+        local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
+        if not ok then
+            w("事件执行失败: " .. tostring(err))
+        end
+        w("交谈结束。")
+        smapEntityList = {}
+        SmapHandlers.look({})
     else
         w("事件系统不可用。")
     end
