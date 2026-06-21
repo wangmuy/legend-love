@@ -13,7 +13,7 @@
 #### Scenario: choose N 选择 NPC 弹出子菜单
 - **Given** `look` 已显示编号列表
 - **WHEN** 输入 `choose N` 且 N 对应一个 NPC
-- **THEN** 弹出子菜单包含"对话"、"查看"、"给予物品"
+- **THEN** 弹出子菜单包含"对话"、"查看"
 
 #### Scenario: choose N 选择物品弹出子菜单
 - **Given** `look` 已显示编号列表  

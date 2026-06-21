@@ -13,11 +13,10 @@ Traceability: [REQ-001]
 - [x] 1.2 `choose N` 在 SMAP 的级联菜单
   Blast Radius: `["game/engine-web/mmap_smap_handlers.lua", "game/engine-web/web_command_engine.lua"]`
   DoD:
-    - [x] 选择 NPC → 弹出子菜单（1.对话 2.查看 3.给予物品）
+    - [x] 选择 NPC → 弹出子菜单（1.对话 2.查看）
     - [x] 选择物品 → 弹出子菜单（1.拾取 2.查看）
     - [x] 选择出口 → 直接传送（同 go <编号>）
     - [x] 子菜单中 ESC(choose 0) 回到场景总览
-    - [x] 给予物品时列出背包物品供选择
 
 ## 2. NPC 对话
 Traceability: [REQ-002]
