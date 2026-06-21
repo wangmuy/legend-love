@@ -6,6 +6,7 @@
     const term = new Terminal({
         cursorBlink: true,
         convertEol: true,
+        scrollback: 2000,
         fontSize: 14,
         fontFamily: "'Courier New', 'Noto Sans SC', monospace",
         theme: {
