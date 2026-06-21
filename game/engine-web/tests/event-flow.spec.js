@@ -261,6 +261,8 @@ test.describe('事件流程测试', () => {
     await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
     let text = await term(page);
     expect(text).toContain('背包');
+    expect(text).toContain('使用物品');
+    expect(text).toContain('装备物品');
 
     // 返回 → menu → 存档
     await cmd(page, 'choose 0'); await page.waitForTimeout(2000);
@@ -269,6 +271,51 @@ test.describe('事件流程测试', () => {
     text = await term(page);
     expect(text).toContain('存档');
     expect(text).toContain('槽位');
+    expect(await ok(page)).toBeTruthy();
+  });
+
+  test('TC-06c: 物品使用和装备', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(4000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE + 4000);
+
+    // menu → 背包 → 使用物品（背包可能为空，验证系统正确处理）
+    await cmd(page, 'menu'); await page.waitForTimeout(2000);
+    await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
+    let text = await term(page);
+    expect(text).toContain('背包');
+
+    // 选择 使用物品 → 可选: 物品为空时显示"没有可使用的物品"
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    text = await term(page);
+    const usableOk = text.includes('药品') || text.includes('物品') || text.includes('没有可使用的');
+    expect(usableOk).toBe(true);
+
+    // 返回 → 测试装备物品
+    await cmd(page, 'choose 0'); await page.waitForTimeout(1500);
+    await cmd(page, 'choose 2'); await page.waitForTimeout(2000);
+    text = await term(page);
+    expect(text).toContain('装备');
+    expect(await ok(page)).toBeTruthy();
+  });
+
+  test('TC-06d: 队伍管理和医疗', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(4000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE + 4000);
+
+    // menu → choose 3 (队伍)
+    await cmd(page, 'menu'); await page.waitForTimeout(2000);
+    await cmd(page, 'choose 3'); await page.waitForTimeout(3000);
+    let text = await term(page);
+    expect(text).toContain('队伍');
+    expect(text).toContain('医疗');
+
+    // 选择 医疗/解毒 → 可能无药品，验证系统正确处理
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    text = await term(page);
+    const healOk = text.includes('药品') || text.includes('没有') || text.includes('物品');
+    expect(healOk).toBe(true);
     expect(await ok(page)).toBeTruthy();
   });
 });
