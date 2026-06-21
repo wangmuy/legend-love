@@ -59,10 +59,9 @@ look → 读取 scene["NPC"]/["物品"]/["出口"]
      → 输出编号列表
 
 choose N → smapEntityList[N]
-  type=npc  → CE.showMenu({对话,查看,给予物品})
+  type=npc  → CE.showMenu({对话,查看})
                对话 → smapNpcTalk → EventExecutor.startEvent
                查看 → getCharsIndex → 输出描述
-               给予 → smapGiveToNpc → 背包菜单
   type=item → CE.showMenu({拾取,查看})
                拾取 → smapTakeItem → 背包写入 + setItemCount
                查看 → items.json → 输出描述
