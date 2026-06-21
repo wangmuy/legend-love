@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady, luaEval } = require('./helpers/setup');
 
 const SETTLE = 6000;
 
@@ -227,39 +227,44 @@ test.describe('事件流程测试', () => {
     expect(await ok(page)).toBeTruthy();
   });
 
-  test('TC-06: 角色管理菜单和状态查看', async ({ page }) => {
+  test('TC-06: 主选单和状态查看', async ({ page }) => {
     test.setTimeout(120000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(4000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE + 4000);
 
-    // 直接通过 luaEval 验证角色管理菜单入口已注册
+    // 验证 RoleMenu_handleChoose 已注册
     const menuCheck = await luaEval(page, 'return tostring(type(rawget(_G, "RoleMenu_handleChoose")) == "function")');
     expect(menuCheck.ok).toBe(true);
     expect(menuCheck.result).toBe('true');
 
-    // 测试状态查看功能
-    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    // 使用 menu 命令打开主选单
+    await cmd(page, 'menu'); await page.waitForTimeout(2000);
     let text = await term(page);
+    expect(text).toContain('主选单');
+    expect(text).toContain('状态');
+
+    // choose 1 → 查看状态
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    text = await term(page);
     expect(text).toContain('角色状态');
     expect(text).toContain('生命');
     expect(await ok(page)).toBeTruthy();
   });
 
-  test('TC-06b: 角色管理背包和存档菜单', async ({ page }) => {
+  test('TC-06b: 主选单物品和存档', async ({ page }) => {
     test.setTimeout(120000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
 
-    // 返回主菜单 → 选择背包
+    // 使用 menu → choose 2 (物品)
+    await cmd(page, 'menu'); await page.waitForTimeout(2000);
     await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
     let text = await term(page);
     expect(text).toContain('背包');
 
-    // 返回 → 选存档
+    // 返回 → menu → 存档
     await cmd(page, 'choose 0'); await page.waitForTimeout(2000);
-    text = await term(page);
-    expect(text).toContain('角色管理');
-
+    await cmd(page, 'menu'); await page.waitForTimeout(2000);
     await cmd(page, 'choose 4'); await page.waitForTimeout(3000);
     text = await term(page);
     expect(text).toContain('存档');

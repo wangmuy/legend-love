@@ -1043,12 +1043,14 @@ function _G.initWebFramework()
         local mmapCmds = {
             list  = { handler = _G.MmapHandlers.list,  description = "列出可去场景并选择前往" },
             look  = { handler = _G.MmapHandlers.look,  description = "查看当前位置、坐标和附近场景" },
+            menu  = { handler = _G.MmapHandlers.menu,  description = "打开主选单（状态/物品/存挡）" },
             quit  = { handler = _G.MmapHandlers.quit,  description = "退出当前游戏，返回开始菜单" },
             help  = { handler = CE.showHelp,           description = "显示帮助信息" },
             choose= { handler = CE.handleChoose,        description = "choose <编号> 选择菜单项" },
         }
         local smapCmds = {
             look  = { handler = _G.SmapHandlers.look,  description = "查看场景并选择交互对象" },
+            menu  = { handler = _G.SmapHandlers.menu,  description = "打开主选单（状态/物品/存挡）" },
             rest  = { handler = _G.SmapHandlers.rest,  description = "休息恢复体力" },
             exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
             leave = { handler = _G.SmapHandlers.leave, description = "离开场景回到大地图" },
