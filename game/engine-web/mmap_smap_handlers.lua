@@ -892,3 +892,209 @@ end
 
 rawset(_G, "MmapHandlers", MmapHandlers)
 rawset(_G, "SmapHandlers", SmapHandlers)
+
+-- ============================================================
+-- Slice 6: 角色管理菜单（通过 look → choose N 访问）
+-- ============================================================
+local roleMenuPhase = nil  -- nil=不在菜单中, "main","status","bag","team","save"
+
+-- 显示角色管理主菜单
+local function showRoleMenu()
+    ws()
+    w("--- 角色管理 ---")
+    w("1. 查看状态")
+    w("2. 背包")
+    w("3. 队伍")
+    w("4. 存档")
+    w("0. 返回")
+    roleMenuPhase = "main"
+    w("输入 choose <编号> 选择操作")
+end
+
+-- 显示角色状态
+local function showRoleStatus()
+    local JY = g(_G, "JY")
+    if not JY then w("游戏未开始"); return end
+    local P0 = JY.Person and JY.Person[0]
+    if not P0 then w("没有角色数据"); return end
+    
+    wt("角色状态")
+    w(string.format("%s  Lv.%d", P0["姓名"] or "?", P0["等级"] or 1))
+    w(string.format("生命:%d/%d  内力:%d/%d  体力:%d/%d",
+        P0["生命"] or 0, P0["生命最大值"] or 0,
+        P0["内力"] or 0, P0["内力最大值"] or 0,
+        P0["体力"] or 0, 100))
+    w(string.format("攻击:%d  防御:%d  轻功:%d  资质:%d",
+        P0["攻击力"] or 0, P0["防御力"] or 0,
+        P0["轻功"] or 0, P0["资质"] or 0))
+    w(string.format("医疗:%d  用毒:%d  解毒:%d",
+        P0["医疗能力"] or 0, P0["用毒能力"] or 0, P0["解毒能力"] or 0))
+    
+    -- 武功
+    local hasWugong = false
+    for i = 1, 10 do
+        local wid = P0["武功" .. i]
+        if wid and wid ~= 0 then
+            if not hasWugong then w("武功:"); hasWugong = true end
+            local wuLevel = P0["武功等级" .. i] or 0
+            local CC = g(_G, "CC")
+            local wuName = CC and CC["武功" .. wid] or ("武功" .. wid)
+            w(string.format("  %d. %s (Lv.%d)", i, wuName, wuLevel))
+        end
+    end
+    if not hasWugong then w("武功: 无") end
+    
+    -- 装备
+    local weapon = P0["武器"] or 0
+    local armor = P0["防具"] or 0
+    local itemName = function(id) return (CC and CC["物品" .. id]) or ("物品" .. id) end
+    w(string.format("装备: 武器=%s  防具=%s", weapon > 0 and itemName(weapon) or "无", armor > 0 and itemName(armor) or "无"))
+    
+    -- 品德/声望/经验
+    w(string.format("品德:%d  声望:%d  经验:%d", P0["品德"] or 0, P0["声望"] or 0, P0["经验"] or 0))
+    
+    roleMenuPhase = nil
+    ws()
+    w("1. 查看队员  0. 返回")
+    roleMenuPhase = "status"
+end
+
+-- 显示背包
+local function showBag()
+    local JY = g(_G, "JY")
+    if not JY or not JY.Base then w("背包: 空"); return end
+    wt("背包")
+    local count = 0
+    for i = 1, 30 do
+        local itemId = JY.Base["物品" .. i]
+        if itemId and itemId ~= 0 then
+            count = count + 1
+            local qty = JY.Base["物品数量" .. i] or 1
+            local CC = g(_G, "CC")
+            local name = CC and CC["物品" .. itemId] or ("物品" .. itemId)
+            w(string.format("%d. %s x%d", count, name, qty))
+        end
+    end
+    if count == 0 then w("背包是空的") end
+    roleMenuPhase = nil
+    ws()
+    w("0. 返回")
+    roleMenuPhase = "bag"
+end
+
+-- 显示队伍
+local function showTeam()
+    local JY = g(_G, "JY")
+    if not JY then return end
+    wt("队伍")
+    local memberCount = 0
+    for i = 1, CC.TeamNum or 6 do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+            memberCount = memberCount + 1
+            local p = JY.Person[pid]
+            w(string.format("%d. %s HP:%d/%d MP:%d/%d Lv.%d",
+                memberCount, p["姓名"] or "?", p["生命"] or 0, p["生命最大值"] or 0,
+                p["内力"] or 0, p["内力最大值"] or 0, p["等级"] or 1))
+        end
+    end
+    if memberCount == 0 then w("队伍为空") end
+    roleMenuPhase = nil
+    ws()
+    w("0. 返回")
+    roleMenuPhase = "team"
+end
+
+-- 存档菜单
+local function showSaveMenu()
+    ws()
+    w("--- 存档管理 ---")
+    w("1. 存到槽位1")
+    w("2. 存到槽位2")
+    w("3. 存到槽位3")
+    w("4. 读取槽位1")
+    w("5. 读取槽位2")
+    w("6. 读取槽位3")
+    w("0. 返回")
+    roleMenuPhase = "save"
+    w("输入 choose <编号> 选择操作")
+end
+
+-- 执行存档
+local function doSave(slot)
+    local saveGameState = g(_G, "saveGameState")
+    if not saveGameState then w("存档系统不可用"); return end
+    local ok = saveGameState(slot)
+    if ok then w(string.format("已保存到槽位%d。", slot)) else w("保存失败。") end
+end
+
+-- 执行读档
+local function doLoad(slot)
+    local loadGameState = g(_G, "loadGameState")
+    if not loadGameState then w("读档系统不可用"); return end
+    w(string.format("正在读取槽位%d...", slot))
+    local ok = loadGameState(slot)
+    if ok then
+        w("读取完成。")
+        local JY = g(_G, "JY")
+        if JY then
+            if JY.Status == 2 then local ml = g(_G, "MmapHandlers"); if ml and ml.look then ml.look({}) end
+            elseif JY.Status == 4 then local sl = g(_G, "SmapHandlers"); if sl and sl.look then sl.look({}) end end
+        end
+    else
+        w("读取失败。")
+    end
+end
+
+-- 处理角色管理 choose N（返回 true=已处理, false=未处理）
+function RoleMenu_handleChoose(n)
+    if roleMenuPhase == "main" then
+        if n == 1 then showRoleStatus()
+        elseif n == 2 then showBag()
+        elseif n == 3 then showTeam()
+        elseif n == 4 then showSaveMenu()
+        elseif n == 0 then roleMenuPhase = nil; return false end
+        return true
+    elseif roleMenuPhase == "status" then
+        if n == 0 then showRoleMenu()
+        elseif n == 1 then -- 查看队员（简化：直接显示队伍）
+            showTeam()
+            roleMenuPhase = "team"
+        end
+        return true
+    elseif roleMenuPhase == "bag" then
+        if n == 0 then showRoleMenu() end
+        return true
+    elseif roleMenuPhase == "team" then
+        if n == 0 then showRoleMenu() end
+        return true
+    elseif roleMenuPhase == "save" then
+        if n >= 1 and n <= 3 then doSave(n)
+        elseif n >= 4 and n <= 6 then doLoad(n - 3)
+        elseif n == 0 then showRoleMenu() end
+        return true
+    end
+    return false
+end
+
+-- 在 look 输出后追加角色管理菜单入口
+local function appendRoleMenuEntry()
+    ws()
+    w("--- 角色管理 ---")
+    w("输入 choose <编号> 选择操作")
+    roleMenuPhase = "main"
+end
+
+-- 覆写 SmapHandlers.look 以追加角色管理菜单
+local _origSmapLook = SmapHandlers.look
+SmapHandlers.look = function(args)
+    _origSmapLook(args)
+    appendRoleMenuEntry()
+end
+
+-- 覆写 MmapHandlers.look 以追加角色管理菜单
+local _origMmapLook = MmapHandlers.look
+MmapHandlers.look = function(args)
+    _origMmapLook(args)
+    appendRoleMenuEntry()
+end

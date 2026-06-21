@@ -1153,10 +1153,16 @@ function processEventQueue(timestamp)
                     -- SMAP/WMAP 状态无菜单时：choose N 选择交互对象
                     local JY = rawget(_G, "JY")
                     local n = tonumber(arg)
-                    if JY and JY.Status == 4 and n and n > 0 then  -- GAME_SMAP
-                        local sh = rawget(_G, "SmapHandlers")
-                        if sh and sh.chooseInteraction then
-                            sh.chooseInteraction(n)
+                    -- 检查角色管理菜单（Slice 6）
+                    if JY and (JY.Status == 2 or JY.Status == 4) and n ~= nil then
+                        local handled = RoleMenu_handleChoose(n)
+                        if handled then
+                            -- 角色管理已处理
+                        elseif JY.Status == 4 then
+                            local sh = rawget(_G, "SmapHandlers")
+                            if sh and sh.chooseInteraction then
+                                sh.chooseInteraction(n)
+                            end
                         end
                     elseif JY and JY.Status == 5 and n then  -- GAME_WMAP
                         local wh = rawget(_G, "WmapHandlers")
