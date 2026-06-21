@@ -22,7 +22,6 @@ end
 -- field filters per data type: keys to REMOVE from each record
 local FILTERS = {
     chars = {
-        "头像代号",
         "出招动画帧数",
         "出招动画延迟",
         "武功音效延迟",

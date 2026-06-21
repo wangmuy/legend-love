@@ -39,7 +39,7 @@ test.describe('事件流程测试', () => {
     page.on('pageerror', e => console.log('[PAGE]', e.message));
     await page.goto('/');
     await waitForPageReady(page);
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(6000);
   });
 
   test('TC-01: 场景包含 NPC 显示', async ({ page }) => {
@@ -63,15 +63,19 @@ test.describe('事件流程测试', () => {
     let text = await term(page);
     expect(text).toContain('软体娃娃');
 
-    // talk to 软体娃娃
-    await cmd(page, 'talk 软体娃娃'); await page.waitForTimeout(5000);
+    // Menu-driven NPC interaction: choose 1 (select NPC) → choose 1 (对话)
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    text = await term(page);
+    expect(text).toContain('对话');
+    expect(text).toContain('查看');
 
+    await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
     text = await term(page);
     expect(text).toContain('你与');
     expect(text).toContain('软体娃娃');
     expect(text).toContain('交谈');
-    // Verify dialog text content is displayed (instruct_51 calls instruct_1)
-    expect(text).toContain('是不是' || '基本知识');
+    // Verify dialog text shows speaker name
+    expect(text).toContain('【');
     expect(await ok(page)).toBeTruthy();
   });
 

@@ -96,7 +96,6 @@ rawset(_G, "instruct_1", function(talkId, headId)
     if not dc then return end
     local raw = dc["dialogues"]
     if not raw then return end
-    -- dialogues 可能是 {dialogues=[...]} 或直接是列表
     local dlg = raw["dialogues"] or raw
     if type(dlg) ~= "table" then return end
     for _, entry in ipairs(dlg) do
@@ -107,7 +106,46 @@ rawset(_G, "instruct_1", function(talkId, headId)
             end
             if text then
                 local w = rawget(_G, "WebUI")
-                if w then w.write(tostring(text)) end
+                if w then
+                    -- 查找说话人名称
+                    local speakerName = "???"
+                    -- 常见头像 ID → 名称映射（头像 ID ≠ 人物代号）
+                    local HEAD_NAME_MAP = {
+                        [0] = "主角",
+                        [73] = "南贤",
+                        [74] = "北丑",
+                        [105] = "店小二",
+                        [106] = "店小二",
+                        [111] = "韦小宝",
+                        [114] = "软体娃娃",
+                    }
+                    speakerName = HEAD_NAME_MAP[headId]
+                    if not speakerName then
+                        if headId == 0 then
+                            local JY = rawget(_G, "JY")
+                            speakerName = JY and JY.Person and JY.Person[0] and JY.Person[0]["姓名"] or "主角"
+                        else
+                            -- 尝试按头像代号查找
+                            local chars = dc["chars"]
+                            if not chars then
+                                local ds = rawget(_G, "initDataSource")
+                                chars = ds and ds["chars"]
+                            end
+                            if chars then
+                                local clist = chars["chars"] or chars
+                                if type(clist) == "table" then
+                                    for _, c in ipairs(clist) do
+                                        if c["头像代号"] == headId or c["代号"] == headId then
+                                            speakerName = c["姓名"] or "???"
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    w.write("【" .. speakerName .. "】" .. tostring(text))
+                end
             else
                 local w = rawget(_G, "WebUI")
                 if w then w.write("[对话文本为空, talkId=" .. tostring(talkId) .. "]") end
@@ -1011,12 +1049,8 @@ function _G.initWebFramework()
         }
         local smapCmds = {
             look  = { handler = _G.SmapHandlers.look,  description = "查看场景并选择交互对象" },
-            talk  = { handler = _G.SmapHandlers.talk,  description = "talk <NPC名> 与 NPC 交谈" },
-            take  = { handler = _G.SmapHandlers.take,  description = "take <物品名> 拾取物品" },
-            give  = { handler = _G.SmapHandlers.give,  description = "give <物品名> <人名> 给予物品" },
             rest  = { handler = _G.SmapHandlers.rest,  description = "休息恢复体力" },
             exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
-            go    = { handler = _G.SmapHandlers.go,    description = "go <编号> 前往出口" },
             leave = { handler = _G.SmapHandlers.leave, description = "离开场景回到大地图" },
             help  = { handler = CE.showHelp,           description = "显示帮助信息" },
             choose= { handler = CE.handleChoose,        description = "choose <编号> 选择交互对象" },

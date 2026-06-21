@@ -60,9 +60,9 @@ test.describe('Slice 4 场景交互集成测试', () => {
     console.log(text);
     expect(text).toContain('look');
     expect(text).toContain('exits');
-    expect(text).toContain('go');
     expect(text).toContain('leave');
     expect(text).toContain('choose');
+    expect(text).toContain('rest');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 

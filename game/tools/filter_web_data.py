@@ -8,7 +8,7 @@ DATA_DIR = "engine-web/data-web"
 FILTERS = {
     "chars.json": {
         "record_key": "chars",
-        "remove": ["头像代号", "出招动画帧数", "出招动画延迟", "武功音效延迟"],
+        "remove": ["出招动画帧数", "出招动画延迟", "武功音效延迟"],
     },
     "items.json": {
         "record_key": "items",
