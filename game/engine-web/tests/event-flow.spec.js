@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
 
 const SETTLE = 6000;
 
@@ -39,7 +39,9 @@ test.describe('事件流程测试', () => {
     page.on('pageerror', e => console.log('[PAGE]', e.message));
     await page.goto('/');
     await waitForPageReady(page);
-    await page.waitForTimeout(6000);
+    // 等待游戏第一帧执行，开始菜单协程运行
+    await page.waitForTimeout(3000);
+    await waitForGameReady(page);
   });
 
   test('TC-01: 场景包含 NPC 显示', async ({ page }) => {
@@ -222,6 +224,46 @@ test.describe('事件流程测试', () => {
     await cmd(page, 'talk 南贤'); await page.waitForTimeout(4000);
     text = await term(page);
     expect(text).toContain('南贤');
+    expect(await ok(page)).toBeTruthy();
+  });
+
+  test('TC-06: 角色管理菜单和状态查看', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(4000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE + 4000);
+
+    // 直接通过 luaEval 验证角色管理菜单入口已注册
+    const menuCheck = await luaEval(page, 'return tostring(type(rawget(_G, "RoleMenu_handleChoose")) == "function")');
+    expect(menuCheck.ok).toBe(true);
+    expect(menuCheck.result).toBe('true');
+
+    // 测试状态查看功能
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    let text = await term(page);
+    expect(text).toContain('角色状态');
+    expect(text).toContain('生命');
+    expect(await ok(page)).toBeTruthy();
+  });
+
+  test('TC-06b: 角色管理背包和存档菜单', async ({ page }) => {
+    test.setTimeout(120000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
+
+    // 返回主菜单 → 选择背包
+    await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
+    let text = await term(page);
+    expect(text).toContain('背包');
+
+    // 返回 → 选存档
+    await cmd(page, 'choose 0'); await page.waitForTimeout(2000);
+    text = await term(page);
+    expect(text).toContain('角色管理');
+
+    await cmd(page, 'choose 4'); await page.waitForTimeout(3000);
+    text = await term(page);
+    expect(text).toContain('存档');
+    expect(text).toContain('槽位');
     expect(await ok(page)).toBeTruthy();
   });
 });
