@@ -594,7 +594,7 @@ rawset(_G, "instruct_63", function(personid, sex)
 end)
 
 -- 兜底: 所有未显式实现的 instruct_* 输出 debug 日志
-for i = 0, 66 do
+for i = 0, 67 do
     if not rawget(_G, "instruct_" .. i) then
         rawset(_G, "instruct_" .. i, function(...)
             EngineAPI.debug.log("instruct_" .. i .. " 未实现(no-op)")
@@ -699,7 +699,7 @@ function _G.initWebFramework()
     -- 1. 加载脚本模块
     -- 先保存我们的 instruct 函数，脚本加载会覆盖它们
     local _our_instruct = {}
-    for i = 0, 66 do
+    for i = 0, 67 do
         local fn = rawget(_G, "instruct_" .. i)
         if fn then _our_instruct[i] = fn end
     end
@@ -732,7 +732,7 @@ function _G.initWebFramework()
     _G.DrawMMap = function() end
     _G.DrawSMap = function() end
     -- script 加载后 jymain.lua 覆盖了 instruct 函数，恢复 Web MUD 版本
-    for i = 0, 66 do
+    for i = 0, 67 do
         if _our_instruct[i] then
             _G["instruct_" .. i] = _our_instruct[i]
         end
