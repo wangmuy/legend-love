@@ -214,8 +214,8 @@ rawset(_G, "instruct_11", function()
     if w then w.write("是否住宿？") end
     local MenuAsync = rawget(_G, "MenuAsync")
     if MenuAsync then
-        local ok = MenuAsync.ShowMenu2Coroutine({{"是", nil, 1}, {"否", nil, 2}}, 2, 0, 0, 0, 0, 0, 0, 1)
-        if ok and ok == 1 then
+        local ok, result = pcall(MenuAsync.ShowMenu2Coroutine, {{"是", nil, 1}, {"否", nil, 2}}, 2, 0, 0, 0, 0, 0, 0, 1)
+        if ok and result and result == 1 then
             rawget(_G, "instruct_12")()
         end
     end
@@ -298,11 +298,16 @@ end)
 -- 由于 catch-all 循环会保存空桩并在 jymain.lua 加载后恢复，
 -- 此处提前实现真实逻辑，确保被 _our_instruct 保存。
 
--- instruct_9: 是否要求加入队伍
+-- instruct_9: 是否要求加入队伍（安全版本，非协程上下文返回 false）
 rawset(_G, "instruct_9", function()
-    local AsyncMessageBox = require("framework.async_message_box")
-    local ok = AsyncMessageBox.ShowYesNoCoroutine(-1, -1, "是否要求加入？", C_ORANGE, CC.DefaultFont)
-    return ok == 1
+    local co = coroutine.running()
+    if not co then return false end
+    local ok, result = pcall(function()
+        local AsyncMessageBox = require("framework.async_message_box")
+        return AsyncMessageBox.ShowYesNoCoroutine(-1, -1, "是否要求加入？", C_ORANGE, CC.DefaultFont)
+    end)
+    if ok then return result == 1 end
+    return false
 end)
 
 -- instruct_10: 加入队员
@@ -580,7 +585,9 @@ end)
 rawset(_G, "instruct_54", function()
     local JY = rawget(_G, "JY")
     if not JY then return end
-    for i = 0, CC.SceneNum - 1 do
+    local CC = rawget(_G, "CC")
+    local sceneNum = (CC and CC.SceneNum) or 100
+    for i = 0, sceneNum - 1 do
         if JY.Scene[i] then JY.Scene[i]["进入条件"] = 0 end
     end
     if JY.Scene[2] then JY.Scene[2]["进入条件"] = 2 end   --云鹤崖
