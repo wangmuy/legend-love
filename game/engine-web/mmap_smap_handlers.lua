@@ -323,16 +323,22 @@ function SmapHandlers.look(args)
     local entityIndex = 0
     smapEntityList = {}
     
-    -- NPC 列表
+    -- NPC 列表 + 交互对象（宝箱/柜子等 oldevent 触发器）
     local npcs = scene["NPC"]
     if npcs and #npcs > 0 then
         local charsIndex = getCharsIndex()
         for _, npc in ipairs(npcs) do
             local charIdStr = tostring(npc["代号"] or npc)
             local npcName = npc["名称"] or "?"
-            -- 跳过非 NPC 事件触发器（oldevent_ 前缀名称）
-            if npcName and not npcName:match("^oldevent_") then
-                if _G.isNpcPresent(sceneId, charIdStr) then
+            local isEventTrigger = npcName and npcName:match("^oldevent_")
+            if isEventTrigger or _G.isNpcPresent(sceneId, charIdStr) then
+                if isEventTrigger then
+                    -- 交互对象（宝箱/柜子等），直接显示并触发事件
+                    entityIndex = entityIndex + 1
+                    local eventId = npc["事件编号"] or 0
+                    smapEntityList[entityIndex] = { type = "event_trigger", eventId = tonumber(eventId), charId = charIdStr, name = npcName, npcData = npc }
+                    w(string.format("%d. 搜索", entityIndex))
+                else
                     local char = charsIndex and charsIndex[charIdStr]
                     local displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charIdStr)
                     entityIndex = entityIndex + 1
@@ -445,6 +451,23 @@ function SmapHandlers.chooseInteraction(idx)
     elseif ent.type == "exit" then
         -- 出口：直接传送
         SmapHandlers.go({tostring(idx)})
+    elseif ent.type == "event_trigger" then
+        -- 交互对象（宝箱/柜子等）：直接执行事件脚本
+        local eventId = ent.eventId or (ent.npcData and (ent.npcData["事件编号"] or ent.npcData["触发事件"]) or 0)
+        if tonumber(eventId) ~= 0 then
+            local EventExecutor = g(_G, "EventExecutor")
+            if EventExecutor then
+                w("你打开了...")
+                local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
+                if not ok then
+                    w("事件执行失败: " .. tostring(err))
+                end
+            end
+        else
+            w("里面什么都没有。")
+        end
+        smapEntityList = {}
+        SmapHandlers.look({})
     end
 end
 
