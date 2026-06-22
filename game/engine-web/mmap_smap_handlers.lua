@@ -1159,11 +1159,11 @@ function RoleMenu_handleChoose(n)
         elseif n == 1 then  -- 使用物品
             roleMenuPhase = "bag_use_select_item"
             bagCache = {}
-            showUsableItems()
+            if not showUsableItems() then roleMenuPhase = nil end
         elseif n == 2 then  -- 装备物品
             roleMenuPhase = "bag_equip_select_item"
             bagCache = {}
-            showEquipableItems()
+            if not showEquipableItems() then roleMenuPhase = nil end
         end
         return true
     elseif roleMenuPhase == "bag_use_select_item" then
@@ -1227,7 +1227,7 @@ function RoleMenu_handleChoose(n)
             roleMenuPhase = "team_heal_select_item"
             bagCache = {}
             w("选择药品：")
-            showUsableItems()
+            if not showUsableItems() then roleMenuPhase = nil end
         end
         return true
     elseif roleMenuPhase == "team_heal_select_item" then
