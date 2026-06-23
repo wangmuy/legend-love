@@ -333,10 +333,12 @@ function SmapHandlers.look(args)
             local isEventTrigger = npcName and npcName:match("^oldevent_")
             if isEventTrigger or _G.isNpcPresent(sceneId, charIdStr) then
                 if isEventTrigger then
-                    -- 交互对象（宝箱/柜子等），检查是否已被触发
+                    -- 交互对象（宝箱/柜子等），检查 D* 数据是否已标记为"已触发"
+                    -- instruct_3 将事件字段7设为3500表示"事件关闭"
                     local eventId = npc["事件编号"] or 0
-                    local eventTriggered = _G.eventTriggered and _G.eventTriggered[sceneId] and _G.eventTriggered[sceneId][tostring(eventId)]
-                    if not eventTriggered then
+                    local GetD = g(_G, "GetD")
+                    local eventOff = GetD and (GetD(sceneId, tonumber(eventId) or 0, 7) == 3500)
+                    if not eventOff then
                         entityIndex = entityIndex + 1
                         smapEntityList[entityIndex] = { type = "event_trigger", eventId = tonumber(eventId), charId = charIdStr, name = npcName, npcData = npc }
                         w(string.format("%d. 搜索", entityIndex))
@@ -456,12 +458,9 @@ function SmapHandlers.chooseInteraction(idx)
         SmapHandlers.go({tostring(idx)})
     elseif ent.type == "event_trigger" then
         -- 交互对象（宝箱/柜子等）：直接执行事件脚本
+        -- instruct_3 会在脚本中通过 SetD 标记事件为已触发
         local eventId = ent.eventId or (ent.npcData and (ent.npcData["事件编号"] or ent.npcData["触发事件"]) or 0)
         if tonumber(eventId) ~= 0 then
-            -- 标记为已触发，防止重复拾取
-            _G.eventTriggered = _G.eventTriggered or {}
-            _G.eventTriggered[sceneId] = _G.eventTriggered[sceneId] or {}
-            _G.eventTriggered[sceneId][tostring(eventId)] = true
             local EventExecutor = g(_G, "EventExecutor")
             if EventExecutor then
                 w("你打开了...")
