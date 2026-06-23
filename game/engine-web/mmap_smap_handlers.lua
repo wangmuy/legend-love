@@ -965,8 +965,9 @@ local function showBag()
         if itemId and itemId ~= 0 then
             count = count + 1
             local qty = JY.Base["物品数量" .. i] or 1
-            local CC = g(_G, "CC")
-            local name = CC and CC["物品" .. itemId] or ("物品" .. itemId)
+            -- 从 JY.Thing 取物品名称（CC 不保证有物品名，JY.Thing 由 initGameState 填充）
+            local thing = JY.Thing and JY.Thing[itemId]
+            local name = (thing and thing["名称"]) or (CC and CC["物品" .. itemId]) or ("物品" .. itemId)
             w(string.format("%d. %s x%d", count, name, qty))
         end
     end
@@ -992,8 +993,11 @@ local function getPersonName(pid)
     return (p and p["姓名"]) or "?" 
 end
 
--- 获取 CC 物品名
-local function getCCItemName(itemId)
+-- 获取物品名称（优先 JY.Thing，其次 CC，兜底显示物品ID）
+local function getItemDisplayName(itemId)
+    local JY = g(_G, "JY")
+    local thing = JY and JY.Thing and JY.Thing[itemId]
+    if thing and thing["名称"] then return thing["名称"] end
     local CC = g(_G, "CC")
     return (CC and CC["物品" .. itemId]) or ("物品" .. itemId)
 end
@@ -1028,7 +1032,7 @@ local function showUsableItems()
         if def["加生命"] and def["加生命"] > 0 then desc = desc .. " +生命" .. def["加生命"] end
         if def["加内力"] and def["加内力"] > 0 then desc = desc .. " +内力" .. def["加内力"] end
         if def["加体力"] and def["加体力"] > 0 then desc = desc .. " +体力" .. def["加体力"] end
-        w(string.format("%d. %s%s", idx, getCCItemName(it.id), desc))
+        w(string.format("%d. %s%s", idx, getItemDisplayName(it.id), desc))
     end
     w("0. 返回")
     return items
@@ -1047,7 +1051,7 @@ local function showEquipableItems()
         table.insert(bagCache, it)
         local def = getItemDef(it.id)
         local slotName = (def["装备类型"] == 0) and "武器" or "防具"
-        w(string.format("%d. %s [%s]", idx, getCCItemName(it.id), slotName))
+        w(string.format("%d. %s [%s]", idx, getItemDisplayName(it.id), slotName))
     end
     w("0. 返回")
     return items
@@ -1242,9 +1246,9 @@ function RoleMenu_handleChoose(n)
         p0[equipSlot] = item.id
         JY.Base["物品" .. item.slot] = oldItem
         JY.Base["物品数量" .. item.slot] = (oldItem > 0) and 1 or 0
-        w(string.format("装备了 %s [%s]。", getCCItemName(item.id), slotName))
+        w(string.format("装备了 %s [%s]。", getItemDisplayName(item.id), slotName))
         if oldItem and oldItem > 0 then
-            w(string.format("卸下了 %s。", getCCItemName(oldItem)))
+            w(string.format("卸下了 %s。", getItemDisplayName(oldItem)))
         end
         roleMenuPhase = nil
         ws()
