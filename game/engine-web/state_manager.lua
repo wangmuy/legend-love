@@ -21,23 +21,33 @@ function initGameState()
     -- Items: initDataSource.items → JY.Thing
     JY.Thing = {}
     if dc.items then
-        for _, rec in ipairs(dc.items) do
-            JY.Thing[rec["代号"]] = rec
+        local itemList = dc.items["items"] or dc.items
+        if type(itemList) == "table" then
+            for _, rec in ipairs(itemList) do
+                if type(rec) == "table" and rec["代号"] ~= nil then
+                    JY.Thing[rec["代号"]] = rec
+                end
+            end
         end
     end
 
     -- Skills: initDataSource.skills → JY.Wugong
     JY.Wugong = {}
     if dc.skills then
-        for _, rec in ipairs(dc.skills) do
-            JY.Wugong[rec["代号"]] = rec
+        local skillList = dc.skills["skills"] or dc.skills
+        if type(skillList) == "table" then
+            for _, rec in ipairs(skillList) do
+                if type(rec) == "table" and rec["代号"] ~= nil then
+                    JY.Wugong[rec["代号"]] = rec
+                end
+            end
         end
     end
 
     -- Scenes: initDataSource.scenes → JY.Scene (flatten nested structure)
     JY.Scene = {}
     if dc.scenes then
-        for _, rec in ipairs(dc.scenes) do
+        for _, rec in ipairs(dc.scenes or {}) do
             local cn = {
                 ["代号"] = rec["代号"],
                 ["名称"] = rec["名称"],

@@ -210,9 +210,20 @@ rawset(_G, "instruct_2", function(itemId, count)
         if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
             JY.Base["物品" .. i] = itemId
             JY.Base["物品数量" .. i] = (JY.Base["物品数量" .. i] or 0) + count
-            -- 从 JY.Thing 取物品名称（而非 CC，CC 不保证有物品名）
-            local thing = JY.Thing and JY.Thing[itemId]
-            local name = (thing and thing["名称"]) or (CC and CC["物品" .. itemId]) or ("物品" .. itemId)
+            -- 从 initDataSource.items 查找物品名称（JY.Thing 未被 initGameState 填充）
+            local name = ("物品" .. itemId)
+            local ds = rawget(_G, "initDataSource")
+            if ds and ds.items then
+                local list = ds.items["items"] or ds.items
+                if type(list) == "table" then
+                    for _, it in ipairs(list) do
+                        if type(it) == "table" and tonumber(it["代号"]) == itemId then
+                            name = it["名称"] or name
+                            break
+                        end
+                    end
+                end
+            end
             local WebUI = rawget(_G, "WebUI")
             if WebUI then WebUI.write(string.format("获得 %s x%d。", name, count)) end
             return
@@ -698,14 +709,19 @@ end
 
 local function ensureSceneDEvents(sceneId)
     local JY = rawget(_G, "JY")
-    if not JY then return end
+    if not JY then
+        EngineAPI.debug.log("ensureSceneDEvents: JY is nil")
+        return
+    end
     JY.D = JY.D or {}
+    EngineAPI.debug.log("ensureSceneDEvents: JY.D=" .. tostring(JY.D) .. ", JY.D[" .. tostring(sceneId) .. "]=" .. tostring(JY.D[sceneId]))
     if JY.D[sceneId] then return end  -- 已加载
     
     local ds = rawget(_G, "initDataSource")
     local events = ds and ds["events"]
     if not events then
         JY.D[sceneId] = {}
+        EngineAPI.debug.log("ensureSceneDEvents: no events data, created empty JY.D[" .. tostring(sceneId) .. "]")
         return
     end
     
@@ -718,6 +734,7 @@ local function ensureSceneDEvents(sceneId)
         end
     end
     JY.D[sceneId] = sceneEvents
+    EngineAPI.debug.log("ensureSceneDEvents: loaded " .. tostring(#sceneEvents) .. " events for scene " .. tostring(sceneId))
 end
 
 rawset(_G, "GetD", function(sceneId, eventId, field)
