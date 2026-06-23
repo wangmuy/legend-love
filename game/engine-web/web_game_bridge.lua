@@ -1112,6 +1112,30 @@ function _G.initWebFramework()
         end
     end
 
+    -- 覆写 LoadRecord：Web MUD 改用 save/load 系统，不从二进制文件读取
+    rawset(_G, "LoadRecord", function(id)
+        id = tonumber(id) or 0
+        -- 先尝试从存档加载
+        local loadGameState = rawget(_G, "loadGameState")
+        if loadGameState and loadGameState(id) then
+            return true
+        end
+        -- 首次新游戏无存档时，从 config 数据初始化 JY.Base
+        if id == 0 then
+            local ds = rawget(_G, "initDataSource")
+            if ds and ds.config then
+                JY.Base = JY.Base or {}
+                for k, v in pairs(ds.config) do
+                    if type(k) == "string" then
+                        JY.Base[k] = v
+                    end
+                end
+                return true
+            end
+        end
+        return false
+    end)
+
     -- 覆写 Init_MMap/Init_SMap：Web MUD 无需加载贴图文件
     rawset(_G, "Init_MMap", function()
         JY.EnterSceneXY = nil
