@@ -176,8 +176,36 @@ rawset(_G, "instruct_3", function(...)
     -- no-op: Web MUD 中运行时事件无需持久化
 end)
 
-rawset(_G, "instruct_2", function(...)
-    -- 修改场景出入口: no-op
+rawset(_G, "instruct_2", function(itemId, count)
+    -- instruct_2(itemId, count): 得到物品（原版注释: 2(2):得到物品）
+    -- 给玩家背包添加物品/金钱
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    JY.Base = JY.Base or {}
+    count = count or 1
+    itemId = tonumber(itemId) or 0
+    -- 银两（物品代号174）：加到 JY.Base["金钱"]
+    if itemId == 174 then
+        JY.Base["金钱"] = (JY.Base["金钱"] or 0) + count
+        local WebUI = rawget(_G, "WebUI")
+        if WebUI then WebUI.write(string.format("获得 %d 两银子。", count)) end
+        return
+    end
+    -- 普通物品：找到空槽位放入
+    for i = 1, 30 do
+        if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
+            JY.Base["物品" .. i] = itemId
+            JY.Base["物品数量" .. i] = (JY.Base["物品数量" .. i] or 0) + count
+            local CC = rawget(_G, "CC")
+            local name = (CC and CC["物品" .. itemId]) or ("物品" .. itemId)
+            local WebUI = rawget(_G, "WebUI")
+            if WebUI then WebUI.write(string.format("获得 %s x%d。", name, count)) end
+            return
+        end
+    end
+    -- 背包已满
+    local WebUI = rawget(_G, "WebUI")
+    if WebUI then WebUI.write("背包已满！") end
 end)
 
 rawset(_G, "instruct_40", function(dir)
