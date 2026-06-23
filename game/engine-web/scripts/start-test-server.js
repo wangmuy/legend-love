@@ -1,7 +1,13 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
+
+// 先清理 8088 端口上残留的旧服务器进程（前一次测试泄漏的）
+try {
+  execSync('fuser -k 8088/tcp 2>/dev/null', { timeout: 3000 });
+} catch (_) {}
 
 // Try dist/ first (built version), fall back to ROOT
 const DIST = path.join(ROOT, 'dist');
