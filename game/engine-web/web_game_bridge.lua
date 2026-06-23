@@ -171,9 +171,23 @@ rawset(_G, "WaitKey", function()
 end)
 
 -- P0 instruct 函数 — 影响游戏流程的
-rawset(_G, "instruct_3", function(...)
-    -- 修改场景事件: oldevent 脚本执行时修改事件表
-    -- no-op: Web MUD 中运行时事件无需持久化
+rawset(_G, "instruct_3", function(sceneid, id, v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10)
+    -- 修改D*（原版 jymain.lua:3133 实现）
+    -- sceneid: 场景id, -2=当前场景
+    -- id: D*编号, -2=当前事件编号(JY.CurrentD)
+    -- v0-v10: D*参数, -2=不变
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    if sceneid == -2 then sceneid = JY.SubScene end
+    if id == -2 then id = JY.CurrentD end
+    local SetD = rawget(_G, "SetD")
+    if not SetD then return end
+    for field = 0, 10 do
+        local v = select(field + 1, v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10)
+        if v ~= -2 then
+            SetD(sceneid, id, field, v)
+        end
+    end
 end)
 
 rawset(_G, "instruct_2", function(itemId, count)
