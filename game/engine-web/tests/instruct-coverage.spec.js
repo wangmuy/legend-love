@@ -391,9 +391,20 @@ test.describe('instruct_* 函数覆盖测试', () => {
     expect(r.result).toBe('ok');
   });
 
-  test('instruct_2 修改出入口（no-op，不崩溃）', async ({ page }) => {
-    const r = await luaEval(page, 'rawget(_G,"instruct_2")(1,2,3); return "ok"');
+  test('instruct_2 得到物品（验证物品添加和金钱增加）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'rawget(_G,"instruct_2")(174, 100)',
+      'local money = JY.Base["金钱"] or 0',
+      'rawget(_G,"instruct_2")(1, 3)',
+      'local item = JY.Base["物品1"] or 0',
+      'local qty = JY.Base["物品数量1"] or 0',
+      'return tostring(money) .. "|" .. tostring(item) .. "|" .. tostring(qty)',
+    ].join('; '));
     expect(r.ok).toBe(true);
+    expect(r.result).toBe('100|1|3');
   });
 
   test('instruct_3 修改场景事件（no-op，不崩溃）', async ({ page }) => {
