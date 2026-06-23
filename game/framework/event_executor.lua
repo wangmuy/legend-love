@@ -69,6 +69,9 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     local eventfilename = string.format("oldevent_%d.lua", eventnum)
     lib.Debug(string.format("oldCallEventCoroutine: %s START", eventfilename))
     
+    -- 设置 JY.CurrentD（原版 EventExecuteCoroutine 的行为，供 instruct_3 用 id=-2 获取当前事件编号）
+    if JY then JY.CurrentD = eventnum end
+    
     -- 安装异步全局函数替换
     AsyncGlobals.install()
     
@@ -84,6 +87,9 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     
     -- 卸载异步全局函数替换
     AsyncGlobals.uninstall()
+    
+    -- 重置 JY.CurrentD
+    if JY then JY.CurrentD = -1 end
     
     lib.Debug(string.format("oldCallEventCoroutine: %s FINISHED", eventfilename))
 end
