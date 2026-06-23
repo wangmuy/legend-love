@@ -5,6 +5,9 @@
 -- WebUI 输出辅助
 _G.WebUI = {}
 
+-- 预注册运行时需要的全局变量（必须在 setmetatable(_G) 之前，否则 _G.xxx 触发 __index=error）
+rawset(_G, "eventConsumed", {})
+
 function _G.WebUI.write(text)
     if _G.JSBridge and _G.JSBridge.write then
         _G.JSBridge.write(tostring(text) .. "\n")
@@ -1079,6 +1082,34 @@ function _G.initWebFramework()
     end)
     if not ok then
         EngineAPI.debug.log("JYMainAdapter.init 失败: " .. tostring(err))
+    end
+
+    -- 初始化 JY.Thing（物品数据）/ JY.Wugong（武功数据），原版 initGameState 运行时未调用
+    -- jymain.lua 的 SetGlobal 会设置 JY.Base/JY.Person 但不填充 JY.Thing/JY.Wugong
+    local ds = rawget(_G, "initDataSource")
+    if ds then
+        if ds.items then
+            local itemList = ds.items["items"] or ds.items
+            if type(itemList) == "table" then
+                JY.Thing = JY.Thing or {}
+                for _, rec in ipairs(itemList) do
+                    if type(rec) == "table" and rec["代号"] ~= nil then
+                        JY.Thing[rec["代号"]] = rec
+                    end
+                end
+            end
+        end
+        if ds.skills then
+            local skillList = ds.skills["skills"] or ds.skills
+            if type(skillList) == "table" then
+                JY.Wugong = JY.Wugong or {}
+                for _, rec in ipairs(skillList) do
+                    if type(rec) == "table" and rec["代号"] ~= nil then
+                        JY.Wugong[rec["代号"]] = rec
+                    end
+                end
+            end
+        end
     end
 
     -- 覆写 Init_MMap/Init_SMap：Web MUD 无需加载贴图文件
