@@ -196,8 +196,9 @@ rawset(_G, "instruct_2", function(itemId, count)
         if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
             JY.Base["物品" .. i] = itemId
             JY.Base["物品数量" .. i] = (JY.Base["物品数量" .. i] or 0) + count
-            local CC = rawget(_G, "CC")
-            local name = (CC and CC["物品" .. itemId]) or ("物品" .. itemId)
+            -- 从 JY.Thing 取物品名称（而非 CC，CC 不保证有物品名）
+            local thing = JY.Thing and JY.Thing[itemId]
+            local name = (thing and thing["名称"]) or (CC and CC["物品" .. itemId]) or ("物品" .. itemId)
             local WebUI = rawget(_G, "WebUI")
             if WebUI then WebUI.write(string.format("获得 %s x%d。", name, count)) end
             return
