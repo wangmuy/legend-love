@@ -333,11 +333,25 @@ function SmapHandlers.look(args)
             local isEventTrigger = npcName and npcName:match("^oldevent_")
             if isEventTrigger or _G.isNpcPresent(sceneId, charIdStr) then
                 if isEventTrigger then
-                    -- 交互对象（宝箱/柜子等），检查 D* 数据是否已标记为"已触发"
-                    -- instruct_3 将事件字段7设为3500表示"事件关闭"
+                    -- 交互对象（宝箱/柜子等），检查是否已被触发
+                    -- 优先检查 D* 数据（instruct_3/SetD 标记），其次 eventConsumed 后备
+                    -- 注意：必须用 rawget 访问 _G，因为 setmetatable(_G, {__index=error})
                     local eventId = npc["事件编号"] or 0
-                    local GetD = g(_G, "GetD")
-                    local eventOff = GetD and (GetD(sceneId, tonumber(eventId) or 0, 7) == 3500)
+                    local eid = tonumber(eventId) or 0
+                    local eventOff = false
+                    local ec = rawget(_G, "eventConsumed")
+                    if ec then
+                        ec = ec[sceneId] and ec[sceneId][tostring(eventId)]
+                    end
+                    if ec then
+                        eventOff = true
+                    else
+                        local GetD = rawget(_G, "GetD")
+                        if GetD then
+                            local ok, val = pcall(GetD, sceneId, eid, 7)
+                            if ok and tonumber(val) ~= 0 then eventOff = true end
+                        end
+                    end
                     if not eventOff then
                         entityIndex = entityIndex + 1
                         smapEntityList[entityIndex] = { type = "event_trigger", eventId = tonumber(eventId), charId = charIdStr, name = npcName, npcData = npc }
@@ -458,9 +472,15 @@ function SmapHandlers.chooseInteraction(idx)
         SmapHandlers.go({tostring(idx)})
     elseif ent.type == "event_trigger" then
         -- 交互对象（宝箱/柜子等）：直接执行事件脚本
-        -- instruct_3 会在脚本中通过 SetD 标记事件为已触发
         local eventId = ent.eventId or (ent.npcData and (ent.npcData["事件编号"] or ent.npcData["触发事件"]) or 0)
         if tonumber(eventId) ~= 0 then
+            -- 标记为已触发（注意：必须用 rawget/rawset 访问 _G，绕过 __index/__newindex）
+            local ec = rawget(_G, "eventConsumed")
+            if not ec then ec = {}; rawset(_G, "eventConsumed", ec) end
+            ec[sceneId] = ec[sceneId] or {}
+            ec[sceneId][tostring(eventId)] = true
+            local JY = g(_G, "JY")
+            if JY then JY.CurrentD = tonumber(eventId) end
             local EventExecutor = g(_G, "EventExecutor")
             if EventExecutor then
                 w("你打开了...")
@@ -469,6 +489,7 @@ function SmapHandlers.chooseInteraction(idx)
                     w("事件执行失败: " .. tostring(err))
                 end
             end
+            if JY then JY.CurrentD = -1 end
         else
             w("里面什么都没有。")
         end
@@ -488,12 +509,14 @@ function smapNpcTalk(sceneId, ent)
     w("你与 " .. ent.name .. " 交谈。")
     local EventExecutor = g(_G, "EventExecutor")
     if EventExecutor then
-        -- 直接调用 oldCallEventCoroutine，绕过协程包装
-        -- 在 Web MUD 中 olEvent 脚本无异步操作，可同步执行
+        -- 必须在调用前设置 JY.CurrentD，因为 instruct_3 等函数用它标记事件状态
+        local JY = g(_G, "JY")
+        if JY then JY.CurrentD = tonumber(eventId) end
         local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
         if not ok then
             w("事件执行失败: " .. tostring(err))
         end
+        if JY then JY.CurrentD = -1 end
         w("交谈结束。")
         smapEntityList = {}
         SmapHandlers.look({})
