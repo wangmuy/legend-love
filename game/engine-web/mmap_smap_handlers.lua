@@ -1125,7 +1125,8 @@ local function showTeam()
     if memberCount == 0 then w("队伍为空") end
     roleMenuPhase = nil
     ws()
-    w("1. 医疗/解毒")
+    w("1. 医疗")
+    w("2. 解毒")
     w("0. 返回")
     roleMenuPhase = "team"
 end
@@ -1256,23 +1257,29 @@ function RoleMenu_handleChoose(n)
         return true
     elseif roleMenuPhase == "team" then
         if n == 0 then showRoleMenu()
-        elseif n == 1 then  -- 医疗/解毒
+        elseif n == 1 then  -- 医疗
             roleMenuPhase = "team_heal_select_item"
             bagCache = {}
             w("选择药品：")
             if not showUsableItems() then roleMenuPhase = nil end
+        elseif n == 2 then  -- 解毒
+            roleMenuPhase = "team_detox_select_item"
+            bagCache = {}
+            w("选择解毒物品：")
+            if not showUsableItems() then roleMenuPhase = nil end
         end
         return true
-    elseif roleMenuPhase == "team_heal_select_item" then
+    elseif roleMenuPhase == "team_heal_select_item" or roleMenuPhase == "team_detox_select_item" then
         if n == 0 then showTeam(); return true end
         local item = bagCache[n]
         if not item then w("无效选择。"); return true end
-        roleMenuPhase = "team_heal_select_target"
+        local targetPhase = (roleMenuPhase == "team_detox_select_item") and "team_detox_select_target" or "team_heal_select_target"
+        roleMenuPhase = targetPhase
         roleMenuSelectedItem = item
         w("选择目标队员：")
         showTeamTargets()
         return true
-    elseif roleMenuPhase == "team_heal_select_target" then
+    elseif roleMenuPhase == "team_heal_select_target" or roleMenuPhase == "team_detox_select_target" then
         if n == 0 then showTeam(); return true end
         local members = {}
         local JY = g(_G, "JY")
