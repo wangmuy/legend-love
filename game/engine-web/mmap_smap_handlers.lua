@@ -1317,14 +1317,14 @@ SmapHandlers.look = function(args)
 end
 
 -- menu 命令：原版 ESC 主选单的文字替代
--- 显示：系统/物品/武功/状态/存挡/读挡
+-- 原版：系统/物品/武功/状态/存挡/读挡
 function SmapHandlers.menu(args)
     roleMenuPhase = "main"
     ws()
     w("--- 主选单 ---")
     w("1. 状态")
     w("2. 物品")
-    w("3. 武功")
+    w("3. 队伍")
     w("4. 系统（存档/读档）")
     w("0. 返回")
     w("输入 choose <编号> 选择操作")
