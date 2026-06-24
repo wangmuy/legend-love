@@ -893,16 +893,20 @@ function _G.initWebFramework()
         if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始游戏\n") end
     end
 
-    -- 覆写 startNewGame：Web MUD 无法读取 R*.idx/grp 文件，直接创建默认数据
+    -- 覆写 startNewGame：Web MUD 使用纯文字菜单（CommandEngine + choose N）
+    -- 原始 startNewGame 假设有图形菜单和二进制存档，Web MUD 用文字交互代替
     startNewGameAdapter.startNewGame = function(menux)
         local JY = rawget(_G, "JY")
         if not JY then JY = {}; rawset(_G, "JY", JY) end
-        JY.Base = JY.Base or {}
-        JY.Person = JY.Person or {}
-        JY.Person[0] = JY.Person[0] or {}
+
+        -- 调用 initGameState 初始化人物、物品、场景等数据
+        local initGameState = rawget(_G, "initGameState")
+        if initGameState then initGameState() end
 
         local P0 = JY.Person[0]
         local CC = rawget(_G, "CC")
+
+        -- 设置主角初始属性
         P0["姓名"] = CC and CC.NewPersonName or "小虾米"
         P0["头像"] = 1
         P0["体力最大值"] = 100
@@ -917,6 +921,7 @@ function _G.initWebFramework()
         P0["人Y"] = 284
         P0["人朝向"] = 0
 
+        -- 属性随机生成与确认循环（Web MUD 文字版）
         local function generateWebAttrs()
             local P0 = JY.Person[0]
             P0["内力性质"] = math.random(0, 2)
@@ -991,6 +996,19 @@ function _G.initWebFramework()
             end
         end
 
+        -- 设置初始队伍（initGameState 从 config 加载，格式为 队伍=[0,-1,...] 数组）
+        local cfg = rawget(_G, "initDataSource") and rawget(_G, "initDataSource").config
+        if cfg and cfg["队伍"] then
+            for i = 1, 6 do
+                JY.Base["队伍" .. i] = cfg["队伍"][i] or -1
+            end
+        else
+            JY.Base["队伍1"] = 0
+            for i = 2, (CC and CC.TeamNum or 6) do
+                JY.Base["队伍" .. i] = -1
+            end
+        end
+
         JY.Base["人X1"] = 364
         JY.Base["人Y1"] = 284
         JY.Base["人X"] = 364
@@ -1000,11 +1018,6 @@ function _G.initWebFramework()
         JY.Base["场景Y"] = 0
         JY.Base["场景宽度"] = 64
         JY.Base["场景高度"] = 64
-        -- 设置初始队伍：主角在槽位1，其余为空
-        JY.Base["队伍1"] = 0
-        for i = 2, (CC and CC.TeamNum or 6) do
-            JY.Base["队伍" .. i] = -1
-        end
 
         JY.Scene = JY.Scene or {}
         JY.Scene[0] = JY.Scene[0] or {["名称"] = "小虾米居", ["进入条件"] = 0}
