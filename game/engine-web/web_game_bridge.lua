@@ -1000,6 +1000,11 @@ function _G.initWebFramework()
         JY.Base["场景Y"] = 0
         JY.Base["场景宽度"] = 64
         JY.Base["场景高度"] = 64
+        -- 设置初始队伍：主角在槽位1，其余为空
+        JY.Base["队伍1"] = 0
+        for i = 2, (CC and CC.TeamNum or 6) do
+            JY.Base["队伍" .. i] = -1
+        end
 
         JY.Scene = JY.Scene or {}
         JY.Scene[0] = JY.Scene[0] or {["名称"] = "小虾米居", ["进入条件"] = 0}
