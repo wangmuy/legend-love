@@ -1120,16 +1120,11 @@ function _G.initWebFramework()
         if loadGameState and loadGameState(id) then
             return true
         end
-        -- 首次新游戏无存档时，从 config 数据初始化 JY.Base
+        -- 首次新游戏无存档时，调用 initGameState 从 config 数据初始化 JY.*
         if id == 0 then
-            local ds = rawget(_G, "initDataSource")
-            if ds and ds.config then
-                JY.Base = JY.Base or {}
-                for k, v in pairs(ds.config) do
-                    if type(k) == "string" then
-                        JY.Base[k] = v
-                    end
-                end
+            local initGameState = rawget(_G, "initGameState")
+            if initGameState then
+                initGameState()
                 return true
             end
         end
