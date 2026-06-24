@@ -107,14 +107,9 @@ function initGameState()
                 JY.Base["队伍" .. i] = cfg["队伍"][i] or 0
             end
         end
-        if cfg["物品"] then
-            for i, item in ipairs(cfg["物品"]) do
-                if i <= 30 then
-                    JY.Base["物品" .. i] = item["代号"] or 0
-                    JY.Base["物品数量" .. i] = item["数量"] or 0
-                end
-            end
-        end
+        -- 注意：不复制 cfg["物品"] 到 JY.Base["物品N"]
+        -- 原版游戏中初始物品放在场景宝箱中，由 oldevent 脚本通过 instruct_2 给予
+        -- 而非直接放在主角身上
     end
 
     -- Shops: initDataSource.shops → JY.Shop
