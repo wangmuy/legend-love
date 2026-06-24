@@ -13,8 +13,13 @@ function initGameState()
     -- Characters: initDataSource.chars → JY.Person (copy directly, keys already Chinese)
     JY.Person = {}
     if dc.chars then
-        for _, rec in ipairs(dc.chars) do
-            JY.Person[rec["代号"]] = rec
+        local charList = dc.chars["chars"] or dc.chars
+        if type(charList) == "table" then
+            for _, rec in ipairs(charList) do
+                if type(rec) == "table" and rec["代号"] ~= nil then
+                    JY.Person[rec["代号"]] = rec
+                end
+            end
         end
     end
 

@@ -1115,18 +1115,20 @@ function _G.initWebFramework()
     -- 覆写 LoadRecord：Web MUD 改用 save/load 系统，不从二进制文件读取
     rawset(_G, "LoadRecord", function(id)
         id = tonumber(id) or 0
-        -- 先尝试从存档加载
-        local loadGameState = rawget(_G, "loadGameState")
-        if loadGameState and loadGameState(id) then
-            return true
-        end
-        -- 首次新游戏无存档时，调用 initGameState 从 config 数据初始化 JY.*
+        -- id=0 是"新游戏"（加载初始数据），不走存档；id=1~3 是读档
         if id == 0 then
+            -- 新游戏：从 config 数据初始化（initGameState 负责格式转换）
             local initGameState = rawget(_G, "initGameState")
             if initGameState then
                 initGameState()
                 return true
             end
+            return false
+        end
+        -- 读档 1~3：从 IndexedDB 加载
+        local loadGameState = rawget(_G, "loadGameState")
+        if loadGameState then
+            return loadGameState(id)
         end
         return false
     end)
