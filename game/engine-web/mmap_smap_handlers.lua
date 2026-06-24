@@ -1106,6 +1106,46 @@ local function applyItemEffect(target, itemId)
     end
 end
 
+-- 执行医疗（原版 ExecDoctor 简化版）
+-- id1=医疗者, id2=被医疗者, 返回恢复的生命值
+local function execDoctorWeb(id1, id2)
+    local JY = g(_G, "JY")
+    if not JY or not JY.Person then return 0 end
+    local healer = JY.Person[id1]
+    local patient = JY.Person[id2]
+    if not healer or not patient then return 0 end
+    if (healer["体力"] or 0) < 50 then
+        w("体力不足，无法医疗。")
+        return 0
+    end
+    local heal = healer["医疗能力"] or 0
+    local injury = patient["受伤程度"] or 0
+    if injury > heal + 20 then
+        w("伤势太重，无法医疗。")
+        return 0
+    end
+    -- 按受伤程度计算实际医疗效果
+    if injury < 25 then heal = heal * 4 / 5
+    elseif injury < 50 then heal = heal * 3 / 4
+    elseif injury < 75 then heal = heal * 2 / 3
+    else heal = heal / 2 end
+    heal = math.floor(heal) + math.random(0, 4)
+    -- 应用效果
+    local oldHp = patient["生命"] or 0
+    local maxHp = patient["生命最大值"] or oldHp
+    patient["生命"] = math.min(maxHp, oldHp + heal)
+    patient["受伤程度"] = math.max(0, (patient["受伤程度"] or 0) - heal)
+    healer["体力"] = (healer["体力"] or 100) - 2
+    local actualHeal = patient["生命"] - oldHp
+    if actualHeal > 0 then
+        w(string.format("%s 为 %s 医疗，生命恢复 %d 点。",
+            healer["姓名"] or "?", patient["姓名"] or "?", actualHeal))
+    else
+        w("医疗完毕，但生命没有变化。")
+    end
+    return actualHeal
+end
+
 -- 显示队伍
 local function showTeam()
     local JY = g(_G, "JY")
@@ -1258,10 +1298,36 @@ function RoleMenu_handleChoose(n)
     elseif roleMenuPhase == "team" then
         if n == 0 then showRoleMenu()
         elseif n == 1 then  -- 医疗
-            roleMenuPhase = "team_heal_select_item"
-            bagCache = {}
-            w("选择药品：")
-            if not showUsableItems() then roleMenuPhase = nil end
+            -- 选医疗者（原版 Menu_Doctor 流程：医疗能力≥20 的队员）
+            local JY = g(_G, "JY")
+            local healers = {}
+            for i = 1, CC.TeamNum or 6 do
+                local pid = JY.Base["队伍" .. i]
+                if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                    local p = JY.Person[pid]
+                    if (p["医疗能力"] or 0) >= 20 then
+                        table.insert(healers, {slot = i, pid = pid, name = p["姓名"] or "?"})
+                    end
+                end
+            end
+            if #healers == 0 then
+                w("没有有医疗能力的队员。"); roleMenuPhase = nil; return true
+            end
+            if #healers == 1 then
+                -- 只有一人可医疗，自动选中
+                roleMenuPhase = "team_heal_select_patient"
+                roleMenuSelectedItem = nil
+                bagCache = healers  -- 复用 bagCache 存储医疗者信息
+            else
+                roleMenuPhase = "team_heal_select_healer"
+                bagCache = healers
+                w("选择医疗者：")
+                for idx, h in ipairs(healers) do
+                    local p = JY.Person[h.pid]
+                    w(string.format("%d. %s (医疗能力:%d)", idx, h.name, p and p["医疗能力"] or 0))
+                end
+                w("0. 返回")
+            end
         elseif n == 2 then  -- 解毒
             roleMenuPhase = "team_detox_select_item"
             bagCache = {}
@@ -1269,6 +1335,74 @@ function RoleMenu_handleChoose(n)
             if not showUsableItems() then roleMenuPhase = nil end
         end
         return true
+    elseif roleMenuPhase == "team_heal_select_healer" then
+        if n == 0 then showTeam(); return true end
+        local healer = bagCache[n]
+        if not healer then w("无效选择。"); return true end
+        roleMenuPhase = "team_heal_select_patient"
+        bagCache = {healer}  -- 保存医疗者
+        -- fall through to patient selection
+
+    elseif roleMenuPhase == "team_heal_select_patient" then
+        if n ~= nil then
+            -- 选了医疗者后，显示患者列表
+            local healer = bagCache[1]
+            if not healer then showTeam(); return true end
+            if n == 0 then showTeam(); return true end
+            local JY = g(_G, "JY")
+            local patients = {}
+            for i = 1, CC.TeamNum or 6 do
+                local pid = JY.Base["队伍" .. i]
+                if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                    local p = JY.Person[pid]
+                    table.insert(patients, {slot = i, pid = pid, p = p, name = p["姓名"] or "?"})
+                end
+            end
+            if #patients == 0 then w("没有可医疗的队员。"); roleMenuPhase = nil; return true end
+            if #patients == 1 then
+                -- 只有一人，直接医疗
+                execDoctorWeb(healer.pid, patients[1].pid)
+                roleMenuPhase = nil
+                ws()
+                showTeam()
+                return true
+            end
+            roleMenuPhase = "team_heal_select_patient"
+            bagCache = {healer = healer, patients = patients}
+            w("选择要医疗的队员：")
+            for idx, pt in ipairs(patients) do
+                w(string.format("%d. %s HP:%d/%d", idx, pt.name, pt.p["生命"] or 0, pt.p["生命最大值"] or 0))
+            end
+            w("0. 返回")
+            return true
+        else
+            -- 首次进入（自动选中唯一医疗者后），显示患者列表
+            local healer = bagCache[1]
+            local JY = g(_G, "JY")
+            local patients = {}
+            for i = 1, CC.TeamNum or 6 do
+                local pid = JY.Base["队伍" .. i]
+                if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                    local p = JY.Person[pid]
+                    table.insert(patients, {slot = i, pid = pid, p = p, name = p["姓名"] or "?"})
+                end
+            end
+            if #patients == 1 then
+                execDoctorWeb(healer.pid, patients[1].pid)
+                roleMenuPhase = nil
+                ws()
+                showTeam()
+                return true
+            end
+            bagCache = {healer = healer, patients = patients}
+            w("选择要医疗的队员：")
+            for idx, pt in ipairs(patients) do
+                w(string.format("%d. %s HP:%d/%d", idx, pt.name, pt.p["生命"] or 0, pt.p["生命最大值"] or 0))
+            end
+            w("0. 返回")
+            return true
+        end
+
     elseif roleMenuPhase == "team_heal_select_item" or roleMenuPhase == "team_detox_select_item" then
         if n == 0 then showTeam(); return true end
         local item = bagCache[n]
