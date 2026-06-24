@@ -1178,7 +1178,7 @@ function RoleMenu_handleChoose(n)
         elseif n == 2 then showBag()
         elseif n == 3 then showTeam()
         elseif n == 4 then showSaveMenu()
-        elseif n == 0 then roleMenuPhase = nil; return false end
+        elseif n == 0 then roleMenuPhase = nil; return true end
         return true
     elseif roleMenuPhase == "status" then
         if n == 0 then showRoleMenu()
