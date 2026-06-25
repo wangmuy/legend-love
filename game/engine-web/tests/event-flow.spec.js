@@ -243,8 +243,8 @@ test.describe('事件流程测试', () => {
     expect(text).toContain('主选单');
     expect(text).toContain('状态');
 
-    // choose 1 → 查看状态
-    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    // choose 3 → 查看状态（1.医疗 2.解毒 3.状态）
+    await cmd(page, 'choose 3'); await page.waitForTimeout(3000);
     text = await term(page);
     expect(text).toContain('角色状态');
     expect(text).toContain('生命');
@@ -256,9 +256,9 @@ test.describe('事件流程测试', () => {
     await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
 
-    // 使用 menu → choose 2 (物品)
+    // 使用 menu → choose 4 (物品，1.医疗 2.解毒 3.状态 4.物品)
     await cmd(page, 'menu'); await page.waitForTimeout(2000);
-    await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 4'); await page.waitForTimeout(3000);
     let text = await term(page);
     expect(text).toContain('背包');
     expect(text).toContain('使用物品');
@@ -267,7 +267,7 @@ test.describe('事件流程测试', () => {
     // 返回 → menu → 存档
     await cmd(page, 'choose 0'); await page.waitForTimeout(2000);
     await cmd(page, 'menu'); await page.waitForTimeout(2000);
-    await cmd(page, 'choose 4'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 6'); await page.waitForTimeout(3000);
     text = await term(page);
     expect(text).toContain('存档');
     expect(text).toContain('槽位');
@@ -279,9 +279,9 @@ test.describe('事件流程测试', () => {
     await cmd(page, 'choose 1'); await page.waitForTimeout(4000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE + 4000);
 
-    // menu → 背包 → 使用物品（背包可能为空，验证系统正确处理）
+    // menu → 背包（1.医疗 2.解毒 3.状态 4.物品）
     await cmd(page, 'menu'); await page.waitForTimeout(2000);
-    await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 4'); await page.waitForTimeout(3000);
     let text = await term(page);
     expect(text).toContain('背包');
 
@@ -304,9 +304,9 @@ test.describe('事件流程测试', () => {
     await cmd(page, 'choose 1'); await page.waitForTimeout(4000);
     await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE + 4000);
 
-    // menu → choose 3 (队伍)
+    // menu → choose 5 (队伍，1.医疗 2.解毒 3.状态 4.物品 5.队伍)
     await cmd(page, 'menu'); await page.waitForTimeout(2000);
-    await cmd(page, 'choose 3'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 5'); await page.waitForTimeout(3000);
     let text = await term(page);
     expect(text).toContain('队伍');
     expect(text).toContain('医疗');
