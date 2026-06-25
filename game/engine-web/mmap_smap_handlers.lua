@@ -1190,8 +1190,6 @@ local function showTeam()
     if memberCount == 0 then w("队伍为空") end
     roleMenuPhase = nil
     ws()
-    w("1. 医疗")
-    w("2. 解毒")
     w("0. 返回")
     roleMenuPhase = "team"
 end
@@ -1240,10 +1238,68 @@ end
 -- 处理角色管理 choose N（返回 true=已处理, false=未处理）
 function RoleMenu_handleChoose(n)
     if roleMenuPhase == "main" then
-        if n == 1 then showRoleStatus()
-        elseif n == 2 then showBag()
-        elseif n == 3 then showTeam()
-        elseif n == 4 then showSaveMenu()
+        if n == 1 then  -- 医疗（一级菜单，原版 MMenu 风格）
+            local JY = g(_G, "JY")
+            local healers = {}
+            for i = 1, CC.TeamNum or 6 do
+                local pid = JY.Base["队伍" .. i]
+                if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                    local p = JY.Person[pid]
+                    if (p["医疗能力"] or 0) >= 20 then
+                        table.insert(healers, {slot = i, pid = pid, name = p["姓名"] or "?"})
+                    end
+                end
+            end
+            if #healers == 0 then
+                w("没有有医疗能力的队员。"); roleMenuPhase = nil; return true
+            end
+            if #healers == 1 then
+                roleMenuPhase = "team_heal_select_patient"
+                roleMenuSelectedItem = nil
+                bagCache = healers
+            else
+                roleMenuPhase = "team_heal_select_healer"
+                bagCache = healers
+                w("选择医疗者：")
+                for idx, h in ipairs(healers) do
+                    local p = JY.Person[h.pid]
+                    w(string.format("%d. %s (医疗能力:%d)", idx, h.name, p and p["医疗能力"] or 0))
+                end
+                w("0. 返回")
+            end
+        elseif n == 2 then  -- 解毒（一级菜单）
+            local JY = g(_G, "JY")
+            local detoxers = {}
+            for i = 1, CC.TeamNum or 6 do
+                local pid = JY.Base["队伍" .. i]
+                if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                    local p = JY.Person[pid]
+                    if (p["解毒能力"] or 0) >= 20 then
+                        table.insert(detoxers, {slot = i, pid = pid, name = p["姓名"] or "?"})
+                    end
+                end
+            end
+            if #detoxers == 0 then
+                w("没有有解毒能力的队员。"); roleMenuPhase = nil; return true
+            end
+            if #detoxers == 1 then
+                roleMenuPhase = "team_detox_select_patient"
+                roleMenuSelectedItem = nil
+                bagCache = detoxers
+            else
+                roleMenuPhase = "team_detox_select_detoxer"
+                bagCache = detoxers
+                w("选择解毒者：")
+                for idx, d in ipairs(detoxers) do
+                    local p = JY.Person[d.pid]
+                    w(string.format("%d. %s (解毒能力:%d)", idx, d.name, p and p["解毒能力"] or 0))
+                end
+                w("0. 返回")
+            end
+        elseif n == 3 then showRoleStatus()
+        elseif n == 4 then showBag()
+        elseif n == 5 then showTeam()
+        elseif n == 6 then showSaveMenu()
         elseif n == 0 then roleMenuPhase = nil; return true end
         return true
     elseif roleMenuPhase == "status" then
@@ -1321,68 +1377,7 @@ function RoleMenu_handleChoose(n)
         showBag()
         return true
     elseif roleMenuPhase == "team" then
-        if n == 0 then showRoleMenu()
-        elseif n == 1 then  -- 医疗
-            -- 选医疗者（原版 Menu_Doctor 流程：医疗能力≥20 的队员）
-            local JY = g(_G, "JY")
-            local healers = {}
-            for i = 1, CC.TeamNum or 6 do
-                local pid = JY.Base["队伍" .. i]
-                if pid and pid >= 0 and JY.Person and JY.Person[pid] then
-                    local p = JY.Person[pid]
-                    if (p["医疗能力"] or 0) >= 20 then
-                        table.insert(healers, {slot = i, pid = pid, name = p["姓名"] or "?"})
-                    end
-                end
-            end
-            if #healers == 0 then
-                w("没有有医疗能力的队员。"); roleMenuPhase = nil; return true
-            end
-            if #healers == 1 then
-                -- 只有一人可医疗，自动选中
-                roleMenuPhase = "team_heal_select_patient"
-                roleMenuSelectedItem = nil
-                bagCache = healers  -- 复用 bagCache 存储医疗者信息
-            else
-                roleMenuPhase = "team_heal_select_healer"
-                bagCache = healers
-                w("选择医疗者：")
-                for idx, h in ipairs(healers) do
-                    local p = JY.Person[h.pid]
-                    w(string.format("%d. %s (医疗能力:%d)", idx, h.name, p and p["医疗能力"] or 0))
-                end
-                w("0. 返回")
-            end
-        elseif n == 2 then  -- 解毒（原版 Menu_DecPoison 流程：解毒能力≥20 的队员）
-            local JY = g(_G, "JY")
-            local detoxers = {}
-            for i = 1, CC.TeamNum or 6 do
-                local pid = JY.Base["队伍" .. i]
-                if pid and pid >= 0 and JY.Person and JY.Person[pid] then
-                    local p = JY.Person[pid]
-                    if (p["解毒能力"] or 0) >= 20 then
-                        table.insert(detoxers, {slot = i, pid = pid, name = p["姓名"] or "?"})
-                    end
-                end
-            end
-            if #detoxers == 0 then
-                w("没有有解毒能力的队员。"); roleMenuPhase = nil; return true
-            end
-            if #detoxers == 1 then
-                roleMenuPhase = "team_detox_select_patient"
-                roleMenuSelectedItem = nil
-                bagCache = detoxers
-            else
-                roleMenuPhase = "team_detox_select_detoxer"
-                bagCache = detoxers
-                w("选择解毒者：")
-                for idx, d in ipairs(detoxers) do
-                    local p = JY.Person[d.pid]
-                    w(string.format("%d. %s (解毒能力:%d)", idx, d.name, p and p["解毒能力"] or 0))
-                end
-                w("0. 返回")
-            end
-        end
+        if n == 0 then showRoleMenu() end
         return true
     elseif roleMenuPhase == "team_heal_select_healer" then
         if n == 0 then showTeam(); return true end
@@ -1556,10 +1551,12 @@ function SmapHandlers.menu(args)
     roleMenuPhase = "main"
     ws()
     w("--- 主选单 ---")
-    w("1. 状态")
-    w("2. 物品")
-    w("3. 队伍")
-    w("4. 系统（存档/读档）")
+    w("1. 医疗")
+    w("2. 解毒")
+    w("3. 状态")
+    w("4. 物品")
+    w("5. 队伍")
+    w("6. 系统（存档/读档）")
     w("0. 返回")
     w("输入 choose <编号> 选择操作")
 end
