@@ -1146,6 +1146,31 @@ local function execDoctorWeb(id1, id2)
     return actualHeal
 end
 
+-- 执行解毒（原版 ExecDecPoison 简化版：jymain.lua:1127）
+local function execDecPoisonWeb(id1, id2)
+    local JY = g(_G, "JY")
+    if not JY or not JY.Person then return 0 end
+    local detoxer = JY.Person[id1]
+    local patient = JY.Person[id2]
+    if not detoxer or not patient then return 0 end
+    local add = detoxer["解毒能力"] or 0
+    local value = patient["中毒程度"] or 0
+    if value > add + 20 then
+        w("中毒太深，无法解毒。")
+        return 0
+    end
+    add = math.floor(add / 3) + math.random(0, 9) - math.random(0, 9)
+    add = math.max(0, math.min(add, value))
+    patient["中毒程度"] = (patient["中毒程度"] or 0) - add
+    if add > 0 then
+        w(string.format("%s 为 %s 解毒，中毒程度减少 %d 点。",
+            detoxer["姓名"] or "?", patient["姓名"] or "?", add))
+    else
+        w("解毒完毕，但中毒程度没有变化。")
+    end
+    return add
+end
+
 -- 显示队伍
 local function showTeam()
     local JY = g(_G, "JY")
@@ -1328,11 +1353,35 @@ function RoleMenu_handleChoose(n)
                 end
                 w("0. 返回")
             end
-        elseif n == 2 then  -- 解毒
-            roleMenuPhase = "team_detox_select_item"
-            bagCache = {}
-            w("选择解毒物品：")
-            if not showUsableItems() then roleMenuPhase = nil end
+        elseif n == 2 then  -- 解毒（原版 Menu_DecPoison 流程：解毒能力≥20 的队员）
+            local JY = g(_G, "JY")
+            local detoxers = {}
+            for i = 1, CC.TeamNum or 6 do
+                local pid = JY.Base["队伍" .. i]
+                if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                    local p = JY.Person[pid]
+                    if (p["解毒能力"] or 0) >= 20 then
+                        table.insert(detoxers, {slot = i, pid = pid, name = p["姓名"] or "?"})
+                    end
+                end
+            end
+            if #detoxers == 0 then
+                w("没有有解毒能力的队员。"); roleMenuPhase = nil; return true
+            end
+            if #detoxers == 1 then
+                roleMenuPhase = "team_detox_select_patient"
+                roleMenuSelectedItem = nil
+                bagCache = detoxers
+            else
+                roleMenuPhase = "team_detox_select_detoxer"
+                bagCache = detoxers
+                w("选择解毒者：")
+                for idx, d in ipairs(detoxers) do
+                    local p = JY.Person[d.pid]
+                    w(string.format("%d. %s (解毒能力:%d)", idx, d.name, p and p["解毒能力"] or 0))
+                end
+                w("0. 返回")
+            end
         end
         return true
     elseif roleMenuPhase == "team_heal_select_healer" then
@@ -1340,8 +1389,15 @@ function RoleMenu_handleChoose(n)
         local healer = bagCache[n]
         if not healer then w("无效选择。"); return true end
         roleMenuPhase = "team_heal_select_patient"
-        bagCache = {healer}  -- 保存医疗者
+        bagCache = {healer}
         -- fall through to patient selection
+
+    elseif roleMenuPhase == "team_detox_select_detoxer" then
+        if n == 0 then showTeam(); return true end
+        local detoxer = bagCache[n]
+        if not detoxer then w("无效选择。"); return true end
+        roleMenuPhase = "team_detox_select_patient"
+        bagCache = {detoxer}
 
     elseif roleMenuPhase == "team_heal_select_patient" then
         if n ~= nil then
@@ -1403,17 +1459,54 @@ function RoleMenu_handleChoose(n)
             return true
         end
 
-    elseif roleMenuPhase == "team_heal_select_item" or roleMenuPhase == "team_detox_select_item" then
+    elseif roleMenuPhase == "team_detox_select_patient" then
+        local detoxer = bagCache[1]
+        if not detoxer then showTeam(); return true end
+        if n == 0 then showTeam(); return true end
+        local JY = g(_G, "JY")
+        local patients = {}
+        for i = 1, CC.TeamNum or 6 do
+            local pid = JY.Base["队伍" .. i]
+            if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                local p = JY.Person[pid]
+                table.insert(patients, {slot = i, pid = pid, p = p, name = p["姓名"] or "?"})
+            end
+        end
+        if #patients == 0 then w("没有队员。"); roleMenuPhase = nil; return true end
+        if #patients == 1 then
+            execDecPoisonWeb(detoxer.pid, patients[1].pid)
+            roleMenuPhase = nil
+            ws()
+            showTeam()
+            return true
+        end
+        -- 多人：选目标（显示中毒程度）
+        if n ~= nil then
+            local target = patients[n]
+            if not target then w("无效选择。"); return true end
+            execDecPoisonWeb(detoxer.pid, target.pid)
+            roleMenuPhase = nil
+            ws()
+            showTeam()
+            return true
+        end
+        w("选择要解毒的队员：")
+        for idx, pt in ipairs(patients) do
+            w(string.format("%d. %s (中毒:%d)", idx, pt.name, pt.p["中毒程度"] or 0))
+        end
+        w("0. 返回")
+        return true
+
+    elseif roleMenuPhase == "team_heal_select_item" then
         if n == 0 then showTeam(); return true end
         local item = bagCache[n]
         if not item then w("无效选择。"); return true end
-        local targetPhase = (roleMenuPhase == "team_detox_select_item") and "team_detox_select_target" or "team_heal_select_target"
-        roleMenuPhase = targetPhase
+        roleMenuPhase = "team_heal_select_target"
         roleMenuSelectedItem = item
         w("选择目标队员：")
         showTeamTargets()
         return true
-    elseif roleMenuPhase == "team_heal_select_target" or roleMenuPhase == "team_detox_select_target" then
+    elseif roleMenuPhase == "team_heal_select_target" then
         if n == 0 then showTeam(); return true end
         local members = {}
         local JY = g(_G, "JY")
