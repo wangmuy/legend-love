@@ -1254,9 +1254,30 @@ function RoleMenu_handleChoose(n)
                 w("没有有医疗能力的队员。"); roleMenuPhase = nil; return true
             end
             if #healers == 1 then
+                -- 自动选中，立即检查患者列表
+                local patients = {}
+                for i = 1, CC.TeamNum or 6 do
+                    local pid = JY.Base["队伍" .. i]
+                    if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                        local p = JY.Person[pid]
+                        table.insert(patients, {slot = i, pid = pid, p = p, name = p["姓名"] or "?"})
+                    end
+                end
+                if #patients == 0 then
+                    w("没有队员可医疗。"); roleMenuPhase = nil; return true
+                end
+                if #patients == 1 then
+                    execDoctorWeb(healers[1].pid, patients[1].pid)
+                    roleMenuPhase = nil
+                    return true
+                end
                 roleMenuPhase = "team_heal_select_patient"
-                roleMenuSelectedItem = nil
-                bagCache = healers
+                bagCache = {healer = healers[1], patients = patients}
+                w("选择要医疗的队员：")
+                for idx, pt in ipairs(patients) do
+                    w(string.format("%d. %s HP:%d/%d", idx, pt.name, pt.p["生命"] or 0, pt.p["生命最大值"] or 0))
+                end
+                w("0. 返回")
             else
                 roleMenuPhase = "team_heal_select_healer"
                 bagCache = healers
@@ -1283,9 +1304,30 @@ function RoleMenu_handleChoose(n)
                 w("没有有解毒能力的队员。"); roleMenuPhase = nil; return true
             end
             if #detoxers == 1 then
+                -- 自动选中，立即检查患者列表
+                local patients = {}
+                for i = 1, CC.TeamNum or 6 do
+                    local pid = JY.Base["队伍" .. i]
+                    if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                        local p = JY.Person[pid]
+                        table.insert(patients, {slot = i, pid = pid, p = p, name = p["姓名"] or "?"})
+                    end
+                end
+                if #patients == 0 then
+                    w("没有队员可解毒。"); roleMenuPhase = nil; return true
+                end
+                if #patients == 1 then
+                    execDecPoisonWeb(detoxers[1].pid, patients[1].pid)
+                    roleMenuPhase = nil
+                    return true
+                end
                 roleMenuPhase = "team_detox_select_patient"
-                roleMenuSelectedItem = nil
-                bagCache = detoxers
+                bagCache = {detoxer = detoxers[1], patients = patients}
+                w("选择要解毒的队员：")
+                for idx, pt in ipairs(patients) do
+                    w(string.format("%d. %s (中毒:%d)", idx, pt.name, pt.p["中毒程度"] or 0))
+                end
+                w("0. 返回")
             else
                 roleMenuPhase = "team_detox_select_detoxer"
                 bagCache = detoxers
