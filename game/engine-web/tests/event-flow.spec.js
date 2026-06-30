@@ -194,9 +194,24 @@ test.describe('事件流程测试', () => {
         }
       }
     }
-    // Talk to NPC in 悦来客栈 (NPC event 235 = 店小二)
+    // Talk to NPC in 悦来客栈 via look → choose N (talk 命令已按 ADR-001 移除)
     text = await term(page);
-    await cmd(page, 'talk oldevent_235'); await page.waitForTimeout(4000);
+    await cmd(page, 'look'); await page.waitForTimeout(2000);
+    text = await term(page);
+    // Find and select 店小二 in the NPC list
+    for (const line of text.split('\n')) {
+      if (line.includes('店小二')) {
+        const n = line.match(/(\d+)\./);
+        if (n) {
+          await cmd(page, 'choose ' + n[1]);
+          await page.waitForTimeout(3000);
+          // Select 对话 from NPC submenu
+          await cmd(page, 'choose 1');
+          await page.waitForTimeout(4000);
+          break;
+        }
+      }
+    }
     text = await term(page);
     expect(text).toContain('交谈');
     expect(await ok(page)).toBeTruthy();
