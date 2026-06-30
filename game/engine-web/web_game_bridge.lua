@@ -249,8 +249,46 @@ rawset(_G, "instruct_13", function(...)
     -- 菜单选择: 交给 MenuAsync 处理
 end)
 
-rawset(_G, "instruct_32", function(...)
+rawset(_G, "instruct_32", function(giveFlag, thingId, num, ...)
     -- 给/取物品: 操作 JY.Base["物品N"]
+    -- oldevent 调用方式: instruct_32(174, -20) 扣除银两
+    -- 或: instruct_32(0, personid, thingId, num) 给某人物品
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    JY.Base = JY.Base or {}
+    local id = tonumber(thingId) or 0
+    local count = tonumber(num) or 0
+    -- 银两（物品174）
+    if id == 174 then
+        JY.Base["金钱"] = (JY.Base["金钱"] or 0) + count
+        return
+    end
+    -- 普通物品
+    if count > 0 then
+        -- 添加物品到空槽
+        for i = 1, 30 do
+            if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
+                JY.Base["物品" .. i] = id
+                JY.Base["物品数量" .. i] = (JY.Base["物品数量" .. i] or 0) + count
+                return
+            end
+        end
+    else
+        -- 扣除物品（负数量）
+        local remain = -count
+        for i = 1, 30 do
+            if remain <= 0 then break end
+            if JY.Base["物品" .. i] == id then
+                local qty = JY.Base["物品数量" .. i] or 1
+                local take = math.min(qty, remain)
+                JY.Base["物品数量" .. i] = qty - take
+                remain = remain - take
+                if JY.Base["物品数量" .. i] <= 0 then
+                    JY.Base["物品" .. i] = 0
+                end
+            end
+        end
+    end
 end)
 
 rawset(_G, "instruct_37", function() end)  -- 场景音乐, no-op
@@ -266,16 +304,17 @@ end)
 -- 功能性 instruct（instruct-game-logic）
 
 rawset(_G, "instruct_11", function()
-    -- 住宿询问
+    -- 住宿询问（原版返回 true=住宿, false=不住）
     local w = rawget(_G, "WebUI")
     if w then w.write("是否住宿？") end
     local MenuAsync = rawget(_G, "MenuAsync")
     if MenuAsync then
         local ok, result = pcall(MenuAsync.ShowMenu2Coroutine, {{"是", nil, 1}, {"否", nil, 2}}, 2, 0, 0, 0, 0, 0, 0, 1)
-        if ok and result and result == 1 then
-            rawget(_G, "instruct_12")()
+        if ok then
+            return result == 1
         end
     end
+    return false
 end)
 
 rawset(_G, "instruct_12", function()
@@ -321,7 +360,7 @@ rawset(_G, "instruct_31", function(itemId, count, flag)
             total = total + (JY.Base["物品数量" .. i] or 1)
         end
     end
-    if flag == 0 then return (total >= (count or 1)) and 1 or 0 end
+    if flag == 0 then return (total >= (count or 1)) end
     if flag == 1 then
         local remain = count or 1
         for i = 1, 30 do
