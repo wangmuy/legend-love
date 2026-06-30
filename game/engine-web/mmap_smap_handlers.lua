@@ -5,6 +5,11 @@ local MmapHandlers = {}
 local SmapHandlers = {}
 local g = rawget
 
+-- 角色管理菜单状态（声明在顶部，所有函数均可访问）
+local roleMenuPhase  -- nil=非菜单状态, "main","status","bag","team","save" 等
+local bagCache = {}  -- 缓存当前列表的物品/队员选择
+local roleMenuSelectedItem  -- 缓存当前选择的物品
+
 local function w(text) local w = g(_G, "WebUI"); if w then w.write(text) end end
 local function wt(text) local w = g(_G, "WebUI"); if w then w.title(text) end end
 local function ws() local w = g(_G, "WebUI"); if w then w.separator() end end
@@ -889,11 +894,9 @@ rawset(_G, "MmapHandlers", MmapHandlers)
 rawset(_G, "SmapHandlers", SmapHandlers)
 
 -- ============================================================
--- Slice 6: 角色管理菜单（通过 look → choose N 访问）
+-- Slice 6: 角色管理菜单（通过 menu 命令打开主选单）
+-- roleMenuPhase/bagCache/roleMenuSelectedItem 已在文件顶部声明
 -- ============================================================
-local roleMenuPhase
-local bagCache = {}   -- 缓存当前列表的物品/队员选择
-local roleMenuSelectedItem  -- 缓存当前选择的物品 = nil  -- nil=不在菜单中, "main","status","bag","team","save"
 
 -- 显示角色管理主菜单
 local function showRoleMenu()
