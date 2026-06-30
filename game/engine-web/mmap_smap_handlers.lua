@@ -555,6 +555,7 @@ function SmapHandlers.leave(args)
     
     -- 离开场景时恢复到该场景在世界地图上的入口坐标
     local sceneId = tostring(JY.SubScene or 0)
+    roleMenuPhase = nil  -- 场景切换时清除菜单状态
     local entrances = getEntrances()
     if entrances then
         for _, entry in ipairs(entrances) do
@@ -598,8 +599,9 @@ function SmapHandlers.go(args)
             -- 自动存档到槽位 0
             local saveGameState = g(_G, "saveGameState")
             if saveGameState then pcall(saveGameState, 0) end
-            
+
             JY.SubScene = targetSceneId
+            roleMenuPhase = nil  -- 场景切换时清除菜单状态
             local targetScene = scenes and scenes[tostring(targetSceneId)]
             if targetScene then
                 w(string.format("进入了 %s。\n", targetScene["名称"]))
@@ -1343,7 +1345,9 @@ function RoleMenu_handleChoose(n)
         elseif n == 5 then showTeam()
         elseif n == 6 then showSaveMenu()
         elseif n == 0 then roleMenuPhase = nil; return true end
-        return true
+        -- 未识别的选择：退出菜单，让输入流向场景交互处理器
+        roleMenuPhase = nil
+        return false
     elseif roleMenuPhase == "status" then
         if n == 0 then showRoleMenu()
         elseif n == 1 then
