@@ -113,7 +113,10 @@ function CommandEngine.showMenu(items, title, callback)
     for i, item in ipairs(items) do
         local label = item.name or tostring(item)
         menu[i] = {string.format("%d. %s", i, label), nil, 1}
+        -- 输出菜单文本（MenuAsync.ShowMenu 使用 DrawString 渲染，Web MUD 不可见）
+        w(string.format("%d. %s", i, label))
     end
+    w("0. 返回")
     
     local MenuAsync = rawget(_G, "MenuAsync") or (package.loaded["framework.menu_async"])
     if not MenuAsync then
