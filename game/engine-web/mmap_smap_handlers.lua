@@ -494,10 +494,20 @@ function smapNpcTalk(sceneId, ent)
     w("你与 " .. ent.name .. " 交谈。")
     local EventExecutor = g(_G, "EventExecutor")
     if EventExecutor then
-        -- oldCallEventCoroutine 内部会设置 JY.CurrentD，供 instruct_3 使用
-        local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
-        if not ok then
-            w("事件执行失败: " .. tostring(err))
+        -- 在协程中执行事件，确保 instruct_11 等阻塞函数可以 yield 等待用户输入
+        local scheduler = g(_G, "CoroutineScheduler")
+        if scheduler and scheduler.getInstance then
+            scheduler = scheduler.getInstance()
+        end
+        if scheduler and scheduler.create then
+            local co = scheduler:create(function()
+                EventExecutor.oldCallEventCoroutine(tonumber(eventId))
+            end, "npc_talk_" .. tostring(eventId))
+            scheduler:start(co, "start")
+        else
+            -- 回退：无协程时直接同步执行
+            local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
+            if not ok then w("事件执行失败: " .. tostring(err)) end
         end
         w("交谈结束。")
         smapEntityList = {}
