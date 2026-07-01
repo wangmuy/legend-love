@@ -307,12 +307,35 @@ rawset(_G, "instruct_11", function()
     -- 住宿询问（原版返回 true=住宿, false=不住）
     local w = rawget(_G, "WebUI")
     if w then w.write("是否住宿？") end
-    local MenuAsync = rawget(_G, "MenuAsync")
-    if MenuAsync then
-        local ok, result = pcall(MenuAsync.ShowMenu2Coroutine, {{"是", nil, 1}, {"否", nil, 2}}, 2, 0, 0, 0, 0, 0, 0, 1)
-        if ok then
-            return result == 1
+    -- 使用 CommandEngine 菜单（Web MUD 原生，支持异步回调）
+    local CE = rawget(_G, "CommandEngine")
+    if CE then
+        local result = false
+        local scheduler = rawget(_G, "CoroutineScheduler")
+        if scheduler and scheduler.getInstance then
+            scheduler = scheduler.getInstance()
         end
+        local myCo = coroutine.running()
+        -- 检查是否在协程中
+        if myCo then
+            -- 非协程环境回退
+        end
+        CE.showMenu(
+            { {name="是"}, {name="否"} },
+            "住宿",
+            function(choice)
+                result = (choice == 1)
+            end
+        )
+        -- 在协程中 yield 等待菜单关闭
+        if scheduler and scheduler.yield then
+            while not (rawget(_G, "MenuAsync") and rawget(_G, "MenuAsync").hasActiveMenu and not rawget(_G, "MenuAsync").hasActiveMenu()) do
+                scheduler:yield("menu_wait")
+            end
+            return result
+        end
+        -- 非协程环境：菜单已显示，输入由 processEventQueue 路由
+        return false
     end
     return false
 end)

@@ -500,8 +500,13 @@ function smapNpcTalk(sceneId, ent)
             scheduler = scheduler.getInstance()
         end
         if scheduler and scheduler.create then
+            -- 在协程中执行事件，后处理也放在协程内（确保 yield 恢复后再执行）
             local co = scheduler:create(function()
-                EventExecutor.oldCallEventCoroutine(tonumber(eventId))
+                local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
+                if not ok then w("事件执行失败: " .. tostring(err)) end
+                w("交谈结束。")
+                smapEntityList = {}
+                SmapHandlers.look({})
             end, "npc_talk_" .. tostring(eventId))
             scheduler:start(co, "start")
         else
