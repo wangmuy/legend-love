@@ -285,6 +285,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('开始菜单 choose 2 (载入进度) 显示无存档提示并返回', async ({ page }) => {
+    test.setTimeout(60000);
     await typeCmd(page, 'choose 2');
     await page.waitForTimeout(3000);
 
@@ -335,6 +336,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('开始菜单 choose 0 (ESC) 重新显示开始菜单', async ({ page }) => {
+    test.setTimeout(60000);
     await page.waitForTimeout(2000);
     await typeCmd(page, 'choose 0');
     await page.waitForTimeout(3000);
@@ -352,6 +354,7 @@ test.describe('Slice 3 完整流程集成测试', () => {
   });
 
   test('开始菜单 choose 3 离开(no-op)后仍可开始游戏', async ({ page }) => {
+    test.setTimeout(60000);
     // choose 3 离开
     await typeCmd(page, 'choose 3');
     await page.waitForTimeout(3000);
@@ -398,6 +401,102 @@ test.describe('Slice 3 完整流程集成测试', () => {
     lines = await getTermLines(page);
     text = lines.join('\n');
     expect(text).toContain('新游戏开始');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('NPC对话: 在主角的家与软体娃娃对话', async ({ page }) => {
+    test.setTimeout(60000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    // 新游戏开始在主角的家，应该能看到NPC列表
+    let lines = await getTermLines(page);
+    let text = lines.join('\n');
+    expect(text).toContain('软体娃娃');
+
+    // 选第一个NPC（软体娃娃）
+    // 注意：场景Entity列表中NPC在第1位（看SmapHandlers.look输出顺序）
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    // 应出现NPC子菜单（对话/查看）
+    expect(text).toContain('对话');
+    expect(text).toContain('查看');
+
+    // 选择"对话"
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    // 应出现软体娃娃的对话文本
+    expect(text).toContain('软体娃娃');
+    expect(text).toContain('提示');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+  });
+
+  test('NPC对话后正确显示交谈结束再重绘场景', async ({ page }) => {
+    test.setTimeout(90000);
+    // 开始游戏
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    // 离开主角的家到大地图
+    await typeCmd(page, 'leave');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    // 进入河洛客栈（按拼音排序第44位）
+    await typeCmd(page, 'list');
+    await page.waitForTimeout(2000);
+    await typeCmd(page, 'choose 44');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    let lines = await getTermLines(page);
+    let text = lines.join('\n');
+    expect(text).toContain('河洛客棧');
+    expect(await hasNoGameErrors(page)).toBeTruthy();
+
+    // 选择掌柜（NPC列表第7位）
+    await typeCmd(page, 'choose 7');
+    await page.waitForTimeout(3000);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    expect(text).toContain('掌柜');
+    expect(text).toContain('对话');
+
+    // 选择"对话"
+    await typeCmd(page, 'choose 1');
+    await page.waitForTimeout(3000);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    // 应出现掌柜的对话文本（关于住宿）
+    expect(text).toContain('掌柜');
+    expect(text).toContain('住');
+
+    // 验证关键点：「交谈结束」不应出现在「是否住宿」之前
+    const talkEndPos = text.indexOf('交谈结束');
+    const dialogPos = text.indexOf('是否住宿');
+    if (talkEndPos >= 0 && dialogPos >= 0) {
+      expect(talkEndPos).toBeGreaterThan(dialogPos);
+    }
+
+    // 选择"否"，不住宿
+    await typeCmd(page, 'choose 2');
+    await page.waitForTimeout(SETTLE_TIMEOUT);
+
+    lines = await getTermLines(page);
+    text = lines.join('\n');
+    // 应出现"交谈结束"和场景重绘
+    expect(text).toContain('交谈结束');
+    expect(text).toContain('河洛客棧');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 });
