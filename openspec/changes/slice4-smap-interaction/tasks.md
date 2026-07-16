@@ -134,3 +134,70 @@ Traceability: [REQ-001, REQ-002, REQ-003]
   Blast Radius: `["game/engine-web/tests/*"]`
   DoD:
     - [x] `npx playwright test` 全部通过
+
+## 5. NPC 对话/招人修复 (fix-npc-dialog-recruitment)
+Traceability: [REQ-002]
+
+### 5.1 根因分析
+- [x] 5.1.1 确认 `instruct_9` 协程对话框流程：`ShowYesNoCoroutine` → `AsyncDialog.showYesNoCoroutine` → `scheduler:yield("dialog")` → 对话框回调 → `coroutine.resume(co, result)`
+  Blast Radius: `["game/framework/async_dialog.lua", "game/framework/async_message_box.lua"]`
+  DoD:
+    - [x] 文档化完整调用链
+    - [x] 确认 yield/resume 时序：dialog update → coroutine scheduler
+
+- [x] 5.1.2 确认 `processEventQueue` 中事件消费顺序：`JSBridge.getEvent` 在 `processEventQueue` 和 `AsyncDialog.handleInput` 之间的竞争条件
+  Blast Radius: `["game/engine-web/web_game_bridge.lua"]`
+  DoD:
+    - [x] 确认 `lib.GetKey()` 与 `processEventQueue` 从同一事件队列消费
+    - [x] 确认 `hasDialog` 标记正确保护事件不被双重消费
+
+### 5.2 修复方案
+- [x] 5.2.1 修复 `AsyncDialog.handleInput` 的事件读取机制，确保与 `processEventQueue` 不冲突
+  Blast Radius: `["game/framework/async_dialog.lua"]`
+  DoD:
+    - [x] 改用 `processEventQueue` 在 `hasDialog=true` 时将事件直接转发给对话框（方案 B）
+
+- [x] 5.2.2 修复 `instruct_9` 对话框关闭后协程返回值正确性
+  Blast Radius: `["game/engine-web/web_game_bridge.lua"]`
+  DoD:
+    - [x] `choose 1`（是）→ `ShowYesNoCoroutine` 返回 `true`
+    - [x] `choose 2`（否）→ `ShowYesNoCoroutine` 返回 `false`
+    - [x] 协程不再被调度器强行恢复导致返回 nil
+
+- [x] 5.2.3 确保 `processEventQueue` 中 dialog update 始终在 coroutine scheduler 之前执行
+  Blast Radius: `["game/engine-web/web_game_bridge.lua"]`
+  DoD:
+    - [x] 确认执行顺序：dialog update → coroutine scheduler → state machine
+    - [x] 删除残留的旧 dialog update 调用
+
+### 5.3 验证
+- [x] 5.3.1 田伯光加入：NPC 对话 → `instruct_9` → 选"是" → 加入队伍
+  Blast Radius: `["game/engine-web/tests/walkthrough-p1.spec.js"]`
+  DoD:
+    - [x] `choose 2` 选田伯光（entity 2）
+    - [x] `choose 1` 选"对话"
+    - [x] 出现"是否要求加入？"对话框
+    - [x] `choose 1` 选"是" → 田伯光加入队伍
+    - [x] 战后存档 JY.Status=2
+
+- [x] 5.3.2 段誉加入：NPC 对话 → `instruct_9` → 选"是" → 加入队伍
+  Blast Radius: `["game/engine-web/tests/walkthrough-p1.spec.js"]`
+  DoD:
+    - [x] 高升客栈 `choose 5` 选段誉
+    - [x] 出现"是否要求加入？"对话框
+    - [x] `choose 1` 选"是" → 段誉加入
+
+- [x] 5.3.3 胡斐加入：NPC 对话 → `instruct_9` → 选"是" → 加入队伍
+  Blast Radius: `["game/engine-web/tests/walkthrough-p2.spec.js"]`
+  DoD:
+    - [x] 胡斐居 `choose 3` 选胡斐（entity 3）
+    - [x] 出现"是否要求加入？"对话框
+    - [x] `choose 1` 选"是" → 胡斐加入
+
+- [x] 5.3.4 回归测试：P1-P9 全部通过
+  Blast Radius: `["game/engine-web/tests/walkthrough-p*.spec.js"]`
+  DoD:
+    - [x] `npx playwright test tests/walkthrough-p1.spec.js` 通过 (3.9m)
+    - [x] `npx playwright test tests/walkthrough-p2.spec.js` 通过 (2.4m)
+    - [x] `npx playwright test tests/walkthrough-p3.spec.js` 通过 (2.4m)
+    - [x] P4-P9 全部通过

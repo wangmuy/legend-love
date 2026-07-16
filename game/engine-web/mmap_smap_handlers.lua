@@ -34,11 +34,11 @@ local function getSceneTemplate(scene)
         end
         return template
     end
-    if name:find("客栈") then return sceneTemplates.inn end
+    if name:find("客栈") or name:find("店") then return sceneTemplates.inn end
     if name:find("居") or name:find("庄") or name:find("阁") then return sceneTemplates.house end
     if name:find("洞") then return sceneTemplates.cave end
     if name:find("派") or name:find("教") or name:find("门") then return string.format(sceneTemplates.school, name) end
-    if name:find("店") or name:find("铺") then return sceneTemplates.shop end
+    if name:find("铺") then return sceneTemplates.shop end
     if name:find("林") or name:find("岛") or name:find("崖") then return sceneTemplates.forest end
     return "这是一个普通的场景，似乎没有什么特别之处。"
 end
@@ -115,10 +115,18 @@ function MmapHandlers.list(args)
         return
     end
 
-    CE.showMenu(sceneItems, "可去场景（选择序号前往）", function(idx)
+    -- 输出标题和场景名到终端（showMenu 的菜单项通过 DrawString 渲染，MUD 中不可见）
+    w("可去场景（选择序号前往）")
+    w("════════════════════════════════════")
+    for i, item in ipairs(sceneItems) do
+        w(string.format("%d. %s", i, item.name))
+    end
+    CE.showMenu(sceneItems, nil, function(idx)
         if idx and idx > 0 then
             local target = sceneItems[idx]
-            if target then goToScene(target) end
+            if target then
+                goToScene(target)
+            end
         end
     end)
 end
@@ -332,7 +340,7 @@ function SmapHandlers.look(args)
     local npcs = scene["NPC"]
     if npcs and #npcs > 0 then
         local charsIndex = getCharsIndex()
-        for _, npc in ipairs(npcs) do
+        for npcIdx, npc in ipairs(npcs) do
             local charIdStr = tostring(npc["代号"] or npc)
             local npcName = npc["名称"] or "?"
             local isEventTrigger = npcName and npcName:match("^oldevent_")
@@ -351,7 +359,7 @@ function SmapHandlers.look(args)
                     local char = charsIndex and charsIndex[charIdStr]
                     local displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charIdStr)
                     entityIndex = entityIndex + 1
-                    smapEntityList[entityIndex] = { type = "npc", charId = charIdStr, name = displayName, npcData = npc }
+                    smapEntityList[entityIndex] = { type = "npc", charId = charIdStr, name = displayName, npcData = npc, npcIndex = npcIdx }
                     w(string.format("%d. %s", entityIndex, displayName))
                 end
             end
@@ -390,6 +398,24 @@ function SmapHandlers.look(args)
         return
     end
     
+    -- 格子事件列表（events.json 中 eventExtra>0 的过路触发事件）
+    local cache = g(_G, "initDataSource")
+    local rawEvents = cache and cache["events"]
+    if rawEvents and rawEvents["events"] then
+        local sceneNum = tonumber(sceneId) or 0
+        for _, evt in ipairs(rawEvents["events"]) do
+            if evt.sceneId == sceneNum and evt.eventExtra and evt.eventExtra > 0 then
+                local eventId = evt.eventExtra
+                local consumed = _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][tostring(eventId)]
+                if not consumed then
+                    entityIndex = entityIndex + 1
+                    smapEntityList[entityIndex] = { type = "event_trigger", eventId = evt.eventExtra, name = "tile_event", npcData = {["事件编号"]=evt.eventExtra} }
+                    w(string.format("%d. 搜索", entityIndex))
+                end
+            end
+        end
+    end
+    
     w("输入 choose <编号> 选择交互对象")
 end
 
@@ -411,11 +437,11 @@ function SmapHandlers.chooseInteraction(idx)
     local sceneId = tostring(JY.SubScene or 0)
     
     if ent.type == "npc" then
-        -- NPC 子菜单（与原版一致：对话，可查看人物信息，如有事件则触发）
+        -- NPC 子菜单（与原版一致：对话，查看，给予银两）
         local CE = g(_G, "CommandEngine")
         if CE then
             CE.showMenu(
-                { {name="对话"}, {name="查看"} },
+                { {name="对话"}, {name="查看"}, {name="给予"} },
                 ent.name,
                 function(actionIdx)
                     if actionIdx == 1 then
@@ -430,6 +456,9 @@ function SmapHandlers.chooseInteraction(idx)
                             if char["描述"] then w(char["描述"]) end
                         end
                         SmapHandlers.look({})
+                    elseif actionIdx == 3 then
+                        -- 给予银两
+                        smapNpcGive(sceneId, ent)
                     end
                 end
             )
@@ -486,6 +515,60 @@ end
 -- NPC 对话
 function smapNpcTalk(sceneId, ent)
     local eventId = ent.npcData["事件编号"] or ent.npcData["触发事件"] or 0
+    local dIdx = ent.npcIndex or tonumber(ent.npcData["触发事件"] or 0)
+    local staticEventId = tonumber(eventId) or 0
+    -- 尝试从 D* 事件表获取动态事件 ID（instruct_3 修改后的值）
+    if staticEventId > 0 then
+        local GetD = g(_G, "GetD")
+        if GetD then
+            local sid = tonumber(sceneId)
+            -- 使用事件编号作为索引（instruct_3 的写入位置）
+            local dynamicId = GetD(sid, staticEventId, 5)
+            if not dynamicId or dynamicId <= 0 then
+                dynamicId = GetD(sid, staticEventId, 4)
+            end
+            if not dynamicId or dynamicId <= 0 then
+                dynamicId = GetD(sid, staticEventId, 0)
+            end
+            if dynamicId and dynamicId > 0 then
+                eventId = dynamicId
+            end
+        end
+        -- 直接访问 JY.D 作为备选
+        local JY = g(_G, "JY")
+        if JY then
+            JY.D = JY.D or {}
+            local sid = tonumber(sceneId)
+            local sceneD = JY.D[sid]
+            if sceneD then
+                -- 检查事件编号索引（instruct_3 写入的位置）
+                local evt = sceneD[staticEventId]
+                if evt then
+                    if evt[5] and evt[5] > 0 then
+                        eventId = evt[5]
+                    elseif evt[4] and evt[4] > 0 then
+                        eventId = evt[4]
+                    elseif evt[0] and evt[0] > 0 then
+                        eventId = evt[0]
+                    end
+                end
+                -- 检查 NPC D* 索引（原版游戏循环读取的位置：100+npcIndex）
+                if dIdx and dIdx > 0 then
+                    local dStarId = 100 + dIdx
+                    local evt2 = sceneD[dStarId]
+                    if evt2 then
+                        if evt2[5] and evt2[5] > 0 then
+                            eventId = evt2[5]
+                        elseif evt2[4] and evt2[4] > 0 then
+                            eventId = evt2[4]
+                        elseif evt2[0] and evt2[0] > 0 then
+                            eventId = evt2[0]
+                        end
+                    end
+                end
+            end
+        end
+    end
     if tonumber(eventId) == 0 then
         w(ent.name .. " 似乎不想说话。")
         SmapHandlers.look({})
@@ -494,6 +577,9 @@ function smapNpcTalk(sceneId, ent)
     w("你与 " .. ent.name .. " 交谈。")
     local EventExecutor = g(_G, "EventExecutor")
     if EventExecutor then
+        -- 注意：event_executor.lua:73 会设置 JY.CurrentD = eventnum（事件编号）
+        -- 因此 instruct_3 会写入 JY.D[sceneId][eventNum][field]
+        -- 无需在此设置 JY.CurrentD，由 oldCallEventCoroutine 处理
         -- 在协程中执行事件，确保 instruct_11 等阻塞函数可以 yield 等待用户输入
         local scheduler = g(_G, "CoroutineScheduler")
         if scheduler and scheduler.getInstance then
@@ -502,8 +588,33 @@ function smapNpcTalk(sceneId, ent)
         if scheduler and scheduler.create then
             -- 在协程中执行事件，后处理也放在协程内（确保 yield 恢复后再执行）
             local co = scheduler:create(function()
+                -- 设置 JY.CurrentD 为 NPC 的 D* 索引，覆盖 event_executor.lua:73 的错误设置
+                -- event_executor.lua:73 设置 JY.CurrentD = eventnum (678)，
+                -- 但原版游戏循环从 GetD(sceneId, 100+npcIndex, 0) 读取
+                -- 所以 instruct_3 写入 JY.D[76][678] 后，需要同步到 JY.D[76][100+npcIndex]
+                local JY = g(_G, "JY")
+                if JY then
+                    JY.CurrentD = 100 + (dIdx or 0)
+                end
                 local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
                 if not ok then w("事件执行失败: " .. tostring(err)) end
+                -- 事件执行完成后，将数据从事件编号索引同步到 NPC D* 索引
+                if JY and JY.D then
+                    local sid = tonumber(sceneId)
+                    local sceneD = JY.D[sid]
+                    if sceneD then
+                        local srcEvt = sceneD[staticEventId]
+                        if srcEvt and dIdx and dIdx > 0 then
+                            local dStarId = 100 + dIdx
+                            sceneD[dStarId] = sceneD[dStarId] or {}
+                            for f = 0, 10 do
+                                if srcEvt[f] ~= nil then
+                                    sceneD[dStarId][f] = srcEvt[f]
+                                end
+                            end
+                        end
+                    end
+                end
                 w("交谈结束。")
                 smapEntityList = {}
                 SmapHandlers.look({})
@@ -513,12 +624,163 @@ function smapNpcTalk(sceneId, ent)
             -- 回退：无协程时直接同步执行
             local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
             if not ok then w("事件执行失败: " .. tostring(err)) end
+            w("交谈结束。")
+            smapEntityList = {}
+            SmapHandlers.look({})
         end
-        w("交谈结束。")
-        smapEntityList = {}
-        SmapHandlers.look({})
     else
         w("事件系统不可用。")
+    end
+end
+
+-- NPC 给予（银两或物品）
+function smapNpcGive(sceneId, ent)
+    local JY = g(_G, "JY")
+    if not JY then JY = {}; rawset(_G, "JY", JY) end
+    JY.Base = JY.Base or {}
+
+    -- 先选类型：银两 / 物品
+    local CE = g(_G, "CommandEngine")
+    if CE then
+        CE.showMenu(
+            { {name="银两"}, {name="物品"} },
+            string.format("给 %s 什么？", ent.name),
+            function(typeChoice)
+                if not typeChoice then
+                    SmapHandlers.look({})
+                    return
+                end
+                if typeChoice == 1 then
+                    smapGiveSilver(sceneId, ent)
+                elseif typeChoice == 2 then
+                    smapGiveItem(sceneId, ent)
+                end
+            end
+        )
+    end
+end
+
+-- 给予银两
+function smapGiveSilver(sceneId, ent)
+    local JY = g(_G, "JY")
+    local money = JY and JY.Base and JY.Base["金钱"] or 0
+    if money <= 0 then
+        w("你身无分文。")
+        SmapHandlers.look({})
+        return
+    end
+
+    w(string.format("你身上有 %d 两银子。想给 %s 多少？", money, ent.name))
+    local amounts = {}
+    for _, v in ipairs({10, 50, 100, 200, 500}) do
+        if money >= v then
+            table.insert(amounts, {name = string.format("%d两", v), amount = v})
+        end
+    end
+    table.insert(amounts, {name = "全部", amount = money})
+    table.insert(amounts, {name = "自定义", amount = -1})
+
+    local CE = g(_G, "CommandEngine")
+    if CE then
+        CE.showMenu(amounts, "选择金额", function(choice)
+            if not choice then
+                SmapHandlers.look({})
+                return
+            end
+            local selected = amounts[choice]
+            if not selected then
+                SmapHandlers.look({})
+                return
+            end
+            if selected.amount == -1 then
+                w("输入 give <数量> 给予银两，choose 0 返回")
+                local smapId = 4
+                local cmds = CE.getCommands(smapId) or {}
+                cmds["give"] = {
+                    handler = function(args)
+                        local amt = tonumber(args and args[1])
+                        if not amt or amt <= 0 then
+                            w("请输入有效的数量。")
+                            return
+                        end
+                        local JY2 = g(_G, "JY")
+                        local m2 = JY2 and JY2.Base and JY2.Base["金钱"] or 0
+                        if amt > m2 then
+                            w(string.format("你只有 %d 两银子。", m2))
+                            return
+                        end
+                        local i32 = g(_G, "instruct_32")
+                        if i32 then i32(0, 174, -amt) end
+                        w(string.format("你给了 %s %d 两银子。", ent.name, amt))
+                        cmds["give"] = nil
+                        CE.registerCommands(smapId, cmds)
+                        SmapHandlers.look({})
+                    end,
+                    description = "给予银两: give <数量>"
+                }
+                CE.registerCommands(smapId, cmds)
+                return
+            end
+            local i32 = g(_G, "instruct_32")
+            if i32 then i32(0, 174, -selected.amount) end
+            w(string.format("你给了 %s %d 两银子。", ent.name, selected.amount))
+            SmapHandlers.look({})
+        end)
+    end
+end
+
+-- 给予物品（从背包选择）
+function smapGiveItem(sceneId, ent)
+    local JY = g(_G, "JY")
+    if not JY or not JY.Base then
+        w("背包是空的。")
+        SmapHandlers.look({})
+        return
+    end
+
+    -- 列出背包中非零物品
+    local bagItems = {}
+    local bagIdx = {}
+    for i = 1, 30 do
+        local itemId = JY.Base["物品" .. i]
+        if itemId and itemId ~= 0 then
+            local qty = JY.Base["物品数量" .. i] or 1
+            local name = "物品" .. itemId
+            local thing = JY.Thing and JY.Thing[itemId]
+            if thing and thing["名称"] then name = thing["名称"] end
+            table.insert(bagItems, { slot = i, id = itemId, qty = qty, name = name })
+        end
+    end
+
+    if #bagItems == 0 then
+        w("背包是空的。")
+        SmapHandlers.look({})
+        return
+    end
+
+    local CE = g(_G, "CommandEngine")
+    if CE then
+        -- 用 menu 列表展示物品，供用户选择
+        local menuItems = {}
+        for _, bi in ipairs(bagItems) do
+            table.insert(menuItems, { name = string.format("%s x%d", bi.name, bi.qty), slot = bi.slot, id = bi.id, qty = bi.qty })
+        end
+        CE.showMenu(menuItems, "选择要给予的物品", function(choice)
+            if not choice then
+                SmapHandlers.look({})
+                return
+            end
+            local selected = menuItems[choice]
+            if not selected then
+                SmapHandlers.look({})
+                return
+            end
+            -- 扣除物品
+            local i32 = g(_G, "instruct_32")
+            if i32 then i32(0, selected.id, -1) end
+            w(string.format("你给了 %s %s。", ent.name, selected.name))
+            SmapHandlers.look({})
+        end)
     end
 end
 
@@ -1358,10 +1620,10 @@ function RoleMenu_handleChoose(n)
                 end
                 w("0. 返回")
             end
-        elseif n == 3 then showRoleStatus()
-        elseif n == 4 then showBag()
-        elseif n == 5 then showTeam()
-        elseif n == 6 then showSaveMenu()
+        elseif n == 3 then showRoleStatus(); roleMenuPhase = "status"; return true
+        elseif n == 4 then showBag(); roleMenuPhase = "bag"; return true
+        elseif n == 5 then showTeam(); roleMenuPhase = "team"; return true
+        elseif n == 6 then showSaveMenu(); roleMenuPhase = "save"; return true
         elseif n == 0 then roleMenuPhase = nil; return true end
         -- 未识别的选择：退出菜单，让输入流向场景交互处理器
         roleMenuPhase = nil
