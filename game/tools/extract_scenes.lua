@@ -87,11 +87,11 @@ end
 
 local function inferType(name)
     if name == "" then return "outdoor" end
-    if name:find("[客栈店楼]") then return "inn" end
-    if name:find("[洞穴墓]") then return "cave" end
-    if name:find("[寺庙庵]") then return "temple" end
-    if name:find("[铺坊市]") then return "shop" end
-    if name:find("[居宅庄]") then return "house" end
+    if name:find("客栈") or name:find("店") or name:find("楼") then return "inn" end
+    if name:find("洞") or name:find("穴") or name:find("墓") then return "cave" end
+    if name:find("寺") or name:find("庙") or name:find("庵") then return "temple" end
+    if name:find("铺") or name:find("坊") or name:find("市") then return "shop" end
+    if name:find("居") or name:find("宅") or name:find("庄") then return "house" end
     return "outdoor"
 end
 
@@ -271,16 +271,29 @@ function extract.run(dataDir, outputFile)
                                 if content:find("instruct_51") then
                                     npcName = "软体娃娃"
                                 else
-                                    -- 尝试从 instruct_1 的注释中提取 NPC 名: [南贤], [店小二]
-                                    -- 格式: instruct_1(talkId,headId,pos) -- N(N):[名称]说:
-                                    for commentName in content:gmatch("%[([^%]]+)%]说:") do
-                                        if commentName ~= "WWW" and commentName ~= "???" then
-                                            npcName = commentName
-                                            break
+                                    -- 判断是否为复杂 NPC 事件（对话、招人、战斗、事件修改等）
+                                    -- 简单事件（单人对话、给物品等）不应提取说话者名作为 NPC 名
+                                    local hasComplexNPC = content:find("instruct_9") or       -- 招人
+                                                          content:find("instruct_3") or       -- 事件修改
+                                                          content:find("instruct_6") or       -- 战斗
+                                                          content:find("instruct_14") or      -- 场景变黑
+                                                          content:find("instruct_13") or      -- 重新显示场景
+                                                          content:find("instruct_10") or      -- 加入队伍
+                                                          false
+                                    -- 统计 instruct_1 调用次数（多次对话=复杂事件）
+                                    local _, i1count = content:gsub("instruct_1%b()", "")
+                                    if hasComplexNPC or i1count >= 3 then
+                                        -- 复杂 NPC 事件：从 instruct_1 注释中提取说话者名
+                                        for commentName in content:gmatch("%[([^%]]+)%]说:") do
+                                            if commentName ~= "WWW" and commentName ~= "???" then
+                                                npcName = commentName
+                                                break
+                                            end
                                         end
                                     end
-                                    -- 如果注释中没有找到名字（[???]），尝试用 headId 映射
-                                    if not npcName then
+                                    -- 简单事件（1-2句对话、给物品等）不应提取说话者名作为 NPC 名
+                                    -- 只有复杂 NPC 事件才使用 headId 映射
+                                    if not npcName and (hasComplexNPC or i1count >= 3) then
                                         local headId = nil
                                         -- 提取第一个 instruct_1 调用的 headId
                                         for h in content:gmatch("instruct_1%b()") do

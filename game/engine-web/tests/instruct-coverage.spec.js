@@ -592,6 +592,65 @@ test.describe('instruct_* 函数覆盖测试', () => {
     expect(r.ok).toBe(true);
   });
 
+  // ===== 补充覆盖有逻辑但缺单元测试的 instruct =====
+
+  test('instruct_1 对话文本查找', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local dc = rawget(_G, "initDataSource") or {}',
+      'rawset(_G, "initDataSource", dc)',
+      'dc["dialogues"] = dc["dialogues"] or {}',
+      'dc["dialogues"]["dialogues"] = { {id=9999, text="测试对话AB"} }',
+      'rawget(_G,"instruct_1")(9999, 0)',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_9 是否要求加入（非协程返回 false）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local fn = rawget(_G, "instruct_9")',
+      'if not fn then return "no-func" end',
+      'local result = fn()',
+      'return tostring(result)',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('false');
+  });
+
+  test('instruct_51 随机提示（验证调用不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local stat, err = pcall(rawget(_G,"instruct_51"))',
+      'if not stat then return "error:" .. tostring(err) end',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('ok');
+  });
+
+  test('instruct_52 品德显示（输出品德指数）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["品德"] = 80 }',
+      'rawget(_G,"instruct_52")()',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_53 声望显示（输出声望指数）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["声望"] = 200 }',
+      'rawget(_G,"instruct_53")()',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+  });
+
   // ===== 全部 68 个 instruct 存在性验证 =====
   test('全部 instruct_0 ~ instruct_67 函数存在', async ({ page }) => {
     const r = await luaEval(page, [
