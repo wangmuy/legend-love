@@ -49,6 +49,8 @@ function WmapHandlers.initWar(enemies, distance)
                     maxHp = p["生命最大值"] or 50,
                     mp = p["内力"] or 30,
                     maxMp = p["内力最大值"] or 30,
+                    attack = p["攻击力"] or 25,
+                    defense = p["防御力"] or 10,
                     x = 0,
                 })
             end
@@ -65,6 +67,8 @@ function WmapHandlers.initWar(enemies, distance)
             maxHp = (p0 and p0["生命最大值"]) or 50,
             mp = (p0 and p0["内力"]) or 30,
             maxMp = (p0 and p0["内力最大值"]) or 30,
+            attack = (p0 and p0["攻击力"]) or 25,
+            defense = (p0 and p0["防御力"]) or 10,
             x = 0,
         })
     end
@@ -75,10 +79,11 @@ end
 
 -- 计算伤害
 local function calcDamage(attacker, defender, power, isMartial)
-    local baseDmg = power or 30
+    local atk = (attacker and attacker.attack) or 25
+    local baseDmg = math.floor(atk * (power or 30) / 100)
     local def = 0
-    if defender.defense then def = defender.defense end
-    local dmg = math.max(1, baseDmg - def / 2 + math.random(0, 10))
+    if defender and defender.defense then def = defender.defense end
+    local dmg = math.max(1, baseDmg - math.floor(def / 4) + math.random(0, 10))
     return math.floor(dmg)
 end
 
@@ -357,14 +362,14 @@ function WmapHandlers.doAttack(enemyIdx, isEnemy)
     local en = war.enemies[enemyIdx]
     if not tm or not en then return end
     
-    local dist = math.abs(tm.x - en.x)
+    local dist = war.distance or 5
     if dist > 1 then
         w("距离太远，无法攻击！")
         WmapHandlers.afterAction()
         return
     end
     
-    local dmg = calcDamage(tm, en, 25, false)
+    local dmg = calcDamage(tm, en, 150, false)
     en.hp = (en.hp or 0) - dmg
     w(string.format("%s攻击%s！伤害 %d！", tm.name or "?", en.name or "?", dmg))
     
@@ -382,7 +387,7 @@ function WmapHandlers.doMartial(enemyIdx, isEnemy)
     local en = war.enemies[enemyIdx]
     if not tm or not en then return end
     
-    local power = 50 + math.random(0, 20)
+    local power = 150 + math.random(0, 30)
     local dmg = math.floor(power - (en.defense or 0) / 3 + math.random(0, 10))
     dmg = math.max(1, dmg)
     en.hp = (en.hp or 0) - dmg

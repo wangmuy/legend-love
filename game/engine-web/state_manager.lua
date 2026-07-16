@@ -162,6 +162,14 @@ function saveGameState(slotId)
         data.scenes = ref.Scene
         data.wugongs = ref.Wugong
         data.shops = ref.Shop
+        data.status = ref.Status or 2  -- 默认 MMAP
+        data.subScene = ref.SubScene or 0
+        data.mmapMusic = ref.MmapMusic or -1
+        data.currentD = ref.CurrentD or -1
+    else
+        -- JY 不存在时也保存默认值
+        data.status = 2
+        data.subScene = 0
     end
 
     local json = encodeSimpleJSON(data)
@@ -194,11 +202,26 @@ function loadGameState(slotId)
         scenes = "Scene",
         wugongs = "Wugong",
         shops = "Shop",
+        status = "Status",
+        subScene = "SubScene",
+        mmapMusic = "MmapMusic",
+        currentD = "CurrentD",
     }
     for jsonKey, jyKey in pairs(restoreMap) do
         local src = data[jsonKey]
         if src then
             _G.JY[jyKey] = restoreNumericKeys(src)
+        end
+    end
+    -- 确保关键字段有默认值（旧存档可能缺失）
+    if _G.JY.Status == nil then _G.JY.Status = 2 end
+    if _G.JY.SubScene == nil then _G.JY.SubScene = 0 end
+    -- 同步状态机，确保状态机切换到当前 JY.Status
+    local ok, sm = pcall(function() return require("framework.state_machine") end)
+    if ok and sm and sm.getInstance then
+        local instance = sm.getInstance()
+        if instance and instance.switchTo then
+            pcall(instance.switchTo, instance, _G.JY.Status)
         end
     end
     return true

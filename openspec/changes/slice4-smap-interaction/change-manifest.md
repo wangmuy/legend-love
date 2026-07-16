@@ -50,6 +50,24 @@ slice4-smap-interaction (场景交互总览: 菜单驱动交互)
 | Depends on | smap-menu-interaction, smap-npc-dialog |
 | Status | [ ] Pending |
 
+### 4. fix-npc-dialog-recruitment (新增)
+
+| 字段 | 值 |
+|------|-----|
+| Scope | 修复 NPC 对话/招人系统（`instruct_9` 对话框协程） |
+| Responsibility | 修复 `AsyncDialog.handleInput` 与 `processEventQueue` 的事件竞争、修复 `instruct_9` 对话框返回值 |
+| Depends on | smap-npc-dialog |
+| Status | [x] Done |
+
+### 5. fix-npc-dynamic-event (新增)
+
+| 字段 | 值 |
+|------|-----|
+| Scope | NPC 事件动态解析（`GetD`/`SetD` + `smapNpcTalk` 动态事件 ID 查找） |
+| Responsibility | 实现 `SetD`/`GetD` 函数存储/读取 D* 事件数据；`smapNpcTalk` 优先从 D* 事件表查找动态事件 ID |
+| Depends on | smap-npc-dialog |
+| Status | [ ] Active |
+
 ## Shared Contracts
 
 | 约定 | 规则 |
