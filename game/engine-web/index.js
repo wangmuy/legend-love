@@ -129,6 +129,7 @@
     /* ── 4. Worker 启动与通信 ── */
     async function startWorker() {
         worker = new Worker('worker.js');
+        window.__worker = worker;  // 暴露给测试框架
 
         worker.onmessage = function(e) {
             const msg = e.data;
@@ -285,6 +286,8 @@
         const eventsJson = await fetchText('data-web/events.json');
 
         // 发送批量初始化消息
+        // 先发送存档缓存，让 Worker 的 luaSaveCache 在 init 之前就绪
+        worker.postMessage({ type: 'init_save_cache', cache: saveCache });
         worker.postMessage({
             type: 'init_all',
             engine: engine,

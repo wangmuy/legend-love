@@ -419,8 +419,43 @@ _G.lib = setmetatable({}, {
         if key == "PicLoadFile" then return function() end end
         if key == "GetS" then return function() return -1 end end
         if key == "SetS" then return function() end end
-        if key == "GetD" then return function() return 0 end end
-        if key == "SetD" then return function() end end
+        -- lib.SetD / lib.GetD: 操作 JY.D{sceneId} Lua 运行时表（供 jymain.lua 调用）
+        if key == "SetD" then
+            return function(sceneId, eventId, field, value)
+                local JY = rawget(_G, "JY")
+                if not JY then
+                    JY = {}
+                    rawset(_G, "JY", JY)
+                end
+                sceneId = tonumber(sceneId) or sceneId
+                eventId = tonumber(eventId) or 0
+                field = tonumber(field) or 0
+                JY.D = JY.D or {}
+                JY.D[sceneId] = JY.D[sceneId] or {}
+                JY.D[sceneId][eventId] = JY.D[sceneId][eventId] or {}
+                JY.D[sceneId][eventId][field] = value
+            end
+        end
+        if key == "GetD" then
+            return function(sceneId, eventId, field)
+                local JY = rawget(_G, "JY")
+                if not JY or not JY.D then return 0 end
+                sceneId = tonumber(sceneId) or sceneId
+                eventId = tonumber(eventId) or 0
+                field = tonumber(field) or 0
+                local sceneD = JY.D[sceneId]
+                if not sceneD then return 0 end
+                local evt = sceneD[eventId]
+                if not evt then return 0 end
+                -- 当查询字段 0（事件ID）时，检查字段 4/5 是否被 instruct_3 修改
+                -- instruct_3 修改字段 4/5 作为后续事件 ID，字段 0 保持不变
+                if field == 0 then
+                    if evt[5] and evt[5] > 0 then return evt[5] end
+                    if evt[4] and evt[4] > 0 then return evt[4] end
+                end
+                return evt[field] or 0
+            end
+        end
         for _, mod in pairs(EngineAPI) do
             if type(mod) == "table" and mod[key] then
                 return mod[key]

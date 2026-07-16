@@ -258,6 +258,16 @@ self.onmessage = function(e) {
       self.postMessage({ type: 'log', text: '  ' + msg.name + ': OK' });
     }
 
+    if (msg.type === 'init_save_cache') {
+      // 从 IndexedDB 恢复存档缓存，确保 reload 后 JSBridge.load 可同步读取
+      const cache = msg.cache;
+      if (cache) {
+        for (const key of Object.keys(cache)) {
+          luaSaveCache[key] = cache[key];
+        }
+      }
+    }
+
     if (msg.type === 'init_all') {
       // 批量初始化：一次性接收所有数据
       self.postMessage({ type: 'log', text: 'Loading ' + msg.engine.length + ' engine modules...' });
@@ -320,6 +330,11 @@ self.onmessage = function(e) {
       }
       // 第一帧同步渲染菜单，然后通知主线程就绪
       startGameLoop();
+    }
+
+    if (msg.type === 'test_inject_save') {
+      // 测试框架注入存档数据（绕过 Lua 字符串转义）
+      luaSaveCache[msg.key] = msg.value;
     }
 
     if (msg.type === 'input') {
