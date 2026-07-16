@@ -25,3 +25,4 @@ game/engine-web/test-results/
 game/engine-web/node_modules/
 game/engine-web/dist/
 game/engine-web/lib/
+game/engine-web/tests/bridge-*.json
