@@ -267,7 +267,78 @@ cd game && lua tests/test_runner.lua              # 运行所有测试
 cd game && lua tests/test_runner.lua input_manager # 运行指定模块
 ```
 
-## Spec 驱动开发
+## Spec-Driven Development (MVP Multi-Scale)
+
+本项目使用 **OpenSpec** 的 **MVP Multi-Scale Spec-Driven Development (SDD)** 系统。
+当前 schema: `spec-driven-enhanced`（Blueprint 级）。
 
 - 使用 OpenSpec，所有文档均使用中文
 - 设置环境变量: `export OPENSPEC_TELEMETRY=0`
+
+### 关键命令
+
+| 命令 | 用途 |
+|------|------|
+| `/mvp:evaluate-scale` | 评估项目规模 + 引导初始化 |
+| `/mvp:init-profile` | 创建 project-profile（治理规则、架构画布） |
+| `/mvp:create-epic` | 创建 epic，包含垂直切片分解 |
+| `/mvp:create-slice` | 创建 vertical-slice，自动搭建子 change 脚手架 |
+| `/mvp:apply-slice` | 从 slice manifest 实现所有子 change |
+| `/mvp:ingest` | 将外部文档摄入为 BDD shadow specs |
+| `/mvp:reverse` | 从无文档代码逆向工程 spec |
+| `/mvp:upgrade` | 升级项目规模（含验证门） |
+| `/mvp:audit` | 扫描结构漂移（孤立条目、层级缺失） |
+| `/mvp:organize` | 修复结构：合并条目或创建新容器 |
+| `/opsx:explore` | 探索想法并固化为 proposal |
+| `/opsx:propose` | 创建含完整产物的 change proposal |
+| `/opsx:apply` | 实现 change 中的任务 |
+| `/opsx:archive` | 归档已完成的 change |
+
+### 产出物规范
+
+| 产物 | 规范要求 |
+|------|----------|
+| **proposal** | 含 In Scope / Out of Scope、父上下文链接、[REQ-XXX] 跟踪 ID |
+| **design** | 关键决策记作 ADR（Context/Decision/Alternatives/Consequences），含 Negative Constraints、Review Checklist |
+| **specs** | 每个需求必有唯一 [REQ-XXX] ID，每个场景用 Given/When/Then 格式 |
+| **tasks** | 每组任务包含 Blast Radius（允许的文件路径）和机器可验证的 DoD（Definition of Done） |
+
+### 产物生命周期
+
+Artifact 使用 YAML front matter 标记状态（status/created/abandoned）：
+
+| 状态 | 含义 |
+|------|------|
+| `active` | 当前进行中 |
+| `dormant` | 超过 60 天无活动 |
+| `done` | 已完成（移至 archive/） |
+| `abandoned` | 正式关闭，未完成（移至 abandoned/） |
+
+### 目录结构
+
+```
+openspec/
+├── config.yaml              # 项目配置 + schema 定义
+├── WORKFLOW.md              # 完整工作流参考（zoom model、引导、操作手册）
+├── project/
+│   ├── profile.md            # 项目档案（治理规则、架构画布）
+│   └── TODO.md               # 涌现想法跟踪
+├── epics/
+│   ├── <active-epic>/        # 活跃 | dormant
+│   ├── archive/              # 已完成
+│   └── abandoned/            # 放弃 | 废弃
+├── changes/
+│   ├── <active-change>/      # 活跃变更
+│   ├── archive/              # 已完成
+│   └── abandoned/            # 放弃 | 撤回
+└── schemas/                  # schema 模板
+```
+
+### 参考文档
+
+- `openspec/config.yaml` — 项目配置、schema 选择指南、启动检查清单
+- `openspec/WORKFLOW.md` — 完整工作流定义（Front Matter、生命周期、Exploration、Triage）
+- `openspec/changes/` — 活动变更和已归档变更
+- `openspec/epics/` — 活动 epic
+
+> **注意**：`openspec/config.yaml` 中的 `context` 字段包含完整的启动检查（项目引导、过时检查、TODO triage），AI 智能体应在每次会话开始时参考。

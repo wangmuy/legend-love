@@ -6,8 +6,8 @@
   "scripts": {
     "prebuild": "rm -rf dist",
     "build": "node scripts/build.js",
-    "dev": "npx serve . -p 8088 --no-clipboard",
-    "start": "npx serve dist -p 8088 --no-clipboard",
+    "dev": "node scripts/start.js",
+    "start": "node scripts/start.js",
     "deploy": "npx gh-pages -d dist",
     "test": "npx playwright test",
     "test:ui": "npx playwright test --ui"
