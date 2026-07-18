@@ -1,4 +1,4 @@
---function oldevent_1001()
+function oldevent_1001()
 
     if instruct_4(144,1,0) ==false then    --  4(4):是否使用物品[飞狐外传]？是则跳转到:Label0
         do return; end
@@ -20,5 +20,5 @@
     instruct_17(-2,1,18,26,0);   --  17(11):修改场景贴图:当前场景层1坐标12-1A
     instruct_0();   --  0(0)::空语句(清屏)
     instruct_13();   --  13(D):重新显示场景
---end
+end
 

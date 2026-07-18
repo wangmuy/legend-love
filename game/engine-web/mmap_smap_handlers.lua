@@ -395,24 +395,50 @@ function SmapHandlers.look(args)
     
     if entityIndex == 0 then
         w("这里什么都没有。")
-        return
     end
-    
-    -- 格子事件列表（events.json 中 eventExtra>0 的过路触发事件）
+
+    -- 格子事件列表（events.json 中 eventExtra>0 的过路触发事件，以及圣堂等场景的 eventTouch 事件）
     local cache = g(_G, "initDataSource")
     local rawEvents = cache and cache["events"]
     if rawEvents and rawEvents["events"] then
         local sceneNum = tonumber(sceneId) or 0
         for _, evt in ipairs(rawEvents["events"]) do
-            if evt.sceneId == sceneNum and evt.eventExtra and evt.eventExtra > 0 then
-                local eventId = evt.eventExtra
-                local consumed = _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][tostring(eventId)]
-                if not consumed then
-                    entityIndex = entityIndex + 1
-                    smapEntityList[entityIndex] = { type = "event_trigger", eventId = evt.eventExtra, name = "tile_event", npcData = {["事件编号"]=evt.eventExtra} }
-                    w(string.format("%d. 搜索", entityIndex))
+            if evt.sceneId == sceneNum then
+                local eventId = nil
+                local eventType = nil
+                if evt.eventExtra and evt.eventExtra > 0 then
+                    eventId = evt.eventExtra
+                    eventType = "event_extra"
+                elseif evt.eventTouch and evt.eventTouch > 0 then
+                    eventId = evt.eventTouch
+                    eventType = "event_touch"
+                end
+                if eventId then
+                    local consumed = _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][tostring(eventId)]
+                    if not consumed then
+                        -- 圣堂事件：检查 D* 表是否已放置天书（tileCurrent == 4664）
+                        if eventId >= 1001 and eventId <= 1014 then
+                            local JY2 = g(_G, "JY")
+                            local tileIdx = eventId - 990
+                            local GetD = g(_G, "GetD")
+                            if GetD and JY2 then
+                                local tileCurrent = GetD(tonumber(sceneId), tileIdx, 5)
+                                if tileCurrent == 4664 then
+                                    goto continue
+                                end
+                            end
+                        end
+                        entityIndex = entityIndex + 1
+                        smapEntityList[entityIndex] = { type = "event_trigger", eventId = eventId, eventType = eventType, name = "tile_event", npcData = {["事件编号"]=eventId} }
+                        if eventId >= 1001 and eventId <= 1014 then
+                            w(string.format("%d. 放置天书", entityIndex))
+                        else
+                            w(string.format("%d. 搜索", entityIndex))
+                        end
+                    end
                 end
             end
+            ::continue::
         end
     end
     
@@ -489,18 +515,35 @@ function SmapHandlers.chooseInteraction(idx)
             end
         end
     elseif ent.type == "event_trigger" then
-        -- 交互对象（宝箱/柜子等）：直接执行事件脚本
+        -- 交互对象（宝箱/柜子/书架等）：直接执行事件脚本
         local eventId = ent.eventId or (ent.npcData and (ent.npcData["事件编号"] or ent.npcData["触发事件"]) or 0)
         if tonumber(eventId) ~= 0 then
-            -- 标记为已触发（eventConsumed 已预注册，直接访问安全）
-            _G.eventConsumed[sceneId] = _G.eventConsumed[sceneId] or {}
-            _G.eventConsumed[sceneId][tostring(eventId)] = true
+            -- 圣堂放置天书事件：不预标记 consumed，由 oldevent 脚本内的 instruct_3 处理 D* 表
+            local isShenTangBook = (eventId >= 1001 and eventId <= 1014)
+            if not isShenTangBook then
+                _G.eventConsumed[sceneId] = _G.eventConsumed[sceneId] or {}
+                _G.eventConsumed[sceneId][tostring(eventId)] = true
+            end
             local EventExecutor = g(_G, "EventExecutor")
             if EventExecutor then
-                w("你打开了...")
-                local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
+                if isShenTangBook then
+                    w("放置天书...")
+                    -- 圣堂书架：oldevent 编号 1001-1014 对应 D* 索引 11-24
+                    -- 设置 JY.CurrentD 为 D* 索引（tileIndex），供 instruct_3(id=-2) 正确写入
+                    local JY = g(_G, "JY")
+                    if JY then JY.CurrentD = (eventId - 990) end  -- 1001→11, 1002→12, ...
+                else
+                    w("你打开了...")
+                end
+                local oldCallEventCoroutine = EventExecutor.oldCallEventCoroutine
+                local ok, err = pcall(oldCallEventCoroutine, EventExecutor, tonumber(eventId))
                 if not ok then
                     w("事件执行失败: " .. tostring(err))
+                end
+                -- 圣堂事件执行后，恢复 JY.CurrentD（由事件处理器自己管理）
+                local JY2 = g(_G, "JY")
+                if JY2 and isShenTangBook then
+                    JY2.CurrentD = -1
                 end
             end
         else
