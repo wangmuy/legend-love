@@ -259,13 +259,21 @@ end)
 
 rawset(_G, "instruct_32", function(giveFlag, thingId, num, ...)
     -- 给/取物品: 操作 JY.Base["物品N"]
-    -- oldevent 调用方式: instruct_32(174, -20) 扣除银两
-    -- 或: instruct_32(0, personid, thingId, num) 给某人物品
+    -- oldevent 调用方式: instruct_32(174, -20) 扣除银两（2个参数）
+    -- 或: instruct_32(0, personid, thingId, num) 给某人物品（4个参数）
     local JY = rawget(_G, "JY")
     if not JY then return end
     JY.Base = JY.Base or {}
-    local id = tonumber(thingId) or 0
-    local count = tonumber(num) or 0
+    local id, count
+    if num == nil then
+        -- 2-arg convention: instruct_32(thingId, count)
+        id = tonumber(giveFlag) or 0
+        count = tonumber(thingId) or 0
+    else
+        -- 4-arg convention: instruct_32(giveFlag, personid, thingId, num)
+        id = tonumber(thingId) or 0
+        count = tonumber(num) or 0
+    end
     -- 银两（物品174）
     if id == 174 then
         JY.Base["金钱"] = (JY.Base["金钱"] or 0) + count
@@ -387,10 +395,23 @@ rawset(_G, "instruct_4", function(thingid, num, direction)
             end
         end
     end
-    -- 显示确认对话框
-    local AsyncMessageBox = require("framework.async_message_box")
-    local result = AsyncMessageBox.ShowYesNoCoroutine(-1, -1, "是否使用物品[" .. itemName .. "]？", C_ORANGE, CC.DefaultFont)
-    return result == 1
+    -- 使用简单标志等待用户响应（避免 MenuAsync 菜单系统在连续交互时的兼容性问题）
+    local w = rawget(_G, "WebUI")
+    if w then w.write("是否使用物品[" .. itemName .. "]？(choose 1=是, choose 2=否)") end
+    rawset(_G, "__instruct4_result", nil)
+    rawset(_G, "__instruct4_waiting", true)
+    local scheduler = rawget(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.yield then
+        while rawget(_G, "__instruct4_waiting") do
+            scheduler:yield("instruct4")
+        end
+    end
+    local result = rawget(_G, "__instruct4_result")
+    rawset(_G, "__instruct4_result", nil)
+    return result
 end)
 
 -- instruct_58: 武道大会比武（简化版：自动胜利，得神杖）
@@ -461,8 +482,31 @@ rawset(_G, "instruct_6", function(warid, tmp, tmp2, flag)
         table.insert(enemies, {name="敌人", hp=30, maxHp=30, mp=0, maxMp=0, x=1, attack=15, defense=5})
     end
     WH.initWar(enemies, 5)
-    -- 等待战斗结果（由玩家操作完成）
-    return true
+    JY.Status = 5  -- GAME_WMAP
+    -- 初始化战斗等待标志
+    rawset(_G, "__warFromInstruct6", true)
+    rawset(_G, "__warComplete", false)
+    rawset(_G, "__warResult", nil)
+    -- 显示战场态势
+    local w = rawget(_G, "WebUI")
+    if w then w.write("战斗开始！输入 look 查看战场态势，choose 选择行动。") end
+    if WH.look then WH.look({}) end
+    -- 挂起协程，等待战斗结果（由 WmapHandlers 在 afterAction/enemyTurn 中恢复）
+    local scheduler = rawget(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.yield then
+        while not rawget(_G, "__warComplete") do
+            scheduler:yield("war")
+        end
+    end
+    -- 清理标志
+    rawset(_G, "__warFromInstruct6", nil)
+    local result = rawget(_G, "__warResult")
+    rawset(_G, "__warComplete", nil)
+    rawset(_G, "__warResult", nil)
+    return result
 end)
 
 rawset(_G, "instruct_14", function()
@@ -1071,23 +1115,40 @@ function _G.initWebFramework()
         end
     end
     
-    -- 修补 saveGameState/loadGameState：将数据也存储到 Lua 全局变量 __saveCache
-    -- 解决 JSBridge.load 在 __index=error 后不可用的问题
+    -- 修补 saveGameState/loadGameState：将数据直接存储到 Lua 全局变量 __saveCache
+    -- 完全绕过 JSBridge 的 save/load 方法，避免 JSON 过大导致的解析问题
     if not rawget(_G, "__savePatched") then
         rawset(_G, "__saveCache", {})
         local origSave = rawget(_G, "saveGameState")
         if origSave then
             rawset(_G, "saveGameState", function(slotId)
-                local result = origSave(slotId)
-                if result then
-                    local prefix = "save_"
-                    local json = nil
-                    pcall(function() json = _G.JSBridge.load(prefix .. tostring(slotId)) end)
-                    if json then
-                        rawget(_G, "__saveCache")[prefix .. tostring(slotId)] = json
+                local prefix = "save_"
+                local key = prefix .. tostring(slotId)
+                -- 直接构建 JSON 并存储到 __saveCache（绕过 JSBridge round-trip）
+                local JY = rawget(_G, "JY")
+                if JY then
+                    local data = {
+                        version = "1",
+                        timestamp = os.time() or 0,
+                        base = JY.Base,
+                        persons = JY.Person,
+                        things = JY.Thing,
+                        scenes = JY.Scene,
+                        wugongs = JY.Wugong,
+                        shops = JY.Shop,
+                        status = JY.Status or 2,
+                        subScene = JY.SubScene or 0,
+                        mmapMusic = JY.MmapMusic or -1,
+                        currentD = JY.CurrentD or -1,
+                        dTable = JY.D,  -- 保存 D* 事件表，保留 instruct_3 的修改
+                    }
+                    local encode = rawget(_G, "encodeSimpleJSON")
+                    if encode then
+                        rawget(_G, "__saveCache")[key] = encode(data)
                     end
                 end
-                return result
+                -- 仍然调用原始 saveGameState 以保持 JSBridge 兼容
+                return origSave(slotId)
             end)
         end
         local origLoad = rawget(_G, "loadGameState")
@@ -1098,8 +1159,54 @@ function _G.initWebFramework()
                 local cache = rawget(_G, "__saveCache")
                 local json = cache and cache[key]
                 if json then
-                    pcall(function() _G.JSBridge.save(key, json) end)
+                    -- 使用 parseJSON（data_loader.lua 定义的 Lua 解析器）替代 _G.JSON.decode
+                    -- （__index=error 元方法会阻止 _G.JSON 访问）
+                    local ok, data = pcall(parseJSON, json)
+                    if ok and data then
+                        -- 直接设置 JY 属性，完全绕过 JSBridge
+                        if not rawget(_G, "JY") then rawset(_G, "JY", {}) end
+                        local JY = rawget(_G, "JY")
+                        local restoreNumericKeys = rawget(_G, "restoreNumericKeys")
+                        local restoreMap = {
+                            base = "Base",
+                            persons = "Person",
+                            things = "Thing",
+                            scenes = "Scene",
+                            wugongs = "Wugong",
+                            shops = "Shop",
+                            status = "Status",
+                            subScene = "SubScene",
+                            mmapMusic = "MmapMusic",
+                            currentD = "CurrentD",
+                            dTable = "D",
+                        }
+                        for jsonKey, jyKey in pairs(restoreMap) do
+                            local src = data[jsonKey]
+                            if src then
+                                if restoreNumericKeys then
+                                    JY[jyKey] = restoreNumericKeys(src)
+                                else
+                                    JY[jyKey] = src
+                                end
+                            end
+                        end
+                        if JY.Status == nil then JY.Status = 2 end
+                        if JY.SubScene == nil then JY.SubScene = 0 end
+                        -- 同步状态机
+                        local sm = rawget(_G, "StateMachine")
+                        if sm then
+                            local inst = sm.getInstance()
+                            if inst and inst.switchTo then
+                                pcall(inst.switchTo, inst, JY.Status)
+                            end
+                        end
+                        return true
+                    else
+                        EngineAPI.debug.log("loadGameState: parseJSON failed: " .. tostring(data))
+                        EngineAPI.debug.log("loadGameState: json length=" .. tostring(#json) .. " first 200=" .. json:sub(1, 200))
+                    end
                 end
+                -- 回退到原始 loadGameState
                 return origLoad(slotId)
             end)
         end
@@ -1539,19 +1646,27 @@ function processEventQueue(timestamp)
                     local cmd, arg = text:match("^(%S+)%s*(.-)$")
                     cmd = cmd and cmd:lower() or ""
 
-                    if cmd == "choose" and hasMenu then
+                    if cmd == "choose" then
                         local n = tonumber(arg)
-                        if n then
+                        -- 优先处理 instruct_4 的用户响应
+                        if rawget(_G, "__instruct4_waiting") and n ~= nil then
+                            rawset(_G, "__instruct4_waiting", false)
+                            rawset(_G, "__instruct4_result", n == 1)
+                        elseif hasMenu and n then
                             MenuAsync.closeMenu(n)
                             lastDrawState = nil
-                        end
-                    elseif cmd == "choose" and not hasMenu then
+                        elseif not hasMenu and n ~= nil then
                         local JY = rawget(_G, "JY")
                         local n = tonumber(arg)
-                        if JY and (JY.Status == 2 or JY.Status == 4) and n ~= nil then
+                        if JY and (JY.Status == 2 or JY.Status == 4 or JY.Status == 5) and n ~= nil then
                             local handled = RoleMenu_handleChoose(n)
                             if handled then
                                 -- 角色管理已处理
+                            elseif JY.Status == 5 then
+                                local wh = rawget(_G, "WmapHandlers")
+                                if wh and wh.chooseInteraction then
+                                    wh.chooseInteraction(n)
+                                end
                             elseif JY.Status == 4 then
                                 local sh = rawget(_G, "SmapHandlers")
                                 if sh and sh.chooseInteraction then
@@ -1563,6 +1678,7 @@ function processEventQueue(timestamp)
                                     mh.chooseInteraction(n)
                                 end
                             end
+                        end
                         end
                     elseif cmd == "leave" then
                         local JY = rawget(_G, "JY")

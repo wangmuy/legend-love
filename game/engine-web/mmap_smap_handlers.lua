@@ -421,6 +421,8 @@ end
 
 -- SMAP choose 处理（由 CommandEngine 调度或 processEventQueue 调用）
 function SmapHandlers.chooseInteraction(idx)
+    local wUI = g(_G, "WebUI")
+    if wUI then wUI.write("[DEBUG chooseInteraction] idx=" .. tostring(idx) .. " entityCount=" .. tostring(#smapEntityList)) end
     if idx < 1 or idx > #smapEntityList then
         w("无效的选择。")
         return
@@ -436,33 +438,15 @@ function SmapHandlers.chooseInteraction(idx)
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     local sceneId = tostring(JY.SubScene or 0)
     
+    local wUI2 = g(_G, "WebUI")
+    if wUI2 then wUI2.write("[DEBUG chooseInteraction] ent.type=" .. tostring(ent.type) .. " ent.name=" .. tostring(ent.name) .. " sceneId=" .. tostring(sceneId)) end
+    
     if ent.type == "npc" then
-        -- NPC 子菜单（与原版一致：对话，查看，给予银两）
-        local CE = g(_G, "CommandEngine")
-        if CE then
-            CE.showMenu(
-                { {name="对话"}, {name="查看"}, {name="给予"} },
-                ent.name,
-                function(actionIdx)
-                    if actionIdx == 1 then
-                        -- 对话
-                        smapNpcTalk(sceneId, ent)
-                    elseif actionIdx == 2 then
-                        -- 查看（仅显示人物基本信息，不添加原版没有的交互）
-                        local charsIndex = getCharsIndex()
-                        local char = charsIndex and charsIndex[ent.charId]
-                        if char then
-                            w(ent.name)
-                            if char["描述"] then w(char["描述"]) end
-                        end
-                        SmapHandlers.look({})
-                    elseif actionIdx == 3 then
-                        -- 给予银两
-                        smapNpcGive(sceneId, ent)
-                    end
-                end
-            )
-        end
+        local wUI2 = g(_G, "WebUI")
+        if wUI2 then wUI2.write("[DEBUG chooseInteraction] type=" .. tostring(ent.type) .. " name=" .. tostring(ent.name) .. " eventId=" .. tostring(ent.npcData and ent.npcData["事件编号"])) end
+        if wUI2 then wUI2.write("[DEBUG chooseInteraction NPC] calling smapNpcTalk") end
+        -- Web MUD: 直接对话，不使用子菜单（MenuAsync 菜单系统在连续交互时可能失效）
+        smapNpcTalk(sceneId, ent)
     elseif ent.type == "item" then
         -- 物品子菜单
         local CE = g(_G, "CommandEngine")
@@ -514,6 +498,8 @@ end
 
 -- NPC 对话
 function smapNpcTalk(sceneId, ent)
+    local wUI = g(_G, "WebUI")
+    if wUI then wUI.write("[DEBUG smapNpcTalk ENTER] sceneId=" .. tostring(sceneId) .. " eventId=" .. tostring(ent.npcData["事件编号"])) end
     local eventId = ent.npcData["事件编号"] or ent.npcData["触发事件"] or 0
     local dIdx = ent.npcIndex or tonumber(ent.npcData["触发事件"] or 0)
     local staticEventId = tonumber(eventId) or 0
@@ -523,9 +509,16 @@ function smapNpcTalk(sceneId, ent)
         if GetD then
             local sid = tonumber(sceneId)
             -- 使用事件编号作为索引（instruct_3 的写入位置）
+            -- 检查顺序：field 5 → 4 → 3 → 2 → 0（与原版 D* 事件解析一致）
             local dynamicId = GetD(sid, staticEventId, 5)
             if not dynamicId or dynamicId <= 0 then
                 dynamicId = GetD(sid, staticEventId, 4)
+            end
+            if not dynamicId or dynamicId <= 0 then
+                dynamicId = GetD(sid, staticEventId, 3)
+            end
+            if not dynamicId or dynamicId <= 0 then
+                dynamicId = GetD(sid, staticEventId, 2)
             end
             if not dynamicId or dynamicId <= 0 then
                 dynamicId = GetD(sid, staticEventId, 0)
@@ -548,6 +541,10 @@ function smapNpcTalk(sceneId, ent)
                         eventId = evt[5]
                     elseif evt[4] and evt[4] > 0 then
                         eventId = evt[4]
+                    elseif evt[3] and evt[3] > 0 then
+                        eventId = evt[3]
+                    elseif evt[2] and evt[2] > 0 then
+                        eventId = evt[2]
                     elseif evt[0] and evt[0] > 0 then
                         eventId = evt[0]
                     end
@@ -561,6 +558,10 @@ function smapNpcTalk(sceneId, ent)
                             eventId = evt2[5]
                         elseif evt2[4] and evt2[4] > 0 then
                             eventId = evt2[4]
+                        elseif evt2[3] and evt2[3] > 0 then
+                            eventId = evt2[3]
+                        elseif evt2[2] and evt2[2] > 0 then
+                            eventId = evt2[2]
                         elseif evt2[0] and evt2[0] > 0 then
                             eventId = evt2[0]
                         end
@@ -569,6 +570,9 @@ function smapNpcTalk(sceneId, ent)
             end
         end
     end
+    -- 调试日志：输出事件ID解析结果
+    local wUI = g(_G, "WebUI")
+    if wUI then wUI.write("[DEBUG smapNpcTalk] sceneId=" .. tostring(sceneId) .. " staticEventId=" .. tostring(staticEventId) .. " resolvedEventId=" .. tostring(eventId) .. " dIdx=" .. tostring(dIdx)) end
     if tonumber(eventId) == 0 then
         w(ent.name .. " 似乎不想说话。")
         SmapHandlers.look({})

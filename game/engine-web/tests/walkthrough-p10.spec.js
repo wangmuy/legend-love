@@ -5,7 +5,7 @@ const { waitForPageReady } = require('./helpers/setup');
 const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
-const SETTLE = 5000;
+const SETTLE = 2000;
 
 test('P10: 武道大会→霹雳堂→圣堂通关', async ({ page }) => {
   test.setTimeout(300000);
@@ -42,8 +42,21 @@ test('P10: 武道大会→霹雳堂→圣堂通关', async ({ page }) => {
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
   t = await getT(page);
-  if (t.includes('绿钥匙')) {
+  if (t.includes('綠鑰匙') || t.includes('绿钥匙')) {
     console.log('  ✓ 获得绿钥匙');
+  } else if (t.includes('神杖') || t.includes('是否使用物品')) {
+    // 神杖确认对话框，选是
+    console.log('  ⚠ 神杖确认对话框，选择是...');
+    // 输出当前终端内容用于调试
+    console.log('  DEBUG terminal (last 1000 chars):', t.substring(t.length - 1000));
+    await cmd(page, 'choose 1'); await page.waitForTimeout(8000);
+    t = await getT(page);
+    console.log('  DEBUG after choose 1 (last 1000 chars):', t.substring(t.length - 1000));
+    if (t.includes('綠鑰匙') || t.includes('绿钥匙')) {
+      console.log('  ✓ 获得绿钥匙');
+    } else {
+      console.log('  ⚠ 第二次对话完成（需神杖才触发神杖检查）');
+    }
   } else {
     console.log('  ⚠ 第二次对话完成（需神杖才触发神杖检查）');
   }

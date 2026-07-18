@@ -430,7 +430,13 @@ function WmapHandlers.afterAction()
     end
     if allDead then
         w("战斗胜利！")
-        -- 奖励: 经验 + 金钱
+        -- 检查是否由 instruct_6 触发（脚本战斗），由 oldevent 脚本处理后续
+        if rawget(_G, "__warFromInstruct6") then
+            rawset(_G, "__warComplete", true)
+            rawset(_G, "__warResult", true)
+            return
+        end
+        -- 自由战斗（非脚本触发），设置奖励和 MMAP
         local JY = rawget(_G, "JY")
         local P0 = JY.Person and JY.Person[0]
         if P0 then
@@ -505,6 +511,12 @@ function WmapHandlers.enemyTurn()
     if allDead then
         w("战斗失败...")
         wmapContext.phase = nil
+        -- 检查是否由 instruct_6 触发（脚本战斗），由 oldevent 脚本处理后续
+        if rawget(_G, "__warFromInstruct6") then
+            rawset(_G, "__warComplete", true)
+            rawset(_G, "__warResult", false)
+            return
+        end
         rawget(_G, "JY").Status = 2  -- GAME_MMAP
         return
     end
