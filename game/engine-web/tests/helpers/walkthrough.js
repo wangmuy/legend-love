@@ -6,19 +6,25 @@ const fs = require('fs');
 const path = require('path');
 
 async function saveTestState(page, slot) {
-  // 使用 saveGameState 保存（可能存储到 luaSaveCache）
+  // 使用 saveGameState 保存（可能存储到 luaSaveCache 和 __saveCache）
   const r = await page.evaluate(async (s) => {
     if (!window.__luaEval) return { ok: false, result: 'bridge not ready' };
     return await window.__luaEval(`return saveGameState(${s})`);
   }, slot);
   // 直接从 JY 读取数据并缓存到 _bridgeCache（绕过 JSBridge.load 的问题）
+  // 使用 encodeSimpleJSON 而非 _G.JSON.encode，因为自定义编码器已处理大表
   const data = await page.evaluate(async (s) => {
     if (!window.__luaEval) return null;
-    const code = 'local J = rawget(_G, "JY"); if not J then return "{}" end; local d = {base=J.Base, persons=J.Person, things=J.Thing, scenes=J.Scene, wugongs=J.Wugong, shops=J.Shop, status=J.Status, subScene=J.SubScene, mmapMusic=J.MmapMusic, currentD=J.CurrentD}; local ok, json = pcall(_G.JSON.encode, d); return ok and json or "{}"';
+    const code = 'local J = rawget(_G, "JY"); if not J then return "{}" end; local d = {base=J.Base, persons=J.Person, things=J.Thing, scenes=J.Scene, wugongs=J.Wugong, shops=J.Shop, status=J.Status, subScene=J.SubScene, mmapMusic=J.MmapMusic, currentD=J.CurrentD}; local encode = rawget(_G, "encodeSimpleJSON"); if not encode then return "{}" end; local ok, json = pcall(encode, d); return ok and json or "{}"';
     const r2 = await window.__luaEval(code);
     return r2 && r2.ok && r2.result !== '{}' ? r2.result : null;
   }, slot);
-  if (data) _bridgeCache[slot] = data;
+  if (data) {
+    _bridgeCache[slot] = data;
+    console.log(`[saveTestState] slot ${slot}: cached ${data.length} bytes`);
+  } else {
+    console.log(`[saveTestState] slot ${slot}: FAILED to cache data`);
+  }
   return r && r.ok && r.result === 'true';
 }
 
@@ -40,8 +46,15 @@ async function loadTestState(page, slot) {
     return r && r.ok && r.result === 'true';
   }, slot);
   if (!hasData) {
-    console.log('[loadTestState] slot ' + slot + ' not in luaSaveCache, trying bridge cache');
+    console.log('[loadTestState] slot ' + slot + ' not in luaSaveCache');
   }
+  // 也检查 __saveCache（patched loadGameState 优先读取）
+  const hasCache = await page.evaluate(async (s) => {
+    if (!window.__luaEval) return false;
+    const r = await window.__luaEval('rawset(_G, "__saveCache", rawget(_G, "__saveCache") or {}); return tostring(rawget(_G, "__saveCache")["save_' + s + '"] ~= nil)');
+    return r && r.ok && r.result === 'true';
+  }, slot);
+  console.log(`[loadTestState] slot ${slot}: luaSaveCache=${hasData}, __saveCache=${hasCache}`);
   // 2. 尝试直接从 luaSaveCache 加载
   let r = await page.evaluate(async (s) => {
     if (!window.__luaEval) return { ok: false };
@@ -56,17 +69,32 @@ async function loadTestState(page, slot) {
     await page.waitForTimeout(500);
     return true;
   }
-  // 3. luaSaveCache 中无数据，从 _bridgeCache 注入并直接解析 JSON（绕过 loadGameState）
+  // 3. luaSaveCache 中无数据，从 _bridgeCache 注入并尝试 loadGameState
   const cacheJson = _bridgeCache[slot];
   if (cacheJson) {
-    // 先注入到 luaSaveCache
+    // 先注入到 luaSaveCache（worker 内存缓存）
     await page.evaluate(({ key, value }) => {
       if (window.__worker) {
         window.__worker.postMessage({ type: 'test_inject_save', key, value });
       }
     }, { key: 'save_' + slot, value: cacheJson });
+    // 也注入到 __saveCache（Lua 全局变量，patched loadGameState 优先读取）
+    const injectSaveCache = await page.evaluate(async ({ json, sn }) => {
+      if (!window.__luaEval) return false;
+      await window.__luaEval('rawset(_G, "__saveCache", rawget(_G, "__saveCache") or {})');
+      const chunkSize = 10000;
+      for (let i = 0; i < json.length; i += chunkSize) {
+        const chunk = json.substring(i, i + chunkSize);
+        const code = i > 0
+          ? 'rawget(_G, "__saveCache")["save_' + sn + '"] = rawget(_G, "__saveCache")["save_' + sn + '"] .. [====[' + chunk + ']====]'
+          : 'rawget(_G, "__saveCache")["save_' + sn + '"] = [====[' + chunk + ']====]';
+        const r = await window.__luaEval(code);
+        if (!r || !r.ok) return false;
+      }
+      return true;
+    }, { json: cacheJson, sn: slot });
     await page.waitForTimeout(500);
-    // 尝试 loadGameState
+    // 尝试 loadGameState（应优先找到 __saveCache 中的数据，直接解析绕过 JSBridge）
     r = await page.evaluate(async (s) => {
       if (!window.__luaEval) return { ok: false };
       const result = await window.__luaEval('return loadGameState(' + s + ')');

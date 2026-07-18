@@ -6,7 +6,7 @@ const { waitForPageReady } = require('./helpers/setup');
 const { saveTestState, loadTestState, flushSaveCache } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
-const SETTLE = 5000;
+const SETTLE = 2000;
 
 // gotoScene: leave → list → 找到场景索引 → 导航
 async function gotoScene(p, name) {

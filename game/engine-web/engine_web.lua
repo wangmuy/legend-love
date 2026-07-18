@@ -452,6 +452,8 @@ _G.lib = setmetatable({}, {
                 if field == 0 then
                     if evt[5] and evt[5] > 0 then return evt[5] end
                     if evt[4] and evt[4] > 0 then return evt[4] end
+                    if evt[3] and evt[3] > 0 then return evt[3] end
+                    if evt[2] and evt[2] > 0 then return evt[2] end
                 end
                 return evt[field] or 0
             end
