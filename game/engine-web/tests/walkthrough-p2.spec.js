@@ -53,8 +53,12 @@ test('P2: 回族→胡斐→冰火岛→绝情谷→大轮寺', async ({ page })
   expect(await saveTestState(page, 22)).toBe(true);
   console.log('  ✓ 绝情谷');
 
-  // 冰蚕洞(TODO:无入口) → 船停大轮寺东 → 大轮寺
-  expect(await loadTestState(page, 22)).toBe(true);
+  // 冰蚕洞/天山雪莲
+  expect(await gotoScene(page, '冰蠶洞')).toBeGreaterThan(0);
+  t = await getT(page); expect(t).toContain('你来到了');
+  console.log('  ✓ 冰蚕洞');
+
+  // 船停大轮寺东 → 大轮寺
   expect(await gotoScene(page, '大輪寺')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);

@@ -11,7 +11,7 @@ test('P3: 百花谷→绝情谷底→古墓→燕子坞→泰山派', async ({ p
   loadSaveCache('bridge-p2.json');
   await page.goto('/'); await waitForPageReady(page); await page.waitForTimeout(3000);
 
-  // 昆仑仙境(无入口跳过)→神雕洞(无数据跳过)→百花谷
+  // 百花谷/养蜂
   expect(await loadTestState(page, 22)).toBe(true);
   expect(await gotoScene(page, '百花谷')).toBeGreaterThan(0);
   let t = await getT(page); expect(t).toContain('你来到了');

@@ -28,7 +28,21 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 蝴蝶谷');
 
-  // 恒山派(无数据跳过)→蜘蛛洞(无数据跳过)→悦来客栈(无数据跳过)→摩天崖(在P5)→五毒教(在P5)
+  // 恒山派
+  expect(await gotoScene(page, '恒山派')).toBeGreaterThan(0);
+  t = await getT(page); expect(t).toContain('你来到了');
+  console.log('  ✓ 恒山派');
+
+  // 蜘蛛洞
+  expect(await gotoScene(page, '蜘蛛洞')).toBeGreaterThan(0);
+  t = await getT(page); expect(t).toContain('你来到了');
+  console.log('  ✓ 蜘蛛洞');
+
+  // 悦来客栈/令狐冲喝酒
+  expect(await gotoScene(page, '悅來客棧')).toBeGreaterThan(0);
+  t = await getT(page); expect(t).toContain('你来到了');
+  console.log('  ✓ 悦来客栈');
+
   // 程瑛加入
   expect(await gotoScene(page, '程瑛居')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
