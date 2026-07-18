@@ -21,13 +21,12 @@ Traceability: [REQ-002]
     - [x] 设置 `JY.CurrentD = dIdx` 确保 `instruct_3` 可正确修改 D* 表
     - [x] 若 `GetD` 返回有效 ID (>0)，使用动态 ID
 
-- [ ] 2.2 修复 `instruct_3` 修改字段 4/5 后动态事件 ID 读取
+- [x] 2.2 修复 `instruct_3` 修改字段 4/5 后动态事件 ID 读取
   Blast Radius: `["game/engine-web/mmap_smap_handlers.lua", "game/engine-web/web_game_bridge.lua"]`
   DoD:
     - [x] `SetD`/`GetD` 实现，使用 `JY.D` 存储
     - [x] `smapNpcTalk` 字段5优先（神杖检查686）
-    - [ ] 霹雳堂孔八拉二次对话触发神杖检查(686)：`GetD` 返回字段5=686
-    - [ ] 已知问题：`lib.SetD` 写入 `JY.D` 后，`lib.GetD` 未返回写入值（可能 `JY.D` 未持久化或 `ensureSceneDEvents` 覆盖数据）
+    - [x] 霹雳堂孔八拉二次对话触发神杖检查(686)：`GetD` 返回字段5=686（P10 测试验证通过，输出 ✓ 获得绿钥匙）
 
 ## 3. 验证
 Traceability: [REQ-WT-001]
