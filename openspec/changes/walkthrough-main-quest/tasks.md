@@ -93,5 +93,5 @@ Traceability: [REQ-WT-002]
     - [x] P10 测试创建（武道大会→霹雳堂→圣堂）
     - [x] 华山论剑对话触发
     - [x] 霹雳堂孔八拉交互
-    - [ ] 圣堂入口（需 NPC 事件动态解析 + 出口系统完善）
-    - [ ] 无 gameLoop error
+    - [x] 圣堂入口（出口系统已完善，P10 测试通过 leave→圣堂→进入）
+    - [x] 无 gameLoop error

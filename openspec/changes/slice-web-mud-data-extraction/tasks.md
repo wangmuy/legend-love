@@ -52,30 +52,30 @@
 - 场景 NPC 数据可能存储在 ranger.grp 的人物数据中（但 Person_S 无"场景"字段）
 
 - [x] 6.10.1 逆向 thing.grp 格式 → 确认为 48×36 地面贴图（1728 字节 = 48×36）
-- [ ] 6.10.2 完善 NPC/物品提取
+- [x] 6.10.2 完善 NPC/物品提取
   DoD:
-    - [ ] 从 allsin.grp 其他 layer 提取 NPC 实体数据
-    - [ ] 或从 ranger.grp 人物数据建立场景映射
-    - [ ] 主角的家场景 NPC 包含软体娃娃
-    - [ ] 重新运行 `lua tools/extract_web_data.lua` 成功
+    - [x] 从 allsin.grp 其他 layer 提取 NPC 实体数据
+    - [x] 或从 ranger.grp 人物数据建立场景映射
+    - [x] 主角的家场景 NPC 包含软体娃娃（event 692，scene 70）
+    - [x] 重新运行 `lua tools/extract_web_data.lua` 成功
 
-- [ ] 6.10.3 验证与回归
+- [x] 6.10.3 验证与回归
   DoD:
-    - [ ] data-integrity 测试全部通过
-    - [ ] 主角的家场景可用 talk 命令找到 NPC
+    - [x] data-integrity 测试全部通过
+    - [x] 主角的家场景可用 talk 命令找到 NPC（walkthrough-p1 测试已验证）
 
 ### 6.11 提取战斗配置数据（war.sta）
 
 war.sta 是二进制战斗配置文件（186 字节/条，约 200 条战斗），包含敌我阵容和初始位置。
 
-- [ ] 6.11.1 解析 war.sta 二进制格式
+- [x] 6.11.1 解析 war.sta 二进制格式
   Blast Radius: `["game/tools/extract_war_sta.lua"]`
   DoD:
-    - [ ] 每条战斗记录含 20 个敌人 ID + 位置
-    - [ ] 输出到 engine-web/data-web/wars.json
-    - [ ] 集成到 extract_web_data.lua 管线（步骤 3b）
+    - [x] 每条战斗记录含 20 个敌人 ID + 位置
+    - [x] 输出到 engine-web/data-web/wars.json（91KB，200 条战斗）
+    - [x] 集成到 extract_web_data.lua 管线（步骤 3b）
 
-- [ ] 6.11.2 验证
+- [x] 6.11.2 验证
   Blast Radius: `["game/engine-web/tests/*"]`
   DoD:
-    - [ ] data-integrity 测试包含 wars 数据验证
+    - [x] data-integrity 测试包含 wars 数据验证
