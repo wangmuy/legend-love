@@ -60,44 +60,63 @@ test('P10: 武道大会→霹雳堂→圣堂通关', async ({ page }) => {
   } else {
     console.log('  ⚠ 第二次对话完成（需神杖才触发神杖检查）');
   }
-  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
-  await cmd(page, 'leave'); await page.waitForTimeout(5000);
-  console.log('  ✓ 霹雳堂');
-
-  // Step 3: 圣堂通关 — 通过霹雳堂出口进入圣堂
-  // 霹雳堂出口在 entity 列表末尾（3个出口 → 圣堂, scene 83）
-  // 使用 look 查看出口列表，再 choose 出口编号
-  t = await getT(page);
-  // 从场景内通过出口进入圣堂
+  // Step 3: 圣堂入口（不 leave，通过霹雳堂出口进入）
   // 出口 entity 位于 NPC 列表之后（5 NPC + 0 items = 前5个）
   // 第1个出口 entity 编号为 6
-  if (t.includes('→ 圣堂') || t.includes('圣堂')) {
-    // 出口可见，直接选择
-    await cmd(page, 'look'); await page.waitForTimeout(1000);
-    await cmd(page, 'choose 6'); await page.waitForTimeout(5000);
+  console.log('  ⚠ 直接从霹雳堂出口进入圣堂...');
+  await cmd(page, 'look'); await page.waitForTimeout(3000);
+  // 尝试多个出口编号（霹雳堂有3个出口到圣堂）
+  let entered = false;
+  for (const exitIdx of [6, 7, 8]) {
+    await cmd(page, 'choose ' + exitIdx); await page.waitForTimeout(5000);
     t = await getT(page);
-    if (t.includes('圣堂')) {
-      console.log('  ✓ 进入圣堂');
-    } else {
-      console.log('  ⚠ 尝试进入圣堂，但出口编号可能不同');
-      // 尝试其他出口编号
-      await cmd(page, 'choose 7'); await page.waitForTimeout(5000);
-      t = await getT(page);
-      if (t.includes('圣堂')) {
-        console.log('  ✓ 进入圣堂（choose 7）');
-      }
+    if (t.includes('圣堂') && !t.includes('→ 圣堂')) {
+      // 内容包含"圣堂"但不包含"→ 圣堂"（出口列表），说明已进入圣堂场景
+      console.log('  ✓ 进入圣堂（choose ' + exitIdx + '）');
+      entered = true;
+      break;
     }
-  } else {
-    // 出口不可见，使用 go 命令
+  }
+  if (!entered) {
+    // 尝试 go 命令
     console.log('  ⚠ 出口不可见，使用 go 1');
     await cmd(page, 'go 1'); await page.waitForTimeout(5000);
     t = await getT(page);
     if (t.includes('圣堂')) {
-      console.log('  ✓ 进入圣堂');
+      console.log('  ✓ 进入圣堂（go 1）');
+      entered = true;
     } else {
       console.log('  ⚠ 圣堂入口未确认');
     }
   }
+  if (!entered) {
+    console.log('  ⚠ 无法进入圣堂，回到大地图');
+    await cmd(page, 'leave'); await page.waitForTimeout(5000);
+  }
+
+  // Step 4: 圣堂内查看书架（放置天书事件）
+  await cmd(page, 'look'); await page.waitForTimeout(3000);
+  t = await getT(page);
+  // 打印完整输出，按行分割
+  const lines = t.split('\n');
+  console.log('  DEBUG 圣堂 look 全文（最后30行）:');
+  for (let i = Math.max(0, lines.length - 30); i < lines.length; i++) {
+    console.log('    |' + (lines[i] || '').substring(0, 200));
+  }
+  if (t.includes('放置天书')) {
+    console.log('  ✓ 圣堂书架可见（放置天书事件已激活）');
+    // 尝试放置第一本书（玩家可能没有天书，事件会优雅处理）
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    t = await getT(page);
+    if (t.includes('放置天书')) {
+      console.log('  ✓ 尝试放置天书（无天书时事件正常返回）');
+    } else {
+      console.log('  ⚠ 圣堂对话触发');
+    }
+  } else {
+    console.log('  ⚠ 圣堂书架未显示');
+  }
+
   expect(await noE(page)).toBeTruthy();
 
   expect(await noE(page)).toBeTruthy();
