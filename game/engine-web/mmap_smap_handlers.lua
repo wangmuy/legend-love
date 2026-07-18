@@ -535,9 +535,21 @@ function SmapHandlers.chooseInteraction(idx)
                 else
                     w("你打开了...")
                 end
-                local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
-                if not ok then
-                    w("事件执行失败: " .. tostring(err))
+                -- 使用协程执行事件，让 battle 系统可以 yield
+                local scheduler = g(_G, "CoroutineScheduler")
+                if scheduler then
+                    local co = scheduler:create(function()
+                        local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
+                        if not ok then
+                            w("事件执行失败: " .. tostring(err))
+                        end
+                    end, "event_trigger_" .. tostring(eventId))
+                    scheduler:start(co, "start")
+                else
+                    local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
+                    if not ok then
+                        w("事件执行失败: " .. tostring(err))
+                    end
                 end
                 -- 圣堂事件执行后，恢复 JY.CurrentD（由事件处理器自己管理）
                 local JY2 = g(_G, "JY")
