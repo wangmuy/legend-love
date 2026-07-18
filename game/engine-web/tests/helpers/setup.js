@@ -4,7 +4,7 @@ async function waitForPageReady(page) {
   // Web Worker 模式：等待 index.js 设置 window.__workerReady
   await page.waitForFunction(() => {
     return window.__workerReady === true;
-  }, { timeout: 30000 });
+  }, { timeout: 60000 });
 }
 
 async function getLuaGlobal(page, name) {

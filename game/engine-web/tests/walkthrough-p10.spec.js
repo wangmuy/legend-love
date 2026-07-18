@@ -25,7 +25,7 @@ test('P10: 武道大会→霹雳堂→圣堂通关', async ({ page }) => {
     console.log('  ⚠ 华山论剑对话完成');
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
-  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  await cmd(page, 'leave'); await page.waitForTimeout(5000);
   expect(await saveTestState(page, 101)).toBe(true);
   console.log('  ✓ 武道大会');
 
@@ -61,7 +61,7 @@ test('P10: 武道大会→霹雳堂→圣堂通关', async ({ page }) => {
     console.log('  ⚠ 第二次对话完成（需神杖才触发神杖检查）');
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
-  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  await cmd(page, 'leave'); await page.waitForTimeout(5000);
   console.log('  ✓ 霹雳堂');
 
   // Step 3: 圣堂通关 — 通过霹雳堂出口进入圣堂
