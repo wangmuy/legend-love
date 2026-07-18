@@ -3,100 +3,670 @@
   "extracted": "2026-06-07",
   "total": 95,
   "entrances": [
-    { "mapX": 17, "mapY": 14, "sceneIdx": 2, "sceneId": 2, "name": "云鶴崖" },
-    { "mapX": 102, "mapY": 15, "sceneIdx": 72, "sceneId": 72, "name": "冰火島" },
-    { "mapX": 103, "mapY": 15, "sceneIdx": 72, "sceneId": 72, "name": "冰火島" },
-    { "mapX": 425, "mapY": 37, "sceneIdx": 79, "sceneId": 79, "name": "山洞" },
-    { "mapX": 277, "mapY": 42, "sceneIdx": 78, "sceneId": 78, "name": "浡泥島" },
-    { "mapX": 64, "mapY": 51, "sceneIdx": 5, "sceneId": 5, "name": "山洞" },
-    { "mapX": 186, "mapY": 63, "sceneIdx": 73, "sceneId": 73, "name": "靈蛇島" },
-    { "mapX": 85, "mapY": 93, "sceneIdx": 0, "sceneId": 0, "name": "胡斐居" },
-    { "mapX": 86, "mapY": 93, "sceneIdx": 0, "sceneId": 0, "name": "胡斐居" },
-    { "mapX": 50, "mapY": 109, "sceneIdx": 6, "sceneId": 6, "name": "北丑居" },
-    { "mapX": 49, "mapY": 110, "sceneIdx": 6, "sceneId": 6, "name": "北丑居" },
-    { "mapX": 141, "mapY": 112, "sceneIdx": 71, "sceneId": 71, "name": "神龍教" },
-    { "mapX": 431, "mapY": 125, "sceneIdx": 77, "sceneId": 77, "name": "萬鱷島" },
-    { "mapX": 341, "mapY": 137, "sceneIdx": 75, "sceneId": 75, "name": "桃花島" },
-    { "mapX": 192, "mapY": 139, "sceneIdx": 29, "sceneId": 29, "name": "泰山派" },
-    { "mapX": 78, "mapY": 140, "sceneIdx": 3, "sceneId": 3, "name": "有間客棧" },
-    { "mapX": 286, "mapY": 156, "sceneIdx": 32, "sceneId": 32, "name": "海邊小屋" },
-    { "mapX": 68, "mapY": 169, "sceneIdx": 7, "sceneId": 7, "name": "山洞" },
-    { "mapX": 117, "mapY": 178, "sceneIdx": 26, "sceneId": 26, "name": "黑木崖" },
-    { "mapX": 18, "mapY": 180, "sceneIdx": 62, "sceneId": 62, "name": "破廟" },
-    { "mapX": 18, "mapY": 181, "sceneIdx": 62, "sceneId": 62, "name": "破廟" },
-    { "mapX": 222, "mapY": 187, "sceneIdx": 24, "sceneId": 24, "name": "苗人鳳居" },
-    { "mapX": 215, "mapY": 195, "sceneIdx": 30, "sceneId": 30, "name": "平一指居" },
-    { "mapX": 330, "mapY": 195, "sceneIdx": 55, "sceneId": 55, "name": "梅莊" },
-    { "mapX": 307, "mapY": 197, "sceneIdx": 52, "sceneId": 52, "name": "燕子塢" },
-    { "mapX": 168, "mapY": 210, "sceneIdx": 23, "sceneId": 23, "name": "洪七公居" },
-    { "mapX": 112, "mapY": 214, "sceneIdx": 31, "sceneId": 31, "name": "" },
-    { "mapX": 145, "mapY": 216, "sceneIdx": 19, "sceneId": 19, "name": "重陽宮" },
-    { "mapX": 409, "mapY": 216, "sceneIdx": 76, "sceneId": 76, "name": "霹靂堂" },
-    { "mapX": 143, "mapY": 218, "sceneIdx": 18, "sceneId": 18, "name": "古墓" },
-    { "mapX": 52, "mapY": 219, "sceneIdx": 15, "sceneId": 15, "name": "沙漠廢墟" },
-    { "mapX": 238, "mapY": 219, "sceneIdx": 44, "sceneId": 44, "name": "蝴蝶谷" },
-    { "mapX": 176, "mapY": 220, "sceneIdx": 53, "sceneId": 53, "name": "擂鼓山" },
-    { "mapX": 74, "mapY": 226, "sceneIdx": 10, "sceneId": 10, "name": "山洞" },
-    { "mapX": 358, "mapY": 228, "sceneIdx": 1, "sceneId": 1, "name": "河洛客棧" },
-    { "mapX": 359, "mapY": 228, "sceneIdx": 1, "sceneId": 1, "name": "河洛客棧" },
-    { "mapX": 356, "mapY": 235, "sceneIdx": 70, "sceneId": 70, "name": "主角的家" },
-    { "mapX": 329, "mapY": 236, "sceneIdx": 63, "sceneId": 63, "name": "天寧寺" },
-    { "mapX": 330, "mapY": 236, "sceneIdx": 63, "sceneId": 63, "name": "天寧寺" },
-    { "mapX": 18, "mapY": 248, "sceneIdx": 9, "sceneId": 9, "name": "成崑居" },
-    { "mapX": 19, "mapY": 248, "sceneIdx": 9, "sceneId": 9, "name": "成崑居" },
-    { "mapX": 132, "mapY": 254, "sceneIdx": 80, "sceneId": 80, "name": "絕情谷底" },
-    { "mapX": 228, "mapY": 256, "sceneIdx": 51, "sceneId": 51, "name": "丐幫" },
-    { "mapX": 134, "mapY": 258, "sceneIdx": 22, "sceneId": 22, "name": "絕情谷" },
-    { "mapX": 368, "mapY": 258, "sceneIdx": 56, "sceneId": 56, "name": "福威鏢局" },
-    { "mapX": 191, "mapY": 260, "sceneIdx": 54, "sceneId": 54, "name": "薛慕華居" },
-    { "mapX": 191, "mapY": 261, "sceneIdx": 54, "sceneId": 54, "name": "薛慕華居" },
-    { "mapX": 158, "mapY": 270, "sceneIdx": 20, "sceneId": 20, "name": "百花谷" },
-    { "mapX": 158, "mapY": 271, "sceneIdx": 20, "sceneId": 20, "name": "百花谷" },
-    { "mapX": 364, "mapY": 279, "sceneIdx": 65, "sceneId": 65, "name": "山洞" },
-    { "mapX": 221, "mapY": 285, "sceneIdx": 40, "sceneId": 40, "name": "悅來客棧" },
-    { "mapX": 193, "mapY": 292, "sceneIdx": 46, "sceneId": 46, "name": "金蛇山洞" },
-    { "mapX": 241, "mapY": 293, "sceneIdx": 27, "sceneId": 27, "name": "嵩山派" },
-    { "mapX": 191, "mapY": 295, "sceneIdx": 25, "sceneId": 25, "name": "武道大會" },
-    { "mapX": 113, "mapY": 297, "sceneIdx": 8, "sceneId": 8, "name": "大輪寺" },
-    { "mapX": 246, "mapY": 300, "sceneIdx": 28, "sceneId": 28, "name": "少林寺" },
-    { "mapX": 188, "mapY": 301, "sceneIdx": 81, "sceneId": 81, "name": "思過崖" },
-    { "mapX": 192, "mapY": 301, "sceneIdx": 57, "sceneId": 57, "name": "華山派" },
-    { "mapX": 192, "mapY": 302, "sceneIdx": 57, "sceneId": 57, "name": "華山派" },
-    { "mapX": 385, "mapY": 305, "sceneIdx": 59, "sceneId": 59, "name": "田伯光居" },
-    { "mapX": 159, "mapY": 313, "sceneIdx": 34, "sceneId": 34, "name": "崆峒派" },
-    { "mapX": 159, "mapY": 314, "sceneIdx": 34, "sceneId": 34, "name": "崆峒派" },
-    { "mapX": 323, "mapY": 317, "sceneIdx": 49, "sceneId": 49, "name": "藥王莊" },
-    { "mapX": 388, "mapY": 324, "sceneIdx": 64, "sceneId": 64, "name": "南賢居" },
-    { "mapX": 455, "mapY": 327, "sceneIdx": 74, "sceneId": 74, "name": "俠客島" },
-    { "mapX": 185, "mapY": 338, "sceneIdx": 38, "sceneId": 38, "name": "摩天崖" },
-    { "mapX": 225, "mapY": 340, "sceneIdx": 43, "sceneId": 43, "name": "武當派" },
-    { "mapX": 120, "mapY": 341, "sceneIdx": 17, "sceneId": 17, "name": "回族部落" },
-    { "mapX": 120, "mapY": 342, "sceneIdx": 17, "sceneId": 17, "name": "回族部落" },
-    { "mapX": 302, "mapY": 342, "sceneIdx": 48, "sceneId": 48, "name": "鐵掌山" },
-    { "mapX": 308, "mapY": 351, "sceneIdx": 21, "sceneId": 21, "name": "黑龍潭" },
-    { "mapX": 308, "mapY": 352, "sceneIdx": 21, "sceneId": 21, "name": "黑龍潭" },
-    { "mapX": 75, "mapY": 363, "sceneIdx": 12, "sceneId": 12, "name": "明教分舵" },
-    { "mapX": 185, "mapY": 369, "sceneIdx": 36, "sceneId": 36, "name": "青城派" },
-    { "mapX": 314, "mapY": 369, "sceneIdx": 47, "sceneId": 47, "name": "一燈居" },
-    { "mapX": 101, "mapY": 373, "sceneIdx": 60, "sceneId": 60, "name": "龍門客棧" },
-    { "mapX": 102, "mapY": 373, "sceneIdx": 60, "sceneId": 60, "name": "龍門客棧" },
-    { "mapX": 395, "mapY": 374, "sceneIdx": 50, "sceneId": 50, "name": "閰基居" },
-    { "mapX": 355, "mapY": 375, "sceneIdx": 58, "sceneId": 58, "name": "衡山派" },
-    { "mapX": 68, "mapY": 396, "sceneIdx": 11, "sceneId": 11, "name": "光明頂" },
-    { "mapX": 103, "mapY": 396, "sceneIdx": 16, "sceneId": 16, "name": "金輪寺" },
-    { "mapX": 198, "mapY": 400, "sceneIdx": 61, "sceneId": 61, "name": "高昇客棧" },
-    { "mapX": 199, "mapY": 400, "sceneIdx": 61, "sceneId": 61, "name": "高昇客棧" },
-    { "mapX": 166, "mapY": 403, "sceneIdx": 39, "sceneId": 39, "name": "凌霄城" },
-    { "mapX": 215, "mapY": 407, "sceneIdx": 33, "sceneId": 33, "name": "峨嵋派" },
-    { "mapX": 132, "mapY": 409, "sceneIdx": 35, "sceneId": 35, "name": "星宿海" },
-    { "mapX": 41, "mapY": 419, "sceneIdx": 68, "sceneId": 68, "name": "崑侖派" },
-    { "mapX": 41, "mapY": 420, "sceneIdx": 68, "sceneId": 68, "name": "崑侖派" },
-    { "mapX": 295, "mapY": 421, "sceneIdx": 45, "sceneId": 45, "name": "程瑛居" },
-    { "mapX": 172, "mapY": 424, "sceneIdx": 41, "sceneId": 41, "name": "山洞" },
-    { "mapX": 246, "mapY": 424, "sceneIdx": 37, "sceneId": 37, "name": "五毒教" },
-    { "mapX": 168, "mapY": 426, "sceneIdx": 42, "sceneId": 42, "name": "無量山洞" },
-    { "mapX": 141, "mapY": 432, "sceneIdx": 69, "sceneId": 69, "name": "白駝山" },
-    { "mapX": 22, "mapY": 439, "sceneIdx": 67, "sceneId": 67, "name": "山洞" },
-    { "mapX": 21, "mapY": 449, "sceneIdx": 66, "sceneId": 66, "name": "山洞" }
+    {
+      "mapX": 17,
+      "mapY": 14,
+      "sceneIdx": 2,
+      "sceneId": 2,
+      "name": "云鶴崖"
+    },
+    {
+      "mapX": 102,
+      "mapY": 15,
+      "sceneIdx": 72,
+      "sceneId": 72,
+      "name": "冰火島"
+    },
+    {
+      "mapX": 103,
+      "mapY": 15,
+      "sceneIdx": 72,
+      "sceneId": 72,
+      "name": "冰火島"
+    },
+    {
+      "mapX": 425,
+      "mapY": 37,
+      "sceneIdx": 79,
+      "sceneId": 79,
+      "name": "山洞"
+    },
+    {
+      "mapX": 277,
+      "mapY": 42,
+      "sceneIdx": 78,
+      "sceneId": 78,
+      "name": "浡泥島"
+    },
+    {
+      "mapX": 64,
+      "mapY": 51,
+      "sceneIdx": 5,
+      "sceneId": 5,
+      "name": "山洞"
+    },
+    {
+      "mapX": 186,
+      "mapY": 63,
+      "sceneIdx": 73,
+      "sceneId": 73,
+      "name": "靈蛇島"
+    },
+    {
+      "mapX": 85,
+      "mapY": 93,
+      "sceneIdx": 0,
+      "sceneId": 0,
+      "name": "胡斐居"
+    },
+    {
+      "mapX": 86,
+      "mapY": 93,
+      "sceneIdx": 0,
+      "sceneId": 0,
+      "name": "胡斐居"
+    },
+    {
+      "mapX": 50,
+      "mapY": 109,
+      "sceneIdx": 6,
+      "sceneId": 6,
+      "name": "北丑居"
+    },
+    {
+      "mapX": 49,
+      "mapY": 110,
+      "sceneIdx": 6,
+      "sceneId": 6,
+      "name": "北丑居"
+    },
+    {
+      "mapX": 141,
+      "mapY": 112,
+      "sceneIdx": 71,
+      "sceneId": 71,
+      "name": "神龍教"
+    },
+    {
+      "mapX": 431,
+      "mapY": 125,
+      "sceneIdx": 77,
+      "sceneId": 77,
+      "name": "萬鱷島"
+    },
+    {
+      "mapX": 341,
+      "mapY": 137,
+      "sceneIdx": 75,
+      "sceneId": 75,
+      "name": "桃花島"
+    },
+    {
+      "mapX": 192,
+      "mapY": 139,
+      "sceneIdx": 29,
+      "sceneId": 29,
+      "name": "泰山派"
+    },
+    {
+      "mapX": 78,
+      "mapY": 140,
+      "sceneIdx": 3,
+      "sceneId": 3,
+      "name": "有間客棧"
+    },
+    {
+      "mapX": 286,
+      "mapY": 156,
+      "sceneIdx": 32,
+      "sceneId": 32,
+      "name": "海邊小屋"
+    },
+    {
+      "mapX": 68,
+      "mapY": 169,
+      "sceneIdx": 7,
+      "sceneId": 7,
+      "name": "神鵰洞"
+    },
+    {
+      "mapX": 117,
+      "mapY": 178,
+      "sceneIdx": 26,
+      "sceneId": 26,
+      "name": "黑木崖"
+    },
+    {
+      "mapX": 18,
+      "mapY": 180,
+      "sceneIdx": 62,
+      "sceneId": 62,
+      "name": "破廟"
+    },
+    {
+      "mapX": 18,
+      "mapY": 181,
+      "sceneIdx": 62,
+      "sceneId": 62,
+      "name": "破廟"
+    },
+    {
+      "mapX": 222,
+      "mapY": 187,
+      "sceneIdx": 24,
+      "sceneId": 24,
+      "name": "苗人鳳居"
+    },
+    {
+      "mapX": 215,
+      "mapY": 195,
+      "sceneIdx": 30,
+      "sceneId": 30,
+      "name": "平一指居"
+    },
+    {
+      "mapX": 330,
+      "mapY": 195,
+      "sceneIdx": 55,
+      "sceneId": 55,
+      "name": "梅莊"
+    },
+    {
+      "mapX": 307,
+      "mapY": 197,
+      "sceneIdx": 52,
+      "sceneId": 52,
+      "name": "燕子塢"
+    },
+    {
+      "mapX": 168,
+      "mapY": 210,
+      "sceneIdx": 23,
+      "sceneId": 23,
+      "name": "洪七公居"
+    },
+    {
+      "mapX": 112,
+      "mapY": 214,
+      "sceneIdx": 31,
+      "sceneId": 31,
+      "name": "恒山派"
+    },
+    {
+      "mapX": 145,
+      "mapY": 216,
+      "sceneIdx": 19,
+      "sceneId": 19,
+      "name": "重陽宮"
+    },
+    {
+      "mapX": 409,
+      "mapY": 216,
+      "sceneIdx": 76,
+      "sceneId": 76,
+      "name": "霹靂堂"
+    },
+    {
+      "mapX": 143,
+      "mapY": 218,
+      "sceneIdx": 18,
+      "sceneId": 18,
+      "name": "古墓"
+    },
+    {
+      "mapX": 52,
+      "mapY": 219,
+      "sceneIdx": 15,
+      "sceneId": 15,
+      "name": "沙漠廢墟"
+    },
+    {
+      "mapX": 238,
+      "mapY": 219,
+      "sceneIdx": 44,
+      "sceneId": 44,
+      "name": "蝴蝶谷"
+    },
+    {
+      "mapX": 176,
+      "mapY": 220,
+      "sceneIdx": 53,
+      "sceneId": 53,
+      "name": "擂鼓山"
+    },
+    {
+      "mapX": 74,
+      "mapY": 226,
+      "sceneIdx": 10,
+      "sceneId": 10,
+      "name": "蜘蛛洞"
+    },
+    {
+      "mapX": 358,
+      "mapY": 228,
+      "sceneIdx": 1,
+      "sceneId": 1,
+      "name": "河洛客棧"
+    },
+    {
+      "mapX": 359,
+      "mapY": 228,
+      "sceneIdx": 1,
+      "sceneId": 1,
+      "name": "河洛客棧"
+    },
+    {
+      "mapX": 356,
+      "mapY": 235,
+      "sceneIdx": 70,
+      "sceneId": 70,
+      "name": "主角的家"
+    },
+    {
+      "mapX": 329,
+      "mapY": 236,
+      "sceneIdx": 63,
+      "sceneId": 63,
+      "name": "天寧寺"
+    },
+    {
+      "mapX": 330,
+      "mapY": 236,
+      "sceneIdx": 63,
+      "sceneId": 63,
+      "name": "天寧寺"
+    },
+    {
+      "mapX": 18,
+      "mapY": 248,
+      "sceneIdx": 9,
+      "sceneId": 9,
+      "name": "成崑居"
+    },
+    {
+      "mapX": 19,
+      "mapY": 248,
+      "sceneIdx": 9,
+      "sceneId": 9,
+      "name": "成崑居"
+    },
+    {
+      "mapX": 132,
+      "mapY": 254,
+      "sceneIdx": 80,
+      "sceneId": 80,
+      "name": "絕情谷底"
+    },
+    {
+      "mapX": 228,
+      "mapY": 256,
+      "sceneIdx": 51,
+      "sceneId": 51,
+      "name": "丐幫"
+    },
+    {
+      "mapX": 134,
+      "mapY": 258,
+      "sceneIdx": 22,
+      "sceneId": 22,
+      "name": "絕情谷"
+    },
+    {
+      "mapX": 368,
+      "mapY": 258,
+      "sceneIdx": 56,
+      "sceneId": 56,
+      "name": "福威鏢局"
+    },
+    {
+      "mapX": 191,
+      "mapY": 260,
+      "sceneIdx": 54,
+      "sceneId": 54,
+      "name": "薛慕華居"
+    },
+    {
+      "mapX": 191,
+      "mapY": 261,
+      "sceneIdx": 54,
+      "sceneId": 54,
+      "name": "薛慕華居"
+    },
+    {
+      "mapX": 158,
+      "mapY": 270,
+      "sceneIdx": 20,
+      "sceneId": 20,
+      "name": "百花谷"
+    },
+    {
+      "mapX": 158,
+      "mapY": 271,
+      "sceneIdx": 20,
+      "sceneId": 20,
+      "name": "百花谷"
+    },
+    {
+      "mapX": 364,
+      "mapY": 279,
+      "sceneIdx": 65,
+      "sceneId": 65,
+      "name": "山洞"
+    },
+    {
+      "mapX": 221,
+      "mapY": 285,
+      "sceneIdx": 40,
+      "sceneId": 40,
+      "name": "悅來客棧"
+    },
+    {
+      "mapX": 193,
+      "mapY": 292,
+      "sceneIdx": 46,
+      "sceneId": 46,
+      "name": "金蛇山洞"
+    },
+    {
+      "mapX": 241,
+      "mapY": 293,
+      "sceneIdx": 27,
+      "sceneId": 27,
+      "name": "嵩山派"
+    },
+    {
+      "mapX": 191,
+      "mapY": 295,
+      "sceneIdx": 25,
+      "sceneId": 25,
+      "name": "武道大會"
+    },
+    {
+      "mapX": 113,
+      "mapY": 297,
+      "sceneIdx": 8,
+      "sceneId": 8,
+      "name": "大輪寺"
+    },
+    {
+      "mapX": 246,
+      "mapY": 300,
+      "sceneIdx": 28,
+      "sceneId": 28,
+      "name": "少林寺"
+    },
+    {
+      "mapX": 188,
+      "mapY": 301,
+      "sceneIdx": 81,
+      "sceneId": 81,
+      "name": "思過崖"
+    },
+    {
+      "mapX": 192,
+      "mapY": 301,
+      "sceneIdx": 57,
+      "sceneId": 57,
+      "name": "華山派"
+    },
+    {
+      "mapX": 192,
+      "mapY": 302,
+      "sceneIdx": 57,
+      "sceneId": 57,
+      "name": "華山派"
+    },
+    {
+      "mapX": 385,
+      "mapY": 305,
+      "sceneIdx": 59,
+      "sceneId": 59,
+      "name": "田伯光居"
+    },
+    {
+      "mapX": 159,
+      "mapY": 313,
+      "sceneIdx": 34,
+      "sceneId": 34,
+      "name": "崆峒派"
+    },
+    {
+      "mapX": 159,
+      "mapY": 314,
+      "sceneIdx": 34,
+      "sceneId": 34,
+      "name": "崆峒派"
+    },
+    {
+      "mapX": 323,
+      "mapY": 317,
+      "sceneIdx": 49,
+      "sceneId": 49,
+      "name": "藥王莊"
+    },
+    {
+      "mapX": 388,
+      "mapY": 324,
+      "sceneIdx": 64,
+      "sceneId": 64,
+      "name": "南賢居"
+    },
+    {
+      "mapX": 455,
+      "mapY": 327,
+      "sceneIdx": 74,
+      "sceneId": 74,
+      "name": "俠客島"
+    },
+    {
+      "mapX": 185,
+      "mapY": 338,
+      "sceneIdx": 38,
+      "sceneId": 38,
+      "name": "摩天崖"
+    },
+    {
+      "mapX": 225,
+      "mapY": 340,
+      "sceneIdx": 43,
+      "sceneId": 43,
+      "name": "武當派"
+    },
+    {
+      "mapX": 120,
+      "mapY": 341,
+      "sceneIdx": 17,
+      "sceneId": 17,
+      "name": "回族部落"
+    },
+    {
+      "mapX": 120,
+      "mapY": 342,
+      "sceneIdx": 17,
+      "sceneId": 17,
+      "name": "回族部落"
+    },
+    {
+      "mapX": 302,
+      "mapY": 342,
+      "sceneIdx": 48,
+      "sceneId": 48,
+      "name": "鐵掌山"
+    },
+    {
+      "mapX": 308,
+      "mapY": 351,
+      "sceneIdx": 21,
+      "sceneId": 21,
+      "name": "黑龍潭"
+    },
+    {
+      "mapX": 308,
+      "mapY": 352,
+      "sceneIdx": 21,
+      "sceneId": 21,
+      "name": "黑龍潭"
+    },
+    {
+      "mapX": 75,
+      "mapY": 363,
+      "sceneIdx": 12,
+      "sceneId": 12,
+      "name": "明教分舵"
+    },
+    {
+      "mapX": 185,
+      "mapY": 369,
+      "sceneIdx": 36,
+      "sceneId": 36,
+      "name": "青城派"
+    },
+    {
+      "mapX": 314,
+      "mapY": 369,
+      "sceneIdx": 47,
+      "sceneId": 47,
+      "name": "一燈居"
+    },
+    {
+      "mapX": 101,
+      "mapY": 373,
+      "sceneIdx": 60,
+      "sceneId": 60,
+      "name": "龍門客棧"
+    },
+    {
+      "mapX": 102,
+      "mapY": 373,
+      "sceneIdx": 60,
+      "sceneId": 60,
+      "name": "龍門客棧"
+    },
+    {
+      "mapX": 395,
+      "mapY": 374,
+      "sceneIdx": 50,
+      "sceneId": 50,
+      "name": "閰基居"
+    },
+    {
+      "mapX": 355,
+      "mapY": 375,
+      "sceneIdx": 58,
+      "sceneId": 58,
+      "name": "衡山派"
+    },
+    {
+      "mapX": 68,
+      "mapY": 396,
+      "sceneIdx": 11,
+      "sceneId": 11,
+      "name": "光明頂"
+    },
+    {
+      "mapX": 103,
+      "mapY": 396,
+      "sceneIdx": 16,
+      "sceneId": 16,
+      "name": "金輪寺"
+    },
+    {
+      "mapX": 198,
+      "mapY": 400,
+      "sceneIdx": 61,
+      "sceneId": 61,
+      "name": "高昇客棧"
+    },
+    {
+      "mapX": 199,
+      "mapY": 400,
+      "sceneIdx": 61,
+      "sceneId": 61,
+      "name": "高昇客棧"
+    },
+    {
+      "mapX": 166,
+      "mapY": 403,
+      "sceneIdx": 39,
+      "sceneId": 39,
+      "name": "凌霄城"
+    },
+    {
+      "mapX": 215,
+      "mapY": 407,
+      "sceneIdx": 33,
+      "sceneId": 33,
+      "name": "峨嵋派"
+    },
+    {
+      "mapX": 132,
+      "mapY": 409,
+      "sceneIdx": 35,
+      "sceneId": 35,
+      "name": "星宿海"
+    },
+    {
+      "mapX": 41,
+      "mapY": 419,
+      "sceneIdx": 68,
+      "sceneId": 68,
+      "name": "崑侖派"
+    },
+    {
+      "mapX": 41,
+      "mapY": 420,
+      "sceneIdx": 68,
+      "sceneId": 68,
+      "name": "崑侖派"
+    },
+    {
+      "mapX": 295,
+      "mapY": 421,
+      "sceneIdx": 45,
+      "sceneId": 45,
+      "name": "程瑛居"
+    },
+    {
+      "mapX": 172,
+      "mapY": 424,
+      "sceneIdx": 41,
+      "sceneId": 41,
+      "name": "山洞"
+    },
+    {
+      "mapX": 246,
+      "mapY": 424,
+      "sceneIdx": 37,
+      "sceneId": 37,
+      "name": "五毒教"
+    },
+    {
+      "mapX": 168,
+      "mapY": 426,
+      "sceneIdx": 42,
+      "sceneId": 42,
+      "name": "無量山洞"
+    },
+    {
+      "mapX": 141,
+      "mapY": 432,
+      "sceneIdx": 69,
+      "sceneId": 69,
+      "name": "白駝山"
+    },
+    {
+      "mapX": 22,
+      "mapY": 439,
+      "sceneIdx": 67,
+      "sceneId": 67,
+      "name": "崑崙仙境"
+    },
+    {
+      "mapX": 21,
+      "mapY": 449,
+      "sceneIdx": 66,
+      "sceneId": 66,
+      "name": "冰蠶洞"
+    }
   ]
 }

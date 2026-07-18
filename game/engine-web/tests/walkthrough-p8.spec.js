@@ -38,9 +38,9 @@ test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   expect(await saveTestState(page, 81)).toBe(true);
   console.log('  ✓ 闯王山洞(雪山飞狐+鸯刀+金丝背心)');
 
-  // Step 2: 鸳鸯岛(场景列表第26项=scene79) — 鸳鸯刀+千年人参
+  // Step 2: 鸳鸯岛(场景列表第18项=scene79) — 鸳鸯刀+千年人参
   expect(await loadTestState(page, 81)).toBe(true);
-  await gotoSceneByIdx(page, 26);
+  await gotoSceneByIdx(page, 18);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(1000);
   // entity 2=oldevent_651 → 鸳鸯刀
