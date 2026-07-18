@@ -39,7 +39,7 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   let t = await getT(page); expect(t).toContain('生命');
   await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
-  t = await getT(page); expect(t).toContain('新游戏开始');
+  t = await getT(page); expect(t).toContain('软体娃娃');
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 11)).toBe(true);
   console.log('  ✓ 开局');

@@ -6,7 +6,7 @@ module.exports = defineConfig({
   expect: { timeout: 10000 },
   globalTeardown: require.resolve('./scripts/global-teardown'),
   use: {
-    baseURL: 'http://localhost:8088',
+    baseURL: 'http://127.0.0.1:8088',
     headless: true,
     launchOptions: {
       executablePath: process.env.HOME + '/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome',
