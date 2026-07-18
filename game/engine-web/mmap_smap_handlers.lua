@@ -471,8 +471,23 @@ function SmapHandlers.chooseInteraction(idx)
             )
         end
     elseif ent.type == "exit" then
-        -- 出口：直接传送
-        SmapHandlers.go({tostring(idx)})
+        -- 出口：直接传送（使用 entity 的 targetSceneId，而非按 exit 索引查找）
+        local targetSceneId = ent.targetSceneId
+        if targetSceneId then
+            local JY = g(_G, "JY")
+            if not JY then JY = {}; rawset(_G, "JY", JY) end
+            JY.SubScene = tonumber(targetSceneId)
+            local scenes = getScenes()
+            local targetScene = scenes and scenes[tostring(targetSceneId)]
+            if targetScene then
+                w(string.format("进入了 %s。\n", targetScene["名称"]))
+                SmapHandlers.look({})
+            else
+                JY.Status = 2
+                w("你回到了大地图。\n")
+                MmapHandlers.look({})
+            end
+        end
     elseif ent.type == "event_trigger" then
         -- 交互对象（宝箱/柜子等）：直接执行事件脚本
         local eventId = ent.eventId or (ent.npcData and (ent.npcData["事件编号"] or ent.npcData["触发事件"]) or 0)
