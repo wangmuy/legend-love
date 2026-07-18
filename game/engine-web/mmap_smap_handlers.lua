@@ -535,8 +535,7 @@ function SmapHandlers.chooseInteraction(idx)
                 else
                     w("你打开了...")
                 end
-                local oldCallEventCoroutine = EventExecutor.oldCallEventCoroutine
-                local ok, err = pcall(oldCallEventCoroutine, EventExecutor, tonumber(eventId))
+                local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
                 if not ok then
                     w("事件执行失败: " .. tostring(err))
                 end
