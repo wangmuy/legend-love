@@ -11,14 +11,27 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   loadSaveCache('bridge-p3.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
-  // 苗人凤居/退敌
+  // 苗人凤居/退敌 — tile event extra=30 → 战斗
   expect(await loadTestState(page, 32)).toBe(true);
   expect(await gotoScene(page, '苗人鳳居')).toBeGreaterThan(0);
   let t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  // entity 3 = tile event 30 (苗人凤退敌), entity 1-2 = NPCs
+  await cmd(page, 'choose 3'); await page.waitForTimeout(5000);
+  t = await getT(page);
+  if (t.includes('战场态势') || t.includes('战斗')) {
+    for (let r = 0; r < 10; r++) {
+      await cmd(page, 'choose 5'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      t = await getT(page);
+      if (t.includes('战斗胜利') || t.includes('战斗失败')) break;
+    }
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  console.log('  ✓ 苗人凤居');
+  console.log('  ✓ 苗人凤居(退敌)');
 
   // 蝴蝶谷/铲子/胡青牛加入
   expect(await gotoScene(page, '蝴蝶谷')).toBeGreaterThan(0);
@@ -66,11 +79,14 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   expect(await saveTestState(page, 41)).toBe(true);
   console.log('  ✓ 程瑛居(程瑛加入)');
 
-  // 黑龙潭
+  // 黑龙潭 — 程英破阵
   expect(await loadTestState(page, 41)).toBe(true);
   expect(await gotoScene(page, '黑龍潭')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  // entity 1 = tile event 416 (程英破阵, 需程英在队伍中)
+  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
+  t = await getT(page);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 黑龙潭');

@@ -63,14 +63,28 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 明教分舵');
 
-  // 光明顶/六大派
+  // 光明顶/六大派 — tile event extra=82 → 六大派围攻战斗
   expect(await gotoScene(page, '光明頂')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  // entity 1-3 = tile events 82 (六大派)
+  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
+  t = await getT(page);
+  if (t.includes('战场态势') || t.includes('战斗')) {
+    console.log('  ⚠ 光明顶战斗触发');
+    for (let r = 0; r < 10; r++) {
+      await cmd(page, 'choose 5'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      t = await getT(page);
+      if (t.includes('战斗胜利') || t.includes('战斗失败')) break;
+    }
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 52)).toBe(true);
-  console.log('  ✓ 光明顶');
+  console.log('  ✓ 光明顶(六大派)');
 
   // 华山派/对话岳不群
   expect(await loadTestState(page, 52)).toBe(true);
