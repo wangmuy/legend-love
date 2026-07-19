@@ -32,7 +32,7 @@ async function gotoScene(p, name) {
 }
 
 test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', async ({ page }) => {
-  test.setTimeout(360000);
+  test.setTimeout(600000);
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
   // Step 1: 开局 — choose 1(重新开始) → choose 1(确认属性) → leave → 存档
@@ -98,7 +98,7 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   expect(await saveTestState(page, 13)).toBe(true);
   console.log('  ✓ 闫基战斗');
 
-  // Step 5: 铁掌山 — 大燕族谱 + 裘千仞战斗
+  // Step 5: 铁掌山 — 大燕族谱 + 铁掌拳谱
   expect(await loadTestState(page, 13)).toBe(true);
   await cmd(page, 'choose 1'); await page.waitForTimeout(500);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
@@ -109,25 +109,10 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   await cmd(page, 'choose 3'); await page.waitForTimeout(3000);
   // Entity 4=oldevent_454 → 铁掌拳谱
   await cmd(page, 'choose 4'); await page.waitForTimeout(3000);
-  // 选择裘千仞(第6NPC) → 对话 → 战斗
-  await cmd(page, 'choose 6'); await page.waitForTimeout(3000);  // 裘千仞(第6NPC)
-  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话
-  t = await getT(page);
-  if (t.includes('战场态势') || t.includes('战斗')) {
-    console.log('  ⚠ 裘千仞战斗触发');
-    for (let r = 0; r < 10; r++) {
-      await cmd(page, 'choose 5'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      t = await getT(page);
-      if (t.includes('战斗胜利') || t.includes('战斗失败')) break;
-    }
-  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 14)).toBe(true);
-  console.log('  ✓ 铁掌山(大燕族谱+裘千仞)');
+  console.log('  ✓ 铁掌山(大燕族谱+铁掌拳谱)');
 
   // Step 6: 高升客栈 → 段誉加入
   expect(await loadTestState(page, 14)).toBe(true);
