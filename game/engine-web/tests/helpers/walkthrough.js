@@ -125,8 +125,8 @@ async function loadTestState(page, slot) {
           if (!r || !r.ok) return false;
         }
       }
-      // 解析 JSON 并设置 JY
-      const parseCode = 'local d = _G.JSON.decode(rawget(_G, "__saveData")); if d then local J = rawget(_G, "JY"); if not J then J = {}; rawset(_G, "JY", J) end; J.Base = d.base or {}; J.Person = d.persons or {}; J.Thing = d.things or {}; J.Scene = d.scenes or {}; J.Wugong = d.wugongs or {}; J.Shop = d.shops or {}; J.Status = d.status or 2; J.SubScene = d.subScene or 0; rawset(_G, "__saveData", nil) end; return tostring(d ~= nil)';
+      // 解析 JSON 并设置 JY（使用 parseJSON 替代 _G.JSON.decode，绕过 __index=error 元表）
+      const parseCode = 'local d = rawget(_G, "parseJSON")(rawget(_G, "__saveData")); if d then local J = rawget(_G, "JY"); if not J then J = {}; rawset(_G, "JY", J) end; J.Base = d.base or {}; J.Person = d.persons or {}; J.Thing = d.things or {}; J.Scene = d.scenes or {}; J.Wugong = d.wugongs or {}; J.Shop = d.shops or {}; J.Status = d.status or 2; J.SubScene = d.subScene or 0; rawset(_G, "__saveData", nil) end; return tostring(d ~= nil)';
       r = await window.__luaEval(parseCode);
       return r && r.ok && r.result === 'true';
     }, { json: cacheJson });

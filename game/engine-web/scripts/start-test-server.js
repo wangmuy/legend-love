@@ -38,6 +38,13 @@ const server = http.createServer((req, res) => {
 });
 
 const PORT = parseInt(process.env.PORT || '8088', 10);
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log(`TEST_SERVER_REUSE:${PORT}`);
+    process.exit(0);
+  }
+  throw err;
+});
 server.listen(PORT, () => {
   console.log(`TEST_SERVER_READY:${PORT}`);
 });
