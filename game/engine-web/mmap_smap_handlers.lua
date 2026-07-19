@@ -1546,6 +1546,9 @@ local function showTeam()
     roleMenuPhase = nil
     ws()
     w("0. 返回")
+    if memberCount > 0 then
+        w("输入 choose <编号> 选择队员执行踢出/医疗/解毒操作")
+    end
     roleMenuPhase = "team"
 end
 
@@ -1776,7 +1779,52 @@ function RoleMenu_handleChoose(n)
         showBag()
         return true
     elseif roleMenuPhase == "team" then
-        if n == 0 then showRoleMenu() end
+        if n == 0 then showRoleMenu(); return true end
+        -- 选择队员，显示操作菜单
+        local JY = g(_G, "JY")
+        if not JY then return true end
+        local idx = 0
+        local selectedPid = nil
+        local selectedName = nil
+        for i = 1, CC.TeamNum or 6 do
+            local pid = JY.Base["队伍" .. i]
+            if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+                idx = idx + 1
+                if idx == n then
+                    selectedPid = pid
+                    selectedName = JY.Person[pid]["姓名"] or "?"
+                    break
+                end
+            end
+        end
+        if selectedPid then
+            bagCache = {pid = selectedPid, name = selectedName}
+            ws()
+            w(string.format("选择对 %s 的操作:", selectedName))
+            w("1. 踢出队伍")
+            w("0. 返回")
+            roleMenuPhase = "team_action"
+        else
+            w("无效的选择。")
+        end
+        return true
+    elseif roleMenuPhase == "team_action" then
+        if n == 0 then showTeam(); return true end
+        if n == 1 then
+            -- 踢出队伍
+            local instruct_21 = g(_G, "instruct_21")
+            local member = bagCache
+            if instruct_21 and member then
+                instruct_21(member.pid)
+                w(string.format("%s 已离开队伍。", member.name))
+            else
+                w("踢出失败。")
+            end
+            bagCache = {}
+            roleMenuPhase = nil
+            ws()
+            showTeam()
+        end
         return true
     elseif roleMenuPhase == "team_heal_select_healer" then
         if n == 0 then showTeam(); return true end
