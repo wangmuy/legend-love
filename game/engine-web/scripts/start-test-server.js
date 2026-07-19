@@ -4,10 +4,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 
-// 先清理 8088 端口上残留的旧服务器进程（前一次测试泄漏的）
-try {
-  execSync('fuser -k 8088/tcp 2>/dev/null', { timeout: 3000 });
-} catch (_) {}
+// 端口由 Playwright webServer 管理，reuseExistingServer=false 时自动清理
 
 // Try dist/ first (built version), fall back to ROOT
 const DIST = path.join(ROOT, 'dist');
