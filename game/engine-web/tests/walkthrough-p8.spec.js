@@ -3,7 +3,7 @@
 // 闯王山洞(scene5,雪山区): 雪山飞狐+鸯刀+金丝背心
 // 鸳鸯岛(scene79,东北角): 鸳鸯刀+千年人参
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
 const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
@@ -20,7 +20,7 @@ async function gotoSceneByIdx(page, idx) {
 test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   test.setTimeout(300000);
   loadSaveCache('bridge-p7.json');
-  await page.goto('/'); await waitForPageReady(page); await page.waitForTimeout(3000);
+  await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
   expect(await loadTestState(page, 71)).toBe(true);
 
   // Step 1: 闯王山洞(场景列表第19项=scene5) — 雪山飞狐+鸯刀+金丝背心

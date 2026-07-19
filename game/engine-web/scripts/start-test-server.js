@@ -4,7 +4,10 @@ const path = require('path');
 const { execSync } = require('child_process');
 const ROOT = path.resolve(__dirname, '..');
 
-// 端口由 Playwright webServer 管理，reuseExistingServer=false 时自动清理
+// 清理端口上的残留进程（首次启动时，reuseExistingServer=true 时后续复用）
+try {
+  execSync('fuser -k 8088/tcp 2>/dev/null', { timeout: 3000 });
+} catch (_) {}
 
 // Try dist/ first (built version), fall back to ROOT
 const DIST = path.join(ROOT, 'dist');
