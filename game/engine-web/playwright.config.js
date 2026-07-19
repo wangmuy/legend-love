@@ -4,7 +4,6 @@ module.exports = defineConfig({
   testDir: './tests',
   timeout: 30000,
   expect: { timeout: 10000 },
-  globalTeardown: require.resolve('./scripts/global-teardown'),
   use: {
     baseURL: 'http://127.0.0.1:8088',
     headless: true,
