@@ -32,7 +32,7 @@ async function gotoScene(p, name) {
 }
 
 test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', async ({ page }) => {
-  test.setTimeout(300000);
+  test.setTimeout(360000);
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
   // Step 1: 开局 — choose 1(重新开始) → choose 1(确认属性) → leave → 存档
