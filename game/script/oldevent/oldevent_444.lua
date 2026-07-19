@@ -1,4 +1,4 @@
---function oldevent_444()
+function oldevent_444()
     instruct_1(1556,0,1);   --  1(1):[WWW]说: 这位兄台，你家怎麽有这麽*多漂亮姊姊．
     instruct_0();   --  0(0)::空语句(清屏)
     instruct_1(1557,61,0);   --  1(1):[欧阳克]说: 她们都是我的弟子．

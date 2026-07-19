@@ -1,4 +1,4 @@
---function oldevent_452()
+function oldevent_452()
     instruct_1(1637,0,1);   --  1(1):[WWW]说: 小子，上次对你手下留情，*你居然还敢再来，是不是活*得不耐烦了！
     instruct_0();   --  0(0)::空语句(清屏)
 

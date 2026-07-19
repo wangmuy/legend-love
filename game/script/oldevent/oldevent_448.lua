@@ -1,4 +1,4 @@
---function oldevent_448()
+function oldevent_448()
     instruct_1(1606,94,0);   --  1(1):[???]说: 来者何人，擅闯我铁掌山．
     instruct_0();   --  0(0)::空语句(清屏)
     instruct_1(1607,0,1);   --  1(1):[WWW]说: 铁掌山？我还以为是”猴爪*山”呢？
