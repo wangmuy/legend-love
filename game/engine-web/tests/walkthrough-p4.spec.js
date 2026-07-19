@@ -7,7 +7,7 @@ const { cmd, getT, noE } = require('./helpers/term');
 const SETTLE = 5000;
 
 test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', async ({ page }) => {
-  test.setTimeout(300000);
+  test.setTimeout(600000);
   loadSaveCache('bridge-p3.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
@@ -30,8 +30,12 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
     }
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  // 苗人凤居二刷 — Entity 2=搜索(oldevent_866, 闯王藏宝图)
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  console.log('  ✓ 苗人凤居(退敌)');
+  console.log('  ✓ 苗人凤居(退敌+二刷)');
 
   // 蝴蝶谷/铲子/胡青牛加入
   expect(await gotoScene(page, '蝴蝶谷')).toBeGreaterThan(0);
@@ -79,17 +83,25 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   expect(await saveTestState(page, 41)).toBe(true);
   console.log('  ✓ 程瑛居(程瑛加入)');
 
-  // 黑龙潭 — 程英破阵
+  // 黑龙潭 — 程英破阵 + 瑛姑对话
   expect(await loadTestState(page, 41)).toBe(true);
   expect(await gotoScene(page, '黑龍潭')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
   // entity 1 = tile event 416 (程英破阵, 需程英在队伍中)
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
-  t = await getT(page);
+  // entity 2 = 瑛姑 NPC
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话
+  // 瑛姑对话有多页, 连续 choose 1 跳过
+  for (let d = 0; d < 10; d++) {
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    t = await getT(page);
+    if (t.includes('手帕') || t.includes('段皇爷')) break;
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  console.log('  ✓ 黑龙潭');
+  console.log('  ✓ 黑龙潭(瑛姑)');
 
   // 一灯居
   expect(await gotoScene(page, '一燈居')).toBeGreaterThan(0);
