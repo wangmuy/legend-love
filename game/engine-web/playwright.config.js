@@ -15,7 +15,7 @@ module.exports = defineConfig({
   webServer: {
     command: 'node scripts/start-test-server.js',
     port: 8088,
-    reuseExistingServer: true,
-    timeout: 30000,
+    reuseExistingServer: false,
+    timeout: 60000,
   },
 });

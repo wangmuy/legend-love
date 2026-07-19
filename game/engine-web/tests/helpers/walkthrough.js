@@ -55,21 +55,32 @@ async function loadTestState(page, slot) {
     return r && r.ok && r.result === 'true';
   }, slot);
   console.log(`[loadTestState] slot ${slot}: luaSaveCache=${hasData}, __saveCache=${hasCache}`);
-  // 2. 尝试直接从 luaSaveCache 加载
-  let r = await page.evaluate(async (s) => {
-    if (!window.__luaEval) return { ok: false };
-    const result = await window.__luaEval('return loadGameState(' + s + ')');
-    if (result && result.ok && result.result === 'true') {
-      await window.__luaEval('local JY = rawget(_G, "JY"); if JY then JY.Status = 2 end');
-      await window.__luaEval('pcall(function() if _G.MmapHandlers then _G.MmapHandlers.look({}) end end)');
+  // 2. 尝试直接从 luaSaveCache 加载（带超时，避免 worker 卡住）
+  let loadSucceeded = false;
+  try {
+    const r = await Promise.race([
+      page.evaluate(async (s) => {
+        if (!window.__luaEval) return { ok: false };
+        const result = await window.__luaEval('return loadGameState(' + s + ')');
+        if (result && result.ok && result.result === 'true') {
+          await window.__luaEval('local JY = rawget(_G, "JY"); if JY then JY.Status = 2 end');
+          await window.__luaEval('pcall(function() if _G.MmapHandlers then _G.MmapHandlers.look({}) end end)');
+        }
+        return result;
+      }, slot),
+      new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 10000)),
+    ]);
+    if (r && r.ok && r.result === 'true') {
+      await page.waitForTimeout(500);
+      return true;
     }
-    return result;
-  }, slot);
-  if (r && r.ok && r.result === 'true') {
-    await page.waitForTimeout(500);
-    return true;
+    if (r && r.timeout) {
+      console.log('[loadTestState] loadGameState timeout, falling back to cache inject');
+    }
+  } catch (e) {
+    console.log('[loadTestState] loadGameState error:', e.message);
   }
-  // 3. luaSaveCache 中无数据，从 _bridgeCache 注入并尝试 loadGameState
+  // 3. 从 _bridgeCache 注入并尝试 loadGameState（带超时）
   const cacheJson = _bridgeCache[slot];
   if (cacheJson) {
     // 先注入到 luaSaveCache（worker 内存缓存）
@@ -94,18 +105,25 @@ async function loadTestState(page, slot) {
       return true;
     }, { json: cacheJson, sn: slot });
     await page.waitForTimeout(500);
-    // 尝试 loadGameState（应优先找到 __saveCache 中的数据，直接解析绕过 JSBridge）
-    r = await page.evaluate(async (s) => {
-      if (!window.__luaEval) return { ok: false };
-      const result = await window.__luaEval('return loadGameState(' + s + ')');
-      if (result && result.ok && result.result === 'true') {
-        await window.__luaEval('local JY = rawget(_G, "JY"); if JY then JY.Status = 2; if _G.MmapHandlers then pcall(_G.MmapHandlers.look, _G.MmapHandlers, {}) end end');
+    // 尝试 loadGameState（带超时）
+    try {
+      const r2 = await Promise.race([
+        page.evaluate(async (s) => {
+          if (!window.__luaEval) return { ok: false };
+          const result = await window.__luaEval('return loadGameState(' + s + ')');
+          if (result && result.ok && result.result === 'true') {
+            await window.__luaEval('local JY = rawget(_G, "JY"); if JY then JY.Status = 2; if _G.MmapHandlers then pcall(_G.MmapHandlers.look, _G.MmapHandlers, {}) end end');
+          }
+          return result;
+        }, slot),
+        new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 10000)),
+      ]);
+      if (r2 && r2.ok && r2.result === 'true') {
+        await page.waitForTimeout(500);
+        return true;
       }
-      return result;
-    }, slot);
-    if (r && r.ok && r.result === 'true') {
-      await page.waitForTimeout(500);
-      return true;
+    } catch (e) {
+      console.log('[loadTestState] retry loadGameState error:', e.message);
     }
     // 如果 loadGameState 仍失败，直接解析 JSON 设置 JY
     let fallbackOk = await page.evaluate(async ({ json }) => {
