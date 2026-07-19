@@ -32,6 +32,14 @@ slice-walkthrough-e2e-tests (攻略 e2e 测试)
 | Responsibility | 定义黄金路径，编写逐步骤的 e2e 测试用例 |
 | Depends on | walkthrough-save-state |
 
+### 3. walkthrough-14-books
+
+| 字段 | 值 |
+|------|-----|
+| Scope | 14 天书收集和通关的 e2e 测试 |
+| Responsibility | 解锁天书事件脚本，为每本天书添加 NPC 对话→获取验证，圣堂放置天书验证 |
+| Depends on | walkthrough-main-quest |
+
 ## Shared Contracts
 
 | 约定 | 规则 |
