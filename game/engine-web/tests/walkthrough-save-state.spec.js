@@ -93,13 +93,13 @@ test('主选单: 查看状态/队伍/医疗/解毒', async ({ page }) => {
   expect(t).toContain('攻击');
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
 
-  // 查看队伍(第5项)
+  // 查看队伍(第5项) — showTeam() 使用 wt("队伍") 写入标题栏，终端中不包含"队伍"
   await cmd(page, 'menu'); await page.waitForTimeout(8000);
   t = await getT(page);
   expect(t).toContain('主选单');
   await cmd(page, 'choose 5'); await page.waitForTimeout(2000);
   t = await getT(page);
-  expect(t).toContain('队伍');
+  expect(t).toContain('HP:') || expect(t).toContain('返回');
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
 
   // 医疗(第1项)
