@@ -4,5 +4,6 @@ function oldevent_454()
     instruct_2(174,400);   --  2(2):得到物品[银两][400]
     instruct_2(54,1);   --  2(2):得到物品[铁掌拳谱][1]
     instruct_37(-1);   --  37(25):增加道德-1
+end
 --end
 
