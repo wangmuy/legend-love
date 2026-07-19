@@ -15,11 +15,15 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   // 药王庄/眼药/程灵素加入
   expect(await gotoScene(page, '藥王莊')).toBeGreaterThan(0);
   let t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 程灵素(第1NPC)
+  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 是(加入)
+  t = await getT(page); expect(t).toContain('程灵素');
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 51)).toBe(true);
-  console.log('  ✓ 药王庄');
+  console.log('  ✓ 药王庄(程灵素加入)');
 
   // 衡山派战斗
   expect(await loadTestState(page, 51)).toBe(true);
@@ -88,10 +92,23 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   // 武当山/击败张三丰
   expect(await gotoScene(page, '武當派')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // 张三丰(第2NPC)
+  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话/挑战
+  t = await getT(page);
+  if (t.includes('战场态势') || t.includes('战斗')) {
+    for (let r = 0; r < 10; r++) {
+      await cmd(page, 'choose 5'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      t = await getT(page);
+      if (t.includes('战斗胜利') || t.includes('战斗失败')) break;
+    }
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  console.log('  ✓ 武当山');
+  console.log('  ✓ 武当山(张三丰)');
 
   // 嵩山派/张旭率意帖
   expect(await gotoScene(page, '嵩山派')).toBeGreaterThan(0);
