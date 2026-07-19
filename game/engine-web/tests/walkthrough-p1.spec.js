@@ -60,6 +60,12 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   expect(await gotoScene(page, '田伯光居')).toBeGreaterThan(0);
   await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // 选田伯光(entity 2)
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 选"对话"
+  // 田伯光对话有多页，逐个跳过
+  for (let d = 0; d < 10; d++) {
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    t = await getT(page);
+    if (t.includes('要求加入') || t.includes('田伯光加入') || t.includes('田伯光')) break;
+  }
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 选"是"（加入）
   t = await getT(page); expect(t).toContain('田伯光');
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
