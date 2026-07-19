@@ -30,7 +30,14 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
     }
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
-  // 苗人凤居二刷 — Entity 2=搜索(oldevent_866, 闯王藏宝图)
+  // 飞狐外传条件检查 — Entity 5=搜索(oldevent_7, 需胡斐+屠龙刀+金丝背心)
+  await cmd(page, 'choose 5'); await page.waitForTimeout(3000);
+  t = await getT(page);
+  if (t.includes('飞狐外传') || t.includes('胡斐') || t.includes('金丝背心')) {
+    console.log('  ✓ 飞狐外传条件检查');
+  }
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  // 苗人凤居二刷 — Entity 2=NPC(oldevent_866, 闯王藏宝图)
   await cmd(page, 'look'); await page.waitForTimeout(2000);
   await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
