@@ -1693,7 +1693,7 @@ function processEventQueue(timestamp)
                     elseif cmd == "menu" then
                         local JY = rawget(_G, "JY")
                         if JY and (JY.Status == 2 or JY.Status == 4) then
-                            showRoleMenu()
+                            rawget(_G, "SmapHandlers").menu({})
                         end
                     elseif cmd == "look" then
                         local JY = rawget(_G, "JY")
