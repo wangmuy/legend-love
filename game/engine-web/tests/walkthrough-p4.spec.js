@@ -111,7 +111,17 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 一灯居');
 
-  // 黑龙潭(二刷, 获得桃花岛位置) → 闫基居/七星海棠
+  // 黑龙潭二刷 — 程英破阵后, 一灯居对话后再次访问黑龙潭触发剧情
+  expect(await gotoScene(page, '黑龍潭')).toBeGreaterThan(0);
+  t = await getT(page); expect(t).toContain('你来到了');
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  // 二刷时 tile event 指向 oldevent_434 (后门重置)
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  console.log('  ✓ 黑龙潭(二刷)');
+
+  // 闫基居/七星海棠
   expect(await gotoScene(page, '閰基居')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);

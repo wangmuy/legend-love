@@ -1,4 +1,4 @@
---function oldevent_446()
+function oldevent_446()
     instruct_1(1632,61,0);   --  1(1):[欧阳克]说: 上次我是大意输你，你还敢*再来，这次要你躺着出去．
     instruct_0();   --  0(0)::空语句(清屏)
 
