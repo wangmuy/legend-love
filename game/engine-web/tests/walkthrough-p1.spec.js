@@ -2,7 +2,7 @@
 // 按 quick_pass_game.md 攻略：南贤→田伯光加入→闫基战斗→铁掌帮→段誉加入→无量山洞
 // 纯用户命令，每步都模拟真实玩家操作
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
 const { saveTestState, loadTestState, flushSaveCache } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
@@ -33,7 +33,7 @@ async function gotoScene(p, name) {
 
 test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', async ({ page }) => {
   test.setTimeout(300000);
-  await page.goto('/'); await waitForPageReady(page); await page.waitForTimeout(3000);
+  await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
   // Step 1: 开局 — choose 1(重新开始) → choose 1(确认属性) → leave → 存档
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);

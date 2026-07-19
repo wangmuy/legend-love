@@ -2,7 +2,7 @@
 // quick_pass_game.md: 霹雳堂→圣堂
 // 霹雳堂(scene76)→孔八拉→神杖→绿钥匙→圣堂→通关
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
 const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
@@ -11,7 +11,7 @@ const SETTLE = 5000;
 test('P9: 霹雳堂→圣堂通关', async ({ page }) => {
   test.setTimeout(300000);
   loadSaveCache('bridge-p8.json');
-  await page.goto('/'); await waitForPageReady(page); await page.waitForTimeout(3000);
+  await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
   expect(await loadTestState(page, 81)).toBe(true);
 
   // Step 1: 霹雳堂(scene76) → 孔八拉 → 对话 → 动态事件验证

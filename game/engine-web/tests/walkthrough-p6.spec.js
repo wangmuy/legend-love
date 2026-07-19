@@ -1,6 +1,6 @@
 // quick_pass_game.md: 神龙教→破庙→成昆→沙漠→北丑→灵蛇→渤泥岛→侠客岛
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
 const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
@@ -9,7 +9,7 @@ const SETTLE = 5000;
 test('P6: 神龙教→破庙→成昆→沙漠→北丑→灵蛇→渤泥→侠客', async ({ page }) => {
   test.setTimeout(300000);
   loadSaveCache('bridge-p5.json');
-  await page.goto('/'); await waitForPageReady(page); await page.waitForTimeout(3000);
+  await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
   expect(await loadTestState(page, 53)).toBe(true);
 
   // 神龙教《鹿鼎记》
