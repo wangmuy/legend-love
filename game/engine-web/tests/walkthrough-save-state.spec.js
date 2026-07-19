@@ -76,8 +76,8 @@ test('loadTestState 后无 gameLoop error', async ({ page }) => {
   expect(await noE(page)).toBeTruthy();
 });
 
-test('主选单: 查看状态/队伍', async ({ page }) => {
-  test.setTimeout(120000);
+test('主选单: 查看状态/队伍/医疗/解毒', async ({ page }) => {
+  test.setTimeout(180000);
   await loadPage(page);
   await startNewGame(page);
   await cmd(page, 'leave'); await page.waitForTimeout(2000);
@@ -86,46 +86,38 @@ test('主选单: 查看状态/队伍', async ({ page }) => {
   let t = await getT(page);
   expect(t).toContain('主选单');
 
+  // 查看状态(第3项)
   await cmd(page, 'choose 3'); await page.waitForTimeout(2000);
   t = await getT(page);
   expect(t).toContain('生命');
   expect(t).toContain('攻击');
-
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
 
+  // 查看队伍(第5项)
   await cmd(page, 'menu'); await page.waitForTimeout(8000);
   t = await getT(page);
   expect(t).toContain('主选单');
   await cmd(page, 'choose 5'); await page.waitForTimeout(2000);
   t = await getT(page);
   expect(t).toContain('队伍');
+  await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
 
-  expect(await noE(page)).toBeTruthy();
-});
-
-test('主选单: 医疗/解毒', async ({ page }) => {
-  test.setTimeout(120000);
-  await loadPage(page);
-  await startNewGame(page);
-  await cmd(page, 'leave'); await page.waitForTimeout(2000);
-
+  // 医疗(第1项)
   await cmd(page, 'menu'); await page.waitForTimeout(8000);
-  let t = await getT(page);
+  t = await getT(page);
   expect(t).toContain('主选单');
   await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
   t = await getT(page);
-  const hasMedical = t.includes('医疗') || t.includes('选择');
-  console.log('  ✓ 医疗菜单可用: ' + hasMedical);
-
+  console.log('  ✓ 医疗菜单可用: ' + (t.includes('医疗') || t.includes('选择')));
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
 
+  // 解毒(第2项)
   await cmd(page, 'menu'); await page.waitForTimeout(8000);
   t = await getT(page);
   expect(t).toContain('主选单');
   await cmd(page, 'choose 2'); await page.waitForTimeout(2000);
   t = await getT(page);
-  const hasDetox = t.includes('解毒') || t.includes('选择');
-  console.log('  ✓ 解毒菜单可用: ' + hasDetox);
+  console.log('  ✓ 解毒菜单可用: ' + (t.includes('解毒') || t.includes('选择')));
 
   expect(await noE(page)).toBeTruthy();
 });
