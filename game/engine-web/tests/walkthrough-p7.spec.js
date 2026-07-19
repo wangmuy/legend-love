@@ -1,6 +1,6 @@
 // quick_pass_game.md: 福威镖局→天宁寺→梅庄→黑木崖→丐帮→桃花岛→主角居
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
 const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
@@ -9,7 +9,7 @@ const SETTLE = 5000;
 test('P7: 福威→天宁→梅庄→黑木崖→丐帮→桃花岛→主角居', async ({ page }) => {
   test.setTimeout(300000);
   loadSaveCache('bridge-p6.json');
-  await page.goto('/'); await waitForPageReady(page); await page.waitForTimeout(3000);
+  await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
   expect(await loadTestState(page, 62)).toBe(true);
 

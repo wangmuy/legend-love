@@ -1,7 +1,7 @@
 // tests/walkthrough-p2.spec.js
 // quick_pass_game.md: 回族部落→胡斐加入→冰火岛→绝情谷→大轮寺
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
 const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
@@ -10,7 +10,7 @@ const SETTLE = 5000;
 test('P2: 回族→胡斐→冰火岛→绝情谷→大轮寺', async ({ page }) => {
   test.setTimeout(300000);
   loadSaveCache('bridge-p1.json');
-  await page.goto('/'); await waitForPageReady(page); await page.waitForTimeout(3000);
+  await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
   expect(await loadTestState(page, 16)).toBe(true);
 
   // 无量山洞已在P1完成，从回族部落继续
