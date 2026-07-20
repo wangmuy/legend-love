@@ -178,12 +178,11 @@ Traceability: [REQ-WT-004]
     - [x] 添加 e2e 测试验证条件触发流程
     - [x] 无 gameLoop error
 
-- [ ] 5.2 光明顶倚天屠龙记数据修复（场景11 NPC数据缺失）
-  Blast Radius: `["game/engine-web/data-web/scenes.json", "game/engine-web/dist/data-web/scenes.json", "game/tools/extract_web_data.lua"]`
+- [x] 5.2 光明顶倚天屠龙记数据修复（场景11，通过 tile event 触发）
+  Blast Radius: `["game/script/oldevent/oldevent_82.lua", "game/engine-web/data-web/scenes.json", "game/engine-web/tests/walkthrough-p5.spec.js"]`
   DoD:
-    - [ ] 分析光明顶场景11的数据提取缺失原因
-    - [ ] 检查 ranger.grp 中 Scene_S 结构，确认光明顶 NPC 数据位置
-    - [ ] 修复数据提取脚本或手动补充 NPC 数据
-    - [ ] 光明顶场景有正确的 NPC 事件可触发倚天屠龙记剧情
-    - [ ] 添加 e2e 测试验证光明顶 NPC 对话
+    - [x] 分析光明顶场景11的触发方式：tile event extra=82（3个格子事件）
+    - [x] oldevent_82 已解锁，包含完整六大派围攻剧情
+    - [x] P5 测试已添加 look → choose 1 触发 tile event 流程
+    - [x] 光明顶六大派围攻战斗已验证通过
     - [x] 无 gameLoop error
