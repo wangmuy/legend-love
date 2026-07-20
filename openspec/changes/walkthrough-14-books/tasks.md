@@ -169,14 +169,14 @@ Traceability: [REQ-WT-003]
 ## 5. 剩余待处理天书
 Traceability: [REQ-WT-004]
 
-- [ ] 5.1 飞狐外传条件触发实现（苗人凤居，需胡斐+屠龙刀+金丝背心）
+- [x] 5.1 飞狐外传条件触发实现（苗人凤居，需胡斐+屠龙刀+金丝背心）
   Blast Radius: `["game/script/oldevent/oldevent_7.lua", "game/engine-web/dist/script/oldevent/oldevent_7.lua", "game/engine-web/mmap_smap_handlers.lua"]`
   DoD:
-    - [ ] 分析飞狐外传获取条件（胡斐在队伍+屠龙刀+金丝背心）
-    - [ ] 实现条件检查逻辑（队伍中是否有胡斐、物品中是否有屠龙刀和金丝背心）
-    - [ ] 条件满足时触发 oldevent_7 给予飞狐外传天书
-    - [ ] 添加 e2e 测试验证条件触发流程
-    - [ ] 无 gameLoop error
+    - [x] 分析飞狐外传获取条件（胡斐在队伍+屠龙刀+金丝背心）
+    - [x] 实现条件检查逻辑（队伍中是否有胡斐、物品中是否有屠龙刀和金丝背心）
+    - [x] 条件满足时触发 oldevent_7 给予飞狐外传天书
+    - [x] 添加 e2e 测试验证条件触发流程
+    - [x] 无 gameLoop error
 
 - [ ] 5.2 光明顶倚天屠龙记数据修复（场景11 NPC数据缺失）
   Blast Radius: `["game/engine-web/data-web/scenes.json", "game/engine-web/dist/data-web/scenes.json", "game/tools/extract_web_data.lua"]`
@@ -186,4 +186,4 @@ Traceability: [REQ-WT-004]
     - [ ] 修复数据提取脚本或手动补充 NPC 数据
     - [ ] 光明顶场景有正确的 NPC 事件可触发倚天屠龙记剧情
     - [ ] 添加 e2e 测试验证光明顶 NPC 对话
-    - [ ] 无 gameLoop error
+    - [x] 无 gameLoop error
