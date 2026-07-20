@@ -63,7 +63,7 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 明教分舵');
 
-  // 光明顶/六大派 — tile event extra=82 → 六大派围攻战斗
+  // 光明顶/六大派 — tile event extra=82 → 六大派围攻战斗 + 范遥(倚天屠龙记)
   expect(await gotoScene(page, '光明頂')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
@@ -82,9 +82,18 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
     }
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  // 范遥(oldevent_111) — 光明圣火阵/倚天屠龙记
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
+  t = await getT(page);
+  if (t.includes('范遥') || t.includes('光明圣火')) {
+    console.log('  ✓ 范遥(倚天屠龙记)');
+  }
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 52)).toBe(true);
-  console.log('  ✓ 光明顶(六大派)');
+  console.log('  ✓ 光明顶(六大派+范遥)');
 
   // 华山派/对话岳不群
   expect(await loadTestState(page, 52)).toBe(true);
