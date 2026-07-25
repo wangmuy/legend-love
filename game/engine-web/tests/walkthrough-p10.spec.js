@@ -11,7 +11,7 @@ test('P10: 武道大会→霹雳堂→圣堂通关', async ({ page }) => {
   test.setTimeout(300000);
   loadSaveCache('bridge-p9.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
-  expect(await loadTestState(page, 91)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
 
   // Step 1: 武道大会(scene25) → 华山论剑格子事件 → 得神杖
   // Entity 1=守卫(oldevent_933), Entity 2=华山论剑(tile 33,26, extra=936)
@@ -26,13 +26,13 @@ test('P10: 武道大会→霹雳堂→圣堂通关', async ({ page }) => {
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(5000);
-  expect(await saveTestState(page, 101)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 武道大会');
 
   // Step 2: 霹雳堂 → 孔八拉 → 神杖 → 绿钥匙
   // 第一次对话: oldevent_678(初始对话) → instruct_3 修改 D* 表
   // 第二次对话: 动态事件解析 → oldevent_686(神杖检查) → 绿钥匙
-  expect(await loadTestState(page, 101)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   expect(await gotoScene(page, '霹靂堂')).toBeGreaterThan(0);
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 1'); await page.waitForTimeout(8000);

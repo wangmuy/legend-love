@@ -41,22 +41,22 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   await cmd(page, 'choose 1'); await page.waitForTimeout(SETTLE);
   t = await getT(page); expect(t).toContain('软体娃娃');
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 11)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 开局');
 
   // Step 2: 南贤对话 — Entity 1=搜索(柜子), Entity 2=南贤
-  expect(await loadTestState(page, 11)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   expect(await gotoScene(page, '南賢居')).toBeGreaterThan(0);
   await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // 南贤(entity 2)
   await cmd(page, 'choose 1'); await page.waitForTimeout(4000);  // 对话
   t = await getT(page); expect(t).toContain('南贤');
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 11)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 南贤对话');
 
   // Step 3: 田伯光加入 — Entity 1=搜索, Entity 2=田伯光NPC → 对话 → 招人
-  expect(await loadTestState(page, 11)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   expect(await gotoScene(page, '田伯光居')).toBeGreaterThan(0);
   await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // 选田伯光(entity 2)
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 选"对话"
@@ -70,11 +70,11 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   t = await getT(page); expect(t).toContain('田伯光');
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 12)).toBe(true);
+  expect(await saveTestState(page, 2)).toBe(true);
   console.log('  ✓ 田伯光加入');
 
   // Step 4: 闫基战斗 — choose 4(瓦片事件) → 战斗 → 胜利
-  expect(await loadTestState(page, 12)).toBe(true);
+  expect(await loadTestState(page, 2)).toBe(true);
   expect(await gotoScene(page, '閰基居')).toBeGreaterThan(0);
   await cmd(page, 'choose 4'); await page.waitForTimeout(5000);
   t = await getT(page); expect(t).toContain('阎基');
@@ -91,15 +91,19 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   }
   t = await getT(page); expect(t).toContain('战斗胜利');
   expect(await noE(page)).toBeTruthy();
-  // 战斗结束后，用 look 确认状态，然后 leave 回到大地图
-  await cmd(page, 'look'); await page.waitForTimeout(1000);
+  // 战斗结束后，用 leave 回到大地图，再重新进入场景搜索物品
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
-  expect(await saveTestState(page, 13)).toBe(true);
+  // 重新进入闫基居，搜索获得物品（两页刀法、药材、天王保命丹）
+  expect(await gotoScene(page, '閰基居')).toBeGreaterThan(0);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 两页刀法
+  await cmd(page, 'choose 2'); await page.waitForTimeout(2000);  // 药材
+  await cmd(page, 'choose 3'); await page.waitForTimeout(2000);  // 天王保命丹
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  expect(await saveTestState(page, 3)).toBe(true);
   console.log('  ✓ 闫基战斗');
 
   // Step 5: 铁掌山 — 大燕族谱 + 铁掌拳谱
-  expect(await loadTestState(page, 13)).toBe(true);
+  expect(await loadTestState(page, 3)).toBe(true);
   await cmd(page, 'choose 1'); await page.waitForTimeout(500);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
@@ -111,11 +115,11 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   await cmd(page, 'choose 4'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 14)).toBe(true);
+  expect(await saveTestState(page, 4)).toBe(true);
   console.log('  ✓ 铁掌山(大燕族谱+铁掌拳谱)');
 
   // Step 6: 高升客栈 → 段誉加入
-  expect(await loadTestState(page, 14)).toBe(true);
+  expect(await loadTestState(page, 4)).toBe(true);
   await cmd(page, 'choose 1'); await page.waitForTimeout(500);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
@@ -126,18 +130,18 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   t = await getT(page); expect(t).toContain('段誉');
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 15)).toBe(true);
+  expect(await saveTestState(page, 5)).toBe(true);
   console.log('  ✓ 段誉加入');
 
   // Step 7: 无量山洞 — 段誉教凌波微步
-  expect(await loadTestState(page, 15)).toBe(true);
+  expect(await loadTestState(page, 5)).toBe(true);
   expect(await gotoScene(page, '無量山洞')).toBeGreaterThan(0);
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 段誉NPC
   await cmd(page, 'choose 1'); await page.waitForTimeout(4000);  // 对话→凌波微步
   t = await getT(page); expect(t).toContain('段誉');
   await cmd(page, 'choose 0'); await page.waitForTimeout(1000);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 16)).toBe(true);
+  expect(await saveTestState(page, 6)).toBe(true);
   console.log('  ✓ 无量山洞');
 
   expect(await noE(page)).toBeTruthy();
