@@ -6,8 +6,8 @@ const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
 const { saveTestState, loadTestState } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
-const SLOT_A = 11;
-const SLOT_B = 12;
+const SLOT_A = 1;
+const SLOT_B = 2;
 
 /** 辅助：加载页面 */
 async function loadPage(page) {

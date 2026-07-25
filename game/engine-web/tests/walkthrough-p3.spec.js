@@ -12,7 +12,7 @@ test('P3: 百花谷→绝情谷底→古墓→燕子坞→泰山派', async ({ p
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
   // 百花谷/养蜂
-  expect(await loadTestState(page, 22)).toBe(true);
+  expect(await loadTestState(page, 2)).toBe(true);
   expect(await gotoScene(page, '百花谷')).toBeGreaterThan(0);
   let t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
@@ -27,11 +27,11 @@ test('P3: 百花谷→绝情谷底→古墓→燕子坞→泰山派', async ({ p
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 31)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 绝情谷底');
 
   // 古墓/小龙女加入 + 九阴真经(oldevent_442)
-  expect(await loadTestState(page, 31)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   expect(await gotoScene(page, '古墓')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
@@ -53,11 +53,11 @@ test('P3: 百花谷→绝情谷底→古墓→燕子坞→泰山派', async ({ p
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 32)).toBe(true);
+  expect(await saveTestState(page, 2)).toBe(true);
   console.log('  ✓ 燕子坞');
 
   // 泰山派/洗手帖
-  expect(await loadTestState(page, 32)).toBe(true);
+  expect(await loadTestState(page, 2)).toBe(true);
   expect(await gotoScene(page, '泰山派')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);

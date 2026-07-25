@@ -21,7 +21,7 @@ test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   test.setTimeout(300000);
   loadSaveCache('bridge-p7.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
-  expect(await loadTestState(page, 71)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
 
   // Step 1: 闯王山洞(场景列表第19项=scene5) — 雪山飞狐+鸯刀+金丝背心
   await gotoSceneByIdx(page, 19);
@@ -35,11 +35,11 @@ test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   await cmd(page, 'choose 7'); await page.waitForTimeout(2000);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 81)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 闯王山洞(雪山飞狐+鸯刀+金丝背心)');
 
   // Step 2: 鸳鸯岛(场景列表第18项=scene79) — 鸳鸯刀+千年人参
-  expect(await loadTestState(page, 81)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   await gotoSceneByIdx(page, 18);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(1000);

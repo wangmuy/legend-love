@@ -10,7 +10,7 @@ test('P6: 神龙教→破庙→成昆→沙漠→北丑→灵蛇→渤泥→侠�
   test.setTimeout(360000);
   loadSaveCache('bridge-p5.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
-  expect(await loadTestState(page, 53)).toBe(true);
+  expect(await loadTestState(page, 3)).toBe(true);
 
   // 神龙教《鹿鼎记》— 洪教主对话(oldevent_609)
   expect(await gotoScene(page, '神龍教')).toBeGreaterThan(0);
@@ -30,11 +30,11 @@ test('P6: 神龙教→破庙→成昆→沙漠→北丑→灵蛇→渤泥→侠�
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 61)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 破庙');
 
   // 成昆居
-  expect(await loadTestState(page, 61)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   expect(await gotoScene(page, '成崑居')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
@@ -56,11 +56,11 @@ test('P6: 神龙教→破庙→成昆→沙漠→北丑→灵蛇→渤泥→侠�
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 62)).toBe(true);
+  expect(await saveTestState(page, 2)).toBe(true);
   console.log('  ✓ 北丑居');
 
   // 灵蛇岛/紫衫龙王
-  expect(await loadTestState(page, 62)).toBe(true);
+  expect(await loadTestState(page, 2)).toBe(true);
   expect(await gotoScene(page, '靈蛇島')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
@@ -88,7 +88,7 @@ test('P6: 神龙教→破庙→成昆→沙漠→北丑→灵蛇→渤泥→侠�
   t = await getT(page);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 63)).toBe(true);
+  expect(await saveTestState(page, 3)).toBe(true);
   console.log('  ✓ 侠客岛(龙岛主)');
 
   expect(await noE(page)).toBeTruthy();

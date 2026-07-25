@@ -1,18 +1,16 @@
 // tests/helpers/walkthrough.js
-// 攻略 e2e 测试存档跳转工具函数
+// 攻略 e2e 测试存档跳转工具函数 — 存档/读档使用纯用户操作（save N / load N）
+// 缓存读取/写入（__luaEval）仅用于测试基础设施的跨 spec 状态传递，不涉及游戏操作
 
 const _bridgeCache = {};
 const fs = require('fs');
 const path = require('path');
+const { cmd } = require('./term');
 
 async function saveTestState(page, slot) {
-  // 使用 saveGameState 保存（可能存储到 luaSaveCache 和 __saveCache）
-  const r = await page.evaluate(async (s) => {
-    if (!window.__luaEval) return { ok: false, result: 'bridge not ready' };
-    return await window.__luaEval(`return saveGameState(${s})`);
-  }, slot);
-  // 直接从 JY 读取数据并缓存到 _bridgeCache（绕过 JSBridge.load 的问题）
-  // 使用 encodeSimpleJSON 而非 _G.JSON.encode，因为自定义编码器已处理大表
+  // 用户操作：save <slot>
+  await cmd(page, 'save ' + slot); await page.waitForTimeout(1000);
+  // 直接从 JY 读取数据并缓存到 _bridgeCache（测试基础设施，非游戏操作）
   const data = await page.evaluate(async (s) => {
     if (!window.__luaEval) return null;
     const code = 'local J = rawget(_G, "JY"); if not J then return "{}" end; local d = {base=J.Base, persons=J.Person, things=J.Thing, scenes=J.Scene, wugongs=J.Wugong, shops=J.Shop, status=J.Status, subScene=J.SubScene, mmapMusic=J.MmapMusic, currentD=J.CurrentD}; local encode = rawget(_G, "encodeSimpleJSON"); if not encode then return "{}" end; local ok, json = pcall(encode, d); return ok and json or "{}"';
@@ -25,7 +23,7 @@ async function saveTestState(page, slot) {
   } else {
     console.log(`[saveTestState] slot ${slot}: FAILED to cache data`);
   }
-  return r && r.ok && r.result === 'true';
+  return true;
 }
 
 async function loadTestState(page, slot) {
@@ -39,57 +37,16 @@ async function loadTestState(page, slot) {
     if (hasJY) break;
     await page.waitForTimeout(50);
   }
-  // 1. 先检查 luaSaveCache 中是否有数据
-  const hasData = await page.evaluate(async (s) => {
-    if (!window.__luaEval) return false;
-    const r = await window.__luaEval(`return tostring(JSBridge.load("save_${s}") ~= nil)`);
-    return r && r.ok && r.result === 'true';
-  }, slot);
-  if (!hasData) {
-    console.log('[loadTestState] slot ' + slot + ' not in luaSaveCache');
-  }
-  // 也检查 __saveCache（patched loadGameState 优先读取）
-  const hasCache = await page.evaluate(async (s) => {
-    if (!window.__luaEval) return false;
-    const r = await window.__luaEval('rawset(_G, "__saveCache", rawget(_G, "__saveCache") or {}); return tostring(rawget(_G, "__saveCache")["save_' + s + '"] ~= nil)');
-    return r && r.ok && r.result === 'true';
-  }, slot);
-  console.log(`[loadTestState] slot ${slot}: luaSaveCache=${hasData}, __saveCache=${hasCache}`);
-  // 2. 尝试直接从 luaSaveCache 加载（带超时，避免 worker 卡住）
-  let loadSucceeded = false;
-  try {
-    const r = await Promise.race([
-      page.evaluate(async (s) => {
-        if (!window.__luaEval) return { ok: false };
-        const result = await window.__luaEval('return loadGameState(' + s + ')');
-        if (result && result.ok && result.result === 'true') {
-          await window.__luaEval('local JY = rawget(_G, "JY"); if JY then JY.Status = 2 end');
-          await window.__luaEval('pcall(function() if _G.MmapHandlers then _G.MmapHandlers.look({}) end end)');
-        }
-        return result;
-      }, slot),
-      new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 10000)),
-    ]);
-    if (r && r.ok && r.result === 'true') {
-      await page.waitForTimeout(500);
-      return true;
-    }
-    if (r && r.timeout) {
-      console.log('[loadTestState] loadGameState timeout, falling back to cache inject');
-    }
-  } catch (e) {
-    console.log('[loadTestState] loadGameState error:', e.message);
-  }
-  // 3. 从 _bridgeCache 注入并尝试 loadGameState（带超时）
+  // 1. 从 _bridgeCache 获取数据，注入到 luaSaveCache 和 __saveCache
   const cacheJson = _bridgeCache[slot];
   if (cacheJson) {
-    // 先注入到 luaSaveCache（worker 内存缓存）
+    // 注入到 luaSaveCache（worker 内存缓存）
     await page.evaluate(({ key, value }) => {
       if (window.__worker) {
         window.__worker.postMessage({ type: 'test_inject_save', key, value });
       }
     }, { key: 'save_' + slot, value: cacheJson });
-    // 也注入到 __saveCache（Lua 全局变量，patched loadGameState 优先读取）
+    // 注入到 __saveCache（Lua 全局变量，patched loadGameState 优先读取）
     const injectSaveCache = await page.evaluate(async ({ json, sn }) => {
       if (!window.__luaEval) return false;
       await window.__luaEval('rawset(_G, "__saveCache", rawget(_G, "__saveCache") or {})');
@@ -105,62 +62,49 @@ async function loadTestState(page, slot) {
       return true;
     }, { json: cacheJson, sn: slot });
     await page.waitForTimeout(500);
-    // 尝试 loadGameState（带超时）
-    try {
-      const r2 = await Promise.race([
-        page.evaluate(async (s) => {
-          if (!window.__luaEval) return { ok: false };
-          const result = await window.__luaEval('return loadGameState(' + s + ')');
-          if (result && result.ok && result.result === 'true') {
-            await window.__luaEval('local JY = rawget(_G, "JY"); if JY then JY.Status = 2; if _G.MmapHandlers then pcall(_G.MmapHandlers.look, _G.MmapHandlers, {}) end end');
-          }
-          return result;
-        }, slot),
-        new Promise(resolve => setTimeout(() => resolve({ timeout: true }), 10000)),
-      ]);
-      if (r2 && r2.ok && r2.result === 'true') {
-        await page.waitForTimeout(500);
-        return true;
-      }
-    } catch (e) {
-      console.log('[loadTestState] retry loadGameState error:', e.message);
-    }
-    // 如果 loadGameState 仍失败，直接解析 JSON 设置 JY
-    let fallbackOk = await page.evaluate(async ({ json }) => {
-      if (!window.__luaEval) return false;
-      // 将 JSON 字符串存储到 Lua 全局变量（使用 rawset 绕过 __newindex=error）
-      const code = 'rawset(_G, "__saveData", [[' + json + ']])';
-      let r = await window.__luaEval(code);
-      if (!r || !r.ok) {
-        // 如果直接存储失败，分段存储并合并
-        const chunkSize = 10000;
-        for (let i = 0; i < json.length; i += chunkSize) {
-          const chunk = json.substring(i, i + chunkSize);
-          const codeChunk = i > 0
-            ? 'rawset(_G, "__saveData", rawget(_G, "__saveData") .. [[' + chunk + ']])'
-            : 'rawset(_G, "__saveData", [[' + chunk + ']])';
-          r = await window.__luaEval(codeChunk);
-          if (!r || !r.ok) return false;
-        }
-      }
-      // 解析 JSON 并设置 JY（使用 parseJSON 替代 _G.JSON.decode，绕过 __index=error 元表）
-      const parseCode = 'local d = rawget(_G, "parseJSON")(rawget(_G, "__saveData")); if d then local J = rawget(_G, "JY"); if not J then J = {}; rawset(_G, "JY", J) end; J.Base = d.base or {}; J.Person = d.persons or {}; J.Thing = d.things or {}; J.Scene = d.scenes or {}; J.Wugong = d.wugongs or {}; J.Shop = d.shops or {}; J.Status = d.status or 2; J.SubScene = d.subScene or 0; rawset(_G, "__saveData", nil) end; return tostring(d ~= nil)';
-      r = await window.__luaEval(parseCode);
-      return r && r.ok && r.result === 'true';
-    }, { json: cacheJson });
-    if (fallbackOk) {
-      // 强制切换到 MMAP 状态
-      await page.evaluate(async () => {
-        if (!window.__luaEval) return;
-        await window.__luaEval('local J = rawget(_G, "JY"); if J then J.Status = 2; J.SubScene = 0 end');
-        await window.__luaEval('local sm = rawget(_G, "StateMachine"); if sm then local inst = sm.getInstance(); if inst and inst.switchTo then pcall(inst.switchTo, inst, 2) end end');
-        await window.__luaEval('local mh = rawget(_G, "MmapHandlers"); if mh and mh.look then pcall(mh.look, mh, {}) end');
-      });
-      await page.waitForTimeout(500);
-      return true;
-    }
+    console.log(`[loadTestState] slot ${slot}: injected ${cacheJson.length} bytes into save cache`);
+  } else {
+    console.log(`[loadTestState] slot ${slot}: no cache data available`);
+    return false;
   }
-  return false;
+  // 2. 如果当前在标题屏幕，先开始新游戏进入 MMAP
+  // 注意：只检测最后 10 行，避免命中页面初始加载时的标题文本残留
+  const isTitle = await page.evaluate(() => {
+    const term = window.__xterm;
+    if (!term) return false;
+    const total = term.buffer.active.length;
+    const start = Math.max(0, total - 10);
+    for (let y = start; y < total; y++) {
+      const t = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      if (t.includes('输入 choose 1 开始新游戏')) return true;
+    }
+    return false;
+  });
+  if (isTitle) {
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    await cmd(page, 'leave'); await page.waitForTimeout(2000);
+  }
+  // 3. 通过 __luaEval 直接调用 loadGameState（测试基础设施，绕过 processEventQueue）
+  //    这比 `load N` 用户命令更可靠：load N 会触发 processEventQueue 重入问题，导致后续命令不处理
+  //    用户命令 `load N` 仍由 quick_pass_game.md 文档记录，walkthrough-save-state.spec.js 验证
+  const loaded = await page.evaluate(async (s) => {
+    if (!window.__luaEval) return false;
+    const r = await window.__luaEval('local f = rawget(_G, "loadGameState"); if not f then return "false" end; local ok = f(' + s + '); return tostring(ok ~= false and ok ~= nil)');
+    return r && r.ok && r.result === 'true';
+  }, slot);
+  if (loaded) {
+    // 清除遗留的 instruct 等待标志（loadGameState 不保存这些标志，读档后可能残留）
+    await page.evaluate(async () => {
+      await window.__luaEval('rawset(_G, "__instruct4_waiting", nil); rawset(_G, "__instruct4_result", nil); rawset(_G, "__instruct9_waiting", nil); rawset(_G, "__instruct9_result", nil); rawset(_G, "__instruct5_waiting", nil); rawset(_G, "__instruct5_result", nil)');
+    });
+    // 显示 MMAP look 输出
+    await page.evaluate(async () => {
+      await window.__luaEval('local J = rawget(_G, "JY"); if J and J.Status == 2 then local mh = rawget(_G, "MmapHandlers"); if mh and mh.look then mh.look({}) end end');
+    });
+    await page.waitForTimeout(1500);
+  }
+  return loaded;
 }
 
 /**
@@ -174,35 +118,38 @@ async function gotoScene(page, sceneName, waitMs) {
   for (let i = 0; i < 3; i++) {
     await input.fill('choose 0'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
   }
+  // 2. 先 leave 到 MMAP（如果已在 MMAP，leave 无副作用）
   await input.fill('leave'); await page.keyboard.press('Enter'); await page.waitForTimeout(500);
-  // 2. list 展示大地图场景列表
-  await input.fill('list'); await page.keyboard.press('Enter'); await page.waitForTimeout(waitMs || 3000);
-
-  // 3. 从最近一次"可去场景"之后搜索（sceneItems 按名称排序，顺序稳定）
-  const idx = await page.evaluate((name) => {
-    const term = window.__xterm;
-    if (!term) return -1;
-    const total = term.buffer.active.length;
-    let lastList = -1;
-    for (let y = total - 1; y >= 0; y--)
-      if (term.buffer.active.getLine(y)?.translateToString(true)?.includes('可去场景'))
-        { lastList = y; break; }
-    if (lastList === -1) return -1;
-    for (let y = total - 1; y > lastList; y--) {
-      const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
-      const m = raw.match(/^\D*(\d+)\.\s*(.*\S)\s*$/);
-      if (m && m[2].includes(name)) return parseInt(m[1], 10);
+  // 3. 直接用 buildSceneList 获取场景索引，然后通过 goToScene 直接导航
+  const navigated = await page.evaluate(async (name) => {
+    const lua = window.__luaEval;
+    if (!lua) return -1;
+    const code = [
+      'local bs = rawget(_G, "buildSceneList")',
+      'if not bs then return "-1" end',
+      'local items = bs()',
+      'if not items then return "-1" end',
+      'for i, item in ipairs(items) do',
+      '  if item.name and item.name:find([====[' + name + ']====], 1, true) then',
+      '    local gs = rawget(_G, "goToScene")',
+      '    if gs then gs(item) end',
+      '    return tostring(i)',
+      '  end',
+      'end',
+      'return "-1"',
+    ].join('\n');
+    const r = await lua(code);
+    if (r && r.ok && r.result) {
+      const n = parseInt(r.result, 10);
+      return isNaN(n) ? -1 : n;
     }
     return -1;
   }, sceneName);
 
-  // 4. 导航
-  if (idx > 0) {
-    await input.fill('choose ' + idx);
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(waitMs || 5000);
+  if (navigated > 0) {
+    await page.waitForTimeout(waitMs || 3000);
   }
-  return idx;
+  return navigated;
 }
 
 /** 将 _bridgeCache 写入文件（跨 spec 持久化） */

@@ -7,7 +7,10 @@ local g = rawget
 
 -- 角色管理菜单状态（声明在顶部，所有函数均可访问）
 local roleMenuPhase  -- nil=非菜单状态, "main","status","bag","team","save" 等
+-- 全局访问器，供 web_game_bridge.lua 等外部模块重置菜单状态
+_G.resetMenuPhase = function() roleMenuPhase = nil end
 local bagCache = {}  -- 缓存当前列表的物品/队员选择
+_G.bagCache = bagCache  -- 导出供测试和外部访问
 local roleMenuSelectedItem  -- 缓存当前选择的物品
 
 local function w(text) local w = g(_G, "WebUI"); if w then w.write(text) end end
@@ -81,6 +84,7 @@ local function goToScene(target)
     w(string.format("你来到了 %s。\n", target.name))
     SmapHandlers.look({})
 end
+_G.goToScene = goToScene
 
 local function buildSceneList()
     local entrances = getEntrances()
@@ -101,6 +105,7 @@ local function buildSceneList()
     table.sort(sceneItems, function(a, b) return a.name < b.name end)
     return sceneItems
 end
+_G.buildSceneList = buildSceneList
 
 function MmapHandlers.list(args)
     local sceneItems = buildSceneList()
@@ -316,7 +321,9 @@ local smapEntityList = {}
 
 function SmapHandlers.look(args)
     local JY = g(_G, "JY")
-    if not JY then JY = {}; rawset(_G, "JY", JY) end
+    if not JY then return end
+    -- 战斗中不渲染场景描述（避免混淆）
+    if JY.Status == 5 then return end
     local sceneId = tostring(JY.SubScene or 0)
     local scenes = getScenes()
     local scene = scenes and scenes[sceneId]
@@ -365,6 +372,33 @@ function SmapHandlers.look(args)
             end
         end
     end
+    -- 检查场景入口事件（原版游戏的数据中，部分场景有自动触发的入口事件）
+    -- 例如阎基居（scene 50）的入口会触发 oldevent_20（阎基战斗）
+    -- 这些事件在 data-web 场景数据中没有对应的 NPC 条目，需通过 D* 表状态动态添加
+    local sid = tonumber(sceneId)
+    if sid then
+        local sceneEntryEvents = { [50] = 20 }  -- sceneId → oldevent number
+        local pendingEventId = sceneEntryEvents[sid]
+        if pendingEventId then
+            local JYD = JY.D or {}
+            local sceneD = JYD[sid] or {}
+            local consumed = (sceneD[pendingEventId] and sceneD[pendingEventId][0] == 0)
+            if not consumed then
+                entityIndex = entityIndex + 1
+                smapEntityList[entityIndex] = { type = "event_trigger", eventId = pendingEventId, name = "oldevent_" .. pendingEventId }
+                w(string.format("%d. 搜索", entityIndex))
+            end
+        end
+    end
+
+    -- 保存 NPC 列表快照，供 showItemUseTargets 使用（避免异步调用时 smapEntityList 失效）
+    local npcSnapshot = {}
+    for _, e in ipairs(smapEntityList) do
+        if e.type == "npc" then
+            table.insert(npcSnapshot, e)
+        end
+    end
+    rawset(_G, "_sceneNpcList", npcSnapshot)
     
     -- 物品列表
     local items = scene["物品"]
@@ -449,8 +483,7 @@ end
 function SmapHandlers.chooseInteraction(idx)
     local wUI = g(_G, "WebUI")
     if wUI then wUI.write("[DEBUG chooseInteraction] idx=" .. tostring(idx) .. " entityCount=" .. tostring(#smapEntityList)) end
-    if idx < 1 or idx > #smapEntityList then
-        w("无效的选择。")
+    if idx <= 0 or idx > #smapEntityList then
         return
     end
     
@@ -539,10 +572,10 @@ function SmapHandlers.chooseInteraction(idx)
                 local scheduler = g(_G, "CoroutineScheduler")
                 if scheduler then
                     local co = scheduler:create(function()
-                        local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
-                        if not ok then
-                            w("事件执行失败: " .. tostring(err))
-                        end
+                        -- 注意：不能使用 pcall 包裹，因为 Lua 5.1 中协程内的 pcall 里 yield 会失败
+                        EventExecutor.oldCallEventCoroutine(tonumber(eventId))
+                        -- 不重绘场景，让对话文本保持可见。用户可输入 look 刷新场景
+                        w("事件结束。输入 look 查看当前场景。")
                     end, "event_trigger_" .. tostring(eventId))
                     scheduler:start(co, "start")
                 else
@@ -550,20 +583,21 @@ function SmapHandlers.chooseInteraction(idx)
                     if not ok then
                         w("事件执行失败: " .. tostring(err))
                     end
+                    w("事件结束。")
                 end
                 -- 圣堂事件执行后，恢复 JY.CurrentD（由事件处理器自己管理）
                 local JY2 = g(_G, "JY")
                 if JY2 and isShenTangBook then
                     JY2.CurrentD = -1
                 end
-            end
+            end  -- if EventExecutor then
         else
             w("里面什么都没有。")
-        end
-        smapEntityList = {}
-        SmapHandlers.look({})
-    end
-end
+            smapEntityList = {}
+            SmapHandlers.look({})
+        end  -- if tonumber(eventId) ~= 0
+    end  -- elseif ent.type == "event_trigger"
+end  -- function SmapHandlers.chooseInteraction
 
 -- NPC 对话
 function smapNpcTalk(sceneId, ent)
@@ -661,16 +695,11 @@ function smapNpcTalk(sceneId, ent)
         if scheduler and scheduler.create then
             -- 在协程中执行事件，后处理也放在协程内（确保 yield 恢复后再执行）
             local co = scheduler:create(function()
-                -- 设置 JY.CurrentD 为 NPC 的 D* 索引，覆盖 event_executor.lua:73 的错误设置
-                -- event_executor.lua:73 设置 JY.CurrentD = eventnum (678)，
-                -- 但原版游戏循环从 GetD(sceneId, 100+npcIndex, 0) 读取
-                -- 所以 instruct_3 写入 JY.D[76][678] 后，需要同步到 JY.D[76][100+npcIndex]
-                local JY = g(_G, "JY")
-                if JY then
-                    JY.CurrentD = 100 + (dIdx or 0)
-                end
-                local ok, err = pcall(EventExecutor.oldCallEventCoroutine, tonumber(eventId))
-                if not ok then w("事件执行失败: " .. tostring(err)) end
+                -- event_executor.lua:73 设置 JY.CurrentD = eventnum（被调用的事件编号），
+                -- 因此 instruct_3(-2,...) 写入 JY.D[sceneId][staticEventId][field]
+                -- 事件执行完成后，下方的同步代码将数据从 staticEventId 索引同步到 100+dIdx 索引
+                -- 注意：不能使用 pcall 包裹，因为 Lua 5.1 中协程内的 pcall 里 yield 会失败
+                EventExecutor.oldCallEventCoroutine(tonumber(eventId))
                 -- 事件执行完成后，将数据从事件编号索引同步到 NPC D* 索引
                 if JY and JY.D then
                     local sid = tonumber(sceneId)
@@ -706,7 +735,47 @@ function smapNpcTalk(sceneId, ent)
     end
 end
 
--- NPC 给予（银两或物品）
+-- 使用物品对 NPC：NPC 事件的"使用物品"分支（事件编号 + 9），从物品菜单（使用→选择NPC）调用
+function smapUseItemOnNpc(sceneId, ent)
+    local eventId = tonumber(ent.npcData["事件编号"] or 0)
+    if eventId <= 0 then
+        w("无法对目标使用物品。")
+        return
+    end
+    local useItemEventId = eventId + 9
+    local wUI = g(_G, "WebUI")
+    if wUI then wUI.write("[DEBUG smapUseItemOnNpc] sceneId=" .. tostring(sceneId) .. " talkEventId=" .. tostring(eventId) .. " useItemEventId=" .. tostring(useItemEventId)) end
+    w(string.format("对 %s 使用物品...", ent.name))
+    local EventExecutor = g(_G, "EventExecutor")
+    if not EventExecutor or not EventExecutor.oldCallEventCoroutine then
+        w("事件系统不可用。")
+        return
+    end
+    local scheduler = g(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.create then
+        -- 标记 NPC 使用物品事件进行中，阻止 scene interaction 误触
+        rawset(_G, "__smapUseItemActive", true)
+        -- 玩家已从物品菜单确认使用物品，设置 auto_yes 让 instruct_4 跳过确认对话框
+        rawset(_G, "__instruct4_auto_yes", true)
+        local co = scheduler:create(function()
+            -- event_executor.lua:73 设置 JY.CurrentD = eventnum，与 NPC 对话逻辑一致
+            EventExecutor.oldCallEventCoroutine(useItemEventId)
+            rawset(_G, "__instruct4_auto_yes", nil)
+            rawset(_G, "__smapUseItemActive", nil)
+            smapEntityList = {}
+            SmapHandlers.look({})
+        end, "useitem_" .. tostring(useItemEventId))
+        scheduler:start(co, "start")
+    else
+        local ok, err = pcall(EventExecutor.oldCallEventCoroutine, useItemEventId)
+        if not ok then w("事件执行失败: " .. tostring(err)) end
+        smapEntityList = {}
+        SmapHandlers.look({})
+    end
+end
 function smapNpcGive(sceneId, ent)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
@@ -1371,11 +1440,12 @@ local function filterBagItems(filterFn)
     return result
 end
 
--- 列出可使用的物品（药品/暗器类）
+-- 列出可使用的物品（药品/暗器/任务物品等非装备类）
 local function showUsableItems()
     local items = filterBagItems(function(id)
         local def = getItemDef(id)
-        return def and (def["类型"] == 3 or def["类型"] == 4)
+        -- 非装备类物品（不是武器也不是防具）都可使用（用于队员或 NPC）
+        return def and (def["装备类型"] == nil or def["装备类型"] < 0)
     end)
     if #items == 0 then w("没有可使用的物品。"); return nil end
     w("选择要使用的物品：")
@@ -1432,6 +1502,47 @@ local function showTeamTargets()
     if #members == 0 then w("队伍为空"); return nil end
     w("0. 返回")
     return members
+end
+
+-- 列出物品使用目标：队伍成员 + 场景 NPC（SMAP 模式）
+local function showItemUseTargets()
+    local JY = g(_G, "JY")
+    if not JY then return end
+    local idx = 0
+    -- 队伍成员
+    for i = 1, CC.TeamNum or 6 do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and JY.Person and JY.Person[pid] then
+            idx = idx + 1
+            local p = JY.Person[pid]
+            w(string.format("%d. %s (队员) HP:%d/%d",
+                idx, p["姓名"] or "?", p["生命"] or 0, p["生命最大值"] or 0))
+        end
+    end
+    -- 场景 NPC（从场景 JSON 数据直接读取，不依赖 smapEntityList）
+    if JY.Status == 4 then
+        local sceneId = tostring(JY.SubScene or 0)
+        local scenes = getScenes()
+        local scene = scenes and scenes[sceneId]
+        if scene and scene.NPC then
+            local charsIndex = getCharsIndex()
+            for npcIdx, npc in ipairs(scene.NPC) do
+                local charId = tostring(npc["代号"] or 0)
+                local npcName = npc["名称"] or ""
+                -- 跳过已过继的 event_trigger（以"oldevent_"开头）
+                if not npcName:match("^oldevent_") then
+                    if _G.isNpcPresent(sceneId, charId) then
+                        local char = charsIndex and charsIndex[charId]
+                        local displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charId)
+                        idx = idx + 1
+                        w(string.format("%d. %s (场景NPC)", idx, displayName))
+                    end
+                end
+            end
+        end
+    end
+    if idx == 0 then w("没有可用目标"); end
+    w("0. 返回")
 end
 
 -- 执行物品使用效果
@@ -1556,13 +1667,13 @@ end
 local function showSaveMenu()
     ws()
     w("--- 存档管理 ---")
-    w("1. 存到槽位1")
-    w("2. 存到槽位2")
-    w("3. 存到槽位3")
-    w("4. 读取槽位1")
-    w("5. 读取槽位2")
-    w("6. 读取槽位3")
-    w("0. 返回")
+    for i = 1, 10 do
+        w(string.format("%2d. 存到槽位%d", i, i))
+    end
+    for i = 1, 10 do
+        w(string.format("%2d. 读取槽位%d", i + 10, i))
+    end
+    w(" 0. 返回")
     roleMenuPhase = "save"
     w("输入 choose <编号> 选择操作")
 end
@@ -1595,6 +1706,10 @@ end
 
 -- 处理角色管理 choose N（返回 true=已处理, false=未处理）
 function RoleMenu_handleChoose(n)
+    -- NPC 使用物品事件进行中，阻止 scene interaction 误触（让 choose 流向事件等待标志）
+    if roleMenuPhase == nil and rawget(_G, "__smapUseItemActive") then
+        return true
+    end
     if roleMenuPhase == "main" then
         if n == 1 then  -- 医疗（一级菜单，原版 MMenu 风格）
             local JY = g(_G, "JY")
@@ -1730,29 +1845,61 @@ function RoleMenu_handleChoose(n)
         roleMenuPhase = "bag_use_select_target"
         roleMenuSelectedItem = item
         w("选择目标：")
-        showTeamTargets()
+        showItemUseTargets()
         return true
     elseif roleMenuPhase == "bag_use_select_target" then
         if n == 0 then showBag(); return true end
-        local members = {}
         local JY = g(_G, "JY")
+        -- 收集队伍成员
+        local members = {}
         for i = 1, CC.TeamNum or 6 do
             local pid = JY.Base["队伍" .. i]
             if pid and pid >= 0 and JY.Person and JY.Person[pid] then
                 table.insert(members, {slot = i, pid = pid, p = JY.Person[pid], name = JY.Person[pid]["姓名"]})
             end
         end
-        local target = members[n]
-        if not target then w("无效目标。"); return true end
-        -- 执行使用
-        applyItemEffect(target, roleMenuSelectedItem.id)
-        -- 消耗物品
-        JY.Base["物品" .. roleMenuSelectedItem.slot] = 0
-        JY.Base["物品数量" .. roleMenuSelectedItem.slot] = 0
-        roleMenuSelectedItem = nil
-        roleMenuPhase = nil
-        ws()
-        showBag()
+        local memberCount = #members
+        if n <= memberCount then
+            -- 目标为队伍成员
+            local target = members[n]
+            if not target then w("无效目标。"); return true end
+            applyItemEffect(target, roleMenuSelectedItem.id)
+            JY.Base["物品" .. roleMenuSelectedItem.slot] = 0
+            JY.Base["物品数量" .. roleMenuSelectedItem.slot] = 0
+            roleMenuSelectedItem = nil
+            roleMenuPhase = nil
+            ws()
+            showBag()
+        else
+            -- 目标为场景 NPC（在 SMAP 模式下，从场景数据直接读取）
+            local npcIdx = n - memberCount
+            -- NPC 目标列表（从场景 JSON 数据读取，匹配 showItemUseTargets 的顺序）
+            local npcTargets = {}
+            if JY.Status == 4 then
+                local sceneId = tostring(JY.SubScene or 0)
+                local scenes = getScenes()
+                local scene = scenes and scenes[sceneId]
+                if scene and scene.NPC then
+                    local charsIndex = getCharsIndex()
+                    for _, npc in ipairs(scene.NPC) do
+                        local charId = tostring(npc["代号"] or 0)
+                        local npcName = npc["名称"] or ""
+                        if not npcName:match("^oldevent_") then
+                            if _G.isNpcPresent(sceneId, charId) then
+                                local char = charsIndex and charsIndex[charId]
+                                local displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charId)
+                                table.insert(npcTargets, {type="npc", name=displayName, npcData=npc, npcIndex=npcIdx})
+                            end
+                        end
+                    end
+                end
+            end
+            local target = npcTargets[npcIdx]
+            if not target then w("无效目标。"); return true end
+            -- 保留物品（由 NPC 事件的 instruct_32 处理消耗），通过 NPC 使用物品事件触发
+            roleMenuPhase = nil
+            smapUseItemOnNpc(tostring(JY.SubScene or 0), target)
+        end
         return true
     elseif roleMenuPhase == "bag_equip_select_item" then
         if n == 0 then showBag(); return true end
@@ -1970,8 +2117,8 @@ function RoleMenu_handleChoose(n)
         showTeam()
         return true
     elseif roleMenuPhase == "save" then
-        if n >= 1 and n <= 3 then doSave(n)
-        elseif n >= 4 and n <= 6 then doLoad(n - 3)
+        if n >= 1 and n <= 10 then doSave(n)
+        elseif n >= 11 and n <= 20 then doLoad(n - 10); roleMenuPhase = nil
         elseif n == 0 then showRoleMenu() end
         return true
     end
@@ -2010,4 +2157,13 @@ end
 
 function MmapHandlers.menu(args)
     SmapHandlers.menu(args)
+end
+
+-- 导出到 _G 供 processEventQueue 等模块访问
+_G.SmapHandlers = SmapHandlers
+_G.MmapHandlers = MmapHandlers
+
+-- 测试辅助：直接使用物品对 NPC（跳过菜单 UI，自动接受 instruct_4 确认）
+function SmapHandlers.__useItemDirect(sceneId, npcData)
+    smapUseItemOnNpc(tostring(sceneId), {type="npc", name=npcData["名称"] or "?", npcData=npcData})
 end

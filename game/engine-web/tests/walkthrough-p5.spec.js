@@ -10,7 +10,7 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   test.setTimeout(300000);
   loadSaveCache('bridge-p4.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
-  expect(await loadTestState(page, 42)).toBe(true);
+  expect(await loadTestState(page, 2)).toBe(true);
 
   // 药王庄/眼药/程灵素加入
   expect(await gotoScene(page, '藥王莊')).toBeGreaterThan(0);
@@ -22,11 +22,11 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   // NPC dialog may not show name in terminal output, just verify no error
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 51)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 药王庄(程灵素加入)');
 
   // 衡山派战斗
-  expect(await loadTestState(page, 51)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   expect(await gotoScene(page, '衡山派')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
@@ -92,11 +92,11 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 52)).toBe(true);
+  expect(await saveTestState(page, 2)).toBe(true);
   console.log('  ✓ 光明顶(六大派+范遥)');
 
   // 华山派/对话岳不群
-  expect(await loadTestState(page, 52)).toBe(true);
+  expect(await loadTestState(page, 2)).toBe(true);
   expect(await gotoScene(page, '華山派')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
@@ -152,7 +152,7 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 53)).toBe(true);
+  expect(await saveTestState(page, 3)).toBe(true);
   console.log('  ✓ 嵩山派');
 
   expect(await noE(page)).toBeTruthy();

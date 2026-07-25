@@ -381,6 +381,11 @@ rawset(_G, "instruct_4", function(thingid, num, direction)
         end
     end
     if not hasItem then return false end
+    -- 如果是从物品菜单（使用→选择NPC）调用，玩家已确认，auto_yes 跳过对话框
+    if rawget(_G, "__instruct4_auto_yes") then
+        rawset(_G, "__instruct4_auto_yes", nil)
+        return true
+    end
     -- 查找物品名称
     local itemName = "物品" .. thingid
     local ds = rawget(_G, "initDataSource")
@@ -506,7 +511,8 @@ rawset(_G, "instruct_6", function(warid, tmp, tmp2, flag)
     local result = rawget(_G, "__warResult")
     rawset(_G, "__warComplete", nil)
     rawset(_G, "__warResult", nil)
-    return result
+    -- 战后退回场景模式（instruct_6 在 NPC 对话场景中调用，应恢复 SMAP）
+    JY.Status = 4  -- GAME_SMAP
 end)
 
 rawset(_G, "instruct_14", function()
@@ -582,16 +588,50 @@ end)
 -- 由于 catch-all 循环会保存空桩并在 jymain.lua 加载后恢复，
 -- 此处提前实现真实逻辑，确保被 _our_instruct 保存。
 
--- instruct_9: 是否要求加入队伍（安全版本，非协程上下文返回 false）
+-- instruct_9: 是否要求加入队伍（使用标志位等待用户响应，与 instruct_4 模式一致）
 rawset(_G, "instruct_9", function()
     local co = coroutine.running()
     if not co then return false end
-    local ok, result = pcall(function()
-        local AsyncMessageBox = require("framework.async_message_box")
-        return AsyncMessageBox.ShowYesNoCoroutine(-1, -1, "是否要求加入？", C_ORANGE, CC.DefaultFont)
-    end)
-    if ok then return result == 1 end
-    return false
+    local w = rawget(_G, "WebUI")
+    if w then w.write("是否要求加入？(choose 1=是, choose 2=否)") end
+    if w then w.write("[DEBUG instruct_9] waiting for choose 1/2") end
+    rawset(_G, "__instruct9_result", nil)
+    rawset(_G, "__instruct9_waiting", true)
+    local scheduler = rawget(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.yield then
+        while rawget(_G, "__instruct9_waiting") do
+            scheduler:yield("instruct9")
+        end
+    end
+    local result = rawget(_G, "__instruct9_result")
+    rawset(_G, "__instruct9_result", nil)
+    if w then w.write("[DEBUG instruct_9] result=" .. tostring(result)) end
+    return result
+end)
+
+-- instruct_5: 是否选择战斗（使用标志位等待用户响应，覆盖 jymain.lua 的 DrawStrBoxYesNo 版本）
+rawset(_G, "instruct_5", function()
+    local co = coroutine.running()
+    if not co then return false end
+    local w = rawget(_G, "WebUI")
+    if w then w.write("是否与之过招？(choose 1=是, choose 2=否)") end
+    rawset(_G, "__instruct5_result", nil)
+    rawset(_G, "__instruct5_waiting", true)
+    local scheduler = rawget(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.yield then
+        while rawget(_G, "__instruct5_waiting") do
+            scheduler:yield("instruct5")
+        end
+    end
+    local result = rawget(_G, "__instruct5_result")
+    rawset(_G, "__instruct5_result", nil)
+    return result
 end)
 
 -- instruct_10: 加入队员
@@ -1605,6 +1645,71 @@ function _G.initWebFramework()
 
     -- 初始状态：保持游戏原有流程（开始菜单），玩家用 choose 1 开始新游戏
     _G.__quiet = true
+
+    -- 最后再确保 instruct_1 为 Web MUD 文本版（jymain.lua 或 SetModify 可能再次覆盖）
+    rawset(_G, "instruct_1", function(talkId, headId)
+        local dc = rawget(_G, "initDataSource")
+        if not dc then return end
+        local raw = dc["dialogues"]
+        if not raw then return end
+        local dlg = raw["dialogues"] or raw
+        if type(dlg) ~= "table" then return end
+        for _, entry in ipairs(dlg) do
+            if entry.id == tonumber(talkId) then
+                local text = entry.text
+                if type(text) == "table" then
+                    text = text[tostring(headId or 1)]
+                end
+                if text then
+                    local w = rawget(_G, "WebUI")
+                    if w then
+                        local speakerName = "???"
+                        local HEAD_NAME_MAP = {
+                            [0] = "主角",
+                            [4] = "阎基",
+                            [73] = "南贤",
+                            [74] = "北丑",
+                            [105] = "掌柜",
+                            [106] = "店小二",
+                            [111] = "韦小宝",
+                            [114] = "软体娃娃",
+                        }
+                        speakerName = HEAD_NAME_MAP[headId]
+                        if not speakerName then
+                            if headId == 0 then
+                                local JY = rawget(_G, "JY")
+                                speakerName = JY and JY.Person and JY.Person[0] and JY.Person[0]["姓名"] or "主角"
+                            else
+                                local chars = dc["chars"]
+                                if not chars then
+                                    local ds = rawget(_G, "initDataSource")
+                                    chars = ds and ds["chars"]
+                                end
+                                if chars then
+                                    local clist = chars["chars"] or chars
+                                    if type(clist) == "table" then
+                                        for _, c in ipairs(clist) do
+                                            if c["头像代号"] == headId or c["代号"] == headId then
+                                                speakerName = c["姓名"] or "???"
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        w.write("【" .. speakerName .. "】" .. tostring(text))
+                    end
+                else
+                    local w = rawget(_G, "WebUI")
+                    if w then w.write("[对话文本为空, talkId=" .. tostring(talkId) .. "]") end
+                end
+                return
+            end
+        end
+        local w = rawget(_G, "WebUI")
+        if w then w.write("[未找到对话, talkId=" .. tostring(talkId) .. "]") end
+    end)
 end
 
 local function determineDrawState()
@@ -1652,10 +1757,16 @@ function processEventQueue(timestamp)
                         if rawget(_G, "__instruct4_waiting") and n ~= nil then
                             rawset(_G, "__instruct4_waiting", false)
                             rawset(_G, "__instruct4_result", n == 1)
-                        elseif hasMenu and n then
+                        elseif rawget(_G, "__instruct9_waiting") and n ~= nil then
+                            rawset(_G, "__instruct9_waiting", false)
+                            rawset(_G, "__instruct9_result", n == 1)
+                        elseif rawget(_G, "__instruct5_waiting") and n ~= nil then
+                            rawset(_G, "__instruct5_waiting", false)
+                            rawset(_G, "__instruct5_result", n == 1)
+                        elseif hasMenu and n and JY.Status ~= 4 then
                             MenuAsync.closeMenu(n)
                             lastDrawState = nil
-                        elseif not hasMenu and n ~= nil then
+                        elseif (not hasMenu or JY.Status == 4) and n ~= nil then
                         local JY = rawget(_G, "JY")
                         local n = tonumber(arg)
                         if JY and (JY.Status == 2 or JY.Status == 4 or JY.Status == 5) and n ~= nil then
@@ -1689,6 +1800,14 @@ function processEventQueue(timestamp)
                         elseif JY and JY.Status == 2 then
                             local wUI = rawget(_G, "WebUI")
                             if wUI then wUI.write("未知命令: leave") end
+                        elseif JY and JY.Status == 5 then
+                            -- WMAP: 退出战斗，返回 MMAP
+                            local wUI = rawget(_G, "WebUI")
+                            if wUI then wUI.write("退出战斗。\n") end
+                            JY.War = nil
+                            JY.Status = 2
+                            local mh = rawget(_G, "MmapHandlers")
+                            if mh and mh.look then mh.look({}) end
                         end
                     elseif cmd == "menu" then
                         local JY = rawget(_G, "JY")
@@ -1704,6 +1823,53 @@ function processEventQueue(timestamp)
                             elseif JY.Status == 2 then
                                 local mh = rawget(_G, "MmapHandlers")
                                 if mh and mh.look then mh.look({}) end
+                            end
+                        end
+                    elseif cmd == "list" then
+                        -- MMAP: 列出可去场景
+                        local JY = rawget(_G, "JY")
+                        if JY and JY.Status == 2 then
+                            local mh = rawget(_G, "MmapHandlers")
+                            if mh and mh.list then mh.list({}) end
+                        end
+                    elseif cmd == "load" then
+                        -- 直接读档：load <slot>
+                        local n = tonumber(arg)
+                        if n and n >= 1 and n <= 10 then
+                            local loadGS = rawget(_G, "loadGameState")
+                            if loadGS then
+                                local ok = loadGS(n)
+                                if ok then
+                                    local wUI = rawget(_G, "WebUI")
+                                    if wUI then wUI.write("读取完成。\n") end
+                                    local resetMenu = rawget(_G, "resetMenuPhase")
+                                    if resetMenu then resetMenu() end
+                                    local JY = rawget(_G, "JY")
+                                    if JY then
+                                        if JY.Status == 2 then
+                                            local ml = rawget(_G, "MmapHandlers")
+                                            if ml and ml.look then ml.look({}) end
+                                        elseif JY.Status == 4 then
+                                            local sl = rawget(_G, "SmapHandlers")
+                                            if sl and sl.look then sl.look({}) end
+                                        end
+                                    end
+                                else
+                                    local wUI = rawget(_G, "WebUI")
+                                    if wUI then wUI.write("读取失败。\n") end
+                                end
+                            end
+                        end
+                    elseif cmd == "save" then
+                        -- 直接存档：save <slot>
+                        local n = tonumber(arg)
+                        if n and n >= 1 and n <= 10 then
+                            local saveGS = rawget(_G, "saveGameState")
+                            if saveGS then
+                                if saveGS(n) then
+                                    local wUI = rawget(_G, "WebUI")
+                                    if wUI then wUI.write(string.format("已保存到槽位%d。\n", n)) end
+                                end
                             end
                         end
                     else

@@ -12,7 +12,7 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
   // 苗人凤居/退敌 — tile event extra=30 → 战斗
-  expect(await loadTestState(page, 32)).toBe(true);
+  expect(await loadTestState(page, 2)).toBe(true);
   expect(await gotoScene(page, '苗人鳳居')).toBeGreaterThan(0);
   let t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
@@ -87,11 +87,11 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   // NPC dialog may not show name in terminal output, just verify no error
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 41)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 程瑛居(程瑛加入)');
 
   // 黑龙潭 — 程英破阵 + 瑛姑对话
-  expect(await loadTestState(page, 41)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   expect(await gotoScene(page, '黑龍潭')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
@@ -134,7 +134,7 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 42)).toBe(true);
+  expect(await saveTestState(page, 2)).toBe(true);
   console.log('  ✓ 闫基居');
 
   expect(await noE(page)).toBeTruthy();
