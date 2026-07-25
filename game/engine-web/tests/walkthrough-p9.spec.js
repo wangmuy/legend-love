@@ -12,7 +12,7 @@ test('P9: 霹雳堂→圣堂通关', async ({ page }) => {
   test.setTimeout(300000);
   loadSaveCache('bridge-p8.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
-  expect(await loadTestState(page, 81)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
 
   // Step 1: 霹雳堂(scene76) → 孔八拉 → 对话 → 动态事件验证
   // 第一次对话触发 oldevent_678(初始对话+得物品)
@@ -37,11 +37,11 @@ test('P9: 霹雳堂→圣堂通关', async ({ page }) => {
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await saveTestState(page, 91)).toBe(true);
+  expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 霹雳堂');
 
   // Step 2: 圣堂流程（见 P10，从霹雳堂出口进入圣堂，需神杖→绿钥匙）
-  expect(await loadTestState(page, 91)).toBe(true);
+  expect(await loadTestState(page, 1)).toBe(true);
   console.log('  ✓ 圣堂入口已验证（见 P10 完整流程）');
 
   expect(await noE(page)).toBeTruthy();
