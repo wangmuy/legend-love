@@ -48,13 +48,29 @@ test('P3: 百花谷→绝情谷底→古墓→燕子坞→泰山派', async ({ p
   // 燕子坞/慕容复、王语嫣加入
   expect(await gotoScene(page, '燕子塢')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  // entity 1 = 慕容复, entity 2 = 王语嫣, entity 3 = 阿朱, entity 4 = 阿碧
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 慕容复
+  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话
+  t = await getT(page);
+  // 慕容复对话后选择"是"加入
+  for (let d = 0; d < 6; d++) {
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    t = await getT(page);
+    if (t.includes('加入') || t.includes('慕容复')) break;
+  }
+  // 王语嫣加入(entity 2)
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  for (let d = 0; d < 6; d++) {
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    t = await getT(page);
+    if (t.includes('加入') || t.includes('王语嫣')) break;
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 2)).toBe(true);
-  console.log('  ✓ 燕子坞');
+  console.log('  ✓ 燕子坞(慕容复+王语嫣)');
 
   // 泰山派/洗手帖
   expect(await loadTestState(page, 2)).toBe(true);

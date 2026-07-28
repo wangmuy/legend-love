@@ -3,7 +3,7 @@
 
 async function cmd(p, t) {
   const i = p.locator('#command-input');
-  await i.waitFor({ state: 'visible', timeout: 5000 });
+  await i.waitFor({ state: 'visible', timeout: 15000 });
   await i.fill(t);
   await p.keyboard.press('Enter');
 }

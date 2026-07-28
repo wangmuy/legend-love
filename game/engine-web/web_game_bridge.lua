@@ -1951,18 +1951,38 @@ local function patchSaveGameState()
     end
 end
 -- 覆盖 loadGameState 以从 Lua 全局变量 __saveCache 读取
+-- 注意：initWebFramework 内部（第 1158~1252 行）已有更好版本的直接解析实现，
+-- 此函数仅作为补充：若第一批补丁未运行（__savePatched 不存在），则添加后备修补
 local function patchLoadGameState()
+    if rawget(_G, "__savePatched") then return end  -- 第一批补丁已生效，跳过
     local origLoad = rawget(_G, "loadGameState")
     if origLoad and not rawget(_G, "__loadPatched") then
         rawset(_G, "loadGameState", function(slotId)
             local prefix = "save_"
             local key = prefix .. tostring(slotId)
-            -- 先尝试从 Lua 全局变量读取
+            -- 先尝试从 Lua 全局变量 __saveCache 读取并直接解析
             local cache = rawget(_G, "__saveCache")
             local json = cache and cache[key]
             if json then
-                -- 注入到 luaSaveCache 后调用原函数
-                pcall(function() _G.JSBridge.save(key, json) end)
+                local parseJSON = rawget(_G, "parseJSON")
+                local restoreNumericKeys = rawget(_G, "restoreNumericKeys")
+                if parseJSON then
+                    local ok, data = pcall(parseJSON, json)
+                    if ok and data then
+                        if not rawget(_G, "JY") then rawset(_G, "JY", {}) end
+                        local JY = rawget(_G, "JY")
+                        local restoreMap = { base = "Base", persons = "Person", things = "Thing", scenes = "Scene", wugongs = "Wugong", shops = "Shop", status = "Status", subScene = "SubScene", mmapMusic = "MmapMusic", currentD = "CurrentD", dTable = "D" }
+                        for jk, jyK in pairs(restoreMap) do
+                            local src = data[jk]
+                            if src then JY[jyK] = (restoreNumericKeys and restoreNumericKeys(src)) or src end
+                        end
+                        if JY.Status == nil then JY.Status = 2 end
+                        if JY.SubScene == nil then JY.SubScene = 0 end
+                        local sm = rawget(_G, "StateMachine")
+                        if sm then local inst = sm.getInstance(); if inst and inst.switchTo then pcall(inst.switchTo, inst, JY.Status) end end
+                        return true
+                    end
+                end
             end
             return origLoad(slotId)
         end)
