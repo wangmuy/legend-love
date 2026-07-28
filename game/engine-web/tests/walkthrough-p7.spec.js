@@ -13,10 +13,13 @@ test('P7: 福威→天宁→梅庄→黑木崖→丐帮→桃花岛→主角居'
 
   expect(await loadTestState(page, 2)).toBe(true);
 
-  // 福威镖局/溪山行旅图
+  // 福威镖局/溪山行旅图 — 林平之对话 + 宝箱搜索
   expect(await gotoScene(page, '福威鏢局')).toBeGreaterThan(0);
   let t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 林平之
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  await cmd(page, 'choose 2'); await page.waitForTimeout(2000);  // 宝箱(银两+智慧果)
+  await cmd(page, 'choose 3'); await page.waitForTimeout(2000);  // 宝箱(溪山行旅图+)
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 福威镖局');
@@ -78,10 +81,13 @@ test('P7: 福威→天宁→梅庄→黑木崖→丐帮→桃花岛→主角居'
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 桃花岛(黄蓉)');
 
-  // 主角居
+  // 主角居/搜刮物品 — 宝箱
   expect(await gotoScene(page, '主角的家')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 精气丸
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 人蔘
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 小还丹
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 银两
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 主角居');

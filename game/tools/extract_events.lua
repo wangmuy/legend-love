@@ -53,7 +53,8 @@ local function main()
     local sceneIds = {}
     local scenesData = readFile(SCENE_IDS_FILE)
     if scenesData then
-        for sid in scenesData:gmatch('"id"[%s:]*([0-9]+)') do
+        -- 匹配场景级"代号"(后跟"入口")，排除 NPC/物品级"代号"
+        for sid in scenesData:gmatch('"代号"[%s:]*([0-9]+)[%s,]*"入口"') do
             sceneIds[#sceneIds + 1] = tonumber(sid)
         end
     end

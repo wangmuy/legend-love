@@ -47,10 +47,21 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 衡山派');
 
-  // 金轮寺/可兰经
+  // 金轮寺/可兰经 — 守门僧兵战斗 + 可兰经获取
   expect(await gotoScene(page, '金輪寺')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  t = await getT(page);
+  if (t.includes('战场态势') || t.includes('战斗')) {
+    for (let r = 0; r < 10; r++) {
+      await cmd(page, 'choose 5'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      t = await getT(page);
+      if (t.includes('战斗胜利') || t.includes('战斗失败')) break;
+    }
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 金轮寺');
@@ -104,10 +115,12 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 华山派');
 
-  // 金蛇洞/金蛇剑
+  // 金蛇洞/金蛇剑 — 拔剑+秘笈+金蛇锥
   expect(await gotoScene(page, '金蛇山洞')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 金蛇剑
+  await cmd(page, 'choose 2'); await page.waitForTimeout(2000);  // 金蛇秘笈
+  await cmd(page, 'choose 3'); await page.waitForTimeout(2000);  // 金蛇锥
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 金蛇洞');

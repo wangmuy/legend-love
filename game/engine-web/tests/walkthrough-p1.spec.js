@@ -73,7 +73,11 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   expect(await saveTestState(page, 2)).toBe(true);
   console.log('  ✓ 田伯光加入');
 
-  // Step 4: 闫基战斗 — choose 4(瓦片事件) → 战斗 → 胜利
+  // Step 4: 唐诗山东/山洞(坐标364:279附近) — 千年人参+凹洞提示
+  // 注：唐诗山东在场景列表显示为"山洞"，需按坐标识别
+  // e2e 测试中跳过此步，手动游玩时参考 quick_pass_game.md
+
+  // Step 5: 闫基战斗 — choose 4(瓦片事件) → 战斗 → 胜利
   expect(await loadTestState(page, 2)).toBe(true);
   expect(await gotoScene(page, '閰基居')).toBeGreaterThan(0);
   await cmd(page, 'choose 4'); await page.waitForTimeout(5000);

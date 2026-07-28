@@ -77,6 +77,34 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 悦来客栈(令狐冲)');
 
+  // 摩天崖 — 石破天对话 + 白龙剑
+  expect(await gotoScene(page, '摩天崖')).toBeGreaterThan(0);
+  t = await getT(page); expect(t).toContain('你来到了');
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 石破天对话
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 2'); await page.waitForTimeout(2000);  // 白龙剑
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  console.log('  ✓ 摩天崖');
+
+  // 五毒教 — 苗人战斗[96]
+  expect(await gotoScene(page, '五毒教')).toBeGreaterThan(0);
+  t = await getT(page); expect(t).toContain('你来到了');
+  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 触发战斗
+  t = await getT(page);
+  if (t.includes('战场态势')) {
+    for (let r = 0; r < 10; r++) {
+      await cmd(page, 'choose 5'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
+      t = await getT(page);
+      if (t.includes('战斗胜利') || t.includes('战斗失败')) break;
+    }
+  }
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  console.log('  ✓ 五毒教');
+
   // 程瑛加入
   expect(await gotoScene(page, '程瑛居')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
