@@ -51,6 +51,23 @@ test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 鸳鸯岛(鸳鸯刀+千年人参)');
 
+  // Step 3: 苗人凤居二刷——《飞狐外传》(需胡斐+屠龙刀+金丝背心)
+  expect(await loadTestState(page, 1)).toBe(true);
+  await cmd(page, 'look'); await page.waitForTimeout(1000);
+  expect(await gotoScene(page, '苗人鳳居')).toBeGreaterThan(0);
+  t = await getT(page); expect(t).toContain('你来到了');
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  // entity 5 = oldevent_7 (需胡斐+屠龙刀+金丝背心)
+  await cmd(page, 'choose 5'); await page.waitForTimeout(5000);
+  t = await getT(page);
+  if (t.includes('飞狐外传')) {
+    console.log('  ✓ 苗人凤居(飞狐外传)');
+  } else {
+    console.log('  ⚠ 苗人凤居二刷(条件可能未满足)');
+  }
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+
   expect(await noE(page)).toBeTruthy();
   flushSaveCache('bridge-p8.json');
   console.log('  ✓ P8 完成');

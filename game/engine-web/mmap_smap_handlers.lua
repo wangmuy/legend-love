@@ -351,7 +351,8 @@ function SmapHandlers.look(args)
             local charIdStr = tostring(npc["代号"] or npc)
             local npcName = npc["名称"] or "?"
             local isEventTrigger = npcName and npcName:match("^oldevent_")
-            if isEventTrigger or _G.isNpcPresent(sceneId, charIdStr) then
+            local npcPresent = _G.isNpcPresent(sceneId, charIdStr)
+            if isEventTrigger or npcPresent then
                 if isEventTrigger then
                     local eventId = npc["事件编号"] or 0
                     local eid = tonumber(eventId) or 0
@@ -551,9 +552,16 @@ function SmapHandlers.chooseInteraction(idx)
         -- 交互对象（宝箱/柜子/书架等）：直接执行事件脚本
         local eventId = ent.eventId or (ent.npcData and (ent.npcData["事件编号"] or ent.npcData["触发事件"]) or 0)
         if tonumber(eventId) ~= 0 then
-            -- 圣堂放置天书事件：不预标记 consumed，由 oldevent 脚本内的 instruct_3 处理 D* 表
+            -- 圣堂放置天书事件：由 oldevent 脚本内的 instruct_3 处理 D* 表，可重复选择
             local isShenTangBook = (eventId >= 1001 and eventId <= 1014)
             if not isShenTangBook then
+                -- 先检查是否已消耗（防止 eventConsumed 设置后重进场景前的重复点击）
+                if _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][tostring(eventId)] then
+                    w("里面什么都没有。")
+                    smapEntityList = {}
+                    SmapHandlers.look({})
+                    return
+                end
                 _G.eventConsumed[sceneId] = _G.eventConsumed[sceneId] or {}
                 _G.eventConsumed[sceneId][tostring(eventId)] = true
             end
@@ -574,8 +582,9 @@ function SmapHandlers.chooseInteraction(idx)
                     local co = scheduler:create(function()
                         -- 注意：不能使用 pcall 包裹，因为 Lua 5.1 中协程内的 pcall 里 yield 会失败
                         EventExecutor.oldCallEventCoroutine(tonumber(eventId))
-                        -- 不重绘场景，让对话文本保持可见。用户可输入 look 刷新场景
-                        w("事件结束。输入 look 查看当前场景。")
+                        -- 重绘场景，更新实体列表（已消耗的事件不再显示）
+                        smapEntityList = {}
+                        SmapHandlers.look({})
                     end, "event_trigger_" .. tostring(eventId))
                     scheduler:start(co, "start")
                 else
@@ -584,6 +593,8 @@ function SmapHandlers.chooseInteraction(idx)
                         w("事件执行失败: " .. tostring(err))
                     end
                     w("事件结束。")
+                    smapEntityList = {}
+                    SmapHandlers.look({})
                 end
                 -- 圣堂事件执行后，恢复 JY.CurrentD（由事件处理器自己管理）
                 local JY2 = g(_G, "JY")

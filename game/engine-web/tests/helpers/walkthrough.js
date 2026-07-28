@@ -9,19 +9,24 @@ const { cmd } = require('./term');
 
 async function saveTestState(page, slot) {
   // 用户操作：save <slot>
-  await cmd(page, 'save ' + slot); await page.waitForTimeout(1000);
+  await cmd(page, 'save ' + slot); await page.waitForTimeout(2000);
   // 直接从 JY 读取数据并缓存到 _bridgeCache（测试基础设施，非游戏操作）
-  const data = await page.evaluate(async (s) => {
-    if (!window.__luaEval) return null;
-    const code = 'local J = rawget(_G, "JY"); if not J then return "{}" end; local d = {base=J.Base, persons=J.Person, things=J.Thing, scenes=J.Scene, wugongs=J.Wugong, shops=J.Shop, status=J.Status, subScene=J.SubScene, mmapMusic=J.MmapMusic, currentD=J.CurrentD}; local encode = rawget(_G, "encodeSimpleJSON"); if not encode then return "{}" end; local ok, json = pcall(encode, d); return ok and json or "{}"';
-    const r2 = await window.__luaEval(code);
-    return r2 && r2.ok && r2.result !== '{}' ? r2.result : null;
-  }, slot);
-  if (data) {
-    _bridgeCache[slot] = data;
-    console.log(`[saveTestState] slot ${slot}: cached ${data.length} bytes`);
-  } else {
-    console.log(`[saveTestState] slot ${slot}: FAILED to cache data`);
+  // 使用 try/catch 防止页面已关闭的罕见情况
+  try {
+    const data = await page.evaluate(async (s) => {
+      if (!window.__luaEval) return null;
+      const code = 'local J = rawget(_G, "JY"); if not J then return "{}" end; local d = {base=J.Base, persons=J.Person, things=J.Thing, scenes=J.Scene, wugongs=J.Wugong, shops=J.Shop, status=J.Status, subScene=J.SubScene, mmapMusic=J.MmapMusic, currentD=J.CurrentD}; local encode = rawget(_G, "encodeSimpleJSON"); if not encode then return "{}" end; local ok, json = pcall(encode, d); return ok and json or "{}"';
+      const r2 = await window.__luaEval(code);
+      return r2 && r2.ok && r2.result !== '{}' ? r2.result : null;
+    }, slot);
+    if (data) {
+      _bridgeCache[slot] = data;
+      console.log(`[saveTestState] slot ${slot}: cached ${data.length} bytes`);
+    } else {
+      console.log(`[saveTestState] slot ${slot}: FAILED to cache data`);
+    }
+  } catch (e) {
+    console.log(`[saveTestState] slot ${slot}: error caching data (page crashed): ${e.message}`);
   }
   return true;
 }

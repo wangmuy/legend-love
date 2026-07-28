@@ -32,7 +32,7 @@ test('P2: 回族→胡斐→冰火岛→绝情谷→大轮寺', async ({ page })
   const used = await page.evaluate(async () => {
     if (!window.__luaEval) return false;
     const r = await window.__luaEval('local sh=rawget(_G,"SmapHandlers");if not sh or not sh.__useItemDirect then return "no_sh" end;local JY=rawget(_G,"JY");if not JY then return "no_jy" end;local sid=JY.SubScene or 0;local ds=rawget(_G,"initDataSource");if not ds then return "no_ds" end;local scenes=ds["scenes"];if not scenes then return "no_scn" end;local list=scenes["scenes"] or scenes;if type(list)~="table" then return "bad_scn" end;for _,s in ipairs(list) do;if s["代号"]==sid then;for _,n in ipairs(s["NPC"] or {}) do;if n["名称"]=="胡斐" then;sh.__useItemDirect(sid,n);return "ok";end;end;return "npc_not_found";end;end;return "scene_not_found_"..tostring(sid)');
-    return r && r.ok && r.result === 'true';
+    return r && r.ok && (r.result === 'true' || r.result === 'ok');
   });
   console.log('useItemDirect:', used);
   // instruct_4: 是否使用物品[两页刀法]？
@@ -50,13 +50,14 @@ test('P2: 回族→胡斐→冰火岛→绝情谷→大轮寺', async ({ page })
   expect(await saveTestState(page, 1)).toBe(true);
   console.log('  ✓ 胡斐加入');
 
-  // 冰火岛/金毛
+  // 冰火岛/金毛 — Entity 1=谢逊对话, Entity 2=得一撮金毛(item 181)
   expect(await loadTestState(page, 1)).toBe(true);
   await gotoScene(page, '冰火島');
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // 得一撮金毛
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  console.log('  ✓ 冰火岛');
+  console.log('  ✓ 冰火岛(金毛)');
 
   // 绝情谷/玉玺/断肠草/君子剑/玉蜂针
   expect(await loadTestState(page, 1)).toBe(true);
@@ -79,6 +80,31 @@ test('P2: 回族→胡斐→冰火岛→绝情谷→大轮寺', async ({ page })
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 大轮寺');
+
+  // 崑崙仙境/张无忌加入 — 需有金毛(从冰火岛获得)
+  // 第一次访问：对话张无忌（oldevent_70）→ D*修改事件为71
+  await gotoScene(page, '崑崙仙境');
+  t = await getT(page); expect(t).toContain('你来到了');
+  await cmd(page, 'choose 2'); await page.waitForTimeout(5000);  // 张无忌对话
+  for (let d = 0; d < 10; d++) {
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+  }
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  // 第二次访问：对话张无忌 → oldevent_71 → 使用金毛 → 加入
+  await gotoScene(page, '崑崙仙境');
+  t = await getT(page); expect(t).toContain('你来到了');
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // 张无忌
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 是（使用金毛）
+  // 对话后出现"是否要求加入？"
+  for (let d = 0; d < 8; d++) {
+    t = await getT(page);
+    if (t.includes('要求加入') || t.includes('加入')) break;
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+  }
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 加入
+  t = await getT(page);
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  console.log('  ✓ 崑崙仙境(张无忌加入)');
 
   expect(await noE(page)).toBeTruthy();
   flushSaveCache('bridge-p2.json');
