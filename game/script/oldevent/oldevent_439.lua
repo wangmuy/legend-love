@@ -1,4 +1,4 @@
-function oldevent_439()
+--function oldevent_439()
     instruct_1(1496,0,1);   --  1(1):[WWW]说: 兄弟近来如何？
     instruct_0();   --  0(0)::空语句(清屏)
 

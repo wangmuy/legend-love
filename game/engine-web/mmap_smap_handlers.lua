@@ -123,8 +123,21 @@ function MmapHandlers.list(args)
     -- 输出标题和场景名到终端（showMenu 的菜单项通过 DrawString 渲染，MUD 中不可见）
     w("可去场景（选择序号前往）")
     w("════════════════════════════════════")
+
+    -- 统计同名场景，同名时追加坐标以区分（如 "山洞 (364,279)"）
+    local nameCount = {}
+    for _, item in ipairs(sceneItems) do
+        nameCount[item.name] = (nameCount[item.name] or 0) + 1
+    end
+
     for i, item in ipairs(sceneItems) do
-        w(string.format("%d. %s", i, item.name))
+        local displayName = item.name
+        if nameCount[item.name] > 1 then
+            local mx = item.entry.mapX or 0
+            local my = item.entry.mapY or 0
+            displayName = string.format("%s (%d,%d)", item.name, mx, my)
+        end
+        w(string.format("%d. %s", i, displayName))
     end
     CE.showMenu(sceneItems, nil, function(idx)
         if idx and idx > 0 then
@@ -373,6 +386,140 @@ function SmapHandlers.look(args)
             end
         end
     end
+
+    -- 运行时 D* 表动态 NPC 扫描
+    -- 原版游戏中，instruct_3 动态修改 D* 表来添加 NPC（如绝情谷底后将小龙女放入古墓）。
+    -- 这些 NPC 不在静态 scenes.json 中，需从 JY.D[sceneId] 运行时表检测并追加。
+    local scanSid = tonumber(sceneId)
+    -- 确保 D* 表已初始化（存档可能未包含 JY.D[sceneId]，需从 initDataSource.events 加载）
+    local ensureFn = g(_G, "ensureSceneDEvents")
+    if ensureFn then ensureFn(scanSid) end
+    local JY2 = g(_G, "JY")
+    local sceneD = JY2 and JY2.D and JY2.D[scanSid]
+    -- 如果 ensureSceneDEvents 未初始化成功（函数不可用或 initDataSource.events 缺失），
+    -- 尝试直接从 initDataSource.events 手动初始化 JY.D[scanSid]
+    if not sceneD then
+        local ds = g(_G, "initDataSource")
+        local events = ds and ds["events"]
+        if events and type(events) == "table" then
+            -- events.json 顶层是 {version, extracted, total, events: [...]} 包装结构
+            local evList = events.events or events
+            if type(evList) == "table" then
+                JY2.D = JY2.D or {}
+                local sceneD2 = {}
+                for _, evt in ipairs(evList) do
+                    if evt and evt.sceneId == scanSid then
+                        local idx = tonumber(evt.tileIndex) or 0
+                        sceneD2[idx] = {
+                            [0] = evt.passable or -1,
+                            [1] = evt.unknown1 or -1,
+                            [2] = evt.eventSpace or -1,
+                            [3] = evt.eventTouch or -1,
+                            [4] = evt.eventExtra or -1,
+                        }
+                    end
+                end
+                JY2.D[scanSid] = sceneD2
+                sceneD = sceneD2
+            end
+        end
+        -- 如果还是没有数据，创建空表
+        if not sceneD then
+            JY2.D = JY2.D or {}
+            JY2.D[scanSid] = {}
+            sceneD = JY2.D[scanSid]
+        end
+    end
+    if sceneD then
+        -- 收集静态 NPC 已有的事件编号，避免重复
+        local staticEventIds = {}
+        if npcs then
+            for _, npc in ipairs(npcs) do
+                local eid = tonumber(npc["事件编号"] or 0)
+                if eid > 0 then staticEventIds[tostring(eid)] = true end
+            end
+        end
+        -- eventConsumed 中已消耗的事件也不显示
+        local consumed = _G.eventConsumed and _G.eventConsumed[tostring(scanSid)] or {}
+        -- 事件编号 → NPC 名称映射（原版已知动态 NPC 事件）
+        local eventNpcNames = {
+            [440] = "小龙女", [441] = "小龙女",
+            [438] = "杨过",   [439] = "杨过",
+            [417] = "瑛姑",
+            [111] = "范遥",
+            [109] = "谢逊",   -- 光明顶（冰火岛67放置，对话→instruct_26 递增灵蛇岛108→倚天链）
+            [110] = "谢逊",   -- 109 对话后事件替换为 110（对话变体）
+            [105] = "金花婆婆", -- 灵蛇岛（108 放置 tile0，激将对话→放置光明顶 111-116 圣火阵）
+            [115] = "圣火阵",  -- 光明顶（105 放置 tile94，战斗[15]胜利后给倚天屠龙记155）
+            [631] = "金轮法王",  -- 金轮寺（可兰经任务，战斗[100]胜利后给可兰经159）
+            [616] = "蓝凤凰",  -- 五毒教（韦小宝线，战斗[98]胜利后放置神龙教611→鹿鼎记）
+            [611] = "洪教主",  -- 神龙教三刷（战斗[95]胜利后给鹿鼎记150）
+            [612] = "洪教主",  -- 611 战斗胜利后事件替换为 612（对话变体）
+            [67] = "冰火岛线索", -- 冰火岛 tile3 eventExtra（65 头颅使用后放置；触发→光明顶谢逊109）
+            [469] = "郭靖",   -- 桃花岛（466 黄蓉对话后放置 tile1，instruct_5 询问战斗→战斗[76][77]→射雕英雄传148）
+            [470] = "郭靖",   -- 469 战斗胜利后事件替换为 470（对话变体）
+        }
+        -- 扫描 D* 表所有条目（0~199），检查事件编号 > 0 的动态 NPC / 静态 tile 事件
+        -- D* 字段（原版）：field[2]=eventSpace(空格触发), field[3]=eventTouch(物品触发), field[4]=eventExtra(路过触发)
+        -- JY.D[sceneId] 有两种格式需兼容：
+        --   数组（ensureSceneDEvents 新格式）：evt[fieldIdx+1] = {passable, unknown1, eventSpace, eventTouch, eventExtra, ...}
+        --   dict（instruct_3/SetD/存档格式）：evt[tostring(fieldIdx)] = {["0"]=..., ["2"]=事件编号, ...}
+        for dEntryIdx = 0, 199 do
+            local evt = sceneD[dEntryIdx]
+            if evt and type(evt) == "table" then
+                -- dict 格式（instruct_3/SetD/存档）：键是 0-based field 索引，如 evt[2]=事件编号
+                -- 数组格式（ensureSceneDEvents 新格式）：{passable, unknown1, eventSpace, ...}，field[i] 在 evt[i+1]
+                -- 判别：SetD 写入的 dict 可能没有 evt[0]/evt[1]（instruct_3 参数为 -2 时跳过该字段，
+                --       如 instruct_3(71,3,-2,-2,611,...) 只写 field2/3/4 → evt={[2]=611,[3]=-1,[4]=-1}），
+                --       因此不能只依赖 evt[0] 存在来判别。补充规则：evt[1] 为空且 evt[2] 存在 → dict。
+                local function dfield(f)
+                    local isDict = evt[0] ~= nil or (evt[1] == nil and evt[2] ~= nil)
+                    if isDict then
+                        local v = evt[f]
+                        if v == nil then v = evt[tostring(f)] end
+                        return v
+                    end
+                    return evt[f + 1]
+                end
+                local eventNum = nil
+                local e2 = dfield(2)
+                local e3 = dfield(3)
+                local e4 = dfield(4)
+                if e2 and e2 > 0 then eventNum = e2
+                elseif e3 and e3 > 0 then eventNum = e3
+                elseif e4 and e4 > 0 then eventNum = e4 end
+                if eventNum then
+                    local eKey = tostring(eventNum)
+                    -- 跳过静态列表中已存在的事件和已消耗事件
+                    if not staticEventIds[eKey] and not consumed[eKey] then
+                        local npcName = eventNpcNames[eventNum] or ("oldevent_" .. eventNum)
+                        local isNamed = eventNpcNames[eventNum] ~= nil
+                        entityIndex = entityIndex + 1
+                        if isNamed then
+                            smapEntityList[entityIndex] = {
+                                type = "npc",
+                                charId = tostring(dEntryIdx),
+                                name = npcName,
+                                npcData = {["事件编号"] = eventNum, ["动态"] = true},
+                                npcIndex = dEntryIdx,
+                            }
+                            w(string.format("%d. %s", entityIndex, npcName))
+                        else
+                            smapEntityList[entityIndex] = {
+                                type = "event_trigger",
+                                eventId = eventNum,
+                                charId = tostring(dEntryIdx),
+                                name = npcName,
+                                npcData = {["事件编号"] = eventNum, ["动态"] = true},
+                            }
+                            w(string.format("%d. 搜索", entityIndex))
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     -- 检查场景入口事件（原版游戏的数据中，部分场景有自动触发的入口事件）
     -- 例如阎基居（scene 50）的入口会触发 oldevent_20（阎基战斗）
     -- 这些事件在 data-web 场景数据中没有对应的 NPC 条目，需通过 D* 表状态动态添加
@@ -482,8 +629,6 @@ end
 
 -- SMAP choose 处理（由 CommandEngine 调度或 processEventQueue 调用）
 function SmapHandlers.chooseInteraction(idx)
-    local wUI = g(_G, "WebUI")
-    if wUI then wUI.write("[DEBUG chooseInteraction] idx=" .. tostring(idx) .. " entityCount=" .. tostring(#smapEntityList)) end
     if idx <= 0 or idx > #smapEntityList then
         return
     end
@@ -498,13 +643,7 @@ function SmapHandlers.chooseInteraction(idx)
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     local sceneId = tostring(JY.SubScene or 0)
     
-    local wUI2 = g(_G, "WebUI")
-    if wUI2 then wUI2.write("[DEBUG chooseInteraction] ent.type=" .. tostring(ent.type) .. " ent.name=" .. tostring(ent.name) .. " sceneId=" .. tostring(sceneId)) end
-    
     if ent.type == "npc" then
-        local wUI2 = g(_G, "WebUI")
-        if wUI2 then wUI2.write("[DEBUG chooseInteraction] type=" .. tostring(ent.type) .. " name=" .. tostring(ent.name) .. " eventId=" .. tostring(ent.npcData and ent.npcData["事件编号"])) end
-        if wUI2 then wUI2.write("[DEBUG chooseInteraction NPC] calling smapNpcTalk") end
         -- Web MUD: 直接对话，不使用子菜单（MenuAsync 菜单系统在连续交互时可能失效）
         smapNpcTalk(sceneId, ent)
     elseif ent.type == "item" then
@@ -611,28 +750,65 @@ function SmapHandlers.chooseInteraction(idx)
 end  -- function SmapHandlers.chooseInteraction
 
 -- NPC 对话
+-- 通过 NPC 的 X,Y 坐标（scenes.json）映射到 D* tile 索引（events.json 的 x,y 字段）
+-- 原版语义：instruct_3(-2,-2,...) 写入 NPC 所在 tile（对话=field2、物品触发=field3），
+-- 坐标映射稳定，不受 instruct_3 改写 tile 事件的影响。
+local function findNpcTileByXY(sceneId, npcData)
+    local x = tonumber(npcData and npcData["X"])
+    local y = tonumber(npcData and npcData["Y"])
+    if not x or not y then return nil end
+    local ds = g(_G, "initDataSource")
+    local events = ds and ds["events"]
+    if not events then return nil end
+    local evList = events.events or events
+    if type(evList) ~= "table" then return nil end
+    local sid = tonumber(sceneId)
+    for _, evt in ipairs(evList) do
+        if tonumber(evt.sceneId) == sid and tonumber(evt.x) == x and tonumber(evt.y) == y then
+            return tonumber(evt.tileIndex)
+        end
+    end
+    return nil
+end
+
 function smapNpcTalk(sceneId, ent)
-    local wUI = g(_G, "WebUI")
-    if wUI then wUI.write("[DEBUG smapNpcTalk ENTER] sceneId=" .. tostring(sceneId) .. " eventId=" .. tostring(ent.npcData["事件编号"])) end
     local eventId = ent.npcData["事件编号"] or ent.npcData["触发事件"] or 0
     local dIdx = ent.npcIndex or tonumber(ent.npcData["触发事件"] or 0)
     local staticEventId = tonumber(eventId) or 0
-    -- 尝试从 D* 事件表获取动态事件 ID（instruct_3 修改后的值）
-    if staticEventId > 0 then
+    -- 动态 D* NPC（look() 的 D* 扫描创建，npcData["动态"]=true）：事件编号已从 D* 表
+    -- field[2] 直接读取（如 616 蓝凤凰），不能再走 GetD 覆盖——instruct_3(-2,...) 写入的
+    -- JY.D[sceneId][eventNum]（如 D37[616]）可能残留其他事件（如金花婆婆 100），
+    -- 导致误覆盖（蓝凤凰 616 → 金花婆婆 100，P6 五毒教二刷失败根因）。
+    -- 只有静态 NPC（scenes.json 定义）才需要 GetD 查运行时升级事件。
+    if staticEventId > 0 and ent.npcData["动态"] ~= true then
         local GetD = g(_G, "GetD")
-        if GetD then
-            local sid = tonumber(sceneId)
+        local JY = g(_G, "JY")
+        local sid = tonumber(sceneId)
+        local tileResolved = false
+        -- 优先：按 X,Y 坐标定位 NPC 所在 tile（原版语义：instruct_3(场景,tile,...) 用 tile 索引写入，
+        -- 如燕子坞 573 事件 instruct_3(51,14,-2,-2,527,531,...) 写丐帮 tile14，而乔峰恰在 tile14）。
+        -- 读该 tile 的 field[2]（eventSpace 对话事件），并设 CurrentD=tile 让事件内 instruct_3(-2,...) 写回同 tile。
+        local tileIdx = findNpcTileByXY(sceneId, ent.npcData)
+        if tileIdx and GetD then
+            local e2 = GetD(sid, tileIdx, 2)
+            if e2 and e2 > 0 then
+                eventId = e2
+                tileResolved = true
+                if JY then JY.CurrentD = tileIdx end
+            end
+        end
+        if not tileResolved and GetD then
             -- 使用事件编号作为索引（instruct_3 的写入位置）
-            -- 检查顺序：field 5 → 4 → 3 → 2 → 0（与原版 D* 事件解析一致）
-            local dynamicId = GetD(sid, staticEventId, 5)
+            -- 对话事件只读 field[2]（eventSpace，原版 oldEventExecute flag=1 语义）。
+            -- 注意：不能读 field[3]（eventTouch 物品触发）——例如燕子坞 487 对话后
+            -- sceneD[487]={2:489,3:493}，若把 493 当对话事件，翻页会误触发"使用玉玺"消耗物品130。
+            -- 顺序：field 2 → 5 → 4 → 0（field3 留给 smapUseItemOnNpc 的物品触发解析）
+            local dynamicId = GetD(sid, staticEventId, 2)
+            if not dynamicId or dynamicId <= 0 then
+                dynamicId = GetD(sid, staticEventId, 5)
+            end
             if not dynamicId or dynamicId <= 0 then
                 dynamicId = GetD(sid, staticEventId, 4)
-            end
-            if not dynamicId or dynamicId <= 0 then
-                dynamicId = GetD(sid, staticEventId, 3)
-            end
-            if not dynamicId or dynamicId <= 0 then
-                dynamicId = GetD(sid, staticEventId, 2)
             end
             if not dynamicId or dynamicId <= 0 then
                 dynamicId = GetD(sid, staticEventId, 0)
@@ -642,23 +818,19 @@ function smapNpcTalk(sceneId, ent)
             end
         end
         -- 直接访问 JY.D 作为备选
-        local JY = g(_G, "JY")
-        if JY then
+        if not tileResolved and JY then
             JY.D = JY.D or {}
-            local sid = tonumber(sceneId)
             local sceneD = JY.D[sid]
             if sceneD then
-                -- 检查事件编号索引（instruct_3 写入的位置）
+                -- 检查事件编号索引（instruct_3 写入的位置）——同样只读 field2/5/4/0，跳过 field3
                 local evt = sceneD[staticEventId]
                 if evt then
-                    if evt[5] and evt[5] > 0 then
+                    if evt[2] and evt[2] > 0 then
+                        eventId = evt[2]
+                    elseif evt[5] and evt[5] > 0 then
                         eventId = evt[5]
                     elseif evt[4] and evt[4] > 0 then
                         eventId = evt[4]
-                    elseif evt[3] and evt[3] > 0 then
-                        eventId = evt[3]
-                    elseif evt[2] and evt[2] > 0 then
-                        eventId = evt[2]
                     elseif evt[0] and evt[0] > 0 then
                         eventId = evt[0]
                     end
@@ -668,14 +840,12 @@ function smapNpcTalk(sceneId, ent)
                     local dStarId = 100 + dIdx
                     local evt2 = sceneD[dStarId]
                     if evt2 then
-                        if evt2[5] and evt2[5] > 0 then
+                        if evt2[2] and evt2[2] > 0 then
+                            eventId = evt2[2]
+                        elseif evt2[5] and evt2[5] > 0 then
                             eventId = evt2[5]
                         elseif evt2[4] and evt2[4] > 0 then
                             eventId = evt2[4]
-                        elseif evt2[3] and evt2[3] > 0 then
-                            eventId = evt2[3]
-                        elseif evt2[2] and evt2[2] > 0 then
-                            eventId = evt2[2]
                         elseif evt2[0] and evt2[0] > 0 then
                             eventId = evt2[0]
                         end
@@ -684,9 +854,6 @@ function smapNpcTalk(sceneId, ent)
             end
         end
     end
-    -- 调试日志：输出事件ID解析结果
-    local wUI = g(_G, "WebUI")
-    if wUI then wUI.write("[DEBUG smapNpcTalk] sceneId=" .. tostring(sceneId) .. " staticEventId=" .. tostring(staticEventId) .. " resolvedEventId=" .. tostring(eventId) .. " dIdx=" .. tostring(dIdx)) end
     if tonumber(eventId) == 0 then
         w(ent.name .. " 似乎不想说话。")
         SmapHandlers.look({})
@@ -746,16 +913,93 @@ function smapNpcTalk(sceneId, ent)
     end
 end
 
--- 使用物品对 NPC：NPC 事件的"使用物品"分支（事件编号 + 9），从物品菜单（使用→选择NPC）调用
+-- 使用物品对 NPC：NPC 事件的"使用物品"分支，从物品菜单（使用→选择NPC）调用
+-- 事件编号解析（与原版 flag=2 物品触发语义一致）：
+--   1. 优先读 D* 表 field[3]（eventTouch，instruct_3 运行时设置的使用物品事件）
+--      —— 例如石破天(333)对话后 instruct_3(-2,-2,-2,-2,334,335,...) 设 field[3]=335（玄冰碧火酒）
+--   2. 回退约定：部分 NPC（如胡斐 1→10 两页刀法）使用"事件编号 + 9"
 function smapUseItemOnNpc(sceneId, ent)
     local eventId = tonumber(ent.npcData["事件编号"] or 0)
     if eventId <= 0 then
         w("无法对目标使用物品。")
         return
     end
-    local useItemEventId = eventId + 9
-    local wUI = g(_G, "WebUI")
-    if wUI then wUI.write("[DEBUG smapUseItemOnNpc] sceneId=" .. tostring(sceneId) .. " talkEventId=" .. tostring(eventId) .. " useItemEventId=" .. tostring(useItemEventId)) end
+    -- 1. 优先读 D* 表 field[3]（eventTouch，instruct_3 运行时设置的使用物品事件）
+    --    —— 例如石破天(333)对话后 instruct_3(-2,-2,-2,-2,334,335,...) 设 field[3]=335（玄冰碧火酒）
+    -- 2. 回退约定：部分 NPC（如胡斐 1→10 两页刀法）使用"事件编号 + 9"
+    local useItemEventId = eventId + 9  -- 回退约定
+    local GetD = g(_G, "GetD")
+    if GetD then
+        -- 注意：eventId 是"事件编号"（如慕容复=487），不是 D* tile 索引。
+        -- 原版语义：NPC 所在 tile 的 field2=对话事件号，field3=使用物品触发事件号。
+        -- 直接用 X,Y 坐标定位 NPC 所在 tile（events.json 的 x,y ↔ tileIndex 映射），
+        -- 读取该 tile 的 field[3] —— 因为 instruct_3(-2,...) 写入的就是 NPC 所在 tile，
+        -- 例如燕子坞 487 对话后 tile1 field3=493（使用玉玺），493 执行后 tile1 field3=573（使用图表）。
+        local JY = g(_G, "JY")
+        local sid = tonumber(sceneId) or (JY and JY.SubScene) or 0
+        local tileIdx = findNpcTileByXY(sceneId, ent.npcData)
+        if tileIdx then
+            -- 关键：instruct_3(-2,...) 用 JY.CurrentD 定位写入的 tile（原版语义），
+            -- 必须设为 NPC 所在 tile，否则事件内的 instruct_3 会把事件写到错误位置。
+            if JY then JY.CurrentD = tileIdx end
+            local d = JY and JY.D and JY.D[sid]
+            if d and d[tileIdx] and type(d[tileIdx]) == "table" then
+                local evt = d[tileIdx]
+                local function df(f)
+                    local isDict = evt[0] ~= nil or (evt[1] == nil and evt[2] ~= nil)
+                    if isDict then
+                        local v = evt[f]
+                        if v == nil then v = evt[tostring(f)] end
+                        return v
+                    end
+                    return evt[f + 1]
+                end
+                local e3 = df(3)
+                if e3 and e3 > 0 then
+                    useItemEventId = tonumber(e3)
+                end
+            end
+        end
+        if useItemEventId == eventId + 9 then
+            -- 坐标定位失败时，回退：扫描 D* 表找到 field2/field3 == eventId 的 tile，取其 field3
+            local d = JY and JY.D and JY.D[sid]
+            local foundTouch = nil
+            local foundTile = nil
+            if d then
+                for tile = 0, 199 do
+                    local evt = d[tile]
+                    if evt and type(evt) == "table" then
+                        local function df(f)
+                            local isDict = evt[0] ~= nil or (evt[1] == nil and evt[2] ~= nil)
+                            if isDict then
+                                local v = evt[f]
+                                if v == nil then v = evt[tostring(f)] end
+                                return v
+                            end
+                            return evt[f + 1]
+                        end
+                        local e2 = df(2)
+                        local e3 = df(3)
+                        if (e2 and e2 > 0 and tonumber(e2) == eventId) or (e3 and e3 > 0 and tonumber(e3) == eventId) then
+                            if e3 and e3 > 0 then foundTouch = tonumber(e3) end
+                            foundTile = tile
+                            break
+                        end
+                    end
+                end
+            end
+            if foundTouch then
+                useItemEventId = foundTouch
+                if JY then JY.CurrentD = foundTile end
+            else
+                -- 回退：直接按 tile 索引读（兼容旧格式/动态 NPC 以 tile 为键）
+                local dyn = GetD(sceneId, eventId, 3)  -- field[3] = eventTouch（使用物品触发事件）
+                if dyn and dyn > 0 then
+                    useItemEventId = dyn
+                end
+            end
+        end
+    end
     w(string.format("对 %s 使用物品...", ent.name))
     local EventExecutor = g(_G, "EventExecutor")
     if not EventExecutor or not EventExecutor.oldCallEventCoroutine then
@@ -894,7 +1138,7 @@ function smapGiveItem(sceneId, ent)
     -- 列出背包中非零物品
     local bagItems = {}
     local bagIdx = {}
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         local itemId = JY.Base["物品" .. i]
         if itemId and itemId ~= 0 then
             local qty = JY.Base["物品数量" .. i] or 1
@@ -946,7 +1190,7 @@ function smapTakeItem(sceneId, ent)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     JY.Base = JY.Base or {}
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
             JY.Base["物品" .. i] = tonumber(ent.itemId) or 0
             JY.Base["物品数量" .. i] = 1
@@ -1217,7 +1461,7 @@ function SmapHandlers.take(args)
             end
             -- 添加到背包
             JY.Base = JY.Base or {}
-            for i = 1, 30 do
+            for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
                 if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
                     JY.Base["物品" .. i] = tonumber(itemId) or 0
                     JY.Base["物品数量" .. i] = 1
@@ -1249,7 +1493,7 @@ function SmapHandlers.give(args)
     -- 查找背包中的物品
     local foundSlot = nil
     JY.Base = JY.Base or {}
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         local id = JY.Base["物品" .. i]
         if id and id ~= 0 then
             local name = getItemName(tostring(id))
@@ -1395,7 +1639,7 @@ local function showBag()
     if not JY or not JY.Base then w("背包: 空"); return end
     wt("背包")
     local count = 0
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         local itemId = JY.Base["物品" .. i]
         if itemId and itemId ~= 0 then
             count = count + 1
@@ -1442,7 +1686,7 @@ local function filterBagItems(filterFn)
     local JY = g(_G, "JY")
     if not JY or not JY.Base then return {} end
     local result = {}
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         local itemId = JY.Base["物品" .. i]
         if itemId and itemId ~= 0 and filterFn(itemId) then
             table.insert(result, {slot = i, id = itemId, qty = JY.Base["物品数量" .. i] or 1})
@@ -1540,14 +1784,19 @@ local function showItemUseTargets()
             for npcIdx, npc in ipairs(scene.NPC) do
                 local charId = tostring(npc["代号"] or 0)
                 local npcName = npc["名称"] or ""
-                -- 跳过已过继的 event_trigger（以"oldevent_"开头）
-                if not npcName:match("^oldevent_") then
-                    if _G.isNpcPresent(sceneId, charId) then
-                        local char = charsIndex and charsIndex[charId]
-                        local displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charId)
-                        idx = idx + 1
-                        w(string.format("%d. %s (场景NPC)", idx, displayName))
+                -- event_trigger（oldevent_ 前缀）也可能是可对话 NPC（如回族部落霍青桐 620），
+                -- 原版中对其使用物品（可兰经）触发 eventTouch 事件（622），因此不能一律跳过。
+                -- 仅当 NPC 无对应 D* 事件时才跳过（纯搜索点）。
+                if _G.isNpcPresent(sceneId, charId) or npcName:match("^oldevent_") then
+                    local char = charsIndex and charsIndex[charId]
+                    local displayName = npcName
+                    if npcName:match("^oldevent_") then
+                        displayName = "oldevent_" .. tostring(npc["事件编号"] or "?") .. "(场景NPC)"
+                    else
+                        displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charId)
                     end
+                    idx = idx + 1
+                    w(string.format("%d. %s", idx, displayName))
                 end
             end
         end
@@ -1895,12 +2144,17 @@ function RoleMenu_handleChoose(n)
                     for _, npc in ipairs(scene.NPC) do
                         local charId = tostring(npc["代号"] or 0)
                         local npcName = npc["名称"] or ""
-                        if not npcName:match("^oldevent_") then
-                            if _G.isNpcPresent(sceneId, charId) then
-                                local char = charsIndex and charsIndex[charId]
-                                local displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charId)
-                                table.insert(npcTargets, {type="npc", name=displayName, npcData=npc, npcIndex=npcIdx})
+                        -- 与 showItemUseTargets 一致：event_trigger（oldevent_）也可能是可对话 NPC，
+                        -- 对其使用物品（如回族部落霍青桐 620 + 可兰经 → 622）触发 eventTouch 事件。
+                        if _G.isNpcPresent(sceneId, charId) or npcName:match("^oldevent_") then
+                            local char = charsIndex and charsIndex[charId]
+                            local displayName = npcName
+                            if npcName:match("^oldevent_") then
+                                displayName = "oldevent_" .. tostring(npc["事件编号"] or "?") .. "(场景NPC)"
+                            else
+                                displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charId)
                             end
+                            table.insert(npcTargets, {type="npc", name=displayName, npcData=npc, npcIndex=npcIdx})
                         end
                     end
                 end
@@ -2144,9 +2398,10 @@ local function appendRoleMenuEntry()
 end
 
 -- 覆写 SmapHandlers.look 以追加角色管理菜单
+-- 注意：必须用 _origSmapLook 保存原函数引用，否则递归调用会无限循环
 local _origSmapLook = SmapHandlers.look
 SmapHandlers.look = function(args)
-    _origSmapLook(args)
+    if _origSmapLook then _origSmapLook(args) end
     appendRoleMenuEntry()
 end
 

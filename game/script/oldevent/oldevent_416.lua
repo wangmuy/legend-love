@@ -1,4 +1,4 @@
-function oldevent_416()
+--function oldevent_416()
 
     if instruct_16(63,1,0) ==false then    --  16(10):队伍是否有[程英]是则跳转到:Label0
         do return; end

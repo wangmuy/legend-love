@@ -1,4 +1,4 @@
-function oldevent_686()
+--function oldevent_686()
 
     if instruct_4(143,1,0) ==false then    --  4(4):是否使用物品[神杖]？是则跳转到:Label0
         do return; end
@@ -37,5 +37,5 @@ function oldevent_686()
     instruct_0();   --  0(0)::空语句(清屏)
     instruct_2(164,1);   --  2(2):得到物品[绿钥匙][1]
     instruct_3(-2,-2,-2,-2,687,-1,-1,-2,-2,-2,-2,-2,-2);   --  3(3):修改事件定义:当前场景:当前场景事件编号
-end
+--end
 

@@ -1,4 +1,4 @@
-function oldevent_450()
+--function oldevent_450()
     instruct_1(1610,0,1);   --  1(1):[WWW]说: 前辈就是铁掌帮的帮主吧．
     instruct_0();   --  0(0)::空语句(清屏)
     instruct_1(1611,67,0);   --  1(1):[裘千仞]说: 小子！你是谁！　　　　　　　　　　　

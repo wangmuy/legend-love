@@ -24,6 +24,15 @@ function WmapHandlers.initWar(enemies, distance)
     local JY = rawget(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     local CC = rawget(_G, "CC")
+
+    -- 重置战斗上下文（防止上一场战斗的相位残留导致新战斗卡死，
+    -- 例如上一场在 select_item 退出，新战斗 look() 会从 select_teammate 重新开始）
+    wmapContext.phase = nil
+    wmapContext.selectedTeammate = nil
+    wmapContext.selectedAction = nil
+    wmapContext.selectedMartial = nil
+    wmapContext.selectedItem = nil
+    wmapContext.validTargets = {}
     
     JY.War = {
         enemies = enemies or {},
@@ -36,9 +45,10 @@ function WmapHandlers.initWar(enemies, distance)
     }
     
     -- 构建我方队伍（JY.Person 中的队伍成员）
+    -- 注意：原版队伍字段名是 JY.Base["队伍"..i]（见 jymain.lua），不是"队友/队员"
     local base = JY.Base or {}
     for i = 1, 6 do
-        local pid = base["队友" .. i] or base["队员" .. i]
+        local pid = base["队伍" .. i] or base["队友" .. i] or base["队员" .. i]
         if pid and pid ~= 0 then
             local p = JY.Person and JY.Person[pid]
             if p then
@@ -250,6 +260,13 @@ function WmapHandlers.chooseInteraction(idx)
         if idx == 1 then WmapHandlers.doMove(1)
         elseif idx == 2 then WmapHandlers.doMove(-1) end
     elseif wmapContext.phase == "select_item" then
+        if idx == 0 or idx == nil then
+            -- 退出物品菜单 → 结束本回合（doBattle 用 choose 0 退出）
+            w("放弃使用物品。")
+            wmapContext.phase = nil
+            WmapHandlers.afterAction()
+            return
+        end
         local item = wmapContext.validTargets[idx]
         if item and item.type == "item" then
             JY.Base["物品" .. item.slot] = 0
@@ -266,12 +283,15 @@ function WmapHandlers.showTargets(actionType)
     wmapContext.validTargets = {}
     local idx = 0
     for i, en in ipairs(war.enemies) do
-        idx = idx + 1
-        local dist = war.distance or 5
-        local canReach = inRange(0, dist)  -- 简化: 默认范围
-        local mark = canReach and "✅" or "❌"
-        w(string.format("  %d. %s (HP:%d/%d, 距离:%d步) %s", idx, en.name or "?", en.hp or 0, en.maxHp or 0, dist, mark))
-        table.insert(wmapContext.validTargets, {type = "enemy", index = i, isEnemy = true})
+        -- 只列出存活敌人（原版战斗不能选择已死目标）
+        if (en.hp or 0) > 0 then
+            idx = idx + 1
+            local dist = war.distance or 5
+            local canReach = inRange(0, dist)  -- 简化: 默认范围
+            local mark = canReach and "✅" or "❌"
+            w(string.format("  %d. %s (HP:%d/%d, 距离:%d步) %s", idx, en.name or "?", en.hp or 0, en.maxHp or 0, dist, mark))
+            table.insert(wmapContext.validTargets, {type = "enemy", index = i, isEnemy = true})
+        end
     end
     w("选择目标:")
 end
@@ -317,7 +337,7 @@ function WmapHandlers.showItems()
     w("物品:")
     wmapContext.validTargets = {}
     local idx = 0
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         local itemId = JY.Base["物品" .. i]
         if itemId and itemId ~= 0 then
             idx = idx + 1
@@ -361,6 +381,12 @@ function WmapHandlers.doAttack(enemyIdx, isEnemy)
     local tm = war.teammates[wmapContext.selectedTeammate]
     local en = war.enemies[enemyIdx]
     if not tm or not en then return end
+    -- 跳过已死目标（防御性：若目标已被击败则结束回合）
+    if (en.hp or 0) <= 0 then
+        w("目标已被击败。")
+        WmapHandlers.afterAction()
+        return
+    end
     
     local dist = war.distance or 5
     if dist > 1 then
@@ -432,6 +458,9 @@ function WmapHandlers.afterAction()
         w("战斗胜利！")
         -- 检查是否由 instruct_6 触发（脚本战斗），由 oldevent 脚本处理后续
         if rawget(_G, "__warFromInstruct6") then
+            -- 原版战斗胜利后发放经验并升级（jymain.lua:4552 War_AddPersonLevel），
+            -- 否则主角武力无法成长（如金蛇剑需武力75+）。
+            WmapHandlers.grantExpAndLevelUp(war)
             rawset(_G, "__warComplete", true)
             rawset(_G, "__warResult", true)
             return
@@ -528,4 +557,104 @@ function WmapHandlers.enemyTurn()
     WmapHandlers.look({})
 end
 
+-- 战斗胜利后发放经验并升级（简化版升级机制）
+-- 原版参考：jymain.lua:4539-4572 War_End（经验=WAR.Data["经验"]/存活人数）+ jymain.lua:4578 War_AddPersonLevel。
+-- 简化：经验 = 战斗经验(原版 war.sta 值)×5，发放给所有队友（含主角 pid=0，
+--      initWar 用 pid~=0 过滤了主角，必须按 JY.Base["队伍"..i] 遍历才能覆盖主角），
+--      保证主角能升级；升级时属性增长按原版公式，cleveradd 取资质基础值（不随机）。
+function WmapHandlers.grantExpAndLevelUp(war)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person then return end
+    local expBase = (war and war.exp) or 0
+    if expBase <= 0 then expBase = 10 end
+    local expGain = math.floor(expBase * 5)
+    -- 按队伍表发放经验（含主角 pid=0，initWar 的 teammates 过滤了主角）
+    local base = JY.Base or {}
+    local granted = false
+    for i = 1, 6 do
+        local pid = base["队伍" .. i] or base["队友" .. i] or base["队员" .. i]
+        if pid then
+            local p = JY.Person[pid]
+            if p then
+                p["经验"] = (p["经验"] or 0) + expGain
+                WmapHandlers.levelUpPerson(pid)
+                granted = true
+            end
+        end
+    end
+    -- 兜底：队伍表为空时，遍历 war.teammates 和主角
+    if not granted then
+        local p0 = JY.Person[0]
+        if p0 then
+            p0["经验"] = (p0["经验"] or 0) + expGain
+            WmapHandlers.levelUpPerson(0)
+        end
+    end
+    w(string.format("战斗胜利！获得 %d 经验。", expGain))
+end
+
+-- 人物升级（按原版 jymain.lua:4578 War_AddPersonLevel 公式）
+-- 资质→cleveradd 基础值：<30→2, <50→3, <70→4, <90→5, 否则6；简化版直接取基础值保证确定性。
+function WmapHandlers.levelUpPerson(pid)
+    local JY = rawget(_G, "JY")
+    local CC = rawget(_G, "CC")
+    local p = JY and JY.Person and JY.Person[pid]
+    if not p then return false end
+    local Rnd = rawget(_G, "Rnd") or function(i) return math.random(i) - 1 end
+    local tmplevel = p["等级"] or 1
+    if CC and CC.Level and tmplevel >= CC.Level then return false end
+    if not (CC and CC.Exp) then return false end
+    if (p["经验"] or 0) < (CC.Exp[tmplevel] or 99999999) then return false end
+    -- 计算可升几级
+    while true do
+        if CC.Level and tmplevel >= CC.Level then break end
+        if (p["经验"] or 0) >= (CC.Exp[tmplevel] or 99999999) then
+            tmplevel = tmplevel + 1
+        else
+            break
+        end
+    end
+    local leveladd = tmplevel - (p["等级"] or 1)
+    if leveladd <= 0 then return false end
+    p["等级"] = tmplevel
+    -- 生命最大值 += (生命增长 + Rnd(3)) * leveladd * 3
+    p["生命最大值"] = (p["生命最大值"] or 50) + ((p["生命增长"] or 5) + Rnd(3)) * leveladd * 3
+    p["生命"] = p["生命最大值"]
+    p["体力"] = (CC and CC.PersonAttribMax and CC.PersonAttribMax["体力"]) or 100
+    p["受伤程度"] = 0
+    p["中毒程度"] = 0
+    -- cleveradd 按资质（简化：取基础值，不随机）
+    local cleveradd
+    local zz = p["资质"] or 50
+    if zz < 30 then cleveradd = 2
+    elseif zz < 50 then cleveradd = 3
+    elseif zz < 70 then cleveradd = 4
+    elseif zz < 90 then cleveradd = 5
+    else cleveradd = 6 end
+    -- 内力最大值 += (9 - cleveradd) * leveladd * 4
+    p["内力最大值"] = (p["内力最大值"] or 30) + (9 - cleveradd) * leveladd * 4
+    p["内力"] = p["内力最大值"]
+    p["攻击力"] = (p["攻击力"] or 0) + cleveradd * leveladd
+    p["防御力"] = (p["防御力"] or 0) + cleveradd * leveladd
+    p["轻功"] = (p["轻功"] or 0) + cleveradd * leveladd
+    -- 各项技能（原版：>=20 时 +Rnd(3)）
+    if (p["医疗能力"] or 0) >= 20 then p["医疗能力"] = p["医疗能力"] + Rnd(3) end
+    if (p["用毒能力"] or 0) >= 20 then p["用毒能力"] = p["用毒能力"] + Rnd(3) end
+    if (p["解毒能力"] or 0) >= 20 then p["解毒能力"] = p["解毒能力"] + Rnd(3) end
+    if (p["拳掌功夫"] or 0) >= 20 then p["拳掌功夫"] = p["拳掌功夫"] + Rnd(3) end
+    if (p["御剑能力"] or 0) >= 20 then p["御剑能力"] = p["御剑能力"] + Rnd(3) end
+    if (p["耍刀技巧"] or 0) >= 20 then p["耍刀技巧"] = p["耍刀技巧"] + Rnd(3) end
+    if (p["暗器技巧"] or 0) >= 20 then p["暗器技巧"] = p["暗器技巧"] + Rnd(3) end
+    return true
+end
+
 rawset(_G, "WmapHandlers", WmapHandlers)
+
+-- 导出当前战斗相位（供测试/doBattle 通过 Lua 直接读取，避免依赖终端文本窗口）
+WmapHandlers.getPhase = function()
+    return wmapContext and wmapContext.phase
+end
+WmapHandlers.getDistance = function()
+    local war = rawget(_G, "JY") and rawget(_G, "JY").War
+    return war and war.distance or nil
+end
