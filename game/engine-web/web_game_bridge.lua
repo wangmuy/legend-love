@@ -217,7 +217,7 @@ rawset(_G, "instruct_2", function(itemId, count)
         return
     end
     -- 普通物品：找到空槽位放入
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
             JY.Base["物品" .. i] = itemId
             JY.Base["物品数量" .. i] = (JY.Base["物品数量" .. i] or 0) + count
@@ -282,7 +282,7 @@ rawset(_G, "instruct_32", function(giveFlag, thingId, num, ...)
     -- 普通物品
     if count > 0 then
         -- 添加物品到空槽
-        for i = 1, 30 do
+        for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
             if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
                 JY.Base["物品" .. i] = id
                 JY.Base["物品数量" .. i] = (JY.Base["物品数量" .. i] or 0) + count
@@ -292,7 +292,7 @@ rawset(_G, "instruct_32", function(giveFlag, thingId, num, ...)
     else
         -- 扣除物品（负数量）
         local remain = -count
-        for i = 1, 30 do
+        for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
             if remain <= 0 then break end
             if JY.Base["物品" .. i] == id then
                 local qty = JY.Base["物品数量" .. i] or 1
@@ -307,14 +307,41 @@ rawset(_G, "instruct_32", function(giveFlag, thingId, num, ...)
     end
 end)
 
-rawset(_G, "instruct_37", function() end)  -- 场景音乐, no-op
-
-rawset(_G, "instruct_56", function(...)
-    -- 队伍: no-op
+-- instruct_37: 增加品德（原版 jymain.lua:3777 AddPersonAttrib(0,"品德",v)）
+rawset(_G, "instruct_37", function(v)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[0] then return end
+    JY.Person[0]["品德"] = (JY.Person[0]["品德"] or 0) + (tonumber(v) or 0)
 end)
 
-rawset(_G, "instruct_26", function(...)
-    -- 修改角色属性: no-op
+-- instruct_56: 增加声望（原版 jymain.lua:3996）
+rawset(_G, "instruct_56", function(v)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[0] then return end
+    JY.Person[0]["声望"] = (JY.Person[0]["声望"] or 0) + (tonumber(v) or 0)
+    -- 声望>200 且集齐14天书后可得武林帖（原版 instruct_2_sub 逻辑，此处简化为直接提示）
+    local instruct_2_sub = rawget(_G, "instruct_2_sub")
+    if instruct_2_sub then pcall(instruct_2_sub) end
+end)
+
+rawset(_G, "instruct_26", function(sceneid, id, v1, v2, v3)
+    -- 增加D*编号（原版 jymain.lua:3492）：
+    -- 对 sceneid 场景的 id 格，field2/field3/field4 各加 v1/v2/v3。
+    -- 例：蝴蝶谷95/光明顶109 调用 instruct_26(73,2,0,0,1) 把灵蛇岛(73) tile2 的
+    --     eventExtra(106→107→108) 递增，108 触发后设置灵蛇岛 tile0 → 105（金花婆婆激将）。
+    sceneid = tonumber(sceneid) or sceneid
+    if sceneid == -2 then
+        local JY = rawget(_G, "JY")
+        sceneid = JY and JY.SubScene
+    end
+    if sceneid == nil then return end
+    local GetD = rawget(_G, "GetD")
+    local SetD = rawget(_G, "SetD")
+    if not GetD or not SetD then return end
+    local v
+    v = GetD(sceneid, id, 2); SetD(sceneid, id, 2, v + (tonumber(v1) or 0))
+    v = GetD(sceneid, id, 3); SetD(sceneid, id, 3, v + (tonumber(v2) or 0))
+    v = GetD(sceneid, id, 4); SetD(sceneid, id, 4, v + (tonumber(v3) or 0))
 end)
 
 -- 功能性 instruct（instruct-game-logic）
@@ -374,7 +401,7 @@ rawset(_G, "instruct_4", function(thingid, num, direction)
     if not JY then return false end
     -- 检查是否有该物品
     local hasItem = false
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         if JY.Base and JY.Base["物品" .. i] == thingid then
             hasItem = true
             break
@@ -433,7 +460,7 @@ rawset(_G, "instruct_58", function()
     end
     -- 给予神杖(143)
     if JY.Base then
-        for i = 1, 30 do
+        for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
             if JY.Base["物品" .. i] == nil or JY.Base["物品" .. i] < 0 then
                 JY.Base["物品" .. i] = 143
                 JY.Base["物品数量" .. i] = 1
@@ -487,6 +514,8 @@ rawset(_G, "instruct_6", function(warid, tmp, tmp2, flag)
         table.insert(enemies, {name="敌人", hp=30, maxHp=30, mp=0, maxMp=0, x=1, attack=15, defense=5})
     end
     WH.initWar(enemies, 5)
+    -- 挂载战斗经验（原版 war.sta 偏移14 的经验字段，wars.json 已提取）
+    if JY.War then JY.War.exp = warDef["经验"] or 0 end
     JY.Status = 5  -- GAME_WMAP
     -- 初始化战斗等待标志
     rawset(_G, "__warFromInstruct6", true)
@@ -513,6 +542,9 @@ rawset(_G, "instruct_6", function(warid, tmp, tmp2, flag)
     rawset(_G, "__warResult", nil)
     -- 战后退回场景模式（instruct_6 在 NPC 对话场景中调用，应恢复 SMAP）
     JY.Status = 4  -- GAME_SMAP
+    -- 返回战斗结果：胜利 true / 失败 false（原版 instruct_6 语义，
+    -- 事件脚本据此分支，如 oldevent_616: instruct_6(98,...)==false → 死亡）
+    return result == true
 end)
 
 rawset(_G, "instruct_14", function()
@@ -549,7 +581,7 @@ rawset(_G, "instruct_31", function(itemId, count, flag)
     end
     -- 物品检查（非金钱）: 遍历背包
     local total = 0
-    for i = 1, 30 do
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
         if JY.Base["物品" .. i] == itemId then
             total = total + (JY.Base["物品数量" .. i] or 1)
         end
@@ -557,7 +589,7 @@ rawset(_G, "instruct_31", function(itemId, count, flag)
     if flag == 0 then return (total >= (count or 1)) end
     if flag == 1 then
         local remain = count or 1
-        for i = 1, 30 do
+        for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
             if remain <= 0 then break end
             if JY.Base["物品" .. i] == itemId then
                 local qty = JY.Base["物品数量" .. i] or 1
@@ -594,7 +626,6 @@ rawset(_G, "instruct_9", function()
     if not co then return false end
     local w = rawget(_G, "WebUI")
     if w then w.write("是否要求加入？(choose 1=是, choose 2=否)") end
-    if w then w.write("[DEBUG instruct_9] waiting for choose 1/2") end
     rawset(_G, "__instruct9_result", nil)
     rawset(_G, "__instruct9_waiting", true)
     local scheduler = rawget(_G, "CoroutineScheduler")
@@ -608,7 +639,6 @@ rawset(_G, "instruct_9", function()
     end
     local result = rawget(_G, "__instruct9_result")
     rawset(_G, "__instruct9_result", nil)
-    if w then w.write("[DEBUG instruct_9] result=" .. tostring(result)) end
     return result
 end)
 
@@ -995,16 +1025,60 @@ local function ensureSceneDEvents(sceneId)
         return
     end
     
-    -- 从 initDataSource.events 拷贝该场景的所有事件
-    local sceneEvents = {}
-    -- events 是 [sceneId, layer, x, y, eventType, ...] 的数组
-    for _, evt in ipairs(events) do
-        if evt[1] == sceneId then
-            table.insert(sceneEvents, evt)
+    -- events.json 顶层是 {version, extracted, total, events: [...]} 包装结构，
+    -- 真正的条目在 events.events（数组，每条是 {sceneId, tileIndex, passable, unknown1, eventSpace, eventTouch, eventExtra, ...}）
+    local evList = (type(events) == "table" and events.events) or events
+    if type(evList) ~= "table" then
+        JY.D[sceneId] = {}
+        return
+    end
+    
+    -- 按原版 D* 表格式构建：JY.D[sceneId][tileIndex] = {field0..field10}
+    -- field[2]=eventSpace(空格触发), field[3]=eventTouch(物品触发), field[4]=eventExtra(路过触发)
+    -- 注意：使用 0-based 字典键（[0]=passable..[4]=eventExtra），与 instruct_3/SetD/GetD 一致，
+    --       避免数组格式(evt[1]=passable)导致 GetD(...,4) 读到 evt[4]=eventTouch 的索引错位。
+    local sceneD = {}
+    for _, evt in ipairs(evList) do
+        if evt and evt.sceneId == sceneId then
+            local idx = tonumber(evt.tileIndex) or 0
+            sceneD[idx] = {
+                [0] = evt.passable or -1,
+                [1] = evt.unknown1 or -1,
+                [2] = evt.eventSpace or -1,
+                [3] = evt.eventTouch or -1,
+                [4] = evt.eventExtra or -1,
+                [5] = evt.tileStart or -1,
+                [6] = evt.tileEnd or -1,
+                [7] = evt.tileCurrent or -1,
+                [8] = evt.animDelay or 0,
+                [9] = evt.x or -1,
+                [10] = evt.y or -1,
+            }
         end
     end
-    JY.D[sceneId] = sceneEvents
-    EngineAPI.debug.log("ensureSceneDEvents: loaded " .. tostring(#sceneEvents) .. " events for scene " .. tostring(sceneId))
+    JY.D[sceneId] = sceneD
+    EngineAPI.debug.log("ensureSceneDEvents: loaded " .. tostring(#evList) .. " raw events, " .. tostring(#sceneD) .. " for scene " .. tostring(sceneId))
+end
+_G.ensureSceneDEvents = ensureSceneDEvents  -- 全局暴露，供 mmap_smap_handlers.lua 的 look() 使用
+
+-- D* 条目格式归一化：旧存档/旧 ensureSceneDEvents 可能是数组格式
+-- （evt[1]=passable, evt[2]=unknown1, evt[3]=eventSpace, evt[4]=eventTouch, evt[5]=eventExtra），
+-- 而 SetD/instruct_3 按 dict 格式（evt[field]）写入。读取/写入前统一为 dict 格式，
+-- 避免 SetD 写入 evt[2] 但 dfield 数组路径读 evt[3] 的索引错位。
+local function normalizeDEntry(evt)
+    if type(evt) ~= "table" then return evt end
+    if evt[0] == nil and evt[1] ~= nil and evt[1] ~= false then
+        local d = {}
+        for i = 1, 11 do
+            if evt[i] ~= nil then d[i - 1] = evt[i] end
+        end
+        -- 保留字符串键（存档反序列化可能产生 tostring 键）
+        for k, v in pairs(evt) do
+            if type(k) == "string" then d[k] = v end
+        end
+        return d
+    end
+    return evt
 end
 
 rawset(_G, "GetD", function(sceneId, eventId, field)
@@ -1017,10 +1091,11 @@ rawset(_G, "GetD", function(sceneId, eventId, field)
     local sceneD = JY and JY.D and JY.D[sceneId]
     if not sceneD then return 0 end
     
-    local evt = sceneD[eventId]
+    local evt = normalizeDEntry(sceneD[eventId])
     if not evt then return 0 end
     
     local val = evt[field]
+    if val == nil then val = evt[tostring(field)] end
     return val or 0
 end)
 
@@ -1040,6 +1115,7 @@ rawset(_G, "SetD", function(sceneId, eventId, field, value)
     if not sceneD[eventId] then
         sceneD[eventId] = {}
     end
+    sceneD[eventId] = normalizeDEntry(sceneD[eventId])
     sceneD[eventId][field] = value
 end)
 
@@ -1081,6 +1157,9 @@ function _G.initWebFramework()
         local fn = rawget(_G, "instruct_" .. i)
         if fn then _our_instruct[i] = fn end
     end
+    -- 保存 Web MUD 版本的 SetD（jymain.lua 会用 lib.SetD 覆盖，它只操作二进制文件）
+    local _our_SetD = rawget(_G, "SetD")
+    local _our_GetD = rawget(_G, "GetD")
     local scriptList = {
         "script/jymain.lua",
         "script/jyconst.lua",
@@ -1115,7 +1194,6 @@ function _G.initWebFramework()
             _G["instruct_" .. i] = _our_instruct[i]
         end
     end
-
     -- 2. 初始化游戏适配器
     require("framework.lib_log")
     _G.EventBridge = require("framework.event_bridge")
@@ -1131,29 +1209,41 @@ function _G.initWebFramework()
     require("framework.script_loader")
     require("framework.async_wrapper")
     _G.EventExecutor = require("framework.event_executor")
+    -- jymain.lua 也会用 lib.SetD/lib.GetD 覆盖 Web MUD 版本的 SetD/GetD，
+    -- lib.SetD 只操作二进制 D* 文件，不修改 JY.D 运行时表。
+    -- 恢复 Web MUD 版本确保 instruct_3（调用 SetD）修改 JY.D 表。
+    -- 注意：必须放在 require("framework.script_loader") 之后，因为脚本加载会覆盖 SetD！
+    if _our_SetD then rawset(_G, "SetD", _our_SetD) end
+    if _our_GetD then rawset(_G, "GetD", _our_GetD) end
     
     -- 覆盖 EventExecutor.oldCallEventCoroutine 以修复 JY.CurrentD 索引不一致问题
-    do
-        local origOldCall = _G.EventExecutor.oldCallEventCoroutine
-        _G.EventExecutor.oldCallEventCoroutine = function(eventnum)
-            local JY = rawget(_G, "JY")
-            local savedCurrentD = JY and JY.CurrentD
-            origOldCall(eventnum)
-            if JY and JY.D and savedCurrentD and savedCurrentD > 0 and savedCurrentD ~= eventnum then
-                for sid, sceneD in pairs(JY.D) do
-                    local srcEvt = sceneD[eventnum]
-                    if srcEvt then
-                        sceneD[savedCurrentD] = sceneD[savedCurrentD] or {}
-                        for f = 0, 10 do
-                            if srcEvt[f] ~= nil then
-                                sceneD[savedCurrentD][f] = srcEvt[f]
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
+    -- 注意：此 hack 已废弃并会破坏数据！它假设 instruct_3(-2,...) 写入 sceneD[eventnum]，
+    -- 然后同步到 sceneD[savedCurrentD]。但 event_executor 已修复 CurrentD 语义
+    -- （smapUseItemOnNpc 设置 CurrentD=触发事件的 tile 索引，instruct_3 直接写入正确 tile），
+    -- 此覆盖反而会把 sceneD[eventnum]（常为空的残留表）复制覆盖到 sceneD[tile]，
+    -- 导致谢逊 tile2 被清零、oldevent_65 头颅事件永远无法触发（P6 光明顶链失败根因）。
+    -- 禁用：保留原始 oldCallEventCoroutine（CurrentD 由 event_executor 统一管理）。
+    -- do
+    --     local origOldCall = _G.EventExecutor.oldCallEventCoroutine
+    --     _G.EventExecutor.oldCallEventCoroutine = function(eventnum)
+    --         local JY = rawget(_G, "JY")
+    --         local savedCurrentD = JY and JY.CurrentD
+    --         origOldCall(eventnum)
+    --         if JY and JY.D and savedCurrentD and savedCurrentD > 0 and savedCurrentD ~= eventnum then
+    --             for sid, sceneD in pairs(JY.D) do
+    --                 local srcEvt = sceneD[eventnum]
+    --                 if srcEvt then
+    --                     sceneD[savedCurrentD] = sceneD[savedCurrentD] or {}
+    --                     for f = 0, 10 do
+    --                         if srcEvt[f] ~= nil then
+    --                             sceneD[savedCurrentD][f] = srcEvt[f]
+    --                         end
+    --                     end
+    --                 end
+    --             end
+    --         end
+    --     end
+    -- end
     
     -- 修补 saveGameState/loadGameState：将数据直接存储到 Lua 全局变量 __saveCache
     -- 完全绕过 JSBridge 的 save/load 方法，避免 JSON 过大导致的解析问题
@@ -1180,7 +1270,8 @@ function _G.initWebFramework()
                         subScene = JY.SubScene or 0,
                         mmapMusic = JY.MmapMusic or -1,
                         currentD = JY.CurrentD or -1,
-                        dTable = JY.D,  -- 保存 D* 事件表，保留 instruct_3 的修改
+                        d = JY.D,  -- 保存 D* 事件表（与 state_manager.saveGameState 键名一致），保留 instruct_3 的修改
+                        dTable = JY.D,  -- 兼容旧键名
                     }
                     local encode = rawget(_G, "encodeSimpleJSON")
                     if encode then
@@ -1218,6 +1309,7 @@ function _G.initWebFramework()
                             subScene = "SubScene",
                             mmapMusic = "MmapMusic",
                             currentD = "CurrentD",
+                            d = "D",
                             dTable = "D",
                         }
                         for jsonKey, jyKey in pairs(restoreMap) do

@@ -166,6 +166,8 @@ function saveGameState(slotId)
         data.subScene = ref.SubScene or 0
         data.mmapMusic = ref.MmapMusic or -1
         data.currentD = ref.CurrentD or -1
+        -- D* 表（原版存档包含 D*，instruct_3 动态放置的 NPC/事件必须随存档持久化）
+        data.d = ref.D
     else
         -- JY 不存在时也保存默认值
         data.status = 2
@@ -206,6 +208,7 @@ function loadGameState(slotId)
         subScene = "SubScene",
         mmapMusic = "MmapMusic",
         currentD = "CurrentD",
+        d = "D",
     }
     for jsonKey, jyKey in pairs(restoreMap) do
         local src = data[jsonKey]
@@ -260,13 +263,17 @@ function encodeSimpleJSON(val)
         s = s:gsub("\t", "\\t")
         return '"' .. s .. '"'
     elseif t == "table" then
+        -- 数组判断：所有键必须是 1..n 的连续整数（无空档），否则按对象序列化
+        -- 修复：稀疏数字键（如 JY.D 的 sceneId）不能当作数组，否则键映射会丢失
         local isArray = true
         local maxIdx = 0
+        local count = 0
         for k in pairs(val) do
-            if type(k) ~= "number" or k < 1 then isArray = false; break end
+            count = count + 1
+            if type(k) ~= "number" or k < 1 or math.floor(k) ~= k then isArray = false; break end
             if k > maxIdx then maxIdx = k end
         end
-        if isArray and maxIdx > 0 then
+        if isArray and maxIdx > 0 and count == maxIdx then
             local parts = {}
             for i = 1, maxIdx do
                 parts[i] = encodeSimpleJSON(val[i])

@@ -1,8 +1,8 @@
-function oldevent_7()
+--function oldevent_7()
     if instruct_16(1,0,0) ==true then    --  16(10):队伍是否有[胡斐]否则跳转到:Label0
-        if instruct_43(122,0) ==true then    --  43(2B):是否有物品[屠龙刀]否则跳转到:Label0
+        if instruct_43(117,0) ==true then    --  43(2B):是否有物品[屠龙刀]否则跳转到:Label0
             if instruct_43(121,0) ==true then    --  43(2B):是否有物品[金丝背心]否则跳转到:Label0
-                instruct_32(122,-1);   --  32(20):物品[屠龙刀]+[-1]
+                instruct_32(117,-1);   --  32(20):物品[屠龙刀]+[-1]
                 instruct_32(121,-1);   --  32(20):物品[金丝背心]+[-1]
                 instruct_2(144,1);   --  2(2):得到物品[飞狐外传][1]
                 instruct_37(5);   --  37(25):增加道德5

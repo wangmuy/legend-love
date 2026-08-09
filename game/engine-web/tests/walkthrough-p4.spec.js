@@ -1,7 +1,7 @@
 // quick_pass_game.md: 苗人凤居→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居
 const { test, expect } = require('@playwright/test');
 const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
-const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache } = require('./helpers/walkthrough');
+const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache, hasItem, hasTeamMember, doBattle } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
 const SETTLE = 5000;
@@ -20,14 +20,7 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'choose 3'); await page.waitForTimeout(5000);
   t = await getT(page);
   if (t.includes('战场态势') || t.includes('战斗')) {
-    for (let r = 0; r < 10; r++) {
-      await cmd(page, 'choose 5'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      t = await getT(page);
-      if (t.includes('战斗胜利') || t.includes('战斗失败')) break;
-    }
+    t = await doBattle(page);
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   // 飞狐外传条件检查 — Entity 5=搜索(oldevent_7, 需胡斐+屠龙刀+金丝背心)
@@ -61,10 +54,15 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   t = await getT(page); expect(t).toContain('你来到了');
   console.log('  ✓ 恒山派');
 
-  // 蜘蛛洞
+  // 蜘蛛洞 — 玄冰碧火酒(oldevent_372, Entity 6)，用于摩天崖石破天加入
   expect(await gotoScene(page, '蜘蛛洞')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  console.log('  ✓ 蜘蛛洞');
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 6'); await page.waitForTimeout(3000);  // Entity 6=oldevent_372 → 玄冰碧火酒
+  expect(await hasItem(page, 136)).toBe(true);  // 玄冰碧火酒(136)
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  console.log('  ✓ 蜘蛛洞(玄冰碧火酒)');
 
   // 悦来客栈/令狐冲喝酒
   expect(await gotoScene(page, '悅來客棧')).toBeGreaterThan(0);
@@ -77,14 +75,51 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 悦来客栈(令狐冲)');
 
-  // 摩天崖 — 石破天对话 + 白龙剑
+  // 摩天崖 — 白龙剑(oldevent_336) + 石破天对话 + 使用玄冰碧火酒加入(oldevent_335→337)
   expect(await gotoScene(page, '摩天崖')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 石破天对话
-  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
-  await cmd(page, 'choose 2'); await page.waitForTimeout(2000);  // 白龙剑
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // Entity 1=oldevent_336 → 白龙剑
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // Entity 2=石破天(oldevent_333 对话→334→335)
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 对话翻页
+  // 使用玄冰碧火酒 on 石破天（menu→物品→使用→玄冰碧火酒→石破天）
+  await cmd(page, 'menu'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 4'); await page.waitForTimeout(2000);  // 物品
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 使用
+  let wineIdx = await page.evaluate(() => {
+    const term = window.__xterm; if (!term) return -1;
+    for (let y = term.buffer.active.length - 1; y >= 0; y--) {
+      const s = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      const m = s.match(/^(\d+)\.\s*.*玄冰碧火酒.*$/);
+      if (m) return parseInt(m[1], 10);
+    }
+    return -1;
+  });
+  if (wineIdx > 0) {
+    await cmd(page, 'choose ' + wineIdx); await page.waitForTimeout(2000);
+    let npcIdx = await page.evaluate(() => {
+      const term = window.__xterm; if (!term) return -1;
+      const total = term.buffer.active.length;
+      let start = -1;
+      for (let y = total - 1; y >= 0; y--)
+        if (term.buffer.active.getLine(y)?.translateToString(true)?.includes('选择目标')) { start = y; break; }
+      if (start === -1) return -1;
+      for (let y = total - 1; y > start; y--) {
+        const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+        const m = raw.match(/^(\d+)\.\s*(.*\S)\s*$/);
+        if (m && m[2].includes('石破天')) return parseInt(m[1], 10);
+      }
+      return -1;
+    });
+    if (npcIdx > 0) { await cmd(page, 'choose ' + npcIdx); await page.waitForTimeout(3000); }
+  }
+  // 是否要求加入？→ 是
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  t = await getT(page);
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  console.log('  ✓ 摩天崖');
+  expect(await hasTeamMember(page, 38)).toBe(true);  // 石破天(38) 加入队伍
+  console.log('  ✓ 摩天崖(石破天加入)');
 
   // 五毒教 — 苗人战斗[96]
   expect(await gotoScene(page, '五毒教')).toBeGreaterThan(0);
@@ -92,14 +127,7 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 触发战斗
   t = await getT(page);
   if (t.includes('战场态势')) {
-    for (let r = 0; r < 10; r++) {
-      await cmd(page, 'choose 5'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      await cmd(page, 'choose 1'); await page.waitForTimeout(300);
-      t = await getT(page);
-      if (t.includes('战斗胜利') || t.includes('战斗失败')) break;
-    }
+    t = await doBattle(page);
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
