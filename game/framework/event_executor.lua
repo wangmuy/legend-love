@@ -70,14 +70,30 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     lib.Debug(string.format("oldCallEventCoroutine: %s START", eventfilename))
     
     -- 设置 JY.CurrentD（原版 EventExecuteCoroutine 的行为，供 instruct_3 用 id=-2 获取当前事件编号）
-    if JY then JY.CurrentD = eventnum end
+    -- 注意：调用方（smapUseItemOnNpc 等）可能已设置 CurrentD = 触发事件的 tile 索引
+    -- （原版语义：instruct_3(-2,...) 写回 NPC 所在 tile，如谢逊 tile2 field3 铁焰令→头颅65）。
+    -- 若调用方已设置有效值则保留，否则回退为事件编号（兼容旧 NPC 对话模型）。
+    if JY and (JY.CurrentD == nil or JY.CurrentD < 0) then
+        JY.CurrentD = eventnum
+    end
     
     -- 安装异步全局函数替换
     AsyncGlobals.install()
     
     local chunk, err = ScriptLoader.load(CONFIG.OldEventPath .. eventfilename)
     if chunk then
+        -- 兼容两种 oldevent 文件格式：
+        --   1) "--function oldevent_N() ... --end"（函数定义被注释，chunk() 直接执行指令）
+        --   2) "function oldevent_N() ... end"（完整函数定义，chunk() 只定义函数不执行）
+        -- 对格式 2，chunk() 执行后会定义全局函数 oldevent_N，需调用它以执行事件指令。
+        -- 仅在 chunk 新定义了该函数时调用（避免重复执行旧函数）。
+        local funcName = "oldevent_" .. tostring(eventnum)
+        local fnBefore = rawget(_G, funcName)
         chunk()  -- 直接执行，不在 pcall 中
+        local fnAfter = rawget(_G, funcName)
+        if fnAfter ~= fnBefore and type(fnAfter) == "function" then
+            fnAfter()
+        end
     else
         lib.Debug("oldCallEventCoroutine: failed to load " .. eventfilename .. ": " .. tostring(err))
         if JY_Error then

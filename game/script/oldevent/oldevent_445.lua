@@ -1,4 +1,4 @@
-function oldevent_445()
+--function oldevent_445()
     instruct_1(1578,61,0);   --  1(1):[欧阳克]说: 怎样，想通了吗．
     instruct_0();   --  0(0)::空语句(清屏)
 

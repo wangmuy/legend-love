@@ -3,7 +3,7 @@
 // 纯用户命令，每步都模拟真实玩家操作
 const { test, expect } = require('@playwright/test');
 const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
-const { saveTestState, loadTestState, flushSaveCache } = require('./helpers/walkthrough');
+const { saveTestState, loadTestState, flushSaveCache, hasItem } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
 const SETTLE = 2000;
@@ -69,13 +69,48 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 选"是"（加入）
   t = await getT(page); expect(t).toContain('田伯光');
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  // 搜索 Entity 1（oldevent_918）→ 得鸳刀+黑血神针（用于鸳鸯岛 P8）
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 2)).toBe(true);
   console.log('  ✓ 田伯光加入');
 
-  // Step 4: 唐诗山东/山洞(坐标364:279附近) — 千年人参+凹洞提示
-  // 注：唐诗山东在场景列表显示为"山洞"，需按坐标识别
-  // e2e 测试中跳过此步，手动游玩时参考 quick_pass_game.md
+  // Step 4: 唐诗山东/山洞(坐标364:279附近, scene 65) — 唐诗选辑(连城诀前置, oldevent_602)
+  // 同名"山洞"场景较多，按坐标(364,279)定位，并通过 goToScene(item) 直接导航（与 gotoScene helper 一致）
+  expect(await loadTestState(page, 2)).toBe(true);
+  const tangGo = await page.evaluate(async () => {
+    const lua = window.__luaEval; if (!lua) return false;
+    const code = [
+      'local bs = rawget(_G, "buildSceneList")',
+      'if not bs then return "false" end',
+      'local items = bs()',
+      'if not items then return "false" end',
+      'local target = nil',
+      'for _, item in ipairs(items) do',
+      '  if item.name == "山洞" and item.entry and tonumber(item.entry.mapX) == 364 and tonumber(item.entry.mapY) == 279 then target = item break end',
+      'end',
+      'if not target then return "false" end',
+      'local gs = rawget(_G, "goToScene")',
+      'if not gs then return "false" end',
+      'gs(target)',
+      'return "true"',
+    ].join('\n');
+    const r = await lua(code);
+    return r && r.ok && r.result === 'true';
+  });
+  expect(tangGo).toBe(true);
+  await page.waitForTimeout(SETTLE);
+  t = await getT(page); expect(t).toContain('你来到了');
+  await cmd(page, 'look'); await page.waitForTimeout(2000);
+  // Entity 2=oldevent_602 → 唐诗选辑(item 160)
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
+  expect(await hasItem(page, 160)).toBe(true);  // 唐诗选辑(160)
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  // 关键：必须在此保存（含唐诗选辑160），否则 Step 5 开头的 loadTestState(2) 会回滚丢弃 160，
+  // 导致连城诀链（P7b 天宁寺二刷）永远拿不到《连城诀》(146)
+  expect(await saveTestState(page, 2)).toBe(true);
+  console.log('  ✓ 唐诗山东(唐诗选辑)');
 
   // Step 5: 闫基战斗 — choose 4(瓦片事件) → 战斗 → 胜利
   expect(await loadTestState(page, 2)).toBe(true);

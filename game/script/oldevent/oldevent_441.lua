@@ -1,4 +1,4 @@
-function oldevent_441()
+--function oldevent_441()
     instruct_1(1509,59,0);   --  1(1):[小龙女]说: 少侠近来如何？
     instruct_0();   --  0(0)::空语句(清屏)
 
