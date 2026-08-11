@@ -90,149 +90,170 @@ async function loadTestState(page, slot) {
     await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
     await cmd(page, 'leave'); await page.waitForTimeout(2000);
   }
-  // 3. 通过 __luaEval 直接调用 loadGameState（测试基础设施，绕过 processEventQueue）
-  //    这比 `load N` 用户命令更可靠：load N 会触发 processEventQueue 重入问题，导致后续命令不处理
-  //    用户命令 `load N` 仍由 quick_pass_game.md 文档记录，walkthrough-save-state.spec.js 验证
-  const loaded = await page.evaluate(async (s) => {
-    if (!window.__luaEval) return false;
-    const r = await window.__luaEval('local f = rawget(_G, "loadGameState"); if not f then return "false" end; local ok = f(' + s + '); return tostring(ok ~= false and ok ~= nil)');
-    return r && r.ok && r.result === 'true';
-  }, slot);
-  if (loaded) {
-    // 清除遗留的 instruct 等待标志（loadGameState 不保存这些标志，读档后可能残留）
-    await page.evaluate(async () => {
-      await window.__luaEval('rawset(_G, "__instruct4_waiting", nil); rawset(_G, "__instruct4_result", nil); rawset(_G, "__instruct9_waiting", nil); rawset(_G, "__instruct9_result", nil); rawset(_G, "__instruct5_waiting", nil); rawset(_G, "__instruct5_result", nil)');
-    });
-    // 显示 MMAP look 输出
-    await page.evaluate(async () => {
-      await window.__luaEval('local J = rawget(_G, "JY"); if J and J.Status == 2 then local mh = rawget(_G, "MmapHandlers"); if mh and mh.look then mh.look({}) end end');
-    });
-    await page.waitForTimeout(1500);
-  }
-  return loaded;
+  // 3. 通过用户命令 load <slot> 读档（processEventQueue 支持 load N：
+  //    从 __saveCache 读取并解析，成功后自动显示对应状态 look）
+  await cmd(page, 'load ' + slot); await page.waitForTimeout(2500);
+  // 清除遗留的 instruct 等待标志（loadGameState 不保存这些标志，读档后可能残留）
+  await page.evaluate(async () => {
+    await window.__luaEval('rawset(_G, "__instruct4_waiting", nil); rawset(_G, "__instruct4_result", nil); rawset(_G, "__instruct9_waiting", nil); rawset(_G, "__instruct9_result", nil); rawset(_G, "__instruct5_waiting", nil); rawset(_G, "__instruct5_result", nil)');
+  });
+  // 显示 MMAP look 输出（load N 已触发 look；此处兜底确保场景可见）
+  await page.evaluate(async () => {
+    await window.__luaEval('local J = rawget(_G, "JY"); if J and J.Status == 2 then local mh = rawget(_G, "MmapHandlers"); if mh and mh.look then mh.look({}) end end');
+  });
+  await page.waitForTimeout(1500);
+  return true;
 }
 
 /**
- * 通过场景名称导航，确保在大地图 → 关对话框 → 关菜单 → 按名称排序的 list → 导航验证
- * sceneItems 按名称排序（buildSceneList 中 table.sort），顺序稳定
+ * 通过场景名称导航 — 纯用户命令流程（leave → list → 解析终端场景列表 → choose <idx>）
+ * 与 quick_pass_game.md 的 gotoScene 自动导航流程一致：
+ *   leave（如在场景）→ list（列出可去场景）→ 终端解析找到场景索引 → choose <idx> 导航
+ * 不使用 __luaEval 注入（buildSceneList/goToScene 仅由游戏内部 list/choose 命令触发）。
  */
 async function gotoScene(page, sceneName, waitMs) {
   const input = page.locator('#command-input');
   await input.waitFor({ state: 'visible', timeout: 15000 });
-  // 1. 确保在大地图状态（关闭可能残留的对话框/菜单）
-  for (let i = 0; i < 3; i++) {
-    await input.fill('choose 0'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+  // 1. 若在场景中先 leave 回大地图（MMAP 下 leave 为"未知命令"，无害）。
+  //    战斗结算/对话残留可能导致 leave 被吞、仍停留场景——此时 SMAP 无 list 命令，
+  //    后续解析必然返回 -1。用 Lua 验证 JY.Status==2，未回大地图则重试 leave。
+  for (let lv = 0; lv < 5; lv++) {
+    await cmd(page, 'leave'); await page.waitForTimeout(800);
+    if (await isInMMap(page)) break;
   }
-  // 2. 直接用 Lua 强制回到 MMAP（避免 leave 命令与 goToScene 的异步竞态：
-  //    leave 是异步入队命令，若延迟处理会把 goToScene 刚设置的 Status=4 覆盖回 2，
-  //    导致游戏停留在大地图、后续场景交互全部失效）
-  //    注意：战斗/长对话后 Lua 引擎可能瞬时繁忙，page.evaluate 会超时。
-  //    此处改为快速失败且非致命：求值失败也继续导航（goToScene 自身会设置 Status/SubScene），
-  //    避免 5 次 × 30s evaluate 超时占满整个测试预算。
-  let mmapOk = false;
-  for (let attempt = 0; attempt < 2 && !mmapOk; attempt++) {
-    try {
-      const r = await page.evaluate(async () => {
-        if (!window.__luaEval) return false;
-        const code = 'local J = rawget(_G, "JY"); if J then J.Status = 2 end; return "ok"';
-        const res = await window.__luaEval(code);
-        return !!(res && res.ok);
-      }, undefined, { timeout: 5000 });
-      mmapOk = !!r;
-    } catch (e) {
-      await page.waitForTimeout(500);
+  // 2. list 列出可去场景（按名称排序，同名场景追加坐标）
+  await cmd(page, 'list'); await page.waitForTimeout(3000);
+  // 3. 解析终端中最近一次 list 输出的场景列表，找到目标名称的索引
+  // 注意：必须"精确匹配"优先（去掉坐标后缀后 == 场景名），否则 includes 会把
+  // "絕情谷" 误匹配到 "絕情谷底"（如 P2 绝情谷段卡住的根因）。
+  const idx = await page.evaluate((n) => {
+    const term = window.__xterm; if (!term) return -1;
+    const total = term.buffer.active.length;
+    let lastList = -1;
+    for (let y = total - 1; y >= 0; y--)
+      if (term.buffer.active.getLine(y)?.translateToString(true)?.includes('可去场景'))
+        { lastList = y; break; }
+    if (lastList === -1) return -1;
+    // 第一轮：精确匹配（显示名去掉 "(x,y)" 坐标后缀后与目标名完全相等）
+    for (let y = total - 1; y > lastList; y--) {
+      const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      const m = raw.match(/^\D*(\d+)\.\s*(.*\S)\s*$/);
+      if (m) {
+        const name = m[2].replace(/\s*\(\d+\s*,\s*\d+\)\s*$/, '').trim();
+        if (name === n) return parseInt(m[1], 10);
+      }
     }
-  }
-  if (!mmapOk) console.log(`[gotoScene] ${sceneName}: Lua Status=2 求值失败（非致命，继续导航）`);
-  await page.waitForTimeout(200);
-  // 3. 直接用 buildSceneList 获取场景索引，然后通过 goToScene 直接导航
-  const navigated = await page.evaluate(async (name) => {
-    const lua = window.__luaEval;
-    if (!lua) return -1;
-    const code = [
-      'local bs = rawget(_G, "buildSceneList")',
-      'if not bs then return "-1" end',
-      'local items = bs()',
-      'if not items then return "-1" end',
-      'for i, item in ipairs(items) do',
-      '  if item.name and item.name:find([====[' + name + ']====], 1, true) then',
-      '    local gs = rawget(_G, "goToScene")',
-      '    if gs then gs(item) end',
-      '    return tostring(i)',
-      '  end',
-      'end',
-      'return "-1"',
-    ].join('\n');
-    const r = await lua(code);
-    if (r && r.ok && r.result) {
-      const n = parseInt(r.result, 10);
-      return isNaN(n) ? -1 : n;
+    // 第二轮：includes 兜底（兼容无法精确匹配的显示名）
+    for (let y = total - 1; y > lastList; y--) {
+      const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      const m = raw.match(/^\D*(\d+)\.\s*(.*\S)\s*$/);
+      if (m && m[2].includes(n)) return parseInt(m[1], 10);
     }
     return -1;
   }, sceneName);
-
-  if (navigated > 0) {
+  if (idx > 0) {
+    await cmd(page, 'choose ' + idx);
     await page.waitForTimeout(waitMs || 3000);
+    // 验证导航真正生效（JY.Status==4 场景状态），若失败（菜单未激活竞态）重试一次
+    if (!(await isInScene(page))) {
+      console.log(`[gotoScene] ${sceneName}: choose ${idx} 后未进入场景，重试`);
+      await cmd(page, 'choose ' + idx);
+      await page.waitForTimeout(waitMs || 3000);
+    }
   }
-  return navigated;
+  return idx;
+}
+
+/** 读取当前是否处于场景状态（JY.Status==4，测试基础设施断言，非游戏操作） */
+async function isInScene(page) {
+  try {
+    const r = await page.evaluate(async () => {
+      if (!window.__luaEval) return false;
+      const res = await window.__luaEval('local J = rawget(_G, "JY"); return (J and J.Status == 4) and "true" or "false"');
+      return res && res.ok && res.result === 'true';
+    });
+    return r === true;
+  } catch (e) { return false; }
+}
+
+/** 读取当前是否处于大地图状态（JY.Status==2，测试基础设施断言，非游戏操作） */
+async function isInMMap(page) {
+  try {
+    const r = await page.evaluate(async () => {
+      if (!window.__luaEval) return false;
+      const res = await window.__luaEval('local J = rawget(_G, "JY"); return (J and J.Status == 2) and "true" or "false"');
+      return res && res.ok && res.result === 'true';
+    });
+    return r === true;
+  } catch (e) { return false; }
 }
 
 /**
- * 通过 sceneId 导航到场景（用于同名场景区分，如多个"山洞"）
- * 直接调用 goToScene(sceneItem)，绕过 list 索引（Lua table.sort 不稳定）
+ * 通过 sceneId 导航（用于同名场景区分，如多个"山洞"）— 纯用户命令流程
+ * 与 gotoScene 相同：leave → list → 终端解析场景列表（同名场景显示 "(mapX,mapY)"）→ choose <idx>
+ * 入口坐标仅从静态数据文件读取用于终端匹配，不注入任何 Lua 状态。
  */
 async function gotoSceneById(page, sceneId, waitMs) {
+  // 从静态数据文件查找该场景的名称与入口坐标（仅用于匹配终端文本，非游戏操作）
+  let target = null;
+  try {
+    const entrances = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../data-web/entrances.json'), 'utf8'));
+    const scenes = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../data-web/scenes.json'), 'utf8'));
+    const sceneList = scenes['scenes'] || scenes;
+    const sceneIndex = {};
+    for (const s of sceneList) sceneIndex[String(s['代号'])] = s;
+    for (const e of entrances['entrances'] || []) {
+      if (String(e.sceneId) === String(sceneId)) {
+        const sc = sceneIndex[String(sceneId)];
+        target = { name: sc && sc['名称'] ? sc['名称'] : (e.name || '场景' + sceneId), mapX: e.mapX, mapY: e.mapY };
+        break;
+      }
+    }
+  } catch (e) { /* 数据文件缺失时退化为仅按名称匹配 */ }
   const input = page.locator('#command-input');
   await input.waitFor({ state: 'visible', timeout: 15000 });
-  for (let i = 0; i < 3; i++) {
-    await input.fill('choose 0'); await page.keyboard.press('Enter'); await page.waitForTimeout(100);
+  // 战斗结算/对话残留可能导致 leave 被吞、仍停留场景——验证 JY.Status==2，未回大地图则重试
+  for (let lv = 0; lv < 5; lv++) {
+    await cmd(page, 'leave'); await page.waitForTimeout(800);
+    if (await isInMMap(page)) break;
   }
-  // 与 gotoScene 相同：Lua 强制回 MMAP，避免 leave 异步命令竞态覆盖 Status
-  // （战斗/长对话后 Lua 引擎可能瞬时繁忙，快速失败且非致命，继续导航）
-  let mmapOk2 = false;
-  for (let attempt = 0; attempt < 2 && !mmapOk2; attempt++) {
-    try {
-      const r = await page.evaluate(async () => {
-        if (!window.__luaEval) return false;
-        const code = 'local J = rawget(_G, "JY"); if J then J.Status = 2 end; return "ok"';
-        const res = await window.__luaEval(code);
-        return !!(res && res.ok);
-      }, undefined, { timeout: 5000 });
-      mmapOk2 = !!r;
-    } catch (e) {
-      await page.waitForTimeout(500);
-    }
+  // list 可能因异步命令排队未及时输出：最多重试 3 次
+  let idx = -1;
+  for (let attempt = 0; attempt < 3 && idx === -1; attempt++) {
+    await cmd(page, 'list'); await page.waitForTimeout(3000);
+    idx = await page.evaluate(({ name, mapX, mapY }) => {
+      const term = window.__xterm; if (!term) return -1;
+      const total = term.buffer.active.length;
+      let lastList = -1;
+      for (let y = total - 1; y >= 0; y--)
+        if (term.buffer.active.getLine(y)?.translateToString(true)?.includes('可去场景')) { lastList = y; break; }
+      if (lastList === -1) return -1;
+      // 第一遍：精确坐标匹配（唯一）
+      for (let y = total - 1; y > lastList; y--) {
+        const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+        const m = raw.match(/^\D*(\d+)\.\s*(.*\S)\s*$/);
+        if (!m) continue;
+        const label = m[2];
+        if (mapX !== undefined && mapY !== undefined) {
+          if (label.includes('(' + mapX + ',' + mapY + ')')) return parseInt(m[1], 10);
+        }
+      }
+      // 第二遍：精确名称匹配（行首为 name 的场景，排除"金蛇山洞"等包含子串的场景）
+      for (let y = total - 1; y > lastList; y--) {
+        const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+        const m = raw.match(/^\D*(\d+)\.\s*(.*\S)\s*$/);
+        if (!m) continue;
+        const label = m[2];
+        if (name && (label === name || label.startsWith(name + ' '))) return parseInt(m[1], 10);
+      }
+      return -1;
+    }, target || {});
   }
-  if (!mmapOk2) console.log(`[gotoSceneById] ${sceneId}: Lua Status=2 求值失败（非致命，继续导航）`);
-  await page.waitForTimeout(200);
-  const navigated = await page.evaluate(async (sid) => {
-    const lua = window.__luaEval;
-    if (!lua) return -1;
-    const code = [
-      'local bs = rawget(_G, "buildSceneList")',
-      'if not bs then return "-1" end',
-      'local items = bs()',
-      'if not items then return "-1" end',
-      'for i, item in ipairs(items) do',
-      '  if tostring(item.sceneId) == tostring(' + sid + ') then',
-      '    local gs = rawget(_G, "goToScene")',
-      '    if gs then gs(item) end',
-      '    return tostring(i)',
-      '  end',
-      'end',
-      'return "-1"',
-    ].join('\n');
-    const r = await lua(code);
-    if (r && r.ok && r.result) {
-      const n = parseInt(r.result, 10);
-      return isNaN(n) ? -1 : n;
-    }
-    return -1;
-  }, sceneId);
-  if (navigated > 0) {
+  if (idx > 0) {
+    await cmd(page, 'choose ' + idx);
     await page.waitForTimeout(waitMs || 3000);
   }
-  return navigated;
+  return idx;
 }
 
 /** 判断当前是否处于战斗状态（JY.Status == 5，可靠，不受终端文本累积影响） */

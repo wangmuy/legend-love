@@ -7,7 +7,7 @@ const { cmd, getT, noE } = require('./helpers/term');
 const SETTLE = 5000;
 
 test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', async ({ page }) => {
-  test.setTimeout(600000);
+  test.setTimeout(900000);
   loadSaveCache('bridge-p3.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 

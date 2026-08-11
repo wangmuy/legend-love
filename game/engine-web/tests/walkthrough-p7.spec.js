@@ -10,7 +10,7 @@ const { cmd, getT, noE } = require('./helpers/term');
 const SETTLE = 5000;
 
 test('P7: 桃花岛→福威→天宁→梅庄→黑木崖→丐帮→主角居→天书收集', async ({ page }) => {
-  test.setTimeout(900000);
+  test.setTimeout(1200000);
   loadSaveCache('bridge-p6.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 

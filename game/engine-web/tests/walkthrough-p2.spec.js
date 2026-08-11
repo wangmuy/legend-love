@@ -37,13 +37,37 @@ test('P2: 回族→胡斐→冰火岛→绝情谷→大轮寺', async ({ page })
   for (let d = 0; d < 8; d++) {
     await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
   }
-  // 通过 __luaEval 调用 SmapHandlers.__useItemDirect 对胡斐使用物品（装测试基础设施，跳过菜单UI）
-  const used = await page.evaluate(async () => {
-    if (!window.__luaEval) return false;
-    const r = await window.__luaEval('local sh=rawget(_G,"SmapHandlers");if not sh or not sh.__useItemDirect then return "no_sh" end;local JY=rawget(_G,"JY");if not JY then return "no_jy" end;local sid=JY.SubScene or 0;local ds=rawget(_G,"initDataSource");if not ds then return "no_ds" end;local scenes=ds["scenes"];if not scenes then return "no_scn" end;local list=scenes["scenes"] or scenes;if type(list)~="table" then return "bad_scn" end;for _,s in ipairs(list) do;if s["代号"]==sid then;for _,n in ipairs(s["NPC"] or {}) do;if n["名称"]=="胡斐" then;sh.__useItemDirect(sid,n);return "ok";end;end;return "npc_not_found";end;end;return "scene_not_found_"..tostring(sid)');
-    return r && r.ok && (r.result === 'true' || r.result === 'ok');
+  // 通过菜单使用两页刀法对胡斐（纯用户命令：menu→物品→使用→两页刀法→胡斐）
+  await cmd(page, 'menu'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 4'); await page.waitForTimeout(2000);  // 物品
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 使用
+  const bladeIdx = await page.evaluate(() => {
+    const term = window.__xterm; if (!term) return -1;
+    for (let y = term.buffer.active.length - 1; y >= 0; y--) {
+      const s = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      const m = s.match(/^(\d+)\.\s*.*[两兩]頁?刀法.*$/);
+      if (m) return parseInt(m[1], 10);
+    }
+    return -1;
   });
-  console.log('useItemDirect:', used);
+  if (bladeIdx > 0) {
+    await cmd(page, 'choose ' + bladeIdx); await page.waitForTimeout(2000);
+    let npcIdx = await page.evaluate(() => {
+      const term = window.__xterm; if (!term) return -1;
+      const total = term.buffer.active.length;
+      let start = -1;
+      for (let y = total - 1; y >= 0; y--)
+        if (term.buffer.active.getLine(y)?.translateToString(true)?.includes('选择目标')) { start = y; break; }
+      if (start === -1) return -1;
+      for (let y = total - 1; y > start; y--) {
+        const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+        const m = raw.match(/^(\d+)\.\s*(.*\S)\s*$/);
+        if (m && m[2].includes('胡斐')) return parseInt(m[1], 10);
+      }
+      return -1;
+    });
+    if (npcIdx > 0) { await cmd(page, 'choose ' + npcIdx); await page.waitForTimeout(3000); }
+  }
   // instruct_4: 是否使用物品[两页刀法]？
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 是
   // 对话后出现"是否要求加入？"
@@ -80,6 +104,8 @@ test('P2: 回族→胡斐→冰火岛→绝情谷→大轮寺', async ({ page })
   console.log('  ✓ 冰火岛(金毛)');
 
   // 绝情谷/玉玺/断肠草/君子剑/玉蜂针 — 全部5个搜索实体
+  // 注意：gotoScene 已修复为"精确匹配优先"（旧版 includes 会把"絕情谷"误匹配到
+  // "絕情谷底"scene 80 杨过场景，导致本段卡死）。实体为 400/401/856/857/399。
   expect(await loadTestState(page, 1)).toBe(true);
   await gotoScene(page, '絕情谷');
   t = await getT(page); expect(t).toContain('你来到了');
