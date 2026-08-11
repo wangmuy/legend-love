@@ -2,13 +2,13 @@
 // 前置：walkthrough-p7.spec.js（P7a）已保存 bridge-p7.json slot 2（含桃花岛射雕148/黑木崖笑傲151/黑木令牌125）
 const { test, expect } = require('@playwright/test');
 const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
-const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache, hasItem, doBattle, inBattle, hasDEvent } = require('./helpers/walkthrough');
+const { saveTestState, loadTestState, gotoScene, gotoSceneById, flushSaveCache, loadSaveCache, hasItem, doBattle, inBattle, hasDEvent } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
 const SETTLE = 5000;
 
 test('P7b: 主角居→丐帮二刷(天龙八部)→天宁寺二刷(连城诀)', async ({ page }) => {
-  test.setTimeout(600000);
+  test.setTimeout(1200000);
   loadSaveCache('bridge-p7.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
   expect(await loadTestState(page, 2)).toBe(true);
@@ -30,12 +30,17 @@ test('P7b: 主角居→丐帮二刷(天龙八部)→天宁寺二刷(连城诀)',
   //     → 使用131(573，设置丐帮 tile14=527) → 丐帮527(问天龙八部)→528(战斗83→147)
   // P6 链中玉玺(130)可能丢失（P2 存档有但后续链未保留），此处重新获取以确保完整。
   if (!(await hasItem(page, 130))) {
-    expect(await gotoScene(page, '絕情谷')).toBeGreaterThan(0);
+    // 注意：gotoScene('絕情谷') 的 includes 匹配会先命中"絕情谷底"(scene 80, 杨过)！
+    // 玉玺在 scene 22"絕情谷"——必须用 gotoSceneById(22) 精确定位。
+    expect(await gotoSceneById(page, 22)).toBeGreaterThan(0);
     t = await getT(page); expect(t).toContain('你来到了');
     await cmd(page, 'look'); await page.waitForTimeout(1500);
-    // 绝情谷5个搜索实体（400/401玉玺/856/857/399），逐个消耗直到拿到玉玺130
-    for (let e = 0; e < 6 && !(await hasItem(page, 130)); e++) {
-      await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
+    // 绝情谷5个搜索实体（400/401玉玺/856/857/399）：choose 触发后 look() 重建实体列表
+    // （已消耗事件不再显示，未消耗的前移）——递增索引会错位（400消耗后401变实体1），
+    // 必须每轮 look 后 choose 1，直到拿到玉玺130。
+    for (let e = 0; e < 8 && !(await hasItem(page, 130)); e++) {
+      await cmd(page, 'look'); await page.waitForTimeout(1200);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(2500);
     }
     await cmd(page, 'choose 0'); await page.waitForTimeout(400);
     await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);

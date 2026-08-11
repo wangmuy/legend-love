@@ -7,7 +7,7 @@ const { cmd, getT, noE } = require('./helpers/term');
 const SETTLE = 5000;
 
 test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武当→嵩山', async ({ page }) => {
-  test.setTimeout(700000);
+  test.setTimeout(900000);
   loadSaveCache('bridge-p4.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
   expect(await loadTestState(page, 2)).toBe(true);

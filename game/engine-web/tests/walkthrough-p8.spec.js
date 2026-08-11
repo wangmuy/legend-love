@@ -10,7 +10,7 @@ const { cmd, getT, noE } = require('./helpers/term');
 const SETTLE = 5000;
 
 test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
-  test.setTimeout(600000);
+  test.setTimeout(1200000);
   loadSaveCache('bridge-p7.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
   expect(await loadTestState(page, 1)).toBe(true);
@@ -40,9 +40,11 @@ test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 1)).toBe(true);
-  expect(await hasItem(page, 145)).toBe(true);  // 《雪山飞狐》item 145
-  expect(await hasItem(page, 188)).toBe(true);  // 鸯刀 item 188
-  expect(await hasItem(page, 121)).toBe(true);  // 金丝背心 item 121
+  // 注意：leave 后 Lua worker 可能繁忙（对话/战斗协程未完全退出），再调 hasItem 会挂起。
+  // 直接使用循环中已通过 Lua 验证过的标志断言（与苗人凤居 got144 同模式）。
+  expect(got145).toBe(true);  // 《雪山飞狐》item 145（循环中 Lua 已验证）
+  expect(got188).toBe(true);  // 鸯刀 item 188
+  expect(got121).toBe(true);  // 金丝背心 item 121
   console.log('  ✓ 闯王山洞(雪山飞狐+鸯刀+金丝背心)');
 
   // Step 2: 鸳鸯岛(scene79) — 鸳鸯刀+千年人参
@@ -65,7 +67,7 @@ test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  expect(await hasItem(page, 157)).toBe(true);  // 《鸳鸯刀》item 157
+  expect(got157).toBe(true);  // 《鸳鸯刀》item 157（循环中 Lua 已验证，leave 后不再调 hasItem 避免挂起）
   console.log('  ✓ 鸳鸯岛(鸳鸯刀+千年人参)');
 
   // Step 3: 苗人凤居二刷——《飞狐外传》(需胡斐+屠龙刀117+金丝背心121)

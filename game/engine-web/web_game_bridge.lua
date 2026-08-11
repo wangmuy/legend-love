@@ -252,6 +252,11 @@ end)
 
 rawset(_G, "instruct_27", function() end)  -- 动画, no-op
 rawset(_G, "instruct_67", function() end)  -- 音效, no-op
+-- 覆写 WarDrawMap：原版访问 WAR.Person[WAR.CurID]（jymain.lua:4963），而 Web MUD 的
+-- WAR 结构只有 teammates/enemies，无 Person/CurID。调用点除 game_states 的 GAME_WMAP
+-- 处理器（已 noop 注册）外，war_async.lua 还有 3 处直接调用 WarDrawMap(0)，都会触发
+-- gameLoop error 并残留终端（P4 noE 失败根因）。Web MUD 战斗为文本渲染，无需绘地图。
+rawset(_G, "WarDrawMap", function() end)
 
 rawset(_G, "instruct_13", function(...)
     -- 菜单选择: 交给 MenuAsync 处理
@@ -1215,6 +1220,10 @@ function _G.initWebFramework()
     -- 注意：必须放在 require("framework.script_loader") 之后，因为脚本加载会覆盖 SetD！
     if _our_SetD then rawset(_G, "SetD", _our_SetD) end
     if _our_GetD then rawset(_G, "GetD", _our_GetD) end
+    -- jymain.lua 在 script_loader 中定义原版 WarDrawMap（访问 WAR.Person[WAR.CurID]），
+    -- 会覆盖文件顶部的 noop。Web MUD 战斗为文本渲染，必须保持 WarDrawMap 为 noop，
+    -- 否则 war_async.lua 的 3 处直接调用会产生 gameLoop error 残留终端（P4 noE 失败根因）。
+    rawset(_G, "WarDrawMap", function() end)
     
     -- 覆盖 EventExecutor.oldCallEventCoroutine 以修复 JY.CurrentD 索引不一致问题
     -- 注意：此 hack 已废弃并会破坏数据！它假设 instruct_3(-2,...) 写入 sceneD[eventnum]，
@@ -1653,13 +1662,17 @@ function _G.initWebFramework()
         JY.D_Valid = nil
     end)
     rawset(_G, "CleanMemory", function() end)
-    -- 覆写 MMAP/SMAP 状态处理器：Web MUD 通过命令处理，无需 game_states 渲染/更新
+    -- 覆写 MMAP/SMAP/WMAP 状态处理器：Web MUD 通过命令处理，无需 game_states 渲染/更新
+    -- 注意：GAME_WMAP（战斗）也必须注册 noop——framework game_states.lua 的 GAME_WMAP 处理器
+    -- 会调用原版 WarDrawMap（访问 WAR.Person[WAR.CurID]），而 Web MUD 的 WAR 结构只有
+    -- teammates/enemies，没有 Person/CurID，会导致 gameLoop error（P4 五毒教战斗 noE 失败根因）
     local eb = _G.EventBridge and _G.EventBridge.getInstance()
     if eb then
         local noop = { enter = function() end, exit = function() end, update = function() end, draw = function() end }
         eb:registerState(GAME_MMAP, noop)
         eb:registerState(GAME_SMAP, noop)
         eb:registerState(GAME_FIRSTMMAP, noop)
+        eb:registerState(GAME_WMAP, noop)
     end
 
     -- 注册 MMAP/SMAP 命令（仅在对应状态下可用）

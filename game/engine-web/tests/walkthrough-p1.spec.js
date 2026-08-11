@@ -3,33 +3,10 @@
 // 纯用户命令，每步都模拟真实玩家操作
 const { test, expect } = require('@playwright/test');
 const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
-const { saveTestState, loadTestState, flushSaveCache, hasItem } = require('./helpers/walkthrough');
+const { saveTestState, loadTestState, flushSaveCache, hasItem, gotoSceneById, gotoScene } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
 const SETTLE = 2000;
-
-// gotoScene: leave → list → 找到场景索引 → 导航
-async function gotoScene(p, name) {
-  await cmd(p, 'leave'); await p.waitForTimeout(500);
-  await cmd(p, 'list'); await p.waitForTimeout(3000);
-  const idx = await p.evaluate((n) => {
-    const term = window.__xterm; if (!term) return -1;
-    const total = term.buffer.active.length;
-    let lastList = -1;
-    for (let y = total - 1; y >= 0; y--)
-      if (term.buffer.active.getLine(y)?.translateToString(true)?.includes('可去场景'))
-        { lastList = y; break; }
-    if (lastList === -1) return -1;
-    for (let y = total - 1; y > lastList; y--) {
-      const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
-      const m = raw.match(/^\D*(\d+)\.\s*(.*\S)\s*$/);
-      if (m && m[2].includes(n)) return parseInt(m[1], 10);
-    }
-    return -1;
-  }, name);
-  if (idx > 0) { await cmd(p, 'choose ' + idx); await p.waitForTimeout(SETTLE); }
-  return idx;
-}
 
 test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', async ({ page }) => {
   test.setTimeout(600000);
@@ -60,13 +37,18 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   expect(await gotoScene(page, '田伯光居')).toBeGreaterThan(0);
   await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // 选田伯光(entity 2)
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 选"对话"
-  // 田伯光对话有多页，逐个跳过
-  for (let d = 0; d < 10; d++) {
+  // 田伯光对话有多页，翻页直到加入询问/对话结束（不能用"田伯光"匹配——历史文本"田伯光居"会导致首轮误 break）
+  for (let d = 0; d < 12; d++) {
     await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
     t = await getT(page);
-    if (t.includes('要求加入') || t.includes('田伯光加入') || t.includes('田伯光')) break;
+    if (t.includes('要求加入') || t.includes('田伯光加入') || t.includes('交谈结束')) break;
   }
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 选"是"（加入）
+  // 防御：若误入"是否与之过招？"（instruct_5 战斗询问），选 2（否）避免战斗分支
+  if (t.includes('与之过招')) {
+    await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
+    t = await getT(page);
+  }
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 选"是"（要求加入）
   t = await getT(page); expect(t).toContain('田伯光');
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   // 搜索 Entity 1（oldevent_918）→ 得鸳刀+黑血神针（用于鸳鸯岛 P8）
@@ -76,29 +58,9 @@ test('P1: 南贤→田伯光加入→闫基战斗→铁掌→段誉→无量', a
   console.log('  ✓ 田伯光加入');
 
   // Step 4: 唐诗山东/山洞(坐标364:279附近, scene 65) — 唐诗选辑(连城诀前置, oldevent_602)
-  // 同名"山洞"场景较多，按坐标(364,279)定位，并通过 goToScene(item) 直接导航（与 gotoScene helper 一致）
+  // 同名"山洞"场景较多，用 gotoSceneById(65) 按 sceneId 定位（纯用户命令：leave→list→按坐标匹配→choose）
   expect(await loadTestState(page, 2)).toBe(true);
-  const tangGo = await page.evaluate(async () => {
-    const lua = window.__luaEval; if (!lua) return false;
-    const code = [
-      'local bs = rawget(_G, "buildSceneList")',
-      'if not bs then return "false" end',
-      'local items = bs()',
-      'if not items then return "false" end',
-      'local target = nil',
-      'for _, item in ipairs(items) do',
-      '  if item.name == "山洞" and item.entry and tonumber(item.entry.mapX) == 364 and tonumber(item.entry.mapY) == 279 then target = item break end',
-      'end',
-      'if not target then return "false" end',
-      'local gs = rawget(_G, "goToScene")',
-      'if not gs then return "false" end',
-      'gs(target)',
-      'return "true"',
-    ].join('\n');
-    const r = await lua(code);
-    return r && r.ok && r.result === 'true';
-  });
-  expect(tangGo).toBe(true);
+  expect(await gotoSceneById(page, 65)).toBeGreaterThan(0);
   await page.waitForTimeout(SETTLE);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
