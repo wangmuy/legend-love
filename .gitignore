@@ -21,7 +21,7 @@ opencode.json
 
 # Web MUD build artifacts
 game/engine-web/data-web/
-game/engine-web/test-results/
+test-results/
 game/engine-web/node_modules/
 game/engine-web/dist/
 game/engine-web/lib/
