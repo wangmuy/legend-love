@@ -73,6 +73,10 @@ function computeLook(sceneId) {
   // 2. 动态 D* 表扫描（0~199，取 eventSpace/eventTouch/eventExtra 任一）
   const d = dTable[sceneId] || {};
   const consumed = {};
+  // 已列出的事件号集合：静态 NPC / D* 扫描 / 入口事件已列出的事件，格子事件段不再重复显示
+  // （与 mmap_smap_handlers.lua look() 的 DISPLAY_DUP 修复保持一致）
+  const listedEventIds = {};
+  for (const k of Object.keys(staticEventIds)) listedEventIds[k] = true;
   for (let i = 0; i < 200; i++) {
     const evt = d[i];
     if (!evt) continue;
@@ -83,7 +87,10 @@ function computeLook(sceneId) {
     if (eventNum == null) continue;
     if (staticEventIds[eventNum]) continue; // 跳过静态列表已有事件
     if (consumed[eventNum]) continue;
+    // 天书放置事件（1001~1014）由格子事件段以"放置天书"列出，此处不显示"搜索"避免重复
+    if (eventNum >= 1001 && eventNum <= 1014) continue;
     const npcName = eventNpcNames[eventNum] || ('oldevent_' + eventNum);
+    listedEventIds[eventNum] = true;
     if (eventNpcNames[eventNum] !== undefined) {
       push({ type: 'npc', label: npcName, eventId: eventNum, src: 'dstar_npc' });
     } else {
@@ -93,7 +100,8 @@ function computeLook(sceneId) {
 
   // 3. 场景入口事件
   const entryEvt = sceneEntryEvents[sceneId];
-  if (entryEvt) {
+  if (entryEvt && !listedEventIds[entryEvt]) {
+    listedEventIds[entryEvt] = true;
     push({ type: 'event_trigger', label: '搜索', eventId: entryEvt, src: 'entry' });
   }
 
@@ -118,6 +126,8 @@ function computeLook(sceneId) {
     else if (evt.touch > 0) { eventId = evt.touch; eventType = 'event_touch'; }
     if (eventId == null) continue;
     if (consumed[eventId]) continue;
+    // 已在静态 NPC / D* 扫描 / 入口事件中列出的事件不再重复显示（消除 DISPLAY_DUP）
+    if (listedEventIds[eventId]) continue;
     const label = (eventId >= 1001 && eventId <= 1014) ? '放置天书' : '搜索';
     push({ type: 'event_trigger', label, eventId, eventType, src: 'grid_' + eventType });
   }
@@ -178,7 +188,7 @@ for (const sid of targets) {
   for (const e of r.list) srcCount[e.src] = (srcCount[e.src] || 0) + 1;
   console.log(`\n=== scene ${r.sceneId} ${r.name} (共 ${r.list.length} 项: ${JSON.stringify(srcCount)}) ===`);
   r.list.forEach((e, i) => {
-    console.log(`  ${i + 1}. ${e.type === 'event_trigger' ? '搜索' : e.label}${e.eventId ? ` [${e.src} evt${e.eventId}]` : ''}${e.type === 'item' ? ' [物品]' : ''}${e.type === 'exit' ? ' [出口]' : ''}`);
+    console.log(`  ${i + 1}. ${e.label || (e.type === 'event_trigger' ? '搜索' : '?')}${e.eventId ? ` [${e.src} evt${e.eventId}]` : ''}${e.type === 'item' ? ' [物品]' : ''}${e.type === 'exit' ? ' [出口]' : ''}`);
   });
   if (r.dupes.length > 0) {
     sceneWithDupes++;
@@ -204,5 +214,5 @@ for (const sid of targets) {
 for (const k of Object.keys(kindCount)) {
   console.log(`[${k}] ${kindCount[k]} 处，涉及场景: ${[...kindScenes[k]].join(', ')}`);
 }
-console.log('结论: DISPLAY_DUP 为显示逻辑重复（同一事件被多段扫描重复列出，无功能影响，点击任一触发同一事件，消耗后全部消失）；');
+console.log('结论: DISPLAY_DUP 已由 look() 跨段去重修复消除（同一事件号在全列表只列出一次）；');
 console.log('      DATA_DUP / EXIT_DUP 为数据本身如此（多格同事件/多出口同目标），原版 D* 表即如此，列表逐格列出属预期。');
