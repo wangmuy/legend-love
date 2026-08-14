@@ -355,6 +355,9 @@ function SmapHandlers.look(args)
     -- 构建交互对象列表（NPC → 物品 → 出口）
     local entityIndex = 0
     smapEntityList = {}
+    -- 已列出的事件号集合：静态 NPC / D* 扫描 / 入口事件已列出的事件，
+    -- 格子事件段不再重复显示（消除同一事件被多段扫描重复列出的 DISPLAY_DUP 显示冗余）
+    local listedEventIds = {}
     
     -- NPC 列表 + 交互对象（宝箱/柜子等 oldevent 触发器）
     local npcs = scene["NPC"]
@@ -441,6 +444,8 @@ function SmapHandlers.look(args)
         end
         -- eventConsumed 中已消耗的事件也不显示
         local consumed = _G.eventConsumed and _G.eventConsumed[tostring(scanSid)] or {}
+        -- 静态 NPC 已列出的事件登记到 listedEventIds，供格子事件段去重
+        for k in pairs(staticEventIds) do listedEventIds[k] = true end
         -- 事件编号 → NPC 名称映射（原版已知动态 NPC 事件）
         local eventNpcNames = {
             [440] = "小龙女", [441] = "小龙女",
@@ -491,10 +496,13 @@ function SmapHandlers.look(args)
                 if eventNum then
                     local eKey = tostring(eventNum)
                     -- 跳过静态列表中已存在的事件和已消耗事件
-                    if not staticEventIds[eKey] and not consumed[eKey] then
+                    -- 天书放置事件（1001~1014）由格子事件段以"放置天书"列出，此处不显示"搜索"避免重复
+                    if not staticEventIds[eKey] and not consumed[eKey]
+                        and not (eventNum >= 1001 and eventNum <= 1014) then
                         local npcName = eventNpcNames[eventNum] or ("oldevent_" .. eventNum)
                         local isNamed = eventNpcNames[eventNum] ~= nil
                         entityIndex = entityIndex + 1
+                        listedEventIds[eKey] = true
                         if isNamed then
                             smapEntityList[entityIndex] = {
                                 type = "npc",
@@ -531,10 +539,13 @@ function SmapHandlers.look(args)
             local JYD = JY.D or {}
             local sceneD = JYD[sid] or {}
             local consumed = (sceneD[pendingEventId] and sceneD[pendingEventId][0] == 0)
-            if not consumed then
+            local eKey = tostring(pendingEventId)
+            -- 已在 D* 扫描/静态 NPC 中列出的事件不再重复显示
+            if not consumed and not listedEventIds[eKey] then
                 entityIndex = entityIndex + 1
                 smapEntityList[entityIndex] = { type = "event_trigger", eventId = pendingEventId, name = "oldevent_" .. pendingEventId }
                 w(string.format("%d. 搜索", entityIndex))
+                listedEventIds[eKey] = true
             end
         end
     end
@@ -609,6 +620,10 @@ function SmapHandlers.look(args)
                                     goto continue
                                 end
                             end
+                        end
+                        -- 已在静态 NPC / D* 扫描 / 入口事件中列出的事件不再重复显示（消除 DISPLAY_DUP）
+                        if listedEventIds[tostring(eventId)] then
+                            goto continue
                         end
                         entityIndex = entityIndex + 1
                         smapEntityList[entityIndex] = { type = "event_trigger", eventId = eventId, eventType = eventType, name = "tile_event", npcData = {["事件编号"]=eventId} }
