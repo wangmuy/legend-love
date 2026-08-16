@@ -332,6 +332,17 @@ end
 -- 场景交互对象列表（由 look 填充，供 choose 使用）
 local smapEntityList = {}
 
+-- 规范化事件号字符串键：Lua 5.3 中 tostring(692)="692" 而 tostring(692.0)="692.0"，
+-- scenes.json（整数事件号）与 events.json/JY.D（浮点事件号）同号不同字符串键，
+-- 会导致 staticEventIds/listedEventIds/eventConsumed 的去重与消耗判断失效
+-- （典型症状：主角居等场景静态 NPC 事件被 D* 扫描重复列出）。
+-- 统一用 floor 后的整数串作为事件号键。
+local function evtKey(eventId)
+    local n = tonumber(eventId)
+    if not n then return tostring(eventId) end
+    return tostring(math.floor(n))
+end
+
 function SmapHandlers.look(args)
     local JY = g(_G, "JY")
     if not JY then return end
@@ -373,7 +384,7 @@ function SmapHandlers.look(args)
                     local eventId = npc["事件编号"] or 0
                     local eid = tonumber(eventId) or 0
                     -- eventConsumed 在 web_game_bridge.lua 已预注册（早于 setmetatable(_G)），直接访问安全
-                    local eventOff = _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][tostring(eventId)]
+                    local eventOff = _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][evtKey(eventId)]
                     if not eventOff then
                         entityIndex = entityIndex + 1
                         smapEntityList[entityIndex] = { type = "event_trigger", eventId = tonumber(eventId), charId = charIdStr, name = npcName, npcData = npc }
@@ -439,7 +450,7 @@ function SmapHandlers.look(args)
         if npcs then
             for _, npc in ipairs(npcs) do
                 local eid = tonumber(npc["事件编号"] or 0)
-                if eid > 0 then staticEventIds[tostring(eid)] = true end
+                if eid > 0 then staticEventIds[evtKey(eid)] = true end
             end
         end
         -- eventConsumed 中已消耗的事件也不显示
@@ -494,7 +505,7 @@ function SmapHandlers.look(args)
                 elseif e3 and e3 > 0 then eventNum = e3
                 elseif e4 and e4 > 0 then eventNum = e4 end
                 if eventNum then
-                    local eKey = tostring(eventNum)
+                    local eKey = evtKey(eventNum)
                     -- 跳过静态列表中已存在的事件和已消耗事件
                     -- 天书放置事件（1001~1014）由格子事件段以"放置天书"列出，此处不显示"搜索"避免重复
                     if not staticEventIds[eKey] and not consumed[eKey]
@@ -539,7 +550,7 @@ function SmapHandlers.look(args)
             local JYD = JY.D or {}
             local sceneD = JYD[sid] or {}
             local consumed = (sceneD[pendingEventId] and sceneD[pendingEventId][0] == 0)
-            local eKey = tostring(pendingEventId)
+            local eKey = evtKey(pendingEventId)
             -- 已在 D* 扫描/静态 NPC 中列出的事件不再重复显示
             if not consumed and not listedEventIds[eKey] then
                 entityIndex = entityIndex + 1
@@ -607,8 +618,23 @@ function SmapHandlers.look(args)
                     eventType = "event_touch"
                 end
                 if eventId then
-                    local consumed = _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][tostring(eventId)]
+                    local consumed = _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][evtKey(eventId)]
                     if not consumed then
+                        -- 运行时状态检查：eventExtra 过路触发事件若已在 D* 表中被清除
+                        -- （如主角居 691 开局剧情触发后 instruct_3 修改事件定义将其置 -1/0），
+                        -- 静态 events.json 仍保留原值，需对照 JY.D 避免残留"搜索"项。
+                        -- 注意：只跳过"已清除"（extra<=0）的事件；若 D* 表该格仍是其他正数
+                        -- 事件号（如苗人凤居 tile9 退敌后为 35，而 events.json 定义 7 的飞狐外传
+                        -- 触发点），事件仍应显示，否则会误杀后续剧情入口（P8 飞狐外传）。
+                        if eventType == "event_extra" then
+                            local JY2 = g(_G, "JY")
+                            local tileIdx = tonumber(evt.tileIndex) or 0
+                            local GetD = g(_G, "GetD")
+                            local curExtra = GetD and JY2 and GetD(tonumber(sceneId), tileIdx, 4)
+                            if curExtra ~= nil and curExtra <= 0 then
+                                goto continue
+                            end
+                        end
                         -- 圣堂事件：检查 D* 表是否已放置天书（tileCurrent == 4664）
                         if eventId >= 1001 and eventId <= 1014 then
                             local JY2 = g(_G, "JY")
@@ -622,7 +648,7 @@ function SmapHandlers.look(args)
                             end
                         end
                         -- 已在静态 NPC / D* 扫描 / 入口事件中列出的事件不再重复显示（消除 DISPLAY_DUP）
-                        if listedEventIds[tostring(eventId)] then
+                        if listedEventIds[evtKey(eventId)] then
                             goto continue
                         end
                         entityIndex = entityIndex + 1
@@ -710,14 +736,14 @@ function SmapHandlers.chooseInteraction(idx)
             local isShenTangBook = (eventId >= 1001 and eventId <= 1014)
             if not isShenTangBook then
                 -- 先检查是否已消耗（防止 eventConsumed 设置后重进场景前的重复点击）
-                if _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][tostring(eventId)] then
+                if _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][evtKey(eventId)] then
                     w("里面什么都没有。")
                     smapEntityList = {}
                     SmapHandlers.look({})
                     return
                 end
                 _G.eventConsumed[sceneId] = _G.eventConsumed[sceneId] or {}
-                _G.eventConsumed[sceneId][tostring(eventId)] = true
+                _G.eventConsumed[sceneId][evtKey(eventId)] = true
             end
             local EventExecutor = g(_G, "EventExecutor")
             if EventExecutor then
