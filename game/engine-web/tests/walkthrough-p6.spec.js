@@ -752,23 +752,30 @@ test('P6b: 冰火岛(屠龙刀)→回族(书剑)→五毒教→神龙教(鹿鼎�
   // 侠客岛二刷/《侠客行》— oldevent_363（需石破天在队）
   // 注意：不能用终端文本"侠客行/太玄经"判断（累积历史会误判提前 break）→ 用 Lua hasItem(154)；
   //       363 有大量对话（约 20+ 段 instruct_1），必须翻页翻完才会执行 instruct_2(154) 给书。
+  // 363 由 359 动态放置到 tile12/13：触发 359 后实体列表重建、索引变化——
+  // 必须每轮重新 look、从 1 开始尝试（与神龙教三刷 611 相同模式）。
   expect(await gotoScene(page, '俠客島')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
   console.log('  [诊断] 侠客岛二刷 石破天在队:', await hasTeamMember(page, 38));
   let got154 = await hasItem(page, 154);
-  for (let ei = 1; ei <= 25 && !got154; ei++) {
-    await cmd(page, 'choose ' + ei); await page.waitForTimeout(2500);
-    // 翻页对话直到回到实体列表/命令模式（363 对话长，必须翻完才给书）
-    for (let pg = 0; pg < 24; pg++) {
-      t = await getT(page);
-      const tail4 = t.split('\n').slice(-4).join('');
-      if (tail4.includes('选择交互对象') || tail4.includes('输入 choose')) break;
-      await cmd(page, 'choose 1'); await page.waitForTimeout(1000);
+  for (let attempt = 0; attempt < 8 && !got154; attempt++) {
+    // 每轮 choose 前必须重新 look（choose 0 会退出实体列表回到场景命令模式，
+    // 若不重新 look，后续 choose ei 会变成菜单选项/无效命令，永远选不中 363）。
+    await cmd(page, 'look'); await page.waitForTimeout(1200);
+    for (let ei = 1; ei <= 15 && !got154; ei++) {
+      await cmd(page, 'choose ' + ei); await page.waitForTimeout(2200);
+      // 翻页对话直到回到实体列表/命令模式（363 对话长，必须翻完才给书）
+      for (let pg = 0; pg < 24; pg++) {
+        t = await getT(page);
+        const tail4 = t.split('\n').slice(-4).join('');
+        if (tail4.includes('选择交互对象') || tail4.includes('输入 choose')) break;
+        await cmd(page, 'choose 1'); await page.waitForTimeout(1000);
+      }
+      got154 = await hasItem(page, 154);  // 《侠客行》item 154
+      if (got154) { console.log('  ✓ 侠客岛二刷(侠客行) 实体' + ei); break; }
+      await cmd(page, 'choose 0'); await page.waitForTimeout(300);
     }
-    got154 = await hasItem(page, 154);  // 《侠客行》item 154
-    if (got154) { console.log('  ✓ 侠客岛二刷(侠客行) 实体' + ei); break; }
-    await cmd(page, 'choose 0'); await page.waitForTimeout(300);
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);

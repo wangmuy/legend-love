@@ -11,8 +11,33 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   loadSaveCache('bridge-p3.json');
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
 
-  // 苗人凤居/退敌 — tile event extra=30 → 战斗
+  // 队伍整理：P3 燕子坞流程已让慕容复真正加入（旧流程假加入），团队满员 6/6，
+  // 摩天崖石破天加入会被 instruct_20(0,6) 满员检查拦截。此处先离队田伯光/慕容复/小龙女
+  // （14 天书均不依赖此三人）腾出名额，供 P4 的胡青牛/石破天/程英加入。
+  // 离队交互：menu → 5(队伍) → choose <队员编号> → 1(踢出队伍)
+  // 注意：主菜单为 1医疗/2解毒/3状态/4物品/5队伍/6系统——队伍是 5，不是 3！
   expect(await loadTestState(page, 2)).toBe(true);
+  for (const nm of ['田伯光', '慕容復', '小龍女']) {
+    await cmd(page, 'menu'); await page.waitForTimeout(1500);
+    await cmd(page, 'choose 5'); await page.waitForTimeout(1500);  // 队伍
+    const memberIdx = await page.evaluate((name) => {
+      const term = window.__xterm; if (!term) return -1;
+      for (let y = term.buffer.active.length - 1; y >= 0; y--) {
+        const s = term.buffer.active.getLine(y)?.translateToString(true) || '';
+        const m = s.match(/^(\d+)\.\s*(.*\S)\s*$/);
+        if (m && m[2].includes(name)) return parseInt(m[1], 10);
+      }
+      return -1;
+    }, nm);
+    if (memberIdx > 0) {
+      await cmd(page, 'choose ' + memberIdx); await page.waitForTimeout(1500);
+      await cmd(page, 'choose 1'); await page.waitForTimeout(1500);  // 踢出队伍
+    }
+    await cmd(page, 'choose 0'); await page.waitForTimeout(400);  // 返回
+    await cmd(page, 'choose 0'); await page.waitForTimeout(400);  // 关闭菜单
+    console.log(`  离队 ${nm} 完成`);
+  }
+  // 苗人凤居/退敌 — tile event extra=30 → 战斗
   expect(await gotoScene(page, '苗人鳳居')).toBeGreaterThan(0);
   let t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);

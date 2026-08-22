@@ -48,28 +48,78 @@ test('P3: 百花谷→绝情谷底→古墓→燕子坞→泰山派', async ({ p
   expect(await hasItem(page, 153)).toBe(true);  // 《神雕侠侣》item 153
   console.log('  ✓ 古墓(九阴真经+小龙女+神雕侠侣)');
 
-  // 燕子坞/慕容复、王语嫣加入
+  // 燕子坞/慕容复、王语嫣加入（需玉玺130 + 谱表131）
+  // 链：慕容复(487)对话（让去找大燕传国玉玺，无加入选项）→ 使用130(493，得紫钥匙)
+  //     → 使用131(573，设置丐帮527 + "怎样，你要不要和我合作？") → choose 1 合作 → 慕容复加入
+  //     → 王语嫣(495，需慕容复在队) → choose 1 加入
   expect(await gotoScene(page, '燕子塢')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
   // entity 1 = 慕容复, entity 2 = 王语嫣, entity 3 = 阿朱, entity 4 = 阿碧
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 慕容复
-  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话
-  t = await getT(page);
-  // 慕容复对话后选择"是"加入
-  for (let d = 0; d < 6; d++) {
-    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
-    t = await getT(page);
-    if (t.includes('加入') || t.includes('慕容复')) break;
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 慕容复(487) 对话
+  for (let p = 0; p < 20; p++) {
+    const tail5 = (await getT(page)).split('\n').slice(-4).join('');
+    if (tail5.includes('选择交互对象') || tail5.includes('输入 choose')) break;
+    await cmd(page, 'choose 1'); await page.waitForTimeout(1000);
   }
-  // 王语嫣加入(entity 2)
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  // 对慕容复使用 130 玉玺（493）与 131 谱表（573），复用 P7b 已验证的物品使用流程
+  for (const [itemId, itemName] of [[130, '大燕傳國玉璽'], [131, '大燕皇帝世系圖表']]) {
+    if (!(await hasItem(page, itemId))) { console.log(`  ⚠ 物品${itemId}缺失，跳过`); continue; }
+    await cmd(page, 'menu'); await page.waitForTimeout(2000);
+    await cmd(page, 'choose 4'); await page.waitForTimeout(2000);  // 物品
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 使用
+    const itemIdx = await page.evaluate(async (nm) => {
+      const term = window.__xterm; if (!term) return -1;
+      for (let y = term.buffer.active.length - 1; y >= 0; y--) {
+        const t = term.buffer.active.getLine(y)?.translateToString(true) || '';
+        const m = t.match(/^(\d+)\.\s*(.*\S)\s*$/);
+        if (m && m[2].includes(nm)) return parseInt(m[1], 10);
+      }
+      return -1;
+    }, itemName);
+    if (itemIdx > 0) {
+      await cmd(page, 'choose ' + itemIdx); await page.waitForTimeout(2000);
+      const npcIdx = await page.evaluate(() => {
+        const term = window.__xterm; if (!term) return -1;
+        const total = term.buffer.active.length;
+        let start = -1;
+        for (let y = total - 1; y >= 0; y--)
+          if (term.buffer.active.getLine(y)?.translateToString(true)?.includes('选择目标')) { start = y; break; }
+        if (start === -1) return -1;
+        for (let y = total - 1; y > start; y--) {
+          const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+          const m = raw.match(/^(\d+)\.\s*(.*\S)\s*$/);
+          if (m && (m[2].includes('慕容复') || m[2].includes('oldevent_487'))) return parseInt(m[1], 10);
+        }
+        return -1;
+      });
+      if (npcIdx > 0) { await cmd(page, 'choose ' + npcIdx); await page.waitForTimeout(5000); }
+      console.log(`  使用 ${itemName}(${itemId}) on 慕容复: 剩余=${await hasItem(page, itemId)}`);
+    } else {
+      console.log(`  ⚠ 物品列表未找到 ${itemName}`);
+      await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+      await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+    }
+    await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+    await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+  }
+  // 使用谱表(573)后：合作对话"怎样，你要不要和我合作？" → choose 1 是（慕容复加入）
+  for (let d = 0; d < 10; d++) {
+    t = await getT(page);
+    if (t.includes('合作') || t.includes('加入')) break;
+    await cmd(page, 'choose 1'); await page.waitForTimeout(1500);
+  }
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 合作 → 慕容复加入
+  // 王语嫣加入(entity 2，需慕容复已在队伍)
   await cmd(page, 'choose 2'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
   for (let d = 0; d < 6; d++) {
-    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
     t = await getT(page);
     if (t.includes('加入') || t.includes('王语嫣')) break;
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
   }
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 是（王语嫣加入）
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 2)).toBe(true);
