@@ -18,6 +18,8 @@ opencode.json
 !.claude/commands/
 !.claude/skills/
 
+.atomcode/*
+
 
 # Web MUD build artifacts
 game/engine-web/data-web/

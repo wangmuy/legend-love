@@ -1280,14 +1280,19 @@ function _G.initWebFramework()
                         mmapMusic = JY.MmapMusic or -1,
                         currentD = JY.CurrentD or -1,
                         d = JY.D,  -- 保存 D* 事件表（与 state_manager.saveGameState 键名一致），保留 instruct_3 的修改
-                        dTable = JY.D,  -- 兼容旧键名
                     }
                     local encode = rawget(_G, "encodeSimpleJSON")
                     if encode then
-                        rawget(_G, "__saveCache")[key] = encode(data)
+                        local json = encode(data)
+                        rawget(_G, "__saveCache")[key] = json
+                        -- 复用同一份 json 直接持久化（跳过 origSave 的二次全量编码，leave 自动存档不再卡顿）
+                        if _G.JSBridge and _G.JSBridge.save then
+                            _G.JSBridge.save(key, json)
+                        end
+                        return true
                     end
                 end
-                -- 仍然调用原始 saveGameState 以保持 JSBridge 兼容
+                -- 回退到原始 saveGameState
                 return origSave(slotId)
             end)
         end

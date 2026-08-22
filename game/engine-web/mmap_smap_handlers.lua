@@ -1269,10 +1269,6 @@ function SmapHandlers.leave(args)
     local JY = g(_G, "JY")
     if not JY then JY = {}; rawset(_G, "JY", JY) end
     
-    -- 自动存档到槽位 0
-    local saveGameState = g(_G, "saveGameState")
-    if saveGameState then pcall(saveGameState, 0) end
-    
     -- 离开场景时恢复到该场景在世界地图上的入口坐标
     local sceneId = tostring(JY.SubScene or 0)
     roleMenuPhase = nil  -- 场景切换时清除菜单状态
@@ -1316,10 +1312,6 @@ function SmapHandlers.go(args)
         local exit = scene["出口"][n]
         local targetSceneId = exit["目标场景"]
         if targetSceneId then
-            -- 自动存档到槽位 0
-            local saveGameState = g(_G, "saveGameState")
-            if saveGameState then pcall(saveGameState, 0) end
-
             JY.SubScene = targetSceneId
             roleMenuPhase = nil  -- 场景切换时清除菜单状态
             local targetScene = scenes and scenes[tostring(targetSceneId)]
