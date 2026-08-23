@@ -175,8 +175,8 @@ function WmapHandlers.look(args)
             return
         end
         w("选择行动的队友:")
-        for _, tm in ipairs(available) do
-            w(string.format("  %d. %s (HP:%d/%d)", tm.index, tm.name, tm.hp, tm.maxHp))
+        for pos, tm in ipairs(available) do
+            w(string.format("  %d. %s (HP:%d/%d)", pos, tm.name, tm.hp, tm.maxHp))
         end
         w("输入 choose <编号> 选择队友")
     else
