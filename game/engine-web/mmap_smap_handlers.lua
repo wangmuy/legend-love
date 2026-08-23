@@ -388,7 +388,8 @@ function SmapHandlers.look(args)
                     if not eventOff then
                         entityIndex = entityIndex + 1
                         smapEntityList[entityIndex] = { type = "event_trigger", eventId = tonumber(eventId), charId = charIdStr, name = npcName, npcData = npc }
-                        w(string.format("%d. 搜索", entityIndex))
+                        -- 追加稳定事件 id（oldevent_XXX）：列表随物品消耗收缩时编号会变，玩家按 id 定位实体
+                        w(string.format("%d. 搜索[oldevent_%d]", entityIndex, eid))
                     end
                 else
                     local char = charsIndex and charsIndex[charIdStr]
@@ -531,7 +532,8 @@ function SmapHandlers.look(args)
                                 name = npcName,
                                 npcData = {["事件编号"] = eventNum, ["动态"] = true},
                             }
-                            w(string.format("%d. 搜索", entityIndex))
+                            -- 追加稳定事件 id（oldevent_XXX）：动态 D* 实体索引随事件放置/消耗变化，玩家按 id 定位
+                            w(string.format("%d. 搜索[oldevent_%d]", entityIndex, eventNum))
                         end
                     end
                 end
@@ -555,7 +557,7 @@ function SmapHandlers.look(args)
             if not consumed and not listedEventIds[eKey] then
                 entityIndex = entityIndex + 1
                 smapEntityList[entityIndex] = { type = "event_trigger", eventId = pendingEventId, name = "oldevent_" .. pendingEventId }
-                w(string.format("%d. 搜索", entityIndex))
+                w(string.format("%d. 搜索[oldevent_%d]", entityIndex, pendingEventId))
                 listedEventIds[eKey] = true
             end
         end
@@ -654,9 +656,10 @@ function SmapHandlers.look(args)
                         entityIndex = entityIndex + 1
                         smapEntityList[entityIndex] = { type = "event_trigger", eventId = eventId, eventType = eventType, name = "tile_event", npcData = {["事件编号"]=eventId} }
                         if eventId >= 1001 and eventId <= 1014 then
-                            w(string.format("%d. 放置天书", entityIndex))
+                            w(string.format("%d. 放置天书[%d]", entityIndex, eventId))
                         else
-                            w(string.format("%d. 搜索", entityIndex))
+                            -- 追加稳定事件 id（oldevent_XXX）：列表随物品消耗收缩时编号会变，玩家按 id 定位实体
+                            w(string.format("%d. 搜索[oldevent_%d]", entityIndex, eventId))
                         end
                     end
                 end
