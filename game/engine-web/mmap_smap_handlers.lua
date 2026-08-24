@@ -1796,6 +1796,10 @@ local function showTeamTargets()
 end
 
 -- 列出物品使用目标：队伍成员 + 场景 NPC（SMAP 模式）
+-- 物品使用目标的动态实体命名（补充 look() 的 eventNpcNames；一灯居的一灯由 oldevent_417 动态放置）
+local itemUseNpcNames = {
+    [425] = "一灯", [426] = "一灯",
+}
 local function showItemUseTargets()
     local JY = g(_G, "JY")
     if not JY then return end
@@ -1833,6 +1837,51 @@ local function showItemUseTargets()
                     end
                     idx = idx + 1
                     w(string.format("%d. %s", idx, displayName))
+                end
+            end
+        end
+        -- D* 动态实体（物品触发目标）：如一灯居的一灯由 oldevent_417 动态写入
+        -- （tile0 field2=425 对话 / field3=426 物品触发），静态 scenes.json 无 NPC，
+        -- 必须扫描 JY.D[sceneId] 的 field3（物品触发）才能列为可用目标。
+        local JY2 = g(_G, "JY")
+        local sidNum = tonumber(sceneId)
+        local ensureFn = g(_G, "ensureSceneDEvents")
+        if ensureFn then ensureFn(sidNum) end
+        local sceneD = JY2 and JY2.D and JY2.D[sidNum]
+        if sceneD then
+            -- 静态 NPC 所在 tile（避免把静态 NPC 的升级事件重复列为独立目标）
+            local staticTiles = {}
+            if scene and scene.NPC then
+                for _, npc in ipairs(scene.NPC) do
+                    local t = findNpcTileByXY(sceneId, npc)
+                    if t then staticTiles[t] = true end
+                end
+            end
+            for dEntryIdx = 0, 199 do
+                local evt = sceneD[dEntryIdx]
+                if evt and type(evt) == "table" and not staticTiles[dEntryIdx] then
+                    local function dfield(f)
+                        local isDict = evt[0] ~= nil or (evt[1] == nil and evt[2] ~= nil)
+                        if isDict then
+                            local v = evt[f]
+                            if v == nil then v = evt[tostring(f)] end
+                            return v
+                        end
+                        return evt[f + 1]
+                    end
+                    local e2 = dfield(2)
+                    local e3 = dfield(3)
+                    local e4 = dfield(4)
+                    -- 仅列有"物品触发"（field3）的动态实体——这些才是可对其使用物品的目标
+                    local eventNum = nil
+                    if e3 and e3 > 0 then eventNum = e3
+                    elseif e2 and e2 > 0 then eventNum = e2
+                    elseif e4 and e4 > 0 then eventNum = e4 end
+                    if eventNum then
+                        local dispName = itemUseNpcNames[eventNum] or ("oldevent_" .. eventNum .. "(场景NPC)")
+                        idx = idx + 1
+                        w(string.format("%d. %s", idx, dispName))
+                    end
                 end
             end
         end
@@ -2169,7 +2218,7 @@ function RoleMenu_handleChoose(n)
         else
             -- 目标为场景 NPC（在 SMAP 模式下，从场景数据直接读取）
             local npcIdx = n - memberCount
-            -- NPC 目标列表（从场景 JSON 数据读取，匹配 showItemUseTargets 的顺序）
+            -- NPC 目标列表（从场景 JSON 数据读取 + D* 动态实体，匹配 showItemUseTargets 的顺序）
             local npcTargets = {}
             if JY.Status == 4 then
                 local sceneId = tostring(JY.SubScene or 0)
@@ -2191,6 +2240,52 @@ function RoleMenu_handleChoose(n)
                                 displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charId)
                             end
                             table.insert(npcTargets, {type="npc", name=displayName, npcData=npc, npcIndex=npcIdx})
+                        end
+                    end
+                end
+                -- D* 动态实体（物品触发目标）：与 showItemUseTargets 一致——如一灯居的一灯
+                -- （oldevent_417 写入 tile0 field2=425/field3=426），静态 scenes.json 无 NPC，
+                -- 必须扫描 JY.D[sceneId] 的 field3（物品触发）才能选择。
+                local JY2 = g(_G, "JY")
+                local sidNum = tonumber(sceneId)
+                local ensureFn = g(_G, "ensureSceneDEvents")
+                if ensureFn then ensureFn(sidNum) end
+                local sceneD = JY2 and JY2.D and JY2.D[sidNum]
+                if sceneD then
+                    local staticTiles = {}
+                    if scene and scene.NPC then
+                        for _, npc in ipairs(scene.NPC) do
+                            local t = findNpcTileByXY(sceneId, npc)
+                            if t then staticTiles[t] = true end
+                        end
+                    end
+                    for dEntryIdx = 0, 199 do
+                        local evt = sceneD[dEntryIdx]
+                        if evt and type(evt) == "table" and not staticTiles[dEntryIdx] then
+                            local function dfield(f)
+                                local isDict = evt[0] ~= nil or (evt[1] == nil and evt[2] ~= nil)
+                                if isDict then
+                                    local v = evt[f]
+                                    if v == nil then v = evt[tostring(f)] end
+                                    return v
+                                end
+                                return evt[f + 1]
+                            end
+                            local e2 = dfield(2)
+                            local e3 = dfield(3)
+                            local e4 = dfield(4)
+                            local eventNum = nil
+                            if e3 and e3 > 0 then eventNum = e3
+                            elseif e2 and e2 > 0 then eventNum = e2
+                            elseif e4 and e4 > 0 then eventNum = e4 end
+                            if eventNum then
+                                local dispName = itemUseNpcNames[eventNum] or ("oldevent_" .. eventNum .. "(场景NPC)")
+                                table.insert(npcTargets, {
+                                    type = "npc", name = dispName,
+                                    npcData = {["事件编号"] = eventNum, ["动态"] = true},
+                                    npcIndex = dEntryIdx,
+                                })
+                            end
                         end
                     end
                 end

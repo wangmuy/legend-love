@@ -191,20 +191,78 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 黑龙潭(瑛姑)');
 
-  // 一灯居
+  // 一灯居 — 使用手帕(item 184)给一灯触发深处剧情(426)，设置黑龙潭二刷419（与攻略 Step10 一致）
   expect(await gotoScene(page, '一燈居')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  if (await hasItem(page, 184)) {
+    await cmd(page, 'menu'); await page.waitForTimeout(2000);
+    await cmd(page, 'choose 4'); await page.waitForTimeout(2000);  // 物品
+    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 使用
+    const handIdx = await page.evaluate(() => {
+      const term = window.__xterm; if (!term) return -1;
+      for (let y = term.buffer.active.length - 1; y >= 0; y--) {
+        const t = term.buffer.active.getLine(y)?.translateToString(true) || '';
+        const m = t.match(/^(\d+)\.\s*(.*\S)\s*$/);
+        if (m && m[2].includes('手帕')) return parseInt(m[1], 10);
+      }
+      return -1;
+    });
+    if (handIdx > 0) {
+      await cmd(page, 'choose ' + handIdx); await page.waitForTimeout(2000);
+      // 目标列表：一灯为 D* 动态实体（itemUseNpcNames 显示"一灯"），按文本定位
+      const yidengIdx = await page.evaluate(() => {
+        const term = window.__xterm; if (!term) return -1;
+        const total = term.buffer.active.length;
+        let start = -1;
+        for (let y = total - 1; y >= 0; y--)
+          if (term.buffer.active.getLine(y)?.translateToString(true)?.includes('选择目标')) { start = y; break; }
+        if (start === -1) return -1;
+        for (let y = total - 1; y > start; y--) {
+          const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+          const m = raw.match(/^(\d+)\.\s*(.*\S)\s*$/);
+          if (m && (m[2].includes('一灯') || m[2].includes('oldevent_425') || m[2].includes('oldevent_426'))) return parseInt(m[1], 10);
+        }
+        return -1;
+      });
+      if (yidengIdx > 0) {
+        await cmd(page, 'choose ' + yidengIdx); await page.waitForTimeout(3000);
+        // 426 深处剧情（是否使用手帕→多页往事）→ 是否选择战斗 → choose 0 拒绝（和解路径同样设置419）
+        for (let d = 0; d < 15; d++) {
+          t = await getT(page);
+          if (t.includes('选择战斗')) break;
+          await cmd(page, 'choose 1'); await page.waitForTimeout(1500);
+        }
+        await cmd(page, 'choose 0'); await page.waitForTimeout(2000);  // 拒绝战斗
+        console.log('  ✓ 一灯居(手帕→深处剧情)');
+      } else {
+        console.log('  ⚠ 目标列表未找到一灯（issue#5 未修复）');
+        await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+        await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+      }
+    } else {
+      console.log('  ⚠ 物品列表未找到手帕');
+      await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+      await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+    }
+    await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+    await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+  } else {
+    console.log('  ⚠ 手帕缺失，跳过一灯居深处剧情');
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
-  console.log('  ✓ 一灯居');
 
-  // 黑龙潭二刷 — 程英破阵后, 一灯居对话后再次访问黑龙潭触发剧情
+  // 黑龙潭二刷 — 深处剧情(426)后 tile1=419（瑛姑"事情办好了吗？"→射鵰英雄传线索），多页对话需循环跳过
   expect(await gotoScene(page, '黑龍潭')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
-  // 二刷时 tile event 指向 oldevent_434 (后门重置)
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 触发二刷事件(419)
+  for (let d = 0; d < 12; d++) {
+    t = await getT(page);
+    if (t.includes('射鵰') || t.includes('周伯通') || t.includes('输入 choose')) break;
+    await cmd(page, 'choose 1'); await page.waitForTimeout(1500);
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 黑龙潭(二刷)');
