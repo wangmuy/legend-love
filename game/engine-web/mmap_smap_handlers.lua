@@ -2051,9 +2051,15 @@ end
 
 -- 处理角色管理 choose N（返回 true=已处理, false=未处理）
 function RoleMenu_handleChoose(n)
-    -- NPC 使用物品事件进行中，阻止 scene interaction 误触（让 choose 流向事件等待标志）
+    -- NPC 使用物品事件进行中，阻止 scene interaction 误触（让 choose 流向事件等待标志）。
+    -- 但战斗中（GAME_WMAP）不拦截：使用物品触发的战斗（如一灯居 426 手帕→战斗[68]）期间
+    -- __smapUseItemActive 仍为 true，若在此拦截会把战斗 choose（选队友/行动）全部吞掉，
+    -- 导致 WmapHandlers.chooseInteraction 永不执行、游戏卡死。战斗中应放行给战斗处理器。
     if roleMenuPhase == nil and rawget(_G, "__smapUseItemActive") then
-        return true
+        local JY = g(_G, "JY")
+        if not (JY and JY.Status == 5) then
+            return true
+        end
     end
     if roleMenuPhase == "main" then
         if n == 1 then  -- 医疗（一级菜单，原版 MMenu 风格）
