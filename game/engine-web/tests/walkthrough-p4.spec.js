@@ -1,7 +1,7 @@
 // quick_pass_game.md: 苗人凤居→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居
 const { test, expect } = require('@playwright/test');
 const { waitForPageReady, waitForGameReady } = require('./helpers/setup');
-const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache, hasItem, hasTeamMember, doBattle } = require('./helpers/walkthrough');
+const { saveTestState, loadTestState, gotoScene, flushSaveCache, loadSaveCache, hasItem, hasTeamMember, doBattle, inBattle } = require('./helpers/walkthrough');
 const { cmd, getT, noE } = require('./helpers/term');
 
 const SETTLE = 5000;
@@ -267,14 +267,52 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 黑龙潭(二刷)');
 
-  // 闫基居/七星海棠
+  // 闫基居/七星海棠 — 触发 27(胡斐检查)→28(阎基认罪)→战斗[2]→七心海棠158
   expect(await gotoScene(page, '閰基居')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'look'); await page.waitForTimeout(2500);
+  // 按稳定 id 触发 胡斐检查(oldevent_27) → tile1 变 28
+  let idx = await page.evaluate(() => {
+    const term = window.__xterm; if (!term) return -1;
+    for (let y = term.buffer.active.length - 1; y >= 0; y--) {
+      const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      const m = raw.match(/^(\d+)\.\s*(.*\S)\s*$/);
+      if (m && m[2].includes('oldevent_27')) return parseInt(m[1], 10);
+    }
+    return -1;
+  });
+  if (idx > 0) {
+    await cmd(page, 'choose ' + idx); await page.waitForTimeout(2500);
+    await cmd(page, 'look'); await page.waitForTimeout(2500);
+  }
+  // 触发 阎基认罪(oldevent_28) → 是否与之过招 → 是 → 战斗[2]
+  idx = await page.evaluate(() => {
+    const term = window.__xterm; if (!term) return -1;
+    for (let y = term.buffer.active.length - 1; y >= 0; y--) {
+      const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      const m = raw.match(/^(\d+)\.\s*(.*\S)\s*$/);
+      if (m && m[2].includes('oldevent_28')) return parseInt(m[1], 10);
+    }
+    return -1;
+  });
+  if (idx > 0) {
+    await cmd(page, 'choose ' + idx); await page.waitForTimeout(3000);
+    for (let d = 0; d < 15; d++) {
+      t = await getT(page);
+      if (t.includes('过招') || t.includes('选择战斗')) break;
+      if (await inBattle(page)) break;
+      await cmd(page, 'choose 1'); await page.waitForTimeout(1500);
+    }
+    if (t.includes('过招') || t.includes('选择战斗')) {
+      await cmd(page, 'choose 1'); await page.waitForTimeout(2500);  // 是
+    }
+    if (await inBattle(page)) { await doBattle(page); await page.waitForTimeout(800); }
+    expect(await hasItem(page, 158)).toBe(true);  // 七心海棠
+  }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 2)).toBe(true);
-  console.log('  ✓ 闫基居');
+  console.log('  ✓ 闫基居(七心海棠)');
 
   expect(await noE(page)).toBeTruthy();
   flushSaveCache('bridge-p4.json');

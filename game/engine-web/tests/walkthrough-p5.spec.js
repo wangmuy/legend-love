@@ -12,13 +12,33 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   await page.goto('/'); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(2000);
   expect(await loadTestState(page, 2)).toBe(true);
 
-  // 药王庄/眼药/程灵素加入
+  // 药王庄/眼药/程灵素加入 — 首访对话(39)不加入 → 使用七心海棠(41)得解药 → 再对话(42)加入
   expect(await gotoScene(page, '藥王莊')).toBeGreaterThan(0);
   let t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 程灵素(第1NPC, 39对话：让找七心海棠, 首访不加入)
+  // 使用七心海棠给程灵素（oldevent_41：得苗人凤眼毒解药137, 道德+1）
+  await cmd(page, 'menu'); await page.waitForTimeout(2000);
+  await cmd(page, 'choose 4'); await page.waitForTimeout(2000);  // 物品
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2000);  // 使用
+  const haiIdx = await page.evaluate(() => {
+    const term = window.__xterm; if (!term) return -1;
+    for (let y = term.buffer.active.length - 1; y >= 0; y--) {
+      const raw = term.buffer.active.getLine(y)?.translateToString(true) || '';
+      const m = raw.match(/^(\d+)\.\s*(.*\S)\s*$/);
+      if (m && m[2].includes('七心海棠')) return parseInt(m[1], 10);
+    }
+    return -1;
+  });
+  if (haiIdx > 0) {
+    await cmd(page, 'choose ' + haiIdx); await page.waitForTimeout(2000);
+    await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 目标程灵素(实体1) → 41
+  }
+  await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+  await cmd(page, 'choose 0'); await page.waitForTimeout(400);
+  // 再次对话程灵素（oldevent_42：是否要求加入 → 是）
   await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 程灵素(第1NPC)
-  await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 是(加入)
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 是(加入, 需胡斐在队)
   // NPC dialog may not show name in terminal output, just verify no error
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
