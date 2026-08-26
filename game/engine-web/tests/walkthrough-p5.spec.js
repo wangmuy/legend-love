@@ -231,18 +231,21 @@ test('P5: 药王庄→金轮寺→明教→光明顶→华山→金蛇洞→武�
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 武当山(张三丰)');
 
-  // 嵩山派/张旭率意帖
+  // 嵩山派/张旭率意帖 — 无战斗：守门弟子(203)对话预告五岳并派大会；列表 5 实体
+  // （203 守门弟子 / 205 仇人 / 209 率意帖 / 868 智慧果 / 198 空事件）
   expect(await gotoScene(page, '嵩山派')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
-  // 如果进入了战斗，处理战斗
-  await cmd(page, 'look'); await page.waitForTimeout(1000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);  // 守门弟子(203)对话，无战斗
+  await cmd(page, 'choose 0'); await page.waitForTimeout(500);
+  await cmd(page, 'look'); await page.waitForTimeout(1000);      // 对话消耗 203 后列表收缩重排
+  await cmd(page, 'choose 2'); await page.waitForTimeout(2000);  // 收缩后 209 率意帖为 Entity 2
   t = await getT(page);
   if (t.includes('战场态势')) {
     t = await doBattle(page);
   }
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
+  expect(await hasItem(page, 179)).toBe(true);  // 张旭率意帖(179) — 梅庄秃笔翁链前置
   expect(await saveTestState(page, 3)).toBe(true);
   console.log('  ✓ 嵩山派');
 
