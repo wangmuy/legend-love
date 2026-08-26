@@ -805,10 +805,11 @@ choose <编号>   ← 按「大地图场景编号表」的编号导航（固定�
 ...找到"嵩山派"的索引...
 > choose 26         ← 导航到嵩山派（列表编号 26）
 （显示"你来到了"）
-（列表已自动显示：Entity 1=搜索[oldevent_203]守门弟子、Entity 2=搜索[oldevent_205]仇人、Entity 3=搜索[oldevent_209]、Entity 4=搜索[oldevent_868]）
-（**嵩山派当前无战斗**——守门弟子（oldevent_203）说"本派近日诸事繁忙，暂不对外开放"，仅预告下月十五五岳并派大会；嵩山大会守卫战斗（oldevent_204，战斗[29]）需后续剧情推进才会出现）
-> choose 3           ← 选择 Entity 3（搜索[oldevent_209]，得张旭率意帖 item 179，道德-1）
+（列表已自动显示 5 项：Entity 1=搜索[oldevent_203]守门弟子、Entity 2=搜索[oldevent_205]仇人、Entity 3=搜索[oldevent_209]、Entity 4=搜索[oldevent_868]、Entity 5=搜索[oldevent_198]）
+（**嵩山派当前无战斗**——守门弟子（oldevent_203）说"本派近日诸事繁忙，暂不对外开放"，仅预告下月十五五岳并派大会；**注意 Entity 5（oldevent_198）是空事件，选择后无任何提示，属正常**。原版中嵩山大会守卫战斗（oldevent_204，战斗[29]）需五岳并派大会剧情推进才会出现，本攻略 P5 阶段不触发，嵩山派只用于收集率意帖）
+> choose 3           ← 选择 Entity 3（搜索[oldevent_209]，得张旭率意帖 item 179，道德-1；梅庄秃笔翁链 oldevent_253 使用）
 （如需物资可再选 Entity 4（搜索[oldevent_868]：智慧果×2+毒蒺藜×5，道德-1））
+（若先对话过 Entity 1/2，列表收缩重排，按"oldevent_209"稳定 id 定位）
 > leave              ← 返回大地图
 ```
 **存档**: `menu` → `choose 6` → `choose 3`（存到槽位3）
