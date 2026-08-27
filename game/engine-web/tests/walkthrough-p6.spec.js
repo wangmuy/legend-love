@@ -58,14 +58,45 @@ test('P6: 神龙教→破庙→冰火岛(铁焰令)→成昆→沙漠→北丑�
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 神龙教(洪教主)');
 
-  // 破庙/广陵散
+  // 破庙/广陵散 — 阿紫(558)仅对话；557 连续两场战斗(星宿门人[87]→游坦之[88])；563 墓碑仅查看；564 使用铁铲得广陵散177
   expect(await gotoScene(page, '破廟')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  await cmd(page, 'choose 1'); await page.waitForTimeout(2500);  // 阿紫(oldevent_558)仅对话
+  // 557 星宿门人战斗（Entity 4~6 为同一事件重复列出，按 id 定位选任一）
+  await cmd(page, 'look'); await page.waitForTimeout(1200);
+  t = await getT(page);
+  let pm557Idx = -1;
+  for (const l of t.split('\n')) { const m = l.match(/^\s*(\d+)\.\s*搜索\[oldevent_557\]/); if (m) { pm557Idx = parseInt(m[1], 10); break; } }
+  expect(pm557Idx).toBeGreaterThan(0);
+  await cmd(page, 'choose ' + pm557Idx); await page.waitForTimeout(2500);
+  for (let b = 0; b < 4; b++) {  // 两场战斗可能衔接，循环 doBattle
+    if (await inBattle(page)) { await doBattle(page); await page.waitForTimeout(2500); }
+    else break;
+  }
+  await page.waitForTimeout(3000);  // 等 557 事件完全结束（尾部 instruct_3 清 tile 后列表才稳定）
+  // 563 墓碑（仅查看）+ 564 使用铁铲得广陵散——按稳定 id 定位（战后列表重排）
+  await cmd(page, 'look'); await page.waitForTimeout(1200);
+  t = await getT(page);
+  let pm563Idx = -1, pm564Idx = -1;
+  for (const l of t.split('\n')) {
+    let m = l.match(/^\s*(\d+)\.\s*搜索\[oldevent_563\]/); if (m) pm563Idx = parseInt(m[1], 10);
+    m = l.match(/^\s*(\d+)\.\s*搜索\[oldevent_564\]/); if (m) pm564Idx = parseInt(m[1], 10);
+  }
+  if (pm563Idx > 0) { await cmd(page, 'choose ' + pm563Idx); await page.waitForTimeout(1500); }  // 墓碑查看
+  // 墓碑查看后列表重绘（563 消耗），重新 look 定位 564（编号已前移）
+  // 注意：终端历史含多轮 look 的旧列表，必须取**最后一个**匹配（最新列表），否则会用旧编号选中无效实体
+  await cmd(page, 'look'); await page.waitForTimeout(1200);
+  t = await getT(page);
+  pm564Idx = -1;
+  for (const l of t.split('\n')) { const m = l.match(/^\s*(\d+)\.\s*搜索\[oldevent_564\]/); if (m) pm564Idx = parseInt(m[1], 10); }
+  expect(pm564Idx).toBeGreaterThan(0);
+  await cmd(page, 'choose ' + pm564Idx); await page.waitForTimeout(2000);  // "是否使用物品[鐵鏟]？"
+  await cmd(page, 'choose 1'); await page.waitForTimeout(3500);  // 是→得广陵散
+  expect(await hasItem(page, 177)).toBe(true);  // 广陵散琴曲（P7 梅庄链原料）
+  console.log('  ✓ 破庙(广陵散177)');
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   expect(await saveTestState(page, 1)).toBe(true);
-  console.log('  ✓ 破庙');
 
   // 成昆居 — 成崑战斗(需先冰火岛用铁焰令)
   expect(await loadTestState(page, 1)).toBe(true);
