@@ -394,6 +394,11 @@ function SmapHandlers.look(args)
                 else
                     local char = charsIndex and charsIndex[charIdStr]
                     local displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charIdStr)
+                    -- 命名 NPC 追加稳定事件 id（[oldevent_XXX]）：人物名不带 id 时玩家无法定位实体
+                    local eid2 = tonumber(npc["事件编号"] or 0)
+                    if eid2 and eid2 > 0 then
+                        displayName = string.format("%s[oldevent_%d]", displayName, eid2)
+                    end
                     entityIndex = entityIndex + 1
                     smapEntityList[entityIndex] = { type = "npc", charId = charIdStr, name = displayName, npcData = npc, npcIndex = npcIdx }
                     w(string.format("%d. %s", entityIndex, displayName))
@@ -523,7 +528,8 @@ function SmapHandlers.look(args)
                                 npcData = {["事件编号"] = eventNum, ["动态"] = true},
                                 npcIndex = dEntryIdx,
                             }
-                            w(string.format("%d. %s", entityIndex, npcName))
+                            -- 命名动态 NPC 也追加稳定事件 id（如"谢逊[oldevent_109]"）
+                            w(string.format("%d. %s[oldevent_%d]", entityIndex, npcName, eventNum))
                         else
                             smapEntityList[entityIndex] = {
                                 type = "event_trigger",
@@ -595,7 +601,8 @@ function SmapHandlers.look(args)
             local targetName = targetScene and targetScene["名称"] or "?"
             entityIndex = entityIndex + 1
             smapEntityList[entityIndex] = { type = "exit", targetSceneId = targetSceneId, name = targetName }
-            w(string.format("%d. → %s", entityIndex, targetName))
+            -- 出口显示追加目标场景 id（如"→ 崑侖仙境(scene 4)"）：同名出口（如沙漠废墟 3 个高昌迷宮）靠 id 区分
+            w(string.format("%d. → %s(scene %s)", entityIndex, targetName, targetSceneId))
         end
     end
     
@@ -1799,6 +1806,10 @@ end
 -- 物品使用目标的动态实体命名（补充 look() 的 eventNpcNames；一灯居的一灯由 oldevent_417 动态放置）
 local itemUseNpcNames = {
     [425] = "一灯", [426] = "一灯",
+    -- 已知 NPC 事件号 → 名字映射（静态 oldevent_ 实体在目标列表中显示人名，如冰火岛谢逊 oldevent_60/61）
+    [60] = "谢逊", [61] = "谢逊",     -- 冰火岛（60 对话 / 61 使用铁焰令）
+    [558] = "阿紫", [559] = "游坦之", -- 破庙（星宿门人战斗后 558/559 为对话实体）
+    [563] = "墓碑",                    -- 破庙（蔡邕之墓，使用铁铲 564 触发）
 }
 local function showItemUseTargets()
     local JY = g(_G, "JY")
@@ -1831,9 +1842,21 @@ local function showItemUseTargets()
                     local char = charsIndex and charsIndex[charId]
                     local displayName = npcName
                     if npcName:match("^oldevent_") then
-                        displayName = "oldevent_" .. tostring(npc["事件编号"] or "?") .. "(场景NPC)"
+                        -- 已知 NPC 事件号显示人名（如冰火岛谢逊 oldevent_60），否则显示事件 id
+                        local eid = tonumber(npc["事件编号"] or 0)
+                        local knownName = itemUseNpcNames[eid]
+                        if knownName then
+                            displayName = string.format("%s[oldevent_%d]", knownName, eid)
+                        else
+                            displayName = "oldevent_" .. tostring(npc["事件编号"] or "?") .. "(场景NPC)"
+                        end
                     else
                         displayName = npcName or (char and char["姓名"]) or ("NPC?" .. charId)
+                        -- 命名 NPC 也追加稳定事件 id（与 look() 一致）
+                        local eid2 = tonumber(npc["事件编号"] or 0)
+                        if eid2 and eid2 > 0 then
+                            displayName = string.format("%s[oldevent_%d]", displayName, eid2)
+                        end
                     end
                     idx = idx + 1
                     w(string.format("%d. %s", idx, displayName))
