@@ -413,7 +413,7 @@ choose <编号>   ← 按「大地图场景编号表」的编号导航（固定�
 （显示"你来到了"）
 > choose 3           ← 搜索 Entity 3（得《神雕侠侣》天书 item 153，oldevent_443——**先取**，442 消耗会同时清掉 443）
 > choose 2           ← 搜索 Entity 2（得九阴真经 item 94，oldevent_442，自动对话抄录）
-> choose 1           ← 选择 NPC 小龙女
+> choose 1           ← 选择 NPC 小龙女[oldevent_440]（Entity 1，对话剧情，可加入）
 （多页对话，连续 choose 1 跳过，出现"是否要求加入？"）
 > choose 1           ← 选"是"（小龙女加入）
 > leave              ← 返回大地图
@@ -589,7 +589,7 @@ choose <编号>   ← 按「大地图场景编号表」的编号导航（固定�
 > choose 56         ← 导航到程瑛居（列表编号 56）
 （显示"你来到了"）
 （列表已自动显示）
-> choose 2           ← 程英（第2NPC，自动对话）
+> choose 2           ← 程英[oldevent_402]（第2NPC，自动对话）
 （多页对话，连续 choose 1 跳过，出现"是否要求加入？"）
 > choose 1           ← 是（程英加入）
 > leave              ← 返回大地图
@@ -1325,7 +1325,7 @@ choose <编号>   ← 按「大地图场景编号表」的编号导航（固定�
 > choose 73         ← 导航到霹雳堂（列表编号 73）
 （显示"你来到了"）
 （列表已自动显示）
-> choose 1           ← 选择 NPC 孔八拉（entity 1）
+> choose 1           ← 选择 NPC 孔八拉[oldevent_678]（entity 1）
 （第一次对话触发 oldevent_678，得霹雳弹×10、霹雳秘笈、黄钥匙）
 > choose 1           ← 再次选择 NPC 孔八拉
 （第二次对话触发动态事件解析，oldevent_679 或 686）
@@ -1354,7 +1354,7 @@ choose <编号>   ← 按「大地图场景编号表」的编号导航（固定�
 ...找到"武道大會"的索引...
 > choose 40         ← 导航到武道大会（列表编号 40）
 （显示"你来到了"）
-> choose 2           ← 选择 Entity 2=华山论剑（tile 事件，extra=936）
+> choose 2           ← 选择 Entity 2=搜索[oldevent_936]（华山论剑，tile 事件 extra=936）
 （触发华山论剑剧情，对话显示"华山论剑"/"神杖"/"岳不群"等）
 > leave              ← 返回大地图
 ```
@@ -1368,7 +1368,7 @@ choose <编号>   ← 按「大地图场景编号表」的编号导航（固定�
 > list
 ...找到"霹靂堂"的索引...
 > choose 73         ← 导航到霹雳堂（列表编号 73）
-> choose 1           ← 选择 NPC 孔八拉
+> choose 1           ← 选择 NPC 孔八拉[oldevent_678]
 （第一次对话触发 oldevent_678，instruct_3 修改 D* 表）
 > choose 1           ← 再次选择 NPC 孔八拉
 （第二次对话触发动态事件解析 oldevent_686 → 神杖检查）
