@@ -100,7 +100,7 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   await cmd(page, 'leave'); await page.waitForTimeout(SETTLE);
   console.log('  ✓ 悦来客栈(令狐冲)');
 
-  // 摩天崖 — 白龙剑(oldevent_336) + 石破天对话 + 使用玄冰碧火酒加入(oldevent_335→337)
+  // 摩天崖 — 白龙剑(oldevent_336) + 石破天对话(oldevent_333) + 使用玄冰碧火酒加入(oldevent_335；拒绝后才留下 337 二次邀请)
   expect(await gotoScene(page, '摩天崖')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
