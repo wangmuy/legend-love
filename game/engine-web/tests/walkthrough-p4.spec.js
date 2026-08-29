@@ -16,6 +16,9 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   // （14 天书均不依赖此三人）腾出名额，供 P4 的胡青牛/石破天/程英加入。
   // 离队交互：menu → 5(队伍) → choose <队员编号> → 1(踢出队伍)
   // 注意：主菜单为 1医疗/2解毒/3状态/4物品/5队伍/6系统——队伍是 5，不是 3！
+  // 踢出会执行原版 CC.PersonExit 离队事件（田伯光→964、慕容復→984、小龍女→992），
+  // 事件内部完成 instruct_21 离队 + instruct_3 放回原场景（田伯光居/燕子坞/古墓），
+  // 完成后自动重新显示队伍列表（choose 0 → 返回主菜单 → choose 0 → 关闭菜单）。
   expect(await loadTestState(page, 2)).toBe(true);
   for (const nm of ['田伯光', '慕容復', '小龍女']) {
     await cmd(page, 'menu'); await page.waitForTimeout(1500);
@@ -101,6 +104,7 @@ test('P4: 苗人凤→蝴蝶谷→程瑛→黑龙潭→一灯居→闫基居', a
   console.log('  ✓ 悦来客栈(令狐冲)');
 
   // 摩天崖 — 白龙剑(oldevent_336) + 石破天对话(oldevent_333) + 使用玄冰碧火酒加入(oldevent_335；拒绝后才留下 337 二次邀请)
+  // 石破天离队招回：踢出(CC.PersonExit 38→972)后他回悦来客栈 tile7/8(事件 973)，对话可重新加入
   expect(await gotoScene(page, '摩天崖')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);

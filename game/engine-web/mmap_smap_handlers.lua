@@ -2383,19 +2383,57 @@ function RoleMenu_handleChoose(n)
     elseif roleMenuPhase == "team_action" then
         if n == 0 then showTeam(); return true end
         if n == 1 then
-            -- 踢出队伍
-            local instruct_21 = g(_G, "instruct_21")
+            -- 踢出队伍：原版 Menu_PersonExit 机制——查 CC.PersonExit 离队事件表，
+            -- 若有对应离队事件（如石破天 38→oldevent_972→放回悦来客栈 tile7/8 事件 973，
+            -- 之后可在悦来客栈对话重新加入），则执行离队事件（事件内部完成 instruct_21
+            -- 离队 + instruct_3 放回原场景）；不在表中的队员回退为仅 instruct_21 离队。
             local member = bagCache
-            if instruct_21 and member then
-                instruct_21(member.pid)
-                w(string.format("%s 已离开队伍。", member.name))
+            if member then
+                local CC = g(_G, "CC")
+                local exitEvent = nil
+                if CC and CC.PersonExit then
+                    for _, v in ipairs(CC.PersonExit) do
+                        if v[1] == member.pid then exitEvent = v[2] break end
+                    end
+                end
+                local EventExecutor = g(_G, "EventExecutor")
+                if exitEvent and EventExecutor then
+                    roleMenuPhase = nil
+                    bagCache = {}
+                    ws()
+                    w(string.format("%s 离开了队伍。", member.name))
+                    local scheduler = g(_G, "CoroutineScheduler")
+                    if scheduler then
+                        local co = scheduler:create(function()
+                            -- 注意：不能使用 pcall 包裹，Lua 5.1 协程内 pcall 中 yield 会失败
+                            EventExecutor.oldCallEventCoroutine(exitEvent)
+                            ws()
+                            showTeam()
+                        end, "team_exit_" .. tostring(member.pid))
+                        scheduler:start(co, "start")
+                    else
+                        local ok, err = pcall(EventExecutor.oldCallEventCoroutine, exitEvent)
+                        if not ok then w("离队事件执行失败: " .. tostring(err)) end
+                        ws()
+                        showTeam()
+                    end
+                else
+                    -- 无离队事件：仅离队
+                    local instruct_21 = g(_G, "instruct_21")
+                    if instruct_21 then
+                        instruct_21(member.pid)
+                        w(string.format("%s 已离开队伍。", member.name))
+                    else
+                        w("踢出失败。")
+                    end
+                    bagCache = {}
+                    roleMenuPhase = nil
+                    ws()
+                    showTeam()
+                end
             else
                 w("踢出失败。")
             end
-            bagCache = {}
-            roleMenuPhase = nil
-            ws()
-            showTeam()
         end
         return true
     elseif roleMenuPhase == "team_heal_select_healer" then
