@@ -253,11 +253,12 @@ test('P6: 神龙教→破庙→冰火岛(铁焰令)→成昆→沙漠→北丑�
   console.log('  ✓ 渤泥岛(袁承志)' + (got156b ? '+碧血剑' : ''));
 
   // 侠客岛/《侠客行》— 龙岛主对话(oldevent_353)
+  // 注意：侠客岛静态 NPC 顺序 1=oldevent_352(李四), 2=龙岛主[353], 3=唐文亮[383]…
+  //       龙岛主是第 2 个 NPC（不是第 3 个）→ choose 2
   expect(await gotoScene(page, '俠客島')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
-  // entity 1=张三, 2=李四, 3=龙岛主, 4=木岛主
-  await cmd(page, 'choose 3'); await page.waitForTimeout(3000);  // 龙岛主
+  await cmd(page, 'choose 2'); await page.waitForTimeout(3000);  // 龙岛主（第2个）
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话
   t = await getT(page);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
