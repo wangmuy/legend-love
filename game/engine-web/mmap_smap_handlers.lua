@@ -81,6 +81,11 @@ local function goToScene(target)
     JY.SubScene = tonumber(target.sceneId)
     JY.Status = 4  -- GAME_SMAP
 
+    -- 场景切换清理：关闭所有活动菜单（陈旧场景列表菜单的回调会在下次 choose 时
+    -- 用旧场景列表 goToScene 劫持交互——P6 Step14 一燈居根因）。
+    local MA = g(_G, "MenuAsync")
+    if MA and MA.clear then MA.clear() end
+
     w(string.format("你来到了 %s。\n", target.name))
     SmapHandlers.look({})
 end
@@ -481,6 +486,13 @@ function SmapHandlers.look(args)
             [67] = "冰火岛线索", -- 冰火岛 tile3 eventExtra（65 头颅使用后放置；触发→光明顶谢逊109）
             [469] = "郭靖",   -- 桃花岛（466 黄蓉对话后放置 tile1，instruct_5 询问战斗→战斗[76][77]→射雕英雄传148）
             [470] = "郭靖",   -- 469 战斗胜利后事件替换为 470（对话变体）
+            [349] = "张三",    -- 侠客岛（入口守卫，无赏善罚恶令被拒）
+            [352] = "李四",    -- 侠客岛（迎宾对话）
+            [416] = "程英",    -- 绝情谷底（程英破阵，需程英在队）
+            [527] = "乔峰",    -- 丐帮（燕子坞大燕图表后动态放置，天龙八部线索对话→528 战斗入口）
+            [528] = "乔峰",    -- 丐帮（527 对话后动态放置，挑战乔峰→战斗[83]→天龙八部147）
+            [620] = "霍青桐",  -- 回族部落（静态 NPC，可兰经物品触发 622 交还→书剑恩仇录）
+            [624] = "守卫",    -- 回族部落（守卫誓死夺回可兰经对话）
         }
         -- 扫描 D* 表所有条目（0~199），检查事件编号 > 0 的动态 NPC / 静态 tile 事件
         -- D* 字段（原版）：field[2]=eventSpace(空格触发), field[3]=eventTouch(物品触发), field[4]=eventExtra(路过触发)
@@ -905,6 +917,15 @@ function smapNpcTalk(sceneId, ent)
                 end
             end
         end
+    end
+    -- 动态 D* NPC：instruct_3(-2,-2,...) 需写回 NPC 所在 tile（原版语义），
+    -- 否则 CurrentD=eventnum 会把升级写入孤儿槽 JY.D[sceneId][eventNum]，
+    -- 导致 tile 不升级、实体不消失、事件可重复触发
+    -- （如 611 战斗胜利后 612 写 D71[611]、tile3 仍 611；616→617 同理，
+    --   蓝凤凰已加入仍重复"是否加入"询问——P6 Step12/13 根因）。
+    if ent.npcData["动态"] == true and dIdx and dIdx > 0 then
+        local JYdyn = g(_G, "JY")
+        if JYdyn then JYdyn.CurrentD = dIdx end
     end
     if tonumber(eventId) == 0 then
         w(ent.name .. " 似乎不想说话。")

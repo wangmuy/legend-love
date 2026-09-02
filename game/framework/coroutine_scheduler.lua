@@ -171,6 +171,40 @@ function CoroutineScheduler:waitForCondition(conditionFn)
     end
 end
 
+-- 终止所有挂起的"事件类"协程（战斗/场景切换/读档时清理僵尸）
+-- 背景：update() 每帧恢复所有 waitingFor~="key" 的协程，且战斗结果用全局
+-- __warComplete/__warResult 标志传递。若战斗协程被中途放弃（战斗中传送/读档/
+-- 菜单劫持后 never-resume），协程永久滞留在 yield("war")，下一场战斗结束时被
+-- 错误唤醒并执行错误的事件后程（P7 串台根因：115 僵尸抢读 76 的标志播放倚天后程）。
+-- 只清理 name 以 "event"/"npc_talk"/"event_trigger" 开头的挂起协程，
+-- 保留菜单/对话等其他框架协程。
+-- @return 清理数量
+function CoroutineScheduler:killStaleEvents()
+    local killed = 0
+    for id, info in pairs(coroutines) do
+        -- 关键：跳过当前正在运行的协程（currentCoroutine）。
+        -- 协程在执行期间（resume 后、yield 前）info.status 仍为旧的 "suspended"，
+        -- 若不跳过，instruct_6 里调用本函数会把"正在调它的那条事件协程"误杀——
+        -- 该协程随后 yield("war") 时已被移出 coroutines 表，成为孤儿永不恢复，
+        -- 战斗胜利后事件后程（instruct_3 升级/给书）不执行（P6 五毒教 616 不置 611 根因）。
+        if id == currentCoroutine then
+            goto continue_kill
+        end
+        local nm = info.name or ""
+        local isEventCo = string.find(nm, "event_", 1, true) ~= nil
+            or string.find(nm, "npc_talk_", 1, true) ~= nil
+        if info.status == "suspended" and isEventCo then
+            coroutines[id] = nil
+            killed = killed + 1
+        end
+        ::continue_kill::
+    end
+    if killed > 0 then
+        self:_debug("CoroutineScheduler.killStaleEvents: killed " .. killed .. " stale event coroutines")
+    end
+    return killed
+end
+
 -- 更新所有协程
 -- @param dt: delta time
 function CoroutineScheduler:update(dt)

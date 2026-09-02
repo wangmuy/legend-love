@@ -69,6 +69,10 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     local eventfilename = string.format("oldevent_%d.lua", eventnum)
     lib.Debug(string.format("oldCallEventCoroutine: %s START", eventfilename))
     
+    -- 保存进入时的 JY.CurrentD（调用方可能已设置为触发事件的 tile 索引，
+    -- 事件结束后恢复它，避免本事件内部嵌套执行其他事件时被覆盖污染）
+    local savedCurrentD = JY and JY.CurrentD
+    
     -- 设置 JY.CurrentD（原版 EventExecuteCoroutine 的行为，供 instruct_3 用 id=-2 获取当前事件编号）
     -- 注意：调用方（smapUseItemOnNpc 等）可能已设置 CurrentD = 触发事件的 tile 索引
     -- （原版语义：instruct_3(-2,...) 写回 NPC 所在 tile，如谢逊 tile2 field3 铁焰令→头颅65）。
@@ -104,8 +108,13 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     -- 卸载异步全局函数替换
     AsyncGlobals.uninstall()
     
-    -- 重置 JY.CurrentD
-    if JY then JY.CurrentD = -1 end
+    -- 恢复调用方设置的 JY.CurrentD（如 smapNpcTalk 动态 D* NPC 分支设置的 tile 索引）。
+    -- 原实现无条件置 -1：若事件内嵌套触发其他事件（战斗结算/后续对话等），内层事件结束时
+    -- 会把 CurrentD 重置为 -1，外层事件继续执行 instruct_3(-2,-2,...) 时便写入孤儿槽
+    -- JY.D[sceneId][eventNum]，导致原 tile 不升级、实体残留可重复触发
+    -- （典型：611 战斗胜利后 612 写 D71[611]、tile3 仍 611 需再选一次才得鹿鼎记；
+    --   616 战后 tile5 仍 616，蓝凤凰已加入仍重复"是否加入"询问——P6 Step12/13 根因）。
+    if JY then JY.CurrentD = savedCurrentD or -1 end
     
     lib.Debug(string.format("oldCallEventCoroutine: %s FINISHED", eventfilename))
 end
