@@ -526,6 +526,22 @@ rawset(_G, "instruct_6", function(warid, tmp, tmp2, flag)
     rawset(_G, "__warFromInstruct6", true)
     rawset(_G, "__warComplete", false)
     rawset(_G, "__warResult", nil)
+    -- 战斗开始清理：
+    -- 1) 杀死所有挂起的僵尸事件协程（战斗中放弃的旧战斗会滞留在 yield("war")，
+    --    否则本战斗结束时被错误唤醒执行错误事件后程——P7 串台根因）。
+    --    当前调用本函数的协程正在 running 状态，不会被误杀。
+    -- 2) 关闭所有活动菜单（陈旧场景列表菜单会在战斗中劫持 choose——一燈居根因）。
+    do
+        local sched = rawget(_G, "CoroutineScheduler")
+        if sched and sched.getInstance then
+            sched = sched.getInstance()
+        end
+        if sched and sched.killStaleEvents then
+            sched:killStaleEvents()
+        end
+        local MA = rawget(_G, "MenuAsync")
+        if MA and MA.clear then MA.clear() end
+    end
     -- 显示战场态势
     local w = rawget(_G, "WebUI")
     if w then w.write("战斗开始！输入 look 查看战场态势，choose 选择行动。") end
@@ -1873,9 +1889,16 @@ function processEventQueue(timestamp)
                         elseif rawget(_G, "__instruct5_waiting") and n ~= nil then
                             rawset(_G, "__instruct5_waiting", false)
                             rawset(_G, "__instruct5_result", n == 1)
-                        elseif hasMenu and n and JY.Status ~= 4 then
+                        elseif hasMenu and n and JY.Status ~= 4 and JY.Status ~= 5 then
                             MenuAsync.closeMenu(n)
                             lastDrawState = nil
+                        elseif hasMenu and n and JY.Status == 5 then
+                            -- 战斗中活动菜单必为陈旧菜单（战斗 UI 不用 MenuAsync）：
+                            -- 陈旧场景列表菜单的回调会 goToScene(第1项=一燈居) 劫持 choose
+                            -- （P6 Step14 一燈居根因）。丢弃该 choose 并清掉陈旧菜单。
+                            MenuAsync.clear()
+                            lastDrawState = nil
+                            w("战斗中忽略菜单选择。输入 look 查看战场态势。")
                         elseif (not hasMenu or JY.Status == 4) and n ~= nil then
                         local JY = rawget(_G, "JY")
                         local n = tonumber(arg)

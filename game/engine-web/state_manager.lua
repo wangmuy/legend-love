@@ -227,6 +227,20 @@ function loadGameState(slotId)
             pcall(instance.switchTo, instance, _G.JY.Status)
         end
     end
+    -- 读档清理：关闭陈旧菜单 + 杀死挂起的僵尸事件协程
+    -- （读档会覆盖 JY.D/Status/SubScene，运行中的旧场景事件协程基于旧状态，
+    --   恢复执行会污染新状态——P6 Step9b/串台根因之一）
+    do
+        local MA = rawget(_G, "MenuAsync")
+        if MA and MA.clear then MA.clear() end
+        local sched = rawget(_G, "CoroutineScheduler")
+        if sched and sched.getInstance then
+            sched = sched.getInstance()
+        end
+        if sched and sched.killStaleEvents then
+            sched:killStaleEvents()
+        end
+    end
     return true
 end
 

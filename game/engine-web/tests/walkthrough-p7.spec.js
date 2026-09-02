@@ -228,8 +228,9 @@ test('P7: 桃花岛→福威→天宁→梅庄→黑木崖→丐帮→主角居�
   expect(await gotoScene(page, '丐幫')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
-  // entity 1=乔峰
-  await cmd(page, 'choose 1'); await page.waitForTimeout(3000);
+  // 列表：1=搜索[oldevent_523] 2=搜索[oldevent_524] 3=乔峰[oldevent_525] 4=搜索[oldevent_527]
+  // （523/524 为打狗阵搜索实体；乔峰是第 3 项，勿用 choose 1）
+  await cmd(page, 'choose 3'); await page.waitForTimeout(3000);
   await cmd(page, 'choose 1'); await page.waitForTimeout(5000);  // 对话
   t = await getT(page);
   await cmd(page, 'choose 0'); await page.waitForTimeout(500);
