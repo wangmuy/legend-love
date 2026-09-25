@@ -123,6 +123,7 @@ rawset(_G, "instruct_1", function(talkId, headId)
                         [105] = "掌柜",
                         [106] = "店小二",
                         [111] = "韦小宝",
+                        [112] = "霍青桐",
                         [114] = "软体娃娃",
                     }
                     speakerName = HEAD_NAME_MAP[headId]
@@ -150,6 +151,7 @@ rawset(_G, "instruct_1", function(talkId, headId)
                             end
                         end
                     end
+                    if not speakerName then speakerName = "???" end
                     w.write("【" .. speakerName .. "】" .. tostring(text))
                 end
             else
@@ -191,6 +193,8 @@ rawset(_G, "instruct_3", function(sceneid, id, v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10
     if not JY then return end
     if sceneid == -2 then sceneid = JY.SubScene end
     if id == -2 then id = JY.CurrentD end
+    -- 无有效 sceneid/id（例如被无参 pcall 调用）时直接返回，避免 SetD 触发 nil 索引
+    if sceneid == nil or id == nil then return end
     local SetD = rawget(_G, "SetD")
     if not SetD then return end
     for field = 0, 10 do
@@ -404,6 +408,8 @@ rawset(_G, "instruct_4", function(thingid, num, direction)
     -- 4(4):是否使用物品[XXX]？ — 显示对话框询问是否使用指定物品
     local JY = rawget(_G, "JY")
     if not JY then return false end
+    -- 无有效物品 id 时直接返回 false，避免把未初始化的空背包槽位(nil)误判为匹配
+    if thingid == nil then return false end
     -- 检查是否有该物品
     local hasItem = false
     for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
@@ -1712,6 +1718,7 @@ function _G.initWebFramework()
             rest  = { handler = _G.SmapHandlers.rest,  description = "休息恢复体力" },
             exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
             leave = { handler = _G.SmapHandlers.leave, description = "离开场景回到大地图" },
+            go    = { handler = _G.SmapHandlers.go,    description = "go <编号> 经出口前往相邻场景" },
             help  = { handler = CE.showHelp,           description = "显示帮助信息" },
             choose= { handler = CE.handleChoose,        description = "choose <编号> 选择交互对象" },
         }
@@ -1798,6 +1805,7 @@ function _G.initWebFramework()
                             [105] = "掌柜",
                             [106] = "店小二",
                             [111] = "韦小宝",
+                            [112] = "霍青桐",
                             [114] = "软体娃娃",
                         }
                         speakerName = HEAD_NAME_MAP[headId]
@@ -1824,6 +1832,7 @@ function _G.initWebFramework()
                                 end
                             end
                         end
+                        if not speakerName then speakerName = "???" end
                         w.write("【" .. speakerName .. "】" .. tostring(text))
                     end
                 else
@@ -1956,6 +1965,11 @@ function processEventQueue(timestamp)
                             elseif JY.Status == 2 then
                                 local mh = rawget(_G, "MmapHandlers")
                                 if mh and mh.look then mh.look({}) end
+                            elseif JY.Status == 5 then
+                                -- GAME_WMAP(战斗): look 需路由到 WmapHandlers.look 显示战场态势
+                                -- （此前遗漏 Status==5 分支，导致战斗中 look 无输出，war 战斗 e2e 失败）
+                                local wh = rawget(_G, "WmapHandlers")
+                                if wh and wh.look then wh.look({}) end
                             end
                         end
                     elseif cmd == "list" then

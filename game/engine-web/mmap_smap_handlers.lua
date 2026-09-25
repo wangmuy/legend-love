@@ -375,6 +375,36 @@ function SmapHandlers.look(args)
     -- 格子事件段不再重复显示（消除同一事件被多段扫描重复列出的 DISPLAY_DUP 显示冗余）
     local listedEventIds = {}
     
+    -- 事件编号 → 已知 NPC 名称映射（原版已知动态/静态 NPC 事件）。
+    -- 提升到函数作用域：静态 NPC 段（raw 名称解析）与下方 D* 扫描段共用，
+    -- 避免两处重复定义导致不一致（如静态 620 霍青桐未解析为人名的问题）。
+    local staticNpcNames = {
+        [440] = "小龙女", [441] = "小龙女",
+        [438] = "杨过",   [439] = "杨过",
+        [417] = "瑛姑",
+        [495] = "王语嫣", -- 燕子坞（530/573 放置 tile2，慕容复加入后对话加入）
+        [111] = "范遥",
+        [109] = "谢逊",   -- 光明顶（冰火岛67放置，对话→instruct_26 递增灵蛇岛108→倚天链）
+        [110] = "谢逊",   -- 109 对话后事件替换为 110（对话变体）
+        [105] = "金花婆婆", -- 灵蛇岛（108 放置 tile0，激将对话→放置光明顶 111-116 圣火阵）
+        [115] = "圣火阵",  -- 光明顶（105 放置 tile94，战斗[15]胜利后给倚天屠龙记155）
+        [631] = "金轮法王",  -- 金轮寺（可兰经任务，战斗[100]胜利后给可兰经159）
+        [616] = "蓝凤凰",  -- 五毒教（韦小宝线，战斗[98]胜利后放置神龙教611→鹿鼎记）
+        [611] = "洪教主",  -- 神龙教三刷（战斗[95]胜利后给鹿鼎记150）
+        [612] = "洪教主",  -- 611 战斗胜利后事件替换为 612（对话变体）
+        [67] = "冰火岛线索", -- 冰火岛 tile3 eventExtra（65 头颅使用后放置；触发→光明顶谢逊109）
+        [469] = "郭靖",   -- 桃花岛（466 黄蓉对话后放置 tile1，instruct_5 询问战斗→战斗[76][77]→射雕英雄传148）
+        [470] = "郭靖",   -- 469 战斗胜利后事件替换为 470（对话变体）
+        [349] = "张三",    -- 侠客岛（入口守卫，无赏善罚恶令被拒）
+        [352] = "李四",    -- 侠客岛（迎宾对话）
+        [416] = "程英",    -- 绝情谷底（程英破阵，需程英在队）
+        [527] = "乔峰",    -- 丐帮（燕子坞大燕图表后动态放置，天龙八部线索对话→528 战斗入口）
+        [528] = "乔峰",    -- 丐帮（527 对话后动态放置，挑战乔峰→战斗[83]→天龙八部147）
+        [620] = "霍青桐",  -- 回族部落（静态 NPC，可兰经物品触发 622 交还→书剑恩仇录）
+        [624] = "守卫",    -- 回族部落（守卫誓死夺回可兰经对话）
+        [605] = "碑文",    -- 天宁寺（静态对象，碑文查看→"上面写着：天宁寺"，无事件）
+    }
+
     -- NPC 列表 + 交互对象（宝箱/柜子等 oldevent 触发器）
     local npcs = scene["NPC"]
     if npcs and #npcs > 0 then
@@ -382,6 +412,18 @@ function SmapHandlers.look(args)
         for npcIdx, npc in ipairs(npcs) do
             local charIdStr = tostring(npc["代号"] or npc)
             local npcName = npc["名称"] or "?"
+            -- 事件编号 → 已知 NPC 名称映射（与下方 D* 扫描段共用 staticNpcNames）。
+            -- 部分静态 NPC（如回族部落 620 霍青桐 / 624 守卫、天宁寺 605 碑文）在
+            -- scenes.json 中名称字段直接存 "oldevent_620"（raw id），若按 ^oldevent_
+            -- 一律归类为 event_trigger，会显示"搜索[oldevent_620]"且选择后走
+            -- "你打开了..." 物品/箱子分支，导致不显示人物名、不触发对话。
+            -- 先用 staticNpcNames 解析出真实名称，再判断是否为事件触发器
+            -- （未收录的 raw id 仍按触发器处理）。
+            local rawEid = tonumber(npc["事件编号"] or 0) or 0
+            if rawEid > 0 and staticNpcNames then
+                local realName = staticNpcNames[rawEid]
+                if realName then npcName = realName end
+            end
             local isEventTrigger = npcName and npcName:match("^oldevent_")
             local npcPresent = _G.isNpcPresent(sceneId, charIdStr)
             if isEventTrigger or npcPresent then
@@ -468,32 +510,7 @@ function SmapHandlers.look(args)
         local consumed = _G.eventConsumed and _G.eventConsumed[tostring(scanSid)] or {}
         -- 静态 NPC 已列出的事件登记到 listedEventIds，供格子事件段去重
         for k in pairs(staticEventIds) do listedEventIds[k] = true end
-        -- 事件编号 → NPC 名称映射（原版已知动态 NPC 事件）
-        local eventNpcNames = {
-            [440] = "小龙女", [441] = "小龙女",
-            [438] = "杨过",   [439] = "杨过",
-            [417] = "瑛姑",
-            [495] = "王语嫣", -- 燕子坞（530/573 放置 tile2，慕容复加入后对话加入）
-            [111] = "范遥",
-            [109] = "谢逊",   -- 光明顶（冰火岛67放置，对话→instruct_26 递增灵蛇岛108→倚天链）
-            [110] = "谢逊",   -- 109 对话后事件替换为 110（对话变体）
-            [105] = "金花婆婆", -- 灵蛇岛（108 放置 tile0，激将对话→放置光明顶 111-116 圣火阵）
-            [115] = "圣火阵",  -- 光明顶（105 放置 tile94，战斗[15]胜利后给倚天屠龙记155）
-            [631] = "金轮法王",  -- 金轮寺（可兰经任务，战斗[100]胜利后给可兰经159）
-            [616] = "蓝凤凰",  -- 五毒教（韦小宝线，战斗[98]胜利后放置神龙教611→鹿鼎记）
-            [611] = "洪教主",  -- 神龙教三刷（战斗[95]胜利后给鹿鼎记150）
-            [612] = "洪教主",  -- 611 战斗胜利后事件替换为 612（对话变体）
-            [67] = "冰火岛线索", -- 冰火岛 tile3 eventExtra（65 头颅使用后放置；触发→光明顶谢逊109）
-            [469] = "郭靖",   -- 桃花岛（466 黄蓉对话后放置 tile1，instruct_5 询问战斗→战斗[76][77]→射雕英雄传148）
-            [470] = "郭靖",   -- 469 战斗胜利后事件替换为 470（对话变体）
-            [349] = "张三",    -- 侠客岛（入口守卫，无赏善罚恶令被拒）
-            [352] = "李四",    -- 侠客岛（迎宾对话）
-            [416] = "程英",    -- 绝情谷底（程英破阵，需程英在队）
-            [527] = "乔峰",    -- 丐帮（燕子坞大燕图表后动态放置，天龙八部线索对话→528 战斗入口）
-            [528] = "乔峰",    -- 丐帮（527 对话后动态放置，挑战乔峰→战斗[83]→天龙八部147）
-            [620] = "霍青桐",  -- 回族部落（静态 NPC，可兰经物品触发 622 交还→书剑恩仇录）
-            [624] = "守卫",    -- 回族部落（守卫誓死夺回可兰经对话）
-        }
+        -- 事件编号 → NPC 名称映射：复用函数作用域的 staticNpcNames（含静态 620 霍青桐/624 守卫）。
         -- 扫描 D* 表所有条目（0~199），检查事件编号 > 0 的动态 NPC / 静态 tile 事件
         -- D* 字段（原版）：field[2]=eventSpace(空格触发), field[3]=eventTouch(物品触发), field[4]=eventExtra(路过触发)
         -- JY.D[sceneId] 有两种格式需兼容：
@@ -529,8 +546,8 @@ function SmapHandlers.look(args)
                     -- 天书放置事件（1001~1014）由格子事件段以"放置天书"列出，此处不显示"搜索"避免重复
                     if not staticEventIds[eKey] and not consumed[eKey]
                         and not (eventNum >= 1001 and eventNum <= 1014) then
-                        local npcName = eventNpcNames[eventNum] or ("oldevent_" .. eventNum)
-                        local isNamed = eventNpcNames[eventNum] ~= nil
+                        local npcName = staticNpcNames[eventNum] or ("oldevent_" .. eventNum)
+                        local isNamed = staticNpcNames[eventNum] ~= nil
                         entityIndex = entityIndex + 1
                         listedEventIds[eKey] = true
                         if isNamed then

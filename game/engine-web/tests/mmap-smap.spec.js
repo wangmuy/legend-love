@@ -293,12 +293,17 @@ test.describe('SMAP 命令（程序化设状态后 E2E）', () => {
     const input = page.locator('#command-input');
     await input.waitFor({ state: 'visible', timeout: 5000 });
 
-    // 选择第一个出口
-    await input.fill('go 1');
+    // 先 look，确保 SMAP 状态已生效且实体列表已生成
+    await input.fill('look');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(3000);
 
-    // 现在在新场景中，输入 look
+    // 通过出口编号前往相邻场景
+    await input.fill('go 1');
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(4000);
+
+    // 现在在新场景中，输入 look 应正常显示新场景交互列表
     await input.fill('look');
     await page.keyboard.press('Enter');
     await page.waitForTimeout(3000);
@@ -306,8 +311,8 @@ test.describe('SMAP 命令（程序化设状态后 E2E）', () => {
     const termText = await getTerminalText(page);
     console.log('=== SMAP GO 1 THEN LOOK OUTPUT ===');
     console.log(termText);
-    // 应显示新场景的描述
-    expect(termText).toContain('输入 exits 查看出口详情，leave 回到大地图');
+    // 应显示新场景的描述与交互提示（新菜单模式：choose 选择交互对象）
+    expect(termText).toContain('输入 choose <编号> 选择交互对象');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
@@ -717,9 +722,10 @@ test.describe('SMAP 菜单交互', () => {
       'JY.Person[0]["内力最大值"] = 50',
       'JY.Person[0]["内力"] = 10',
       'JY.Base["金钱"] = 200',
-      'local s = rawget(_G, "getScenes") and getScenes()',
-      'local sc = s and s[tostring(JY.SubScene or "1")]',
-      'if sc then sc["类型"] = "inn" end',
+      'local sid = tostring(JY.SubScene or "0")',
+      'local dc = rawget(_G, "initDataSource")',
+      'local arr = dc and dc["scenes"] and dc["scenes"]["scenes"]',
+      'if arr then for _, sc in ipairs(arr) do if tostring(sc["代号"]) == sid then sc["类型"] = "inn" end end end',
       'local sh = rawget(_G, "SmapHandlers")',
       'sh.rest({})',
       'return tostring(JY.Base["金钱"]) .. "|" .. tostring(JY.Person[0]["生命"])',
@@ -736,9 +742,10 @@ test.describe('SMAP 菜单交互', () => {
       'if not JY then JY = {}; rawset(_G, "JY", JY) end',
       'JY.Base = JY.Base or {}',
       'JY.Base["金钱"] = 50',
-      'local s = rawget(_G, "getScenes") and getScenes()',
-      'local sc = s and s[tostring(JY.SubScene or "1")]',
-      'if sc then sc["类型"] = "inn" end',
+      'local sid = tostring(JY.SubScene or "0")',
+      'local dc = rawget(_G, "initDataSource")',
+      'local arr = dc and dc["scenes"] and dc["scenes"]["scenes"]',
+      'if arr then for _, sc in ipairs(arr) do if tostring(sc["代号"]) == sid then sc["类型"] = "inn" end end end',
       'local sh = rawget(_G, "SmapHandlers")',
       'sh.rest({})',
       'return tostring(JY.Base["金钱"])',
@@ -751,9 +758,10 @@ test.describe('SMAP 菜单交互', () => {
     const r = await luaEval(page, [
       'local JY = rawget(_G, "JY")',
       'if not JY then JY = {}; rawset(_G, "JY", JY) end',
-      'local s = rawget(_G, "getScenes") and getScenes()',
-      'local sc = s and s[tostring(JY.SubScene or "1")]',
-      'if sc then sc["类型"] = "outdoor" end',
+      'local sid = tostring(JY.SubScene or "0")',
+      'local dc = rawget(_G, "initDataSource")',
+      'local arr = dc and dc["scenes"] and dc["scenes"]["scenes"]',
+      'if arr then for _, sc in ipairs(arr) do if tostring(sc["代号"]) == sid then sc["类型"] = "outdoor" end end end',
       'local sh = rawget(_G, "SmapHandlers")',
       'sh.rest({})',
       'return "ok"',

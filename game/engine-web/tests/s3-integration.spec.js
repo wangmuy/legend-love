@@ -417,25 +417,17 @@ test.describe('Slice 3 完整流程集成测试', () => {
     expect(text).toContain('软体娃娃');
 
     // 选第一个NPC（软体娃娃）
-    // 注意：场景Entity列表中NPC在第1位（看SmapHandlers.look输出顺序）
+    // 新版引擎：选中实体即直接交谈（无"对话/查看"子菜单）
     await typeCmd(page, 'choose 1');
     await page.waitForTimeout(3000);
 
     lines = await getTermLines(page);
     text = lines.join('\n');
-    // 应出现NPC子菜单（对话/查看）
-    expect(text).toContain('对话');
-    expect(text).toContain('查看');
-
-    // 选择"对话"
-    await typeCmd(page, 'choose 1');
-    await page.waitForTimeout(3000);
-
-    lines = await getTermLines(page);
-    text = lines.join('\n');
-    // 应出现软体娃娃的对话文本
+    // 应直接出现软体娃娃的交谈文本
+    expect(text).toContain('你与');
     expect(text).toContain('软体娃娃');
-    expect(text).toContain('提示');
+    expect(text).toContain('交谈');
+    expect(text).toContain('交谈结束');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 
@@ -451,10 +443,10 @@ test.describe('Slice 3 完整流程集成测试', () => {
     await typeCmd(page, 'leave');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
-    // 进入河洛客栈（按拼音排序第44位）
+    // 进入河洛客棧（可去场景按名称字节序排，河洛客棧位于第 42 位；第 44 位为洪七公居）
     await typeCmd(page, 'list');
     await page.waitForTimeout(2000);
-    await typeCmd(page, 'choose 44');
+    await typeCmd(page, 'choose 42');
     await page.waitForTimeout(SETTLE_TIMEOUT);
 
     let lines = await getTermLines(page);
@@ -462,31 +454,16 @@ test.describe('Slice 3 完整流程集成测试', () => {
     expect(text).toContain('河洛客棧');
     expect(await hasNoGameErrors(page)).toBeTruthy();
 
-    // 选择掌柜（NPC列表第7位）
+    // 选择掌柜（NPC列表第7位）—— 新版引擎选中实体即直接交谈
     await typeCmd(page, 'choose 7');
     await page.waitForTimeout(3000);
 
     lines = await getTermLines(page);
     text = lines.join('\n');
+    expect(text).toContain('你与');
     expect(text).toContain('掌柜');
-    expect(text).toContain('对话');
-
-    // 选择"对话"
-    await typeCmd(page, 'choose 1');
-    await page.waitForTimeout(3000);
-
-    lines = await getTermLines(page);
-    text = lines.join('\n');
-    // 应出现掌柜的对话文本（关于住宿）
-    expect(text).toContain('掌柜');
-    expect(text).toContain('住');
-
-    // 验证关键点：「交谈结束」不应出现在「是否住宿」之前
-    const talkEndPos = text.indexOf('交谈结束');
-    const dialogPos = text.indexOf('是否住宿');
-    if (talkEndPos >= 0 && dialogPos >= 0) {
-      expect(talkEndPos).toBeGreaterThan(dialogPos);
-    }
+    // 掌柜直接抛出住宿询问（无"对话"子菜单）
+    expect(text).toContain('是否住宿');
 
     // 选择"否"，不住宿
     await typeCmd(page, 'choose 2');
@@ -494,9 +471,10 @@ test.describe('Slice 3 完整流程集成测试', () => {
 
     lines = await getTermLines(page);
     text = lines.join('\n');
-    // 应出现"交谈结束"和场景重绘
-    expect(text).toContain('交谈结束');
+    // 拒绝住宿后，后续台词（嵩山弟子欢迎）出现并重绘场景
     expect(text).toContain('河洛客棧');
+    expect(text).toContain('嵩山弟子');
+    expect(text).toContain('欢迎光临');
     expect(await hasNoGameErrors(page)).toBeTruthy();
   });
 });

@@ -65,12 +65,7 @@ test.describe('事件流程测试', () => {
     let text = await term(page);
     expect(text).toContain('软体娃娃');
 
-    // Menu-driven NPC interaction: choose 1 (select NPC) → choose 1 (对话)
-    await cmd(page, 'choose 1'); await page.waitForTimeout(2000);
-    text = await term(page);
-    expect(text).toContain('对话');
-    expect(text).toContain('查看');
-
+    // Web MUD: choose 1 (select NPC) → 直接对话（不使用“对话/查看”子菜单）
     await cmd(page, 'choose 1'); await page.waitForTimeout(5000);
     text = await term(page);
     expect(text).toContain('你与');
