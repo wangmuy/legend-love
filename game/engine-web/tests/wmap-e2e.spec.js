@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { waitForPageReady, luaEval } = require('./helpers/setup');
+const { waitForPageReady, waitForGameReady, luaEval } = require('./helpers/setup');
 
 const SETTLE_TIMEOUT = 4000;
 
@@ -35,12 +35,50 @@ async function typeCmd(page, text) {
   await page.keyboard.press('Enter');
 }
 
-/** Start a new game: choose 1 (start) → choose 1 (confirm attributes) */
+/** 等待游戏稳定进入可操作地图场景（主角的家），避免在软体娃娃开场对话尚未结束时调用 initWar
+ * 导致对话协程随后把 JY.Status 覆盖回 SMAP，战斗未真正建立。轮询终端的场景交互列表标记。 */
+async function waitForMap(page, timeoutMs = 60000) {
+  const start = Date.now();
+  let prev = '';
+  while (Date.now() - start < timeoutMs) {
+    const text = (await getTermLines(page)).join('\n');
+    if (text.includes('选择交互对象') || text.includes('menu 打开主选单')) {
+      if (prev.includes('选择交互对象')) return true;  // 连续两次稳定在地图交互界面
+      prev = text;
+    } else {
+      prev = '';
+    }
+    await page.waitForTimeout(500);
+  }
+  return false;
+}
+
+/** 轮询终端是否出现标记（game loop 刚启动时可能吞掉输入，需轮询确认到达指定阶段） */
+async function waitForMarker(page, marker, timeoutMs = 10000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const text = (await getTermLines(page)).join('\n');
+    if (text.includes(marker)) return true;
+    await page.waitForTimeout(500);
+  }
+  return false;
+}
+
+/** Start a new game: choose 1 (start, 属性确认) → choose 1 (confirm) → 地图。
+ * 由于 game loop 启动后一小段窗口内输入可能被丢弃（非确定竞态），逐阶段轮询并在
+ * 输入未生效时重发 choose 1，确保在调用 initWar 前游戏已真正进入地图场景。 */
 async function startNewGame(page) {
+  // 阶段1: 每次点击开始新游戏后，等待属性确认屏（生命/攻击/资质）出现；若被吞则重发。
+  let gotAttr = false;
+  for (let k = 0; k < 8 && !gotAttr; k++) {
+    await typeCmd(page, 'choose 1');
+    gotAttr = await waitForMarker(page, '生命', 6000);
+  }
+  if (!gotAttr) throw new Error('startNewGame: 未能进入属性确认屏幕');
+
+  // 阶段2: 确认属性 → 进入地图场景
   await typeCmd(page, 'choose 1');
-  await page.waitForTimeout(3000);
-  await typeCmd(page, 'choose 1');
-  await page.waitForTimeout(SETTLE_TIMEOUT);
+  await waitForMap(page);
 }
 
 test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
@@ -48,7 +86,9 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
     page.on('pageerror', e => console.log('[BROWSER ERROR]', e.message));
     await page.goto('/');
     await waitForPageReady(page);
-    await page.waitForTimeout(6000);
+    // 等待真正的游戏起始菜单出现（而非固定时延），避免低配置/多 worker 负载下启动未完成
+    await waitForGameReady(page);
+    await page.waitForTimeout(2000);
   });
 
   test('WmapHandlers and war init via luaEval', async ({ page }) => {
@@ -67,7 +107,7 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
       'P0["生命"]=100; P0["生命最大值"]=100; P0["内力"]=50; P0["内力最大值"]=50',
       'P0["攻击力"]=30; P0["防御力"]=20',
       'local W = rawget(_G, "WmapHandlers")',
-      'W.initWar({{name="山贼",hp=30,maxHp=30,mp=0,maxMp=0,x=5,attack=15,defense=5}}, 5)',
+      'W.initWar({{name="山贼",hp=30,maxHp=30,mp=0,maxMp=0,x=5,attack=15,defense=5}}, 1)',
       'return "ok|"..tostring(#JY.War.teammates).."|"..tostring(#JY.War.enemies)',
     ].join('; '));
     expect(r2.ok).toBe(true);
@@ -91,7 +131,7 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
       'P0["生命"]=100; P0["生命最大值"]=100; P0["内力"]=50; P0["内力最大值"]=50',
       'P0["攻击力"]=30; P0["防御力"]=20',
       'local W = rawget(_G, "WmapHandlers")',
-      'W.initWar({{name="山贼",hp=30,maxHp=30,mp=0,maxMp=0,x=0,attack=15,defense=5}}, 5)',
+      'W.initWar({{name="山贼",hp=30,maxHp=30,mp=0,maxMp=0,x=0,attack=15,defense=5}}, 1)',
       'return "ok"',
     ].join('; '));
     expect(init.ok).toBe(true);
@@ -142,7 +182,7 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
       'P0["生命"]=100; P0["生命最大值"]=100; P0["内力"]=50; P0["内力最大值"]=50',
       'P0["攻击力"]=60; P0["防御力"]=30',
       'local W = rawget(_G, "WmapHandlers")',
-      'W.initWar({{name="小贼",hp=5,maxHp=5,mp=0,maxMp=0,x=0,attack=5,defense=1}}, 3)',
+      'W.initWar({{name="小贼",hp=5,maxHp=5,mp=0,maxMp=0,x=0,attack=5,defense=1}}, 1)',
       'return "ok"',
     ].join('; '));
     expect(init.ok).toBe(true);
@@ -216,7 +256,7 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
       'P0["生命"]=100; P0["生命最大值"]=100; P0["内力"]=50; P0["内力最大值"]=50',
       'P0["攻击力"]=30; P0["防御力"]=20',
       'local W = rawget(_G, "WmapHandlers")',
-      'W.initWar({{name="山贼",hp=30,maxHp=30,mp=0,maxMp=0,x=1,attack=15,defense=5}}, 5)',
+      'W.initWar({{name="山贼",hp=30,maxHp=30,mp=0,maxMp=0,x=1,attack=15,defense=5}}, 1)',
       'return "ok"',
     ].join('; '));
     expect(initResult.ok).toBe(true);
@@ -245,7 +285,7 @@ test.describe('Slice 5 WMAP 战斗系统 E2E', () => {
       'P0["攻击力"]=60; P0["防御力"]=30',
       'P0["经验"]=0',
       'local W = rawget(_G, "WmapHandlers")',
-      'W.initWar({{name="山贼",hp=5,maxHp=5,mp=0,maxMp=0,x=0,attack=5,defense=1}}, 3)',
+      'W.initWar({{name="山贼",hp=5,maxHp=5,mp=0,maxMp=0,x=0,attack=5,defense=1}}, 1)',
       'return "ok"',
     ].join('; '));
     expect(init.ok).toBe(true);

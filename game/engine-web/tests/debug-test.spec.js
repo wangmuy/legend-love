@@ -15,5 +15,6 @@ test('debug luaEval', async ({ page }) => {
 
   const r = await luaEval(page, 'return 42');
   console.log('DEBUG return 42:', JSON.stringify(r));
-  expect(r).toBe(42);
+  expect(r.ok).toBe(true);
+  expect(parseInt(r.result)).toBe(42);
 });

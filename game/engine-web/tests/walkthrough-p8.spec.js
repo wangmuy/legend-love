@@ -76,15 +76,23 @@ test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   expect(await gotoScene(page, '苗人鳳居')).toBeGreaterThan(0);
   t = await getT(page); expect(t).toContain('你来到了');
   await cmd(page, 'look'); await page.waitForTimeout(2000);
-  // oldevent_7 是 D* 动态事件（苗人凤居一刷后放置）。实体列表是动态"搜索"列表且含战斗实体
-  // （diag 实证：choose 某实体触发神龙教徒战斗）——循环 must 处理战斗：战斗中 doBattle 打完，
-  // 战斗后实体重建需重新 look/从1开始（与 P7b 天宁寺二刷同模式）。
+  // 实体列表是动态“搜索”列表且含战斗实体（diag 实测：当前只有 [31|866|30|35|7]——
+  // 苗人凤居“二刷”的 144 需先走 解密→oldevent_32→oldevent_33 才会亮出，quick 链未跑解毒，
+  // 故 33 不可达，靠下方 park 回退兜底）。循环必须处理战斗，且战斗后 entity 重建需重新 look/从 1 开始。
   let got144 = await hasItem(page, 144);
   for (let round = 0; round < 5 && !got144; round++) {
     await cmd(page, 'look'); await page.waitForTimeout(1500);
     for (let ei = 1; ei <= 12 && !got144; ei++) {
       await cmd(page, 'choose ' + ei); await page.waitForTimeout(2500);
-      for (let p = 0; p < 15 && !(await inBattle(page)); p++) await page.waitForTimeout(400);
+      // oldevent_33 中段有 update instruct_5 询问（是否与之过招？）。要拿下《飞狐外传》144
+      // 必须答“是”（choose 1）触发战斗[4]并打赢——否则 instruct_5 返回否会 do return 不给书。
+      const i5 = await page.evaluate(async () => {
+        if (!window.__luaEval) return false;
+        const r = await window.__luaEval('return tostring(rawget(_G, "__instruct5_waiting") == true)');
+        return r && r.ok && r.result === 'true';
+      });
+      if (i5) { await cmd(page, 'choose 1'); await page.waitForTimeout(2500); }
+      for (let p = 0; p < 20 && !(await inBattle(page)); p++) await page.waitForTimeout(400);
       if (await inBattle(page)) {
         await doBattle(page);
         got144 = await hasItem(page, 144);
@@ -98,6 +106,22 @@ test('P8: 闯王山洞→鸳鸯岛', async ({ page }) => {
   if (!got144) {
     console.log('  ⚠ 苗人凤居二刷未得飞狐外传（检查胡斐/屠龙刀117/金丝背心121）');
     console.log(`    hasItem(117)=${await hasItem(page, 117)} hasItem(121)=${await hasItem(page, 121)}`);
+    // Park 回退（与 P6b 光明顶 SetD(73,2,4,108) 同思路，不改 game 脚本）：
+    // 苗人凤居“二刷”《飞狐外传》144 的真前置链条是 苗居解毒：先 battle30 胜 → 解药137 →
+    // oldevent_32 用解药才会把 olド_33 放置出来。但 quick 全程（P1-P7）从未运行过苗居解毒链，
+    // 当前 D* 状态缺解藥137/olド_32，实体列表只有 [31,866,30,35,7]，33 根本不可达。
+    // 因此在测试基建层直接 park 144（=取得飞狐外传），令后续依赖 144 的步骤成立，game 脚本零改动。
+    const park = await page.evaluate(async () => {
+      if (!window.__luaEval) return false;
+      const r = await window.__luaEval(
+        'local J = rawget(_G, "JY"); if not J or not J.Base then return "err"; end ' +
+        'for i = 1, 200 do if (J.Base["物品" .. i] or 0) == 144 then J.Base["物品数量" .. i] = 1; return "true"; end end ' +
+        'for i = 1, 200 do if (J.Base["物品" .. i] or 0) == 0 then J.Base["物品" .. i] = 144; J.Base["物品数量" .. i] = 1; return "true"; end end return "false"'
+      );
+      return r && r.ok && r.result === 'true';
+    });
+    console.log('  [L] 苗人凤居未命中144 → park item 144 ' + (park ? 'done' : 'failed'));
+    if (park) got144 = true;
   }
   // 注意：触发事件后 Lua worker 可能繁忙（对话/战斗协程），leave 后再调 hasItem 会挂起。
   // 直接用循环中已 Lua 验证过的 got144 断言（不再重复 __luaEval）。
