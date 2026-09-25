@@ -7,8 +7,8 @@
 
 ---本代码由游泳的鱼编写
 
-local FileUtil = require "framework.lib_file"
-local ScriptLoader = require "framework.script_loader"
+local FileUtil = require "lib_file"
+local ScriptLoader = require "script_loader"
 
 --本模块是lua主模块，由C主程序JYLua.exe调用。C程序主要提供游戏需要的视频、音乐、键盘等API函数，供lua调用。
 --游戏的所有逻辑都在lua代码中，以方便大家对代码的修改。
@@ -17,14 +17,14 @@ local ScriptLoader = require "framework.script_loader"
 --导入其他模块。之所以做成函数是为了避免编译查错时编译器会寻找这些模块。
 function IncludeFile()              --导入其他模块
     --dofile("config.lua");       --此文件在C函数中预先加载。这里就不加载了
-    -- Use EngineAPI.script.load for .love file compatibility
-    local jyconst_loader, err = EngineAPI.script.load(CONFIG.ScriptPath .. "jyconst.lua")
+    -- Use love.filesystem.load for .love file compatibility
+    local jyconst_loader = love.filesystem.load(CONFIG.ScriptPath .. "jyconst.lua")
     if jyconst_loader then
         jyconst_loader()
     else
         dofile(CONFIG.ScriptPath .. "jyconst.lua")
     end
-    local jymodify_loader, err2 = EngineAPI.script.load(CONFIG.ScriptPath .. "jymodify.lua")
+    local jymodify_loader = love.filesystem.load(CONFIG.ScriptPath .. "jymodify.lua")
     if jymodify_loader then
         jymodify_loader()
     else
@@ -3005,10 +3005,10 @@ function GenTalkIdx()         --生成对话索引文件
     local rshift = bit32 and bit32.rshift
 
     -- 索引已存在且格式合法时直接复用，避免每次启动全量重建
-    local idxExists = EngineAPI.file.exists(CC.TalkIdxFile)
-    local grpExists = EngineAPI.file.exists(CC.TalkGrpFile)
+    local idxInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(CC.TalkIdxFile)
+    local grpInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(CC.TalkGrpFile)
     local idxSize = FileUtil.getsize(CC.TalkIdxFile)
-    if idxSize and idxSize > 0 and idxSize % 4 == 0 and idxExists and grpExists then
+    if idxSize and idxSize > 0 and idxSize % 4 == 0 and idxInfo and grpInfo and idxInfo.modtime and grpInfo.modtime and idxInfo.modtime >= grpInfo.modtime then
         return
     end
 
@@ -3196,8 +3196,8 @@ function instruct_6(warid,tmp,tmp2,flag)      --战斗
     local isexp = (flag == 0) and 0 or (flag or 1)
     if co then
         lib.Debug("instruct_6: running in coroutine, warid=" .. warid .. ", flag=" .. tostring(flag) .. ", isexp=" .. tostring(isexp))
-        local scheduler = require("framework.coroutine_scheduler")
-        local WarAsync = require("framework.war_async")
+        local scheduler = require("coroutine_scheduler")
+        local WarAsync = require("war_async")
         
         lib.Debug("instruct_6: creating battle sub-coroutine")
         local warCo = scheduler:create(function()
@@ -3517,7 +3517,7 @@ function instruct_27(id,startpic,endpic)           --显示动画
     -- 获取协程调度器
     local scheduler = nil
     if coroutine.running() then
-        scheduler = require("framework.coroutine_scheduler").getInstance()
+        scheduler = require("coroutine_scheduler").getInstance()
     end
     
     if scheduler then
