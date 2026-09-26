@@ -75,18 +75,35 @@ _G.FrameworkSources = _G.FrameworkSources or {}
 
 function _G.registerFrameworkModule(name, source)
     _G.FrameworkSources[name] = source
-    package.preload[name] = function()
-        local fn, err = load(source, "@" .. name)
-        if not fn then
-            EngineAPI.debug.log("加载模块失败 " .. name .. ": " .. tostring(err))
-            return {}
+
+    -- 注册模块加载器。框架模块统一以 framework.* 前缀注册，
+    -- 但原版游戏脚本（jymain.lua / jymodify.lua 等）会以顶层裸名 require
+    -- （例如 require "lib_file"、require "script_loader"、require("coroutine_scheduler")），
+    -- 因此除 framework.* 外还需为对应裸名注册同一加载器，
+    -- 否则 require 会落入 fengari 的 HTTP module 搜索 → 404 → "Framework init FAILED"。
+    local function makeLoader(regName)
+        return function()
+            local fn, err = load(source, "@" .. regName)
+            if not fn then
+                EngineAPI.debug.log("加载模块失败 " .. regName .. ": " .. tostring(err))
+                return {}
+            end
+            local ok, result = pcall(fn)
+            if not ok then
+                EngineAPI.debug.log("执行模块失败 " .. regName .. ": " .. tostring(err))
+                return {}
+            end
+            return result
         end
-        local ok, result = pcall(fn)
-        if not ok then
-            EngineAPI.debug.log("执行模块失败 " .. name .. ": " .. tostring(err))
-            return {}
-        end
-        return result
+    end
+
+    package.preload[name] = makeLoader(name)
+
+    -- 注册裸名别名（如 framework.lib_file → lib_file），供原版脚本顶层 require 使用。
+    -- 仅在裸名尚未注册时添加，避免覆盖其它模块。
+    local moduleName = name:match("^framework%.(.+)$")
+    if moduleName and not package.preload[moduleName] then
+        package.preload[moduleName] = makeLoader(moduleName)
     end
 end
 
@@ -1173,6 +1190,38 @@ local lastDrawState = nil
 function _G.initWebFramework()
     -- 0. 先加载 config 确保 CONFIG 全局变量存在
     require("framework.config")
+
+    -- 0.5 提供最小 LÖVE 兼容垫片（love.filesystem）
+    -- 原版 master 脚本（script/jymain.lua）的 IncludeFile()/GenTalkIdx() 依赖全局 love
+    -- （love.filesystem.load / love.filesystem.getInfo），而 Web MUD 引擎没有 love。
+    -- 这里提供满足脚本所需的最小垫片：
+    --  - love.filesystem.load(path) 从已注册的 FrameworkSources 中读取源码并返回 chunk（LÖVE 语义）
+    --  - love.filesystem.getInfo(path) 返回 nil（Web 环境无二进制资源，调用处均做了空值保护）
+    if not _G.love then
+        local loveShim = { filesystem = {} }
+        loveShim.filesystem.load = function(path)
+            path = tostring(path):gsub("^%.?/?", "")
+            local src = _G.FrameworkSources and _G.FrameworkSources[path]
+            if not src then
+                return nil, "Web shim: no source registered for " .. tostring(path)
+            end
+            local chunk, err = load(src, "@" .. path)
+            if not chunk then
+                return nil, err
+            end
+            return chunk
+        end
+        loveShim.filesystem.getInfo = function()
+            return nil
+        end
+        loveShim.filesystem.write = function()
+            return true
+        end
+        loveShim.filesystem.remove = function()
+            return true
+        end
+        rawset(_G, "love", loveShim)
+    end
     
     -- 初始化 __quiet 标志（必须在 setmetatable(_G) 之前存在）
     _G.__quiet = false
