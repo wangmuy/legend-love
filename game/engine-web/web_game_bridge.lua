@@ -1191,38 +1191,6 @@ function _G.initWebFramework()
     -- 0. 先加载 config 确保 CONFIG 全局变量存在
     require("framework.config")
 
-    -- 0.5 提供最小 LÖVE 兼容垫片（love.filesystem）
-    -- 原版 master 脚本（script/jymain.lua）的 IncludeFile()/GenTalkIdx() 依赖全局 love
-    -- （love.filesystem.load / love.filesystem.getInfo），而 Web MUD 引擎没有 love。
-    -- 这里提供满足脚本所需的最小垫片：
-    --  - love.filesystem.load(path) 从已注册的 FrameworkSources 中读取源码并返回 chunk（LÖVE 语义）
-    --  - love.filesystem.getInfo(path) 返回 nil（Web 环境无二进制资源，调用处均做了空值保护）
-    if not _G.love then
-        local loveShim = { filesystem = {} }
-        loveShim.filesystem.load = function(path)
-            path = tostring(path):gsub("^%.?/?", "")
-            local src = _G.FrameworkSources and _G.FrameworkSources[path]
-            if not src then
-                return nil, "Web shim: no source registered for " .. tostring(path)
-            end
-            local chunk, err = load(src, "@" .. path)
-            if not chunk then
-                return nil, err
-            end
-            return chunk
-        end
-        loveShim.filesystem.getInfo = function()
-            return nil
-        end
-        loveShim.filesystem.write = function()
-            return true
-        end
-        loveShim.filesystem.remove = function()
-            return true
-        end
-        rawset(_G, "love", loveShim)
-    end
-    
     -- 初始化 __quiet 标志（必须在 setmetatable(_G) 之前存在）
     _G.__quiet = false
 
