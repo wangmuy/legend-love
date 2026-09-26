@@ -214,6 +214,17 @@ EngineAPI.file.exists = function(filename)
     return false
 end
 
+EngineAPI.file.getInfo = function(filename)
+    logCall("file.getInfo", filename)
+    local f = io.open(filename, "rb")
+    if not f then
+        return nil
+    end
+    local size = f:seek("end")
+    f:close()
+    return { size = size, modtime = nil, type = "file" }
+end
+
 EngineAPI.file.read = function(filename)
     logCall("file.read", filename)
     local f = io.open(filename, "rb")

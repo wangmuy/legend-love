@@ -103,6 +103,7 @@ function TestEngineAPI.testFileModule()
     TestHelper.assertNotNil(EngineAPI.file.remove, "file.remove should exist")
     TestHelper.assertNotNil(EngineAPI.file.getSize, "file.getSize should exist")
     TestHelper.assertNotNil(EngineAPI.file.exists, "file.exists should exist")
+    TestHelper.assertNotNil(EngineAPI.file.getInfo, "file.getInfo should exist")
 end
 
 function TestEngineAPI.testScriptModule()

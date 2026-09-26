@@ -120,6 +120,13 @@ function FileUtil.getsize(filepath)
     return EngineAPI.file.getSize(filepath)
 end
 
+function FileUtil.getInfo(filepath)
+    if not (hasLoveFS() and EngineAPI.file.getInfo) then
+        return nil
+    end
+    return EngineAPI.file.getInfo(filepath)
+end
+
 -- Wrapper object for file handle - provides common methods
 FileUtil.FileHandle = {}
 FileUtil.FileHandle.__index = FileUtil.FileHandle

@@ -263,6 +263,14 @@ function EngineAPI.file.exists(filename)
     return _G.rawDataCache and _G.rawDataCache[filename] ~= nil
 end
 
+function EngineAPI.file.getInfo(filename)
+    local content = _G.rawDataCache and _G.rawDataCache[filename]
+    if content then
+        return { size = #content, modtime = nil, type = "file" }
+    end
+    return nil
+end
+
 function EngineAPI.file.read(filename)
     if _G.rawDataCache then
         return _G.rawDataCache[filename]

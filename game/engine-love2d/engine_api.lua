@@ -206,6 +206,11 @@ function M.file.getSize(filename) end
 -- @return boolean
 function M.file.exists(filename) end
 
+--- 获取文件信息（大小/修改时间等）
+-- @param filename string 文件路径
+-- @return table|nil "{size, modtime, type}"，不存在时返回 nil
+function M.file.getInfo(filename) end
+
 --- 读取文件内容
 function M.file.read(filename) end
 

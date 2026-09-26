@@ -169,6 +169,17 @@ EngineAPI.file.exists = function(filename)
     return info ~= nil
 end
 
+EngineAPI.file.getInfo = function(filename)
+    if love and love.filesystem and love.filesystem.getInfo then
+        return love.filesystem.getInfo(filename)
+    end
+    local f = io.open(filename, "rb")
+    if not f then return nil end
+    local size = f:seek("end")
+    f:close()
+    return { size = size, modtime = nil, type = "file" }
+end
+
 EngineAPI.file.read = function(filename)
     if love and love.filesystem and love.filesystem.read then
         return love.filesystem.read(filename)
