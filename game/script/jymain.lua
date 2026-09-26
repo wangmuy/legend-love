@@ -3260,6 +3260,14 @@ function instruct_10(personid)            --加入队员
         lib.Debug("instruct_10 error: person id not exist");
         return ;
     end
+    -- 防重复入队：若该角色已在队伍中（不区分其当前所在地），直接返回，避免因
+    -- 重复触发加入剧情（如重复对话、事件在同 tile 多实体上重复分发）而产生两份相同队员。
+    for i =1, CC.TeamNum do
+        if JY.Base and JY.Base["队伍"..i]==personid then
+            lib.Debug("instruct_10 info: person "..tostring(personid).." already in team, skip duplicate join");
+            return ;
+        end
+    end
     local add=0;
     for i =2, CC.TeamNum do             --第一个位置是主角，从第二个开始
         if JY.Base["队伍"..i]<0 then

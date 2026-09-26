@@ -712,6 +712,10 @@ end)
 rawset(_G, "instruct_10", function(personid)
     local JY = rawget(_G, "JY")
     if not JY or not JY.Person or not JY.Person[personid] then return end
+    -- 防重复入队：若该角色已在队伍中直接返回（web 引擎版，与 jymain.lua 一致）
+    for i = 1, CC.TeamNum do
+        if JY.Base["队伍" .. i] == personid then return end
+    end
     for i = 2, CC.TeamNum do
         if JY.Base["队伍" .. i] == nil or JY.Base["队伍" .. i] < 0 then
             JY.Base["队伍" .. i] = personid
