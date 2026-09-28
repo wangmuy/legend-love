@@ -802,6 +802,15 @@ function SmapHandlers.chooseInteraction(idx)
                     local co = scheduler:create(function()
                         -- 注意：不能使用 pcall 包裹，因为 Lua 5.1 中协程内的 pcall 里 yield 会失败
                         EventExecutor.oldCallEventCoroutine(tonumber(eventId))
+                        -- 圣堂事件执行完毕后，恢复 JY.CurrentD（关键：必须等事件全程完成。
+                        -- 若在下方 scheduler:start 之后立即重置，事件在 instruct_4（是否使用物品）
+                        -- yield 后 resume 时 CurrentD 已被清成 -1，instruct_3(-2,id=-2) 会写入
+                        -- GetCurrentD=-1 的空槽，D* 书架格 field5 仍为 4662，instruct_61 永远
+                        -- false——圣堂放完 14 本书也不开门/不通关）
+                        if isShenTangBook then
+                            local JY0 = g(_G, "JY")
+                            if JY0 then JY0.CurrentD = -1 end
+                        end
                         -- 重绘场景，更新实体列表（已消耗的事件不再显示）
                         smapEntityList = {}
                         SmapHandlers.look({})
@@ -815,11 +824,6 @@ function SmapHandlers.chooseInteraction(idx)
                     w("事件结束。")
                     smapEntityList = {}
                     SmapHandlers.look({})
-                end
-                -- 圣堂事件执行后，恢复 JY.CurrentD（由事件处理器自己管理）
-                local JY2 = g(_G, "JY")
-                if JY2 and isShenTangBook then
-                    JY2.CurrentD = -1
                 end
             end  -- if EventExecutor then
         else
