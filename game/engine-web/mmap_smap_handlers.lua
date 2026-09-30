@@ -966,12 +966,41 @@ function smapNpcTalk(sceneId, ent)
         end
         if scheduler and scheduler.create then
             -- 在协程中执行事件，后处理也放在协程内（确保 yield 恢复后再执行）
+            local finale = (tonumber(eventId) == 1017)  -- 时空机终局
             local co = scheduler:create(function()
                 -- event_executor.lua:73 设置 JY.CurrentD = eventnum（被调用的事件编号），
                 -- 因此 instruct_3(-2,...) 写入 JY.D[sceneId][staticEventId][field]
                 -- 事件执行完成后，下方的同步代码将数据从 staticEventId 索引同步到 100+dIdx 索引
                 -- 注意：不能使用 pcall 包裹，因为 Lua 5.1 中协程内的 pcall 里 yield 会失败
+                if finale then
+                    -- 终局时空机：让 WaitKey 自动继续到 GAME_END（见 web_game_bridge.WaitKey）
+                    rawset(_G, "__endingReached", true)
+                end
                 EventExecutor.oldCallEventCoroutine(tonumber(eventId))
+                rawset(_G, "__endingReached", nil)
+                if finale then
+                    -- 时空机终局：让用户体验到“游戏整体结束”，而不是停留在圣堂场景继续交互。
+                    -- instruct_62 会把 JY.Status 置为 GAME_END，但在 Web MUD 中状态机不会绘制通关画面，
+                    -- 且 npc_talk 结束后会重新渲染场景列表盖住结尾信息。因此在这里直接收尾：
+                    -- 1) 输出通关横幅（对齐原版“集齐十四天书→回到现实”的结局）；
+                    -- 2) 置 JY.Status=GAME_END；
+                    -- 3) 设置 __gameOver，后续命令处理会短路为“游戏已结束”。
+                    local wEnd = rawget(_G, "WebUI")
+                    if wEnd and wEnd.write then
+                        wEnd.write("\n====================================================\n")
+                        wEnd.write("    ☆ 恭喜通关！游戏结束 ☆\n")
+                        wEnd.write("    你已集齐十四天书，开启了时空通道回到现实！\n")
+                        wEnd.write("    感谢游玩《金庸群侠传 Web MUD》\n")
+                        wEnd.write("    输入 quit 退出游戏\n")
+                        wEnd.write("====================================================\n")
+                    end
+                    if JY then
+                        JY.Status = (rawget(_G, "jyconst") and rawget(_G, "jyconst").GAME_END) or 7
+                    end
+                    rawset(_G, "__gameOver", true)
+                    smapEntityList = {}
+                    return
+                end
                 -- 事件执行完成后，将数据从事件编号索引同步到 NPC D* 索引
                 if JY and JY.D then
                     local sid = tonumber(sceneId)
@@ -2674,4 +2703,11 @@ _G.MmapHandlers = MmapHandlers
 -- 测试辅助：直接使用物品对 NPC（跳过菜单 UI，自动接受 instruct_4 确认）
 function SmapHandlers.__useItemDirect(sceneId, npcData)
     smapUseItemOnNpc(tostring(sceneId), {type="npc", name=npcData["名称"] or "?", npcData=npcData})
+end
+
+-- 测试辅助：直接触发 NPC 对话（smapNpcTalk），用于验证 npc_talk 协程分支/fimale 终局路径
+function SmapHandlers.__npcTalkDirect(sceneId, npcData)
+    local JY = g(_G, "JY")
+    if JY then JY.SubScene = tonumber(sceneId) end
+    smapNpcTalk(tostring(sceneId), {type="npc", name=npcData["名称"] or "?", npcData=npcData})
 end
