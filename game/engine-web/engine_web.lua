@@ -394,7 +394,25 @@ end
 --------------------------------------------------------------------------------
 EngineAPI.app = {}
 
-function EngineAPI.app.quit() end
+function EngineAPI.app.quit()
+    -- Web MUD：结束/通关时终结交互。
+    -- 无真实窗口可关闭，所以向终端输出明确的“游戏结束”结论，并把 JY.Status 固定为
+    -- GAME_END(7)，避免玩家仍停留在圣堂/场景列表里继续输入造成“卡死既不结束”的观感。
+    local JY = rawget(_G, "JY")
+    if JY then
+        JY.Status = (rawget(_G, "jyconst") and rawget(_G, "jyconst").GAME_END) or 7
+    end
+    local w = rawget(_G, "WebUI")
+    if w and w.write then
+        w.write("\n====================================================\n")
+        w.write("    ☆ 游戏结束 / 恭喜通关！☆\n")
+        w.write("    感谢游玩《金庸群侠传 Web MUD》\n")
+        w.write("    你已集齐十四天书，成为武林盟主！\n")
+        w.write("====================================================\n")
+    end
+    -- 标记游戏已结束，命令处理器将对后续命令不再渲染场景
+    rawset(_G, "__gameOver", true)
+end
 
 --------------------------------------------------------------------------------
 -- Global setup

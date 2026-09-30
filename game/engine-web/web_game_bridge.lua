@@ -184,6 +184,13 @@ end)
 
 -- WaitKey — 供 oldevent 脚本使用，等待用户输入后继续
 rawset(_G, "WaitKey", function()
+    -- 终局时空机结局（oldevent_1017 → instruct_62 播放片尾）里没有真实键盘可等待：
+    -- MUD 的 InputManager key 队列无 Web 来源，yield("key") 永远等不到输入会卡死，
+    -- 导致 instruct_62 永远到不了 JY.Status=GAME_END、游戏“停在圣堂不结束”。
+    -- 因此终局时跳过按键等待，自动继续到 GAME_END。
+    if rawget(_G, "__endingReached") then
+        return
+    end
     local w = rawget(_G, "WebUI")
     if w then w.write("按回车继续...") end
     local CoroutineScheduler = rawget(_G, "CoroutineScheduler")
@@ -1898,6 +1905,18 @@ function processEventQueue(timestamp)
 
     -- 1. 处理输入事件（仅当无对话框时消费事件；对话框自己通过 lib.GetKey 消费）
     if not hasDialog then
+        -- 终局：游戏已结束，不再处理任何场景命令
+        if rawget(_G, "__gameOver") then
+            local JSG = rawget(_G, "JSBridge")
+            if JSG and JSG.getEventCount and JSG.getEventCount() > 0 then
+                JSG.getEvent() -- 丢弃积压的输入
+            end
+            local wEnd = rawget(_G, "WebUI")
+            if wEnd and wEnd.write then
+                wEnd.write("游戏已结束。输入 quit 退出。\n")
+            end
+            return
+        end
         local JSBridge = rawget(_G, "JSBridge")
         if JSBridge and JSBridge.getEventCount and JSBridge.getEventCount() > 0 then
             local evt = JSBridge.getEvent()
