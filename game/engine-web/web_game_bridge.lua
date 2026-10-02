@@ -1438,10 +1438,36 @@ function _G.initWebFramework()
     -- 用 rawset 直接写入 _G，因为 initCoroutine 中 JYMainAdapter 是全局引用
     rawset(_G, "JYMainAdapter", target)
 
-    -- 覆写 loadGame：Web MUD 无二进制存档文件
+    -- 覆盖 loadGame：Web MUD 开始菜单的“载入游戏/载入进度”直接读取主存档（槽位1）。
+    -- 原实现硬编码成“没有存档”空栈，导致开始菜单选了“载入进度”永远提示无存档，
+    -- 而进入游戏后 menu 的“读档11（读取槽位1）”却能读到——存档/读档指标不一致。
+    -- 这里让开始菜单的“载入游戏”真正走 loadGameState(1)，与游戏内读档一致。
     startNewGameAdapter.loadGame = function()
         local WebUI = rawget(_G, "WebUI")
-        if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始游戏\n") end
+        local loadGS = rawget(_G, "loadGameState")
+        if loadGS then
+            local ok = loadGS(1)
+            if ok then
+                if WebUI then WebUI.write("读取存档成功。") end
+                local JY = rawget(_G, "JY")
+                if JY and JY.Status and JY.Status ~= 0 then
+                    local sm = rawget(_G, "StateMachine")
+                    if sm and sm.getInstance then
+                        local inst
+                        pcall(function() inst = sm.getInstance() end)
+                        if inst and inst.switchTo then pcall(inst.switchTo, inst, JY.Status) end
+                    end
+                end
+                local sl = nil
+                if JY and JY.Status == 4 then sl = rawget(_G, "SmapHandlers")
+                elseif JY and JY.Status == 2 then sl = rawget(_G, "MmapHandlers") end
+                if sl and sl.look then sl.look({}) end
+            else
+                if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始。") end
+            end
+        else
+            if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始。") end
+        end
     end
 
     -- 覆写 startNewGame：Web MUD 使用纯文字菜单（CommandEngine + choose N）
