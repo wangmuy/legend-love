@@ -774,6 +774,7 @@ function SmapHandlers.chooseInteraction(idx)
         if tonumber(eventId) ~= 0 then
             -- 圣堂放置天书事件：由 oldevent 脚本内的 instruct_3 处理 D* 表，可重复选择
             local isShenTangBook = (eventId >= 1001 and eventId <= 1014)
+            local finale = (tonumber(eventId) == 1017)  -- 时空机终局（搜索[event_trigger] 路径）
             if not isShenTangBook then
                 -- 先检查是否已消耗（防止 eventConsumed 设置后重进场景前的重复点击）
                 if _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][evtKey(eventId)] then
@@ -801,7 +802,33 @@ function SmapHandlers.chooseInteraction(idx)
                 if scheduler then
                     local co = scheduler:create(function()
                         -- 注意：不能使用 pcall 包裹，因为 Lua 5.1 中协程内的 pcall 里 yield 会失败
+                        -- 终局时空机（oldevent_1017）末尾 instruct_62 会 WaitKey。
+                        -- 必须像 smapNpcTalk 的 finale 分支那样让 WaitKey 自动继续到 GAME_END，
+                        -- 否则选择“搜索[oldevent_1017]”后游戏停在圣堂不结束（Issue #4）。
+                        if finale then
+                            rawset(_G, "__endingReached", true)
+                        end
                         EventExecutor.oldCallEventCoroutine(tonumber(eventId))
+                        rawset(_G, "__endingReached", nil)
+                        if finale then
+                            -- 与 smapNpcTalk 时空机终局一致：输出通关横幅、置 GAME_END、__gameOver
+                            local jWf = g(_G, "JY")
+                            local wE2 = rawget(_G, "WebUI")
+                            if wE2 and wE2.write then
+                                wE2.write("\n====================================================\n")
+                                wE2.write("    ☆ 恭喜通关！游戏结束 ☆\n")
+                                wE2.write("    你已集齐十四天书，开启了时空隧道回到现实！\n")
+                                wE2.write("    感谢游玩《金庸群侠传 Web MUD》\n")
+                                wE2.write("    输入 quit 退出游戏\n")
+                                wE2.write("====================================================\n")
+                            end
+                            if jWf then
+                                jWf.Status = (rawget(_G, "jyconst") and rawget(_G, "jyconst").GAME_END) or 7
+                            end
+                            rawset(_G, "__gameOver", true)
+                            smapEntityList = {}
+                            return
+                        end
                         -- 圣堂事件执行完毕后，恢复 JY.CurrentD（关键：必须等事件全程完成。
                         -- 若在下方 scheduler:start 之后立即重置，事件在 instruct_4（是否使用物品）
                         -- yield 后 resume 时 CurrentD 已被清成 -1，instruct_3(-2,id=-2) 会写入
@@ -1041,6 +1068,14 @@ end
 --   1. 优先读 D* 表 field[3]（eventTouch，instruct_3 运行时设置的使用物品事件）
 --      —— 例如石破天(333)对话后 instruct_3(-2,-2,-2,-2,334,335,...) 设 field[3]=335（玄冰碧火酒）
 --   2. 回退约定：部分 NPC（如胡斐 1→10 两页刀法）使用"事件编号 + 9"
+-- 已知 NPC 的"使用物品触发"事件映射：当运行时 D* field[3] 未设置时兜底。
+-- 背景：孔八拉(678)的神杖检查是 oldevent_686，field[3]=686 只在运行过 oldevent_678(对话)
+-- 后由 instruct_3 写入；若玩家先对孔八拉使用神杖（未先对话），field[3] 仍是 -1，
+-- 老回退 eventId+9=687 恰好是台词事件（"我是武林盟主了"），故只显示台词、不发绿钥匙。
+local npcKnownItemTouchEvent = {
+    [678] = 686,  -- 孔八拉：使用神杖 → oldevent_686 神杖检查/贯绿钥匙
+}
+
 function smapUseItemOnNpc(sceneId, ent)
     local eventId = tonumber(ent.npcData["事件编号"] or 0)
     if eventId <= 0 then
@@ -1050,7 +1085,9 @@ function smapUseItemOnNpc(sceneId, ent)
     -- 1. 优先读 D* 表 field[3]（eventTouch，instruct_3 运行时设置的使用物品事件）
     --    —— 例如石破天(333)对话后 instruct_3(-2,-2,-2,-2,334,335,...) 设 field[3]=335（玄冰碧火酒）
     -- 2. 回退约定：部分 NPC（如胡斐 1→10 两页刀法）使用"事件编号 + 9"
-    local useItemEventId = eventId + 9  -- 回退约定
+    --    但孔八拉(678)若未先对话，field[3] 尚未设为 686，用 +9(=687 台词)会误显示"我是武林盟主了"
+    --    而不发绿钥匙；此处改用已知映射若有更正确。
+    local useItemEventId = npcKnownItemTouchEvent[eventId] or (eventId + 9)  -- 回退约定
     local GetD = g(_G, "GetD")
     if GetD then
         -- 注意：eventId 是"事件编号"（如慕容复=487），不是 D* tile 索引。
