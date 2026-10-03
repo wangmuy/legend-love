@@ -1485,6 +1485,38 @@ function _G.initWebFramework()
         local JSB = rawget(_G, "JSBridge")
         local CS = rawget(_G, "CoroutineScheduler")
         local scheduler = CS and CS.getInstance and CS.getInstance()
+        -- 预热：在首次 loadGameState 之前确保 worker 侧存档缓存已就绪。
+        -- 根因（用户 Issue1：开始菜单选“载入进度”后要等一会才显示读取成功/连续 choose 才有输出）：
+        -- reload 后主线程首次 init_save_cache 可能读到尚未落盘的 IndexedDB，导致 worker 的
+        -- luaSaveCache（以及其刷入的 __saveCache）在开始菜单时仍为空，首次 loadGameState(1)
+        -- 立即失败。旧实现只在 attempt>1 时才 requestSync+等待，造成无谓的延迟。
+        -- 这里在 attempt 1 之前先做主线程同步 + 短限等，保证第一次尝试即命中已就绪的缓存。
+        local function hasSave1()
+            local sc = rawget(_G, "__saveCache")
+            if sc and sc["save_1"] and sc["save_1"] ~= "" then return true end
+            local b = rawget(_G, "JSBridge")
+            if b and b.load then
+                local okL, v = pcall(function() return b.load("save_1") end)
+                if okL and type(v) == "string" and v ~= "" and v ~= "save_1" then
+                    return true
+                end
+            end
+            return false
+        end
+        if not hasSave1() and JSB and JSB.requestSync then
+            pcall(function() JSB.requestSync() end)
+            if scheduler and scheduler.waitForCondition then
+                local frames = 0
+                local F_MAX = 60
+                pcall(function()
+                    scheduler:waitForCondition(function()
+                        frames = frames + 1
+                        return frames >= F_MAX or hasSave1()
+                    end)
+                end)
+            end
+            if _rsync then _rsync() end
+        end
         local finalOk = false
         for attempt = 1, 4 do
             if attempt > 1 then
