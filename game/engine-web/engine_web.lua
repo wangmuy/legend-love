@@ -10,6 +10,12 @@ local EngineAPI = {}
 EngineAPI.render = {}
 local renderBuffer = {}
 
+-- Web 文本版：屏幕不真正的清除（render.present 为无操作），Lua 侧每帧都会用同样
+-- (x,y,str) 重绘菜单项/地图标注等，导致终端逐帧累积出大量重复行（用户反馈“对话后
+-- 菜单显示2次”）。这里按坐标去重：同一 (x,y) 写入相同文本时，若无变化则不再重复输出，
+-- 从而把每帧重绘的同一内容收敛为一行；内容改变或坐标改变时照常输出。
+local _renderKey = {}
+
 local function colorToAnsi(color)
     if not color then return "\027[37m" end
     local r, g, b
@@ -33,7 +39,17 @@ end
 function EngineAPI.render.text(x, y, str, color, size)
     -- Worker 模式下 ANSI escape 通过 postMessage 会损坏，改用直接文本输出
     local w = rawget(_G, "WebUI")
-    if w then w.write(tostring(str)) end
+    if not w or not w.write then return end
+    local s = tostring(str)
+    -- 坐标去重：同一 (x,y) 无变化不重复输出（收敛每帧重绘的菜单项，避免终端累积重复行）
+    local kx = math.floor(x or 0)
+    local ky = math.floor(y or 0)
+    local key = kx * 10000 + ky
+    if _renderKey[key] == s then
+        return
+    end
+    _renderKey[key] = s
+    w.write(s)
 end
 
 function EngineAPI.render.fillRect(x1, y1, x2, y2, color) end
@@ -394,23 +410,44 @@ end
 --------------------------------------------------------------------------------
 EngineAPI.app = {}
 
+-- 通关/结束 BANNER（去重）：同一局可能由多个地方输出“恭喜通关/游戏结束”
+-- （时空梭 finale 协程直接打印、GAME_END 状态机 enter→app.quit 各自打印等）。
+-- 通过标志保证同一局只展示一次，避免内容重复两次（Issue2 重复根因）。
+-- 新游戏开始时调用 resetEndBanner() 重置，保证重玩仍能正常显示。
+local endBannerShown = false
+rawset(_G, "resetEndBanner", function()
+    endBannerShown = false
+    rawset(_G, "__gameOver", nil)
+end)
+function EngineAPI.app.showFinalBanner(lines)
+    if endBannerShown then return end
+    endBannerShown = true
+    local w = rawget(_G, "WebUI")
+    if not (w and w.write) then return end
+    w.write("\n====================================================\n")
+    if lines then
+        for _, ln in ipairs(lines) do
+            w.write(ln .. "\n")
+        end
+    end
+    w.write("====================================================\n")
+end
+
 function EngineAPI.app.quit()
     -- Web MUD：结束/通关时终结交互。
     -- 无真实窗口可关闭，所以向终端输出明确的“游戏结束”结论，并把 JY.Status 固定为
-    -- GAME_END(7)，避免玩家仍停留在圣堂/场景列表里继续输入造成“卡死既不结束”的观感。
+    -- GAME_END(7)，避免玩家在圣堂/场景选择里继续走导致快捷保留/退出混乱的观感。
+    -- 通关 BANNER 由 showFinalBanner 去重输出（同一局只显示一次）。
     local JY = rawget(_G, "JY")
     if JY then
         JY.Status = (rawget(_G, "jyconst") and rawget(_G, "jyconst").GAME_END) or 7
     end
-    local w = rawget(_G, "WebUI")
-    if w and w.write then
-        w.write("\n====================================================\n")
-        w.write("    ☆ 游戏结束 / 恭喜通关！☆\n")
-        w.write("    感谢游玩《金庸群侠传 Web MUD》\n")
-        w.write("    你已集齐十四天书，成为武林盟主！\n")
-        w.write("====================================================\n")
-    end
-    -- 标记游戏已结束，命令处理器将对后续命令不再渲染场景
+    EngineAPI.app.showFinalBanner({
+        "    ☆ 游戏结束 / 恭喜通关！☆",
+        "    感谢游玩《金庸群侠传 Web MUD》",
+        "    你已集齐十四天书，成为武林盟主！",
+    })
+    -- 标记游戏已结束，命令处理器对后续命令不再使用 BANNER
     rawset(_G, "__gameOver", true)
 end
 

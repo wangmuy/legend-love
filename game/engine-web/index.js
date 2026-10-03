@@ -165,6 +165,13 @@
             } else if (msg.type === 'db_list') {
                 const keys = dbListKeys();
                 worker.postMessage({ type: 'db_result', key: '__list', value: keys });
+            } else if (msg.type === 'request_save_sync') {
+                // 开始菜单读档前的自我修复：重新从 IndexedDB 读回全部存档并重发
+                // init_save_cache，让 worker 的 luaSaveCache 得以补偿刷新（处理 reload
+                // 后首次 init_save_cache 可能读到尚未落盘的数据、导致误报“没有存档”）。
+                loadAllSavesToCache().then(() => {
+                    worker.postMessage({ type: 'init_save_cache', cache: saveCache });
+                });
             } else if (msg.type === 'lua_result') {
                 // 透传给等待的 luaEval 调用方
                 if (luaEvalCallbacks[msg.id]) {
@@ -313,7 +320,6 @@
         }
         term.write('  oldevent scripts: registered\r\n');
     }
-
     /* ── 6. 启动 ── */
     startWorker();
 })();

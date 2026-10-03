@@ -1415,8 +1415,9 @@ function _G.initWebFramework()
     -- parseJSON 失败 → 提示“没有存档” —— 而直接/游戏内调用却没有问题（用户 Issue1 的现象）。
     -- 因此这里在启动阶段（尚未进入主循环、JSBridge.load 正常）把存档刷入 __saveCache，
     -- 令 loadGameState 优先命中 __saveCache，绕开帧内 JSBridge.load 的退化问题。
-    do
+    rawset(_G, "resyncSaveCache", function()
         local sc = rawget(_G, "__saveCache")
+        if not sc then sc = {}; rawset(_G, "__saveCache", sc) end
         local lb = rawget(_G, "JSBridge")
         if sc and lb and lb.listSaves and lb.load then
             local ok, keys = pcall(function() return lb.listSaves() end)
@@ -1434,7 +1435,9 @@ function _G.initWebFramework()
                 end
             end
         end
-    end
+    end)
+    local _rsync = rawget(_G, "resyncSaveCache")
+    if _rsync then _rsync() end
 
     -- CommandEngine already loaded as global via loadLuaModule in index.js
     if not _G.CommandEngine then
@@ -1472,34 +1475,64 @@ function _G.initWebFramework()
     startNewGameAdapter.loadGame = function()
         local WebUI = rawget(_G, "WebUI")
         local loadGS = rawget(_G, "loadGameState")
-        if loadGS then
-            local ok = loadGS(1)
-            if ok then
-                if WebUI then WebUI.write("读取存档成功。") end
-                local JY = rawget(_G, "JY")
-                if JY and JY.Status and JY.Status ~= 0 then
-                    local sm = rawget(_G, "StateMachine")
-                    if sm and sm.getInstance then
-                        local inst
-                        pcall(function() inst = sm.getInstance() end)
-                        if inst and inst.switchTo then pcall(inst.switchTo, inst, JY.Status) end
-                    end
+        local _rsync = rawget(_G, "resyncSaveCache")
+        -- 自我修复：先同步一次 worker 侧 IndexedDB 的存档到 __saveCache。
+        -- 根因：reload 后 worker 的 luaSaveCache 可能为空（首次 init_save_cache 读到
+        -- 尚未落盘的 IndexedDB），使开始菜单首次“载入进度”被误报为“没有存档”（用户 Issue1：
+        -- “第一次选择无输出，连续 choose 后才成功”）。这里失败时用 JSBridge.requestSync()
+        -- 令主线程按 IndexedDB 真实状态重发 init_save_cache，等若干帧后重试，保证一次 choose。
+        if _rsync then _rsync() end
+        local JSB = rawget(_G, "JSBridge")
+        local CS = rawget(_G, "CoroutineScheduler")
+        local scheduler = CS and CS.getInstance and CS.getInstance()
+        local finalOk = false
+        for attempt = 1, 4 do
+            if attempt > 1 then
+                if JSB and JSB.requestSync then
+                    pcall(function() JSB.requestSync() end)
                 end
-                local sl = nil
-                if JY and JY.Status == 4 then sl = rawget(_G, "SmapHandlers")
-                elseif JY and JY.Status == 2 then sl = rawget(_G, "MmapHandlers") end
-                if sl and sl.look then sl.look({}) end
-            else
-                if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始。") end
+                if scheduler and scheduler.waitForCondition then
+                    local frames = 0
+                    local F_MAX = 90
+                    pcall(function()
+                        scheduler:waitForCondition(function()
+                            frames = frames + 1
+                            return frames >= F_MAX
+                        end)
+                    end)
+                end
+                if _rsync then _rsync() end
             end
+            if not loadGS then break end
+            local okL, e1 = pcall(loadGS, 1)
+            local isOk = okL and (okL == true or okL == 1)
+            if isOk then finalOk = true break end
+        end
+        if finalOk then
+            if WebUI then WebUI.write("读取存档成功。") end
+            local JY = rawget(_G, "JY")
+            if JY and JY.Status and JY.Status ~= 0 then
+                local sm = rawget(_G, "StateMachine")
+                if sm and sm.getInstance then
+                    local inst
+                    pcall(function() inst = sm.getInstance() end)
+                    if inst and inst.switchTo then pcall(inst.switchTo, inst, JY.Status) end
+                end
+            end
+            local sl = nil
+            if JY and JY.Status == 4 then sl = rawget(_G, "SmapHandlers")
+            elseif JY and JY.Status == 2 then sl = rawget(_G, "MmapHandlers") end
+            if sl and sl.look then sl.look({}) end
         else
             if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始。") end
         end
     end
-
     -- 覆写 startNewGame：Web MUD 使用纯文字菜单（CommandEngine + choose N）
     -- 原始 startNewGame 假设有图形菜单和二进制存档，Web MUD 用文字交互代替
     startNewGameAdapter.startNewGame = function(menux)
+        -- 新游戏：重置终局去重标志与 __gameOver，保证重玩仍能正常显示通关 BANNER 并继续游玩
+        local _reb = rawget(_G, "resetEndBanner")
+        if _reb then _reb() end
         local JY = rawget(_G, "JY")
         if not JY then JY = {}; rawset(_G, "JY", JY) end
 
