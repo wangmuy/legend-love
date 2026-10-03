@@ -811,16 +811,16 @@ function SmapHandlers.chooseInteraction(idx)
                         EventExecutor.oldCallEventCoroutine(tonumber(eventId))
                         rawset(_G, "__endingReached", nil)
                         if finale then
-                            -- 与 smapNpcTalk 时空机终局一致：输出通关横幅、置 GAME_END、__gameOver
+                            -- 与 smapNpcTalk 时空机终局一致：输出通关横幅（去重）、置 GAME_END、__gameOver
                             local jWf = g(_G, "JY")
-                            local wE2 = rawget(_G, "WebUI")
-                            if wE2 and wE2.write then
-                                wE2.write("\n====================================================\n")
-                                wE2.write("    ☆ 恭喜通关！游戏结束 ☆\n")
-                                wE2.write("    你已集齐十四天书，开启了时空隧道回到现实！\n")
-                                wE2.write("    感谢游玩《金庸群侠传 Web MUD》\n")
-                                wE2.write("    输入 quit 退出游戏\n")
-                                wE2.write("====================================================\n")
+                            local _EA = rawget(_G, "EngineAPI")
+                            if _EA and _EA.app and _EA.app.showFinalBanner then
+                                _EA.app.showFinalBanner({
+                                    "    ☆ 恭喜通关！游戏结束 ☆",
+                                    "    你已集齐十四天书，开启了时空隧道回到现实！",
+                                    "    感谢游玩《金庸群侠传 Web MUD》",
+                                    "    输入 quit 退出游戏",
+                                })
                             end
                             if jWf then
                                 jWf.Status = (rawget(_G, "jyconst") and rawget(_G, "jyconst").GAME_END) or 7
@@ -1012,14 +1012,14 @@ function smapNpcTalk(sceneId, ent)
                     -- 1) 输出通关横幅（对齐原版“集齐十四天书→回到现实”的结局）；
                     -- 2) 置 JY.Status=GAME_END；
                     -- 3) 设置 __gameOver，后续命令处理会短路为“游戏已结束”。
-                    local wEnd = rawget(_G, "WebUI")
-                    if wEnd and wEnd.write then
-                        wEnd.write("\n====================================================\n")
-                        wEnd.write("    ☆ 恭喜通关！游戏结束 ☆\n")
-                        wEnd.write("    你已集齐十四天书，开启了时空通道回到现实！\n")
-                        wEnd.write("    感谢游玩《金庸群侠传 Web MUD》\n")
-                        wEnd.write("    输入 quit 退出游戏\n")
-                        wEnd.write("====================================================\n")
+                    local _EA2 = rawget(_G, "EngineAPI")
+                    if _EA2 and _EA2.app and _EA2.app.showFinalBanner then
+                        _EA2.app.showFinalBanner({
+                            "    ☆ 恭喜通关！游戏结束 ☆",
+                            "    你已集齐十四天书，开启了时空通道回到现实！",
+                            "    感谢游玩《金庸群侠传 Web MUD》",
+                            "    输入 quit 退出游戏",
+                        })
                     end
                     if JY then
                         JY.Status = (rawget(_G, "jyconst") and rawget(_G, "jyconst").GAME_END) or 7

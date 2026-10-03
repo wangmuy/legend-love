@@ -94,6 +94,16 @@ function injectWorkerJSBridge() {
   });
   lua.lua_settable(L, -3);
 
+  // requestSync：请求主线程重新从 IndexedDB 读回存档并重发 init_save_cache，
+  // 让 worker 的 luaSaveCache 得以补偿刷新（用于开始菜单读档前的自我修复，
+  // 避免 reload 后 luaSaveCache 为空导致首次“载入进度”误报“没有存档”）。
+  lua.lua_pushstring(L, 'requestSync');
+  lua.lua_pushcfunction(L, function(state) {
+    self.postMessage({ type: 'request_save_sync' });
+    return 0;
+  });
+  lua.lua_settable(L, -3);
+
   lua.lua_pushstring(L, 'listSaves');
   lua.lua_pushcfunction(L, function(state) {
     // 列出本地缓存的存档键
