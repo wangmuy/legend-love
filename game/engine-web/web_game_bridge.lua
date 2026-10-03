@@ -1408,7 +1408,34 @@ function _G.initWebFramework()
         end
         rawset(_G, "__savePatched", true)
     end
-    
+
+    -- 开机启动：把 IndexedDB 中已有的存档读入 Lua 端 __saveCache。
+    -- 关键：开始菜单“载入进度”是在游戏主循环帧内调用 loadGameState(1) 的，
+    -- 而**在帧内 JSBridge.load 会退化返回存档 key 本身（而非 JSON）**，导致
+    -- parseJSON 失败 → 提示“没有存档” —— 而直接/游戏内调用却没有问题（用户 Issue1 的现象）。
+    -- 因此这里在启动阶段（尚未进入主循环、JSBridge.load 正常）把存档刷入 __saveCache，
+    -- 令 loadGameState 优先命中 __saveCache，绕开帧内 JSBridge.load 的退化问题。
+    do
+        local sc = rawget(_G, "__saveCache")
+        local lb = rawget(_G, "JSBridge")
+        if sc and lb and lb.listSaves and lb.load then
+            local ok, keys = pcall(function() return lb.listSaves() end)
+            if ok and type(keys) == "table" then
+                for i = 1, #keys do
+                    local k = keys[i]
+                    if type(k) == "string" then
+                        pcall(function()
+                            local v = lb.load(k)
+                            if type(v) == "string" and v ~= "" and v ~= k then
+                                sc[k] = v
+                            end
+                        end)
+                    end
+                end
+            end
+        end
+    end
+
     -- CommandEngine already loaded as global via loadLuaModule in index.js
     if not _G.CommandEngine then
         _G.CommandEngine = require("web_command_engine")
@@ -1933,13 +1960,18 @@ function processEventQueue(timestamp)
     if not hasDialog then
         -- 终局：游戏已结束，不再处理任何场景命令
         if rawget(_G, "__gameOver") then
+            -- 只在终局第一帧提示一次（后续每 16ms 一帧都会进入此分支，
+            -- 若不守卫会刷屏无限打印“游戏已结束”——Issue2 无限循环打印根因）
+            if not rawget(_G, "__gameOverNotified") then
+                rawset(_G, "__gameOverNotified", true)
+                local wEnd = rawget(_G, "WebUI")
+                if wEnd and wEnd.write then
+                    wEnd.write("游戏已结束。输入 quit 退出。\n")
+                end
+            end
             local JSG = rawget(_G, "JSBridge")
             if JSG and JSG.getEventCount and JSG.getEventCount() > 0 then
                 JSG.getEvent() -- 丢弃积压的输入
-            end
-            local wEnd = rawget(_G, "WebUI")
-            if wEnd and wEnd.write then
-                wEnd.write("游戏已结束。输入 quit 退出。\n")
             end
             return
         end
