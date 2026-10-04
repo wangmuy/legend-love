@@ -32,9 +32,13 @@ test('A1 start-load reads persisted save after real reload', async ({ page }) =>
   const pre = await LE(page, `local J=rawget(_G,"JY"); return "status="..tostring(J and J.Status).." sub="..tostring(J and J.SubScene)`);
   console.log('after reload (start status):', pre && pre.result);
 
-  // start screen choose 2 = 载入进度
+  // start screen choose 2 = 载入进度（现在先呈现可选槽位菜单），然后选择槽位1
   const before = await getT(page);
   await cmd(page, 'choose 2');
+  await page.waitForTimeout(2500);
+  const menuT = await getT(page);
+  console.log('start-load submenu shows 读取槽位:', menuT.includes('读取槽位1'));
+  await cmd(page, 'choose 1'); // 选择槽位1
   await page.waitForTimeout(3500);
 
   const after = await getT(page);

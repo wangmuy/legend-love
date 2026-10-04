@@ -1468,11 +1468,17 @@ function _G.initWebFramework()
     -- 用 rawset 直接写入 _G，因为 initCoroutine 中 JYMainAdapter 是全局引用
     rawset(_G, "JYMainAdapter", target)
 
-    -- 覆盖 loadGame：Web MUD 开始菜单的“载入游戏/载入进度”直接读取主存档（槽位1）。
-    -- 原实现硬编码成“没有存档”空栈，导致开始菜单选了“载入进度”永远提示无存档，
-    -- 而进入游戏后 menu 的“读档11（读取槽位1）”却能读到——存档/读档指标不一致。
-    -- 这里让开始菜单的“载入游戏”真正走 loadGameState(1)，与游戏内读档一致。
+    -- 覆盖 loadGame：Web MUD 开始菜单的“载入进度”按槽位读取存档。
+    -- 历史硬编码成“没有存档”空栈 / 直接读槽位 1，与游戏内 menu 的“读取槽位 N”列表
+    -- 不一致（用户 Issue1：开始载入无可选槽位、游戏内却有完整列表）。
+    -- 现支持 loadGameSlot(slot)，与游戏内读档一致；slot 缺省时回退为槽位 1。
     startNewGameAdapter.loadGame = function()
+        startNewGameAdapter.loadGameSlot(nil)
+    end
+    startNewGameAdapter.loadGameSlot = function(slot)
+        slot = tonumber(slot) or 1
+        if slot < 1 then slot = 1 end
+        if slot > 10 then slot = 10 end
         local WebUI = rawget(_G, "WebUI")
         local loadGS = rawget(_G, "loadGameState")
         local _rsync = rawget(_G, "resyncSaveCache")
@@ -1491,19 +1497,20 @@ function _G.initWebFramework()
         -- luaSaveCache（以及其刷入的 __saveCache）在开始菜单时仍为空，首次 loadGameState(1)
         -- 立即失败。旧实现只在 attempt>1 时才 requestSync+等待，造成无谓的延迟。
         -- 这里在 attempt 1 之前先做主线程同步 + 短限等，保证第一次尝试即命中已就绪的缓存。
-        local function hasSave1()
+        local sKey = "save_" .. tostring(slot)
+        local function hasSave()
             local sc = rawget(_G, "__saveCache")
-            if sc and sc["save_1"] and sc["save_1"] ~= "" then return true end
+            if sc and sc[sKey] and sc[sKey] ~= "" then return true end
             local b = rawget(_G, "JSBridge")
             if b and b.load then
-                local okL, v = pcall(function() return b.load("save_1") end)
-                if okL and type(v) == "string" and v ~= "" and v ~= "save_1" then
+                local okL, v = pcall(function() return b.load(sKey) end)
+                if okL and type(v) == "string" and v ~= "" and v ~= sKey then
                     return true
                 end
             end
             return false
         end
-        if not hasSave1() and JSB and JSB.requestSync then
+        if not hasSave() and JSB and JSB.requestSync then
             pcall(function() JSB.requestSync() end)
             if scheduler and scheduler.waitForCondition then
                 local frames = 0
@@ -1511,7 +1518,7 @@ function _G.initWebFramework()
                 pcall(function()
                     scheduler:waitForCondition(function()
                         frames = frames + 1
-                        return frames >= F_MAX or hasSave1()
+                        return frames >= F_MAX or hasSave()
                     end)
                 end)
             end
@@ -1536,12 +1543,12 @@ function _G.initWebFramework()
                 if _rsync then _rsync() end
             end
             if not loadGS then break end
-            local okL, e1 = pcall(loadGS, 1)
+            local okL, e1 = pcall(loadGS, slot)
             local isOk = okL and (okL == true or okL == 1)
             if isOk then finalOk = true break end
         end
         if finalOk then
-            if WebUI then WebUI.write("读取存档成功。") end
+            if WebUI then WebUI.write(string.format("读取存档成功（槽位%d）。", slot)) end
             local JY = rawget(_G, "JY")
             if JY and JY.Status and JY.Status ~= 0 then
                 local sm = rawget(_G, "StateMachine")
@@ -1557,6 +1564,84 @@ function _G.initWebFramework()
             if sl and sl.look then sl.look({}) end
         else
             if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始。") end
+        end
+    end
+    -- 开始菜单“载入进度”的槽位选择器：先同步存档缓存、列出可选槽位并让用户选一个读取。
+    -- 与游戏内 menu>存档管理 的“读取槽位 N”一致，解决用户 Issue1：开始菜单载入无可选槽位
+    -- （原来静默读槽位 1），游戏内却显示完整读取列表。
+    startNewGameAdapter.loadLoadMenu = function()
+        local WebUI = rawget(_G, "WebUI")
+        local _rsync = rawget(_G, "resyncSaveCache")
+        -- 预热存档缓存（与 loadGameSlot 一致，消除 reload 后首次缓存为空导致的延迟）
+        if _rsync then pcall(_rsync) end
+        local JSB = rawget(_G, "JSBridge")
+        local CS = rawget(_G, "CoroutineScheduler")
+        local scheduler = CS and CS.getInstance and CS.getInstance()
+        if JSB and JSB.requestSync then
+            pcall(function() JSB.requestSync() end)
+            if scheduler and scheduler.waitForCondition then
+                local frames = 0
+                pcall(function()
+                    scheduler:waitForCondition(function()
+                        frames = frames + 1
+                        local sc = rawget(_G, "__saveCache")
+                        local any = false
+                        if sc then
+                            for k, v in pairs(sc) do
+                                if type(k) == "string" and k:sub(1, 5) == "save_" and v and v ~= "" then any = true break end
+                            end
+                        end
+                        return frames >= 60 or any
+                    end)
+                end)
+            end
+            if _rsync then pcall(_rsync) end
+        end
+        -- ·列出当前有数据的槽位
+        local slots = {}
+        local sc = rawget(_G, "__saveCache")
+        if sc then
+            for s = 1, 10 do
+                local v = sc["save_" .. tostring(s)]
+                if v and v ~= "" then slots[#slots + 1] = s end
+            end
+        end
+        if #slots == 0 then
+            if WebUI then WebUI.write("没有存档，输入 choose 1 开始新游戏。") end
+            return
+        end
+        -- 显示可选槽位菜单
+        local MenuAsync = rawget(_G, "MenuAsync")
+        local CC = rawget(_G, "CC")
+        if not MenuAsync or not CC then
+            if WebUI then WebUI.write("存档选择菜单不可用，直接读取槽位" .. tostring(slots[1]) .. "。") end
+            startNewGameAdapter.loadGameSlot(slots[1])
+            return
+        end
+        local menu = {}
+        local byIndex = {}
+        for idx, s in ipairs(slots) do
+            menu[#menu + 1] = { string.format("读取槽位%d", s), nil, 1 }
+            byIndex[idx] = s
+        end
+        menu[#menu + 1] = { "0. 返回主菜单", nil, 1 }
+        -- 在终端输出可选槽位（与 CommandEngine 菜单格式一致，供用户选择）
+        if WebUI then
+            WebUI.write("───────────────────────────────────")
+            WebUI.write("--- 载入存档 ---")
+            for idx, item in ipairs(menu) do
+                WebUI.write(string.format("%d. %s", idx, item[1]))
+            end
+            WebUI.write("输入 choose <编号> 选择存档")
+            WebUI.write("选择要读取的存档槽位：")
+        end
+        local sel = MenuAsync.ShowMenuCoroutine(menu, #menu, 0, 0, 0, 0, 0, 0, 1,
+            CC.DefaultFont, rawget(_G, "C_RED"), rawget(_G, "C_WHITE"))
+        local slot = byIndex[sel]
+        if slot then
+            startNewGameAdapter.loadGameSlot(slot)
+        elseif WebUI then
+            WebUI.write("已取消载入，返回开始菜单。")
         end
     end
     -- 覆写 startNewGame：Web MUD 使用纯文字菜单（CommandEngine + choose N）
@@ -1751,7 +1836,7 @@ function _G.initWebFramework()
             if menuReturn == 1 then
                 startNewGameAdapter.startNewGame(0)
             elseif menuReturn == 2 then
-                startNewGameAdapter.loadGame()
+                startNewGameAdapter.loadLoadMenu()
             elseif menuReturn == 3 then
                 -- Web MUD: choose 3 = no-op，显示提示后继续显示开始菜单
                 local WebUI = rawget(_G, "WebUI")
