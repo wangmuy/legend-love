@@ -39,6 +39,8 @@ test('IE21: 开始菜单 loadGame 真实读档渲染', async ({ page }) => {
   // 刷新回到开始菜单，选“尽快进度”
   await page.reload(); await waitForPageReady(page); await waitForGameReady(page); await page.waitForTimeout(1500);
   await cmd(page, 'choose 2');
+  // 开始菜单“载入进度”现在先呈现可选槽位菜单；存档在槽位1，select第一项=槽位1
+  await cmd(page, 'choose 1');
   // 轮询终端直到出现“读取存档成功”或“没有存档”（加载重试最多耗时数秒，避免固定等待竞态）
   await page.waitForFunction(() => {
     const term = window.__xterm; if (!term) return false;

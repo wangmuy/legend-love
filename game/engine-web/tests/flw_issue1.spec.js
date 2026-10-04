@@ -17,10 +17,17 @@ test('issue1 start load', async ({ page }) => {
   const stBefore = await page.evaluate(async ()=>{const r=await window.__luaEval('return tostring(rawget(_G,"__saveCache") and rawget(_G,"__saveCache")["save_1"] ~= nil)');return r&&r.ok?r.result:'err';});
   console.log('save_1 present:', stBefore);
 
-  // choose 2 = 载入进度 at start menu
+  // choose 2 = 载入进度 at start menu, now presents a selectable slot menu; save_1 seeded so slot1 is offered
   await cmd(page,'choose 2'); await page.waitForTimeout(2500);
   t = await getT(page);
-  console.log('=== after choose 2 ===');
+  console.log('=== after choose 2 (slot menu) ===');
+  for (const l of t.split('\n').filter(Boolean).slice(-8)) console.log('   ' + l.trimEnd().substring(0,70));
+  const hasSel = t.includes('读取槽位1');
+  console.log('submenu lists selectable 读取槽位1:', hasSel);
+  // 选择槽位1
+  if (hasSel) { await cmd(page,'choose 1'); await page.waitForTimeout(2500); }
+  t = await getT(page);
+  console.log('=== after select slot1 ===');
   for (const l of t.split('\n').filter(Boolean).slice(-8)) console.log('   ' + l.trimEnd().substring(0,70));
   const res = await page.evaluate(async ()=>{
     const c='local J=rawget(_G,"JY"); return "status="..tostring(J and J.Status).." sub="..tostring(J and J.SubScene)';
