@@ -45,7 +45,7 @@ function TestItemAsync.testSelectThingByArrayConvertsArrays()
     thingnum[1] = 5
     thingnum[2] = 2
     
-    local ItemAsync = require("item_async")
+    local ItemAsync = require("framework.item_async")
     
     local gridItems = {}
     local count = 0
@@ -75,7 +75,7 @@ function TestItemAsync.testSelectThingByArrayEmptyReturnsNegative()
     setup()
     print("\n=== Test: SelectThingByArrayAsync Empty Returns -1 ===")
     
-    local ItemAsync = require("item_async")
+    local ItemAsync = require("framework.item_async")
     local result = ItemAsync.SelectThingByArrayAsync({}, {}, 0)
     
     TestHelper.assertEquals(-1, result, "Empty array should return -1")
@@ -156,7 +156,7 @@ function TestItemAsync.testGridDisplayNotSimpleTextMenu()
     setup()
     print("\n=== Test: Grid Display Uses SelectThingGridAsync ===")
     
-    local ItemAsync = require("item_async")
+    local ItemAsync = require("framework.item_async")
     
     local hasGridFunction = ItemAsync.SelectThingGridAsync ~= nil
     TestHelper.assertEquals(true, hasGridFunction, "ItemAsync should have SelectThingGridAsync function")

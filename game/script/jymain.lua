@@ -17,18 +17,27 @@ local ScriptLoader = require "script_loader"
 --导入其他模块。之所以做成函数是为了避免编译查错时编译器会寻找这些模块。
 function IncludeFile()              --导入其他模块
     --dofile("config.lua");       --此文件在C函数中预先加载。这里就不加载了
-    -- Use love.filesystem.load for .love file compatibility
-    local jyconst_loader = love.filesystem.load(CONFIG.ScriptPath .. "jyconst.lua")
+    -- 通过 ScriptLoader 加载脚本（内部委托 EngineAPI.script.load 支持 .love 打包）
+    -- 避免在脚本中直接依赖全局 love，具体加载细节由各引擎（engine-love2d 等）实现
+    local jyconst_loader = ScriptLoader.load(CONFIG.ScriptPath .. "jyconst.lua")
     if jyconst_loader then
         jyconst_loader()
     else
-        dofile(CONFIG.ScriptPath .. "jyconst.lua")
+        local fpath = CONFIG.ScriptPath .. "jyconst.lua"
+        local ok = pcall(dofile, fpath)
+        if not ok then
+            pcall(dofile, "game/" .. fpath)
+        end
     end
-    local jymodify_loader = love.filesystem.load(CONFIG.ScriptPath .. "jymodify.lua")
+    local jymodify_loader = ScriptLoader.load(CONFIG.ScriptPath .. "jymodify.lua")
     if jymodify_loader then
         jymodify_loader()
     else
-        dofile(CONFIG.ScriptPath .. "jymodify.lua")
+        local fpath = CONFIG.ScriptPath .. "jymodify.lua"
+        local ok = pcall(dofile, fpath)
+        if not ok then
+            pcall(dofile, "game/" .. fpath)
+        end
     end
 end
 
@@ -3005,8 +3014,9 @@ function GenTalkIdx()         --生成对话索引文件
     local rshift = bit32 and bit32.rshift
 
     -- 索引已存在且格式合法时直接复用，避免每次启动全量重建
-    local idxInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(CC.TalkIdxFile)
-    local grpInfo = love and love.filesystem and love.filesystem.getInfo and love.filesystem.getInfo(CC.TalkGrpFile)
+    -- 通过 FileUtil.getInfo 获取文件信息（内部委托 EngineAPI.file.getInfo），不直接依赖 love
+    local idxInfo = FileUtil.getInfo(CC.TalkIdxFile)
+    local grpInfo = FileUtil.getInfo(CC.TalkGrpFile)
     local idxSize = FileUtil.getsize(CC.TalkIdxFile)
     if idxSize and idxSize > 0 and idxSize % 4 == 0 and idxInfo and grpInfo and idxInfo.modtime and grpInfo.modtime and idxInfo.modtime >= grpInfo.modtime then
         return
@@ -3249,6 +3259,14 @@ function instruct_10(personid)            --加入队员
     if JY.Person[personid]==nil then
         lib.Debug("instruct_10 error: person id not exist");
         return ;
+    end
+    -- 防重复入队：若该角色已在队伍中（不区分其当前所在地），直接返回，避免因
+    -- 重复触发加入剧情（如重复对话、事件在同 tile 多实体上重复分发）而产生两份相同队员。
+    for i =1, CC.TeamNum do
+        if JY.Base and JY.Base["队伍"..i]==personid then
+            lib.Debug("instruct_10 info: person "..tostring(personid).." already in team, skip duplicate join");
+            return ;
+        end
     end
     local add=0;
     for i =2, CC.TeamNum do             --第一个位置是主角，从第二个开始

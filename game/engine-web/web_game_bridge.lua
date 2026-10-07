@@ -1,0 +1,2389 @@
+-- web_game_bridge.lua
+-- Web MUD 游戏框架集成层
+-- processEventQueue + 兼容函数 + 模块加载
+
+-- WebUI 输出辅助
+_G.WebUI = {}
+
+-- 预注册运行时需要的全局变量（必须在 setmetatable(_G) 之前，否则 _G.xxx 触发 __index=error）
+rawset(_G, "eventConsumed", {})
+
+function _G.WebUI.write(text)
+    local JSBridge = _G.JSBridge
+    if JSBridge and JSBridge.write then
+        JSBridge.write(tostring(text) .. "\n")
+    end
+end
+
+function _G.WebUI.writeLine(text)
+    local JSBridge = _G.JSBridge
+    if JSBridge and JSBridge.write then
+        JSBridge.write(tostring(text))
+    end
+end
+
+function _G.WebUI.separator()
+    _G.JSBridge.write(string.rep("─", 40) .. "\n")
+end
+
+function _G.WebUI.title(text)
+    _G.JSBridge.write("\n" .. tostring(text) .. "\n")
+    _G.JSBridge.write(string.rep("═", #tostring(text)) .. "\n")
+end
+
+-- io 桩函数（浏览器环境无文件系统）
+_G.io = {
+    open = function() return nil end,
+    lines = function() return function() return nil end end,
+    input = function() end,
+    output = function() end,
+    tmpfile = function() return nil end,
+    type = function() return nil end,
+    write = function() end,
+    read = function() return nil end,
+}
+
+-- 兼容函数映射
+_G.Cls = function()
+    EngineAPI.render.drawBackground({0, 0, 0})
+end
+
+_G.ShowScreen = function()
+    EngineAPI.render.present()
+end
+
+_G.DrawString = function(x, y, str, color, size)
+    EngineAPI.render.text(x, y, str, color, size)
+end
+
+_G.DrawBox = function(x1, y1, x2, y2, color)
+    EngineAPI.render.text(x1, y1, string.rep("─", 20), color)
+end
+
+_G.DrawMMap = function()
+end
+
+_G.DrawSMap = function()
+end
+
+_G.DrawHead = function(x, y, headId) end
+_G.DrawHeadPic = function(x, y, headId) end
+_G.PlayMIDI = function() end
+
+-- 框架模块源存储
+_G.FrameworkSources = _G.FrameworkSources or {}
+
+function _G.registerFrameworkModule(name, source)
+    _G.FrameworkSources[name] = source
+
+    -- 注册模块加载器。框架模块统一以 framework.* 前缀注册，
+    -- 但原版游戏脚本（jymain.lua / jymodify.lua 等）会以顶层裸名 require
+    -- （例如 require "lib_file"、require "script_loader"、require("coroutine_scheduler")），
+    -- 因此除 framework.* 外还需为对应裸名注册同一加载器，
+    -- 否则 require 会落入 fengari 的 HTTP module 搜索 → 404 → "Framework init FAILED"。
+    local function makeLoader(regName)
+        return function()
+            local fn, err = load(source, "@" .. regName)
+            if not fn then
+                EngineAPI.debug.log("加载模块失败 " .. regName .. ": " .. tostring(err))
+                return {}
+            end
+            local ok, result = pcall(fn)
+            if not ok then
+                EngineAPI.debug.log("执行模块失败 " .. regName .. ": " .. tostring(err))
+                return {}
+            end
+            return result
+        end
+    end
+
+    package.preload[name] = makeLoader(name)
+
+    -- 注册裸名别名（如 framework.lib_file → lib_file），供原版脚本顶层 require 使用。
+    -- 仅在裸名尚未注册时添加，避免覆盖其它模块。
+    local moduleName = name:match("^framework%.(.+)$")
+    if moduleName and not package.preload[moduleName] then
+        package.preload[moduleName] = makeLoader(moduleName)
+    end
+end
+
+-- Slice 4: Web MUD 版 instruct 函数（供 oldevent 脚本使用）
+rawset(_G, "instruct_0", function()
+    local w = rawget(_G, "WebUI")
+    if w then w.separator() end
+end)
+
+rawset(_G, "instruct_1", function(talkId, headId)
+    local dc = rawget(_G, "initDataSource")
+    if not dc then return end
+    local raw = dc["dialogues"]
+    if not raw then return end
+    local dlg = raw["dialogues"] or raw
+    if type(dlg) ~= "table" then return end
+    for _, entry in ipairs(dlg) do
+        if entry.id == tonumber(talkId) then
+            local text = entry.text
+            if type(text) == "table" then
+                text = text[tostring(headId or 1)]
+            end
+            if text then
+                local w = rawget(_G, "WebUI")
+                if w then
+                    -- 查找说话人名称
+                    local speakerName = "???"
+                    -- 常见头像 ID → 名称映射（头像 ID ≠ 人物代号）
+                    local HEAD_NAME_MAP = {
+                        [0] = "主角",
+                        [4] = "阎基",
+                        [73] = "南贤",
+                        [74] = "北丑",
+                        [105] = "掌柜",
+                        [106] = "店小二",
+                        [111] = "韦小宝",
+                        [112] = "霍青桐",
+                        [114] = "软体娃娃",
+                    }
+                    speakerName = HEAD_NAME_MAP[headId]
+                    if not speakerName then
+                        if headId == 0 then
+                            local JY = rawget(_G, "JY")
+                            speakerName = JY and JY.Person and JY.Person[0] and JY.Person[0]["姓名"] or "主角"
+                        else
+                            -- 尝试按头像代号查找
+                            local chars = dc["chars"]
+                            if not chars then
+                                local ds = rawget(_G, "initDataSource")
+                                chars = ds and ds["chars"]
+                            end
+                            if chars then
+                                local clist = chars["chars"] or chars
+                                if type(clist) == "table" then
+                                    for _, c in ipairs(clist) do
+                                        if c["头像代号"] == headId or c["代号"] == headId then
+                                            speakerName = c["姓名"] or "???"
+                                            break
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    if not speakerName then speakerName = "???" end
+                    w.write("【" .. speakerName .. "】" .. tostring(text))
+                end
+            else
+                local w = rawget(_G, "WebUI")
+                if w then w.write("[对话文本为空, talkId=" .. tostring(talkId) .. "]") end
+            end
+            return
+        end
+    end
+    local w = rawget(_G, "WebUI")
+    if w then w.write("[未找到对话, talkId=" .. tostring(talkId) .. "]") end
+end)
+
+-- WaitKey — 供 oldevent 脚本使用，等待用户输入后继续
+rawset(_G, "WaitKey", function()
+    -- 终局时空机结局（oldevent_1017 → instruct_62 播放片尾）里没有真实键盘可等待：
+    -- MUD 的 InputManager key 队列无 Web 来源，yield("key") 永远等不到输入会卡死，
+    -- 导致 instruct_62 永远到不了 JY.Status=GAME_END、游戏“停在圣堂不结束”。
+    -- 因此终局时跳过按键等待，自动继续到 GAME_END。
+    if rawget(_G, "__endingReached") then
+        return
+    end
+    local w = rawget(_G, "WebUI")
+    if w then w.write("按回车继续...") end
+    local CoroutineScheduler = rawget(_G, "CoroutineScheduler")
+    if CoroutineScheduler then
+        local cs = CoroutineScheduler.getInstance()
+        if cs and cs.waitForKey then
+            cs:waitForKey()
+        end
+    end
+end)
+
+-- P0 instruct 函数 — 影响游戏流程的
+
+-- instruct_3 由 jymain.lua 定义（line 3133），通过 SetD → lib.SetD 操作 JY.D 运行时表
+
+rawset(_G, "instruct_3", function(sceneid, id, v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10)
+    -- 修改D*（原版 jymain.lua:3133 实现）
+    -- sceneid: 场景id, -2=当前场景
+    -- id: D*编号, -2=当前事件编号(JY.CurrentD)
+    -- v0-v10: D*参数, -2=不变
+    -- 注意：event_executor.lua:73 设置 JY.CurrentD = eventnum，
+    -- 因此 instruct_3 写入 JY.D[sceneId][eventNum][field]
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    if sceneid == -2 then sceneid = JY.SubScene end
+    if id == -2 then id = JY.CurrentD end
+    -- 无有效 sceneid/id（例如被无参 pcall 调用）时直接返回，避免 SetD 触发 nil 索引
+    if sceneid == nil or id == nil then return end
+    local SetD = rawget(_G, "SetD")
+    if not SetD then return end
+    for field = 0, 10 do
+        local v = select(field + 1, v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, v10)
+        if v ~= -2 then
+            SetD(sceneid, id, field, v)
+        end
+    end
+end)
+
+rawset(_G, "instruct_2", function(itemId, count)
+    -- instruct_2(itemId, count): 得到物品（原版注释: 2(2):得到物品）
+    -- 给玩家背包添加物品/金钱
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    JY.Base = JY.Base or {}
+    count = count or 1
+    itemId = tonumber(itemId) or 0
+    -- 银两（物品代号174）：加到 JY.Base["金钱"]
+    if itemId == 174 then
+        JY.Base["金钱"] = (JY.Base["金钱"] or 0) + count
+        local WebUI = rawget(_G, "WebUI")
+        if WebUI then WebUI.write(string.format("获得 %d 两银子。", count)) end
+        return
+    end
+    -- 普通物品：找到空槽位放入
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
+        if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
+            JY.Base["物品" .. i] = itemId
+            JY.Base["物品数量" .. i] = (JY.Base["物品数量" .. i] or 0) + count
+            -- 从 initDataSource.items 查找物品名称（JY.Thing 未被 initGameState 填充）
+            local name = ("物品" .. itemId)
+            local ds = rawget(_G, "initDataSource")
+            if ds and ds.items then
+                local list = ds.items["items"] or ds.items
+                if type(list) == "table" then
+                    for _, it in ipairs(list) do
+                        if type(it) == "table" and tonumber(it["代号"]) == itemId then
+                            name = it["名称"] or name
+                            break
+                        end
+                    end
+                end
+            end
+            local WebUI = rawget(_G, "WebUI")
+            if WebUI then WebUI.write(string.format("获得 %s x%d。", name, count)) end
+            return
+        end
+    end
+    -- 背包已满
+    local WebUI = rawget(_G, "WebUI")
+    if WebUI then WebUI.write("背包已满！") end
+end)
+
+rawset(_G, "instruct_40", function(dir)
+    local JY = rawget(_G, "JY")
+    if JY then JY.Base["人方向"] = dir end
+end)
+
+rawset(_G, "instruct_27", function() end)  -- 动画, no-op
+rawset(_G, "instruct_67", function() end)  -- 音效, no-op
+-- 覆写 WarDrawMap：原版访问 WAR.Person[WAR.CurID]（jymain.lua:4963），而 Web MUD 的
+-- WAR 结构只有 teammates/enemies，无 Person/CurID。调用点除 game_states 的 GAME_WMAP
+-- 处理器（已 noop 注册）外，war_async.lua 还有 3 处直接调用 WarDrawMap(0)，都会触发
+-- gameLoop error 并残留终端（P4 noE 失败根因）。Web MUD 战斗为文本渲染，无需绘地图。
+rawset(_G, "WarDrawMap", function() end)
+
+rawset(_G, "instruct_13", function(...)
+    -- 菜单选择: 交给 MenuAsync 处理
+end)
+
+rawset(_G, "instruct_32", function(giveFlag, thingId, num, ...)
+    -- 给/取物品: 操作 JY.Base["物品N"]
+    -- oldevent 调用方式: instruct_32(174, -20) 扣除银两（2个参数）
+    -- 或: instruct_32(0, personid, thingId, num) 给某人物品（4个参数）
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    JY.Base = JY.Base or {}
+    local id, count
+    if num == nil then
+        -- 2-arg convention: instruct_32(thingId, count)
+        id = tonumber(giveFlag) or 0
+        count = tonumber(thingId) or 0
+    else
+        -- 4-arg convention: instruct_32(giveFlag, personid, thingId, num)
+        id = tonumber(thingId) or 0
+        count = tonumber(num) or 0
+    end
+    -- 银两（物品174）
+    if id == 174 then
+        JY.Base["金钱"] = (JY.Base["金钱"] or 0) + count
+        return
+    end
+    -- 普通物品
+    if count > 0 then
+        -- 添加物品到空槽
+        for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
+            if not JY.Base["物品" .. i] or JY.Base["物品" .. i] == 0 then
+                JY.Base["物品" .. i] = id
+                JY.Base["物品数量" .. i] = (JY.Base["物品数量" .. i] or 0) + count
+                return
+            end
+        end
+    else
+        -- 扣除物品（负数量）
+        local remain = -count
+        for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
+            if remain <= 0 then break end
+            if JY.Base["物品" .. i] == id then
+                local qty = JY.Base["物品数量" .. i] or 1
+                local take = math.min(qty, remain)
+                JY.Base["物品数量" .. i] = qty - take
+                remain = remain - take
+                if JY.Base["物品数量" .. i] <= 0 then
+                    JY.Base["物品" .. i] = 0
+                end
+            end
+        end
+    end
+end)
+
+-- instruct_37: 增加品德（原版 jymain.lua:3777 AddPersonAttrib(0,"品德",v)）
+rawset(_G, "instruct_37", function(v)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[0] then return end
+    JY.Person[0]["品德"] = (JY.Person[0]["品德"] or 0) + (tonumber(v) or 0)
+end)
+
+-- instruct_56: 增加声望（原版 jymain.lua:3996）
+rawset(_G, "instruct_56", function(v)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[0] then return end
+    JY.Person[0]["声望"] = (JY.Person[0]["声望"] or 0) + (tonumber(v) or 0)
+    -- 声望>200 且集齐14天书后可得武林帖（原版 instruct_2_sub 逻辑，此处简化为直接提示）
+    local instruct_2_sub = rawget(_G, "instruct_2_sub")
+    if instruct_2_sub then pcall(instruct_2_sub) end
+end)
+
+rawset(_G, "instruct_26", function(sceneid, id, v1, v2, v3)
+    -- 增加D*编号（原版 jymain.lua:3492）：
+    -- 对 sceneid 场景的 id 格，field2/field3/field4 各加 v1/v2/v3。
+    -- 例：蝴蝶谷95/光明顶109 调用 instruct_26(73,2,0,0,1) 把灵蛇岛(73) tile2 的
+    --     eventExtra(106→107→108) 递增，108 触发后设置灵蛇岛 tile0 → 105（金花婆婆激将）。
+    sceneid = tonumber(sceneid) or sceneid
+    if sceneid == -2 then
+        local JY = rawget(_G, "JY")
+        sceneid = JY and JY.SubScene
+    end
+    if sceneid == nil then return end
+    local GetD = rawget(_G, "GetD")
+    local SetD = rawget(_G, "SetD")
+    if not GetD or not SetD then return end
+    local v
+    v = GetD(sceneid, id, 2); SetD(sceneid, id, 2, v + (tonumber(v1) or 0))
+    v = GetD(sceneid, id, 3); SetD(sceneid, id, 3, v + (tonumber(v2) or 0))
+    v = GetD(sceneid, id, 4); SetD(sceneid, id, 4, v + (tonumber(v3) or 0))
+end)
+
+-- 功能性 instruct（instruct-game-logic）
+
+rawset(_G, "instruct_11", function()
+    -- 住宿询问（原版返回 true=住宿, false=不住）
+    local w = rawget(_G, "WebUI")
+    if w then w.write("是否住宿？") end
+    -- 使用 CommandEngine 菜单（Web MUD 原生，支持异步回调）
+    local CE = rawget(_G, "CommandEngine")
+    if CE then
+        local result = false
+        local scheduler = rawget(_G, "CoroutineScheduler")
+        if scheduler and scheduler.getInstance then
+            scheduler = scheduler.getInstance()
+        end
+        local myCo = coroutine.running()
+        -- 检查是否在协程中
+        if myCo then
+            -- 非协程环境回退
+        end
+        CE.showMenu(
+            { {name="是"}, {name="否"} },
+            "住宿",
+            function(choice)
+                result = (choice == 1)
+            end
+        )
+        -- 在协程中 yield 等待菜单关闭
+        if scheduler and scheduler.yield then
+            while not (rawget(_G, "MenuAsync") and rawget(_G, "MenuAsync").hasActiveMenu and not rawget(_G, "MenuAsync").hasActiveMenu()) do
+                scheduler:yield("menu_wait")
+            end
+            return result
+        end
+        -- 非协程环境：菜单已显示，输入由 processEventQueue 路由
+        return false
+    end
+    return false
+end)
+
+rawset(_G, "instruct_12", function()
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[0] then
+        local p0 = JY.Person[0]
+        p0["生命"] = p0["生命最大值"]
+        p0["体力"] = 100
+        p0["内力"] = p0["内力最大值"]
+    end
+    local w = rawget(_G, "WebUI")
+    if w then w.write("体力完全恢复了。") end
+end)
+
+rawset(_G, "instruct_4", function(thingid, num, direction)
+    -- 4(4):是否使用物品[XXX]？ — 显示对话框询问是否使用指定物品
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    -- 无有效物品 id 时直接返回 false，避免把未初始化的空背包槽位(nil)误判为匹配
+    if thingid == nil then return false end
+    -- 检查是否有该物品
+    local hasItem = false
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
+        if JY.Base and JY.Base["物品" .. i] == thingid then
+            hasItem = true
+            break
+        end
+    end
+    if not hasItem then return false end
+    -- 如果是从物品菜单（使用→选择NPC）调用，玩家已确认，auto_yes 跳过对话框
+    if rawget(_G, "__instruct4_auto_yes") then
+        rawset(_G, "__instruct4_auto_yes", nil)
+        return true
+    end
+    -- 查找物品名称
+    local itemName = "物品" .. thingid
+    local ds = rawget(_G, "initDataSource")
+    if ds and ds.items then
+        local list = ds.items["items"] or ds.items
+        if type(list) == "table" then
+            for _, it in ipairs(list) do
+                if type(it) == "table" and tonumber(it["代号"]) == thingid then
+                    itemName = it["名称"] or itemName
+                    break
+                end
+            end
+        end
+    end
+    -- 使用简单标志等待用户响应（避免 MenuAsync 菜单系统在连续交互时的兼容性问题）
+    local w = rawget(_G, "WebUI")
+    if w then w.write("是否使用物品[" .. itemName .. "]？(choose 1=是, choose 2=否)") end
+    rawset(_G, "__instruct4_result", nil)
+    rawset(_G, "__instruct4_waiting", true)
+    local scheduler = rawget(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.yield then
+        while rawget(_G, "__instruct4_waiting") do
+            scheduler:yield("instruct4")
+        end
+    end
+    local result = rawget(_G, "__instruct4_result")
+    rawset(_G, "__instruct4_result", nil)
+    return result
+end)
+
+-- instruct_58: 武道大会比武（简化版：自动胜利，得神杖）
+rawset(_G, "instruct_58", function()
+    -- 58(3A):武道大会比武 — 简化版，自动判定胜利
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    local w = rawget(_G, "WebUI")
+    if w then
+        w.write("华山论剑开始！")
+        w.write("经过一番激战，你击败了所有对手！")
+        w.write("你成为了新一任的武林盟主！")
+        w.write("你获得了神杖！")
+    end
+    -- 给予神杖(143)
+    if JY.Base then
+        for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
+            if JY.Base["物品" .. i] == nil or JY.Base["物品" .. i] < 0 then
+                JY.Base["物品" .. i] = 143
+                JY.Base["物品数量" .. i] = 1
+                break
+            end
+        end
+    end
+    return true
+end)
+
+-- instruct_6: 战斗 — MUD 版，使用 WmapHandlers.initWar 而非 WarAsync.WarMainCoroutine
+rawset(_G, "instruct_6", function(warid, tmp, tmp2, flag)
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    local WH = rawget(_G, "WmapHandlers")
+    if not WH or not WH.initWar then return false end
+    -- 从 wars 数据加载敌人
+    local ds = rawget(_G, "initDataSource")
+    local warsData = ds and ds.wars and ds.wars.wars
+    if not warsData then return false end
+    local warDef
+    for _, w in ipairs(warsData) do
+        if w["代号"] == warid then warDef = w; break end
+    end
+    if not warDef then return false end
+    -- 构建敌人列表
+    local enemies = {}
+    local chars = ds and ds.chars and ds.chars.chars
+    local enemyList = warDef["敌人"] or warDef.enemies or {}
+    for _, e in ipairs(enemyList) do
+        local cid = e["代号"] or e
+        if cid and cid > 0 and cid ~= 65535 then
+            local char
+            if chars then
+                for _, c in ipairs(chars) do
+                    if c["代号"] == cid then char = c; break end
+                end
+            end
+            table.insert(enemies, {
+                name = (char and char["姓名"]) or ("敌人" .. cid),
+                hp = e["生命"] or e.hp or 50,
+                maxHp = e["生命"] or e.hp or 50,
+                mp = 0, maxMp = 0,
+                x = e.X or e.x or 1,
+                attack = (char and char["攻击力"]) or 20,
+                defense = (char and char["防御力"]) or 10,
+            })
+        end
+    end
+    if #enemies == 0 then
+        table.insert(enemies, {name="敌人", hp=30, maxHp=30, mp=0, maxMp=0, x=1, attack=15, defense=5})
+    end
+    WH.initWar(enemies, 5)
+    -- 挂载战斗经验（原版 war.sta 偏移14 的经验字段，wars.json 已提取）
+    if JY.War then JY.War.exp = warDef["经验"] or 0 end
+    JY.Status = 5  -- GAME_WMAP
+    -- 初始化战斗等待标志
+    rawset(_G, "__warFromInstruct6", true)
+    rawset(_G, "__warComplete", false)
+    rawset(_G, "__warResult", nil)
+    -- 战斗开始清理：
+    -- 1) 杀死所有挂起的僵尸事件协程（战斗中放弃的旧战斗会滞留在 yield("war")，
+    --    否则本战斗结束时被错误唤醒执行错误事件后程——P7 串台根因）。
+    --    当前调用本函数的协程正在 running 状态，不会被误杀。
+    -- 2) 关闭所有活动菜单（陈旧场景列表菜单会在战斗中劫持 choose——一燈居根因）。
+    do
+        local sched = rawget(_G, "CoroutineScheduler")
+        if sched and sched.getInstance then
+            sched = sched.getInstance()
+        end
+        if sched and sched.killStaleEvents then
+            sched:killStaleEvents()
+        end
+        local MA = rawget(_G, "MenuAsync")
+        if MA and MA.clear then MA.clear() end
+    end
+    -- 显示战场态势
+    local w = rawget(_G, "WebUI")
+    if w then w.write("战斗开始！输入 look 查看战场态势，choose 选择行动。") end
+    if WH.look then WH.look({}) end
+    -- 挂起协程，等待战斗结果（由 WmapHandlers 在 afterAction/enemyTurn 中恢复）
+    local scheduler = rawget(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.yield then
+        while not rawget(_G, "__warComplete") do
+            scheduler:yield("war")
+        end
+    end
+    -- 清理标志
+    rawset(_G, "__warFromInstruct6", nil)
+    local result = rawget(_G, "__warResult")
+    rawset(_G, "__warComplete", nil)
+    rawset(_G, "__warResult", nil)
+    -- 战后退回场景模式（instruct_6 在 NPC 对话场景中调用，应恢复 SMAP）
+    JY.Status = 4  -- GAME_SMAP
+    -- 返回战斗结果：胜利 true / 失败 false（原版 instruct_6 语义，
+    -- 事件脚本据此分支，如 oldevent_616: instruct_6(98,...)==false → 死亡）
+    return result == true
+end)
+
+rawset(_G, "instruct_14", function()
+    -- 场景变黑: 原版用于画面效果，MUD 中重新显示场景
+    local JY = rawget(_G, "JY")
+    if JY and JY.Status == 5 then
+        -- 战斗中不重绘场景
+        return
+    end
+    -- 确保状态为 SMAP
+    if JY then JY.Status = 4 end
+    local sh = rawget(_G, "SmapHandlers")
+    if sh and sh.look then sh.look({}) end
+end)
+
+rawset(_G, "instruct_19", function(x, y)
+    local JY = rawget(_G, "JY")
+    if JY then
+        JY.Base["人X1"] = x
+        JY.Base["人Y1"] = y
+    end
+end)
+
+rawset(_G, "instruct_31", function(itemId, count, flag)
+    local JY = rawget(_G, "JY")
+    if not JY then return -1 end
+    JY.Base = JY.Base or {}
+    if itemId == 0 then
+        local money = JY.Base["金钱"] or 0
+        if flag == 0 then return (money >= (count or 0)) and 1 or 0 end
+        if flag == 1 then JY.Base["金钱"] = math.max(0, money - (count or 0)); return 1 end
+        if flag == 2 then JY.Base["金钱"] = (money or 0) + (count or 0); return 1 end
+        return -1
+    end
+    -- 物品检查（非金钱）: 遍历背包
+    local total = 0
+    for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
+        if JY.Base["物品" .. i] == itemId then
+            total = total + (JY.Base["物品数量" .. i] or 1)
+        end
+    end
+    if flag == 0 then return (total >= (count or 1)) end
+    if flag == 1 then
+        local remain = count or 1
+        for i = 1, 200 do  -- 原版 CC.MyThingNum=200，背包容量
+            if remain <= 0 then break end
+            if JY.Base["物品" .. i] == itemId then
+                local qty = JY.Base["物品数量" .. i] or 1
+                local take = math.min(qty, remain)
+                JY.Base["物品数量" .. i] = qty - take
+                remain = remain - take
+                if JY.Base["物品数量" .. i] <= 0 then
+                    JY.Base["物品" .. i] = 0
+                end
+            end
+        end
+        return (remain <= 0) and 1 or 0
+    end
+    return -1
+end)
+
+-- instruct_51: 问软体娃娃 — 随机显示 18 条游戏提示之一
+rawset(_G, "instruct_51", function()
+    local Rnd = rawget(_G, "Rnd") or function(i) return math.random(i) - 1 end
+    local talkId = 2547 + Rnd(18)
+    local instruct_1 = rawget(_G, "instruct_1")
+    if instruct_1 then
+        instruct_1(talkId, 114, 0)
+    end
+end)
+
+-- === 以下 instruct_* 由 jymain.lua 定义但被 Web MUD 空桩覆盖 ===
+-- 由于 catch-all 循环会保存空桩并在 jymain.lua 加载后恢复，
+-- 此处提前实现真实逻辑，确保被 _our_instruct 保存。
+
+-- instruct_9: 是否要求加入队伍（使用标志位等待用户响应，与 instruct_4 模式一致）
+rawset(_G, "instruct_9", function()
+    local co = coroutine.running()
+    if not co then return false end
+    local w = rawget(_G, "WebUI")
+    if w then w.write("是否要求加入？(choose 1=是, choose 2=否)") end
+    rawset(_G, "__instruct9_result", nil)
+    rawset(_G, "__instruct9_waiting", true)
+    local scheduler = rawget(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.yield then
+        while rawget(_G, "__instruct9_waiting") do
+            scheduler:yield("instruct9")
+        end
+    end
+    local result = rawget(_G, "__instruct9_result")
+    rawset(_G, "__instruct9_result", nil)
+    return result
+end)
+
+-- instruct_5: 是否选择战斗（使用标志位等待用户响应，覆盖 jymain.lua 的 DrawStrBoxYesNo 版本）
+rawset(_G, "instruct_5", function()
+    local co = coroutine.running()
+    if not co then return false end
+    local w = rawget(_G, "WebUI")
+    if w then w.write("是否与之过招？(choose 1=是, choose 2=否)") end
+    rawset(_G, "__instruct5_result", nil)
+    rawset(_G, "__instruct5_waiting", true)
+    local scheduler = rawget(_G, "CoroutineScheduler")
+    if scheduler and scheduler.getInstance then
+        scheduler = scheduler.getInstance()
+    end
+    if scheduler and scheduler.yield then
+        while rawget(_G, "__instruct5_waiting") do
+            scheduler:yield("instruct5")
+        end
+    end
+    local result = rawget(_G, "__instruct5_result")
+    rawset(_G, "__instruct5_result", nil)
+    return result
+end)
+
+-- instruct_10: 加入队员
+rawset(_G, "instruct_10", function(personid)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return end
+    -- 防重复入队：若该角色已在队伍中直接返回（web 引擎版，与 jymain.lua 一致）
+    for i = 1, CC.TeamNum do
+        if JY.Base["队伍" .. i] == personid then return end
+    end
+    for i = 2, CC.TeamNum do
+        if JY.Base["队伍" .. i] == nil or JY.Base["队伍" .. i] < 0 then
+            JY.Base["队伍" .. i] = personid
+            for j = 1, 4 do
+                local id = JY.Person[personid]["携带物品" .. j]
+                local num = JY.Person[personid]["携带物品数量" .. j]
+                if id and id > 0 then
+                    local instruct_32 = rawget(_G, "instruct_32")
+                    if instruct_32 then instruct_32(0, personid, id, 0) end
+                    instruct_31(id, num, 2)
+                end
+            end
+            return
+        end
+    end
+end)
+
+-- instruct_16: 队伍中是否有某人
+rawset(_G, "instruct_16", function(personid)
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    for i = 1, CC.TeamNum do
+        if JY.Base["队伍" .. i] == personid then return true end
+    end
+    return false
+end)
+
+-- instruct_18: 是否有某种物品
+rawset(_G, "instruct_18", function(thingid)
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    for i = 1, CC.MyThingNum or 30 do
+        if JY.Base["物品" .. i] == thingid then return true end
+    end
+    return false
+end)
+
+-- instruct_20: 判断队伍是否满
+rawset(_G, "instruct_20", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    return (JY.Base["队伍" .. CC.TeamNum] or 0) >= 0
+end)
+
+-- instruct_21: 离队
+rawset(_G, "instruct_21", function(personid)
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    local j = 0
+    for i = 1, CC.TeamNum do
+        if JY.Base["队伍" .. i] == personid then j = i; break end
+    end
+    if j == 0 then return end
+    for i = j + 1, CC.TeamNum do
+        JY.Base["队伍" .. i - 1] = JY.Base["队伍" .. i]
+    end
+    JY.Base["队伍" .. CC.TeamNum] = -1
+end)
+
+-- instruct_22: 内力降为0
+rawset(_G, "instruct_22", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    for i = 1, CC.TeamNum do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and JY.Person[pid] then
+            JY.Person[pid]["内力"] = 0
+        end
+    end
+end)
+
+-- instruct_23: 设置用毒
+rawset(_G, "instruct_23", function(personid, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[personid] then
+        JY.Person[personid]["用毒能力"] = value
+    end
+end)
+
+-- instruct_28: 判断品德
+rawset(_G, "instruct_28", function(personid, vmin, vmax)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return false end
+    local v = JY.Person[personid]["品德"] or 0
+    return v >= vmin and v <= vmax
+end)
+
+-- instruct_29: 判断攻击力
+rawset(_G, "instruct_29", function(personid, vmin, vmax)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return false end
+    local v = JY.Person[personid]["攻击力"] or 0
+    return v >= vmin and v <= vmax
+end)
+
+-- instruct_33: 学会武功
+rawset(_G, "instruct_33", function(personid, wugongid, flag)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return end
+    local added = false
+    for i = 1, 10 do
+        if JY.Person[personid]["武功" .. i] == 0 or not JY.Person[personid]["武功" .. i] then
+            JY.Person[personid]["武功" .. i] = wugongid
+            JY.Person[personid]["武功等级" .. i] = 0
+            added = true
+            break
+        end
+    end
+    if not added then
+        JY.Person[personid]["武功10"] = wugongid
+        JY.Person[personid]["武功等级10"] = 0
+    end
+end)
+
+-- instruct_34: 资质增加
+rawset(_G, "instruct_34", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["资质"] = (JY.Person[id]["资质"] or 0) + value
+    end
+end)
+
+-- instruct_35: 设置武功
+rawset(_G, "instruct_35", function(personid, idx, wugongid, wugonglevel)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return end
+    if idx and idx >= 0 then
+        JY.Person[personid]["武功" .. (idx + 1)] = wugongid
+        JY.Person[personid]["武功等级" .. (idx + 1)] = wugonglevel
+    else
+        for i = 1, 10 do
+            if not JY.Person[personid]["武功" .. i] or JY.Person[personid]["武功" .. i] == 0 then
+                JY.Person[personid]["武功" .. i] = wugongid
+                JY.Person[personid]["武功等级" .. i] = wugonglevel
+                return
+            end
+        end
+        JY.Person[personid]["武功1"] = wugongid
+        JY.Person[personid]["武功等级1"] = wugonglevel
+    end
+end)
+
+-- instruct_36: 判断主角性别
+rawset(_G, "instruct_36", function(sex)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[0] then return false end
+    return JY.Person[0]["性别"] == sex
+end)
+
+-- instruct_39: 打开场景
+rawset(_G, "instruct_39", function(sceneid)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Scene and JY.Scene[sceneid] then
+        JY.Scene[sceneid]["进入条件"] = 0
+    end
+end)
+
+-- instruct_41: 其他人员增加物品
+rawset(_G, "instruct_41", function(personid, thingid, num)
+    local JY = rawget(_G, "JY")
+    if not JY or not JY.Person or not JY.Person[personid] then return end
+    local k = 0
+    for i = 1, 4 do
+        if JY.Person[personid]["携带物品" .. i] == thingid then
+            JY.Person[personid]["携带物品数量" .. i] = (JY.Person[personid]["携带物品数量" .. i] or 1) + num
+            k = i
+            break
+        end
+    end
+    if k == 0 then
+        for i = 1, 4 do
+            if not JY.Person[personid]["携带物品" .. i] or JY.Person[personid]["携带物品" .. i] <= 0 then
+                JY.Person[personid]["携带物品" .. i] = thingid
+                JY.Person[personid]["携带物品数量" .. i] = num
+                break
+            end
+        end
+    end
+end)
+
+-- instruct_42: 队伍中是否有女性
+rawset(_G, "instruct_42", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return false end
+    for i = 1, CC.TeamNum do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and JY.Person and JY.Person[pid] and JY.Person[pid]["性别"] == 1 then
+            return true
+        end
+    end
+    return false
+end)
+
+-- instruct_43: 是否有某种物品（委托给 instruct_18）
+rawset(_G, "instruct_43", function(thingid)
+    local instruct_18 = rawget(_G, "instruct_18")
+    if instruct_18 then return instruct_18(thingid) end
+    return false
+end)
+
+-- instruct_45: 增加轻功
+rawset(_G, "instruct_45", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["轻功"] = (JY.Person[id]["轻功"] or 0) + value
+    end
+end)
+
+-- instruct_46: 增加内力
+rawset(_G, "instruct_46", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["内力最大值"] = (JY.Person[id]["内力最大值"] or 0) + value
+    end
+end)
+
+-- instruct_47: 增加攻击力
+rawset(_G, "instruct_47", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["攻击力"] = (JY.Person[id]["攻击力"] or 0) + value
+    end
+end)
+
+-- instruct_48: 增加生命
+rawset(_G, "instruct_48", function(id, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[id] then
+        JY.Person[id]["生命最大值"] = (JY.Person[id]["生命最大值"] or 0) + value
+    end
+end)
+
+-- instruct_49: 设置内力属性
+rawset(_G, "instruct_49", function(personid, value)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[personid] then
+        JY.Person[personid]["内力性质"] = value
+    end
+end)
+
+-- instruct_50: 判断是否有5种物品
+rawset(_G, "instruct_50", function(id1, id2, id3, id4, id5)
+    local instruct_18 = rawget(_G, "instruct_18")
+    if not instruct_18 then return false end
+    local num = 0
+    for _, id in ipairs({id1, id2, id3, id4, id5}) do
+        if instruct_18(id) then num = num + 1 end
+    end
+    return num == 5
+end)
+
+-- instruct_52: 看品德
+rawset(_G, "instruct_52", function()
+    local JY = rawget(_G, "JY")
+    local morale = JY and JY.Person and JY.Person[0] and JY.Person[0]["品德"] or 0
+    local WebUI = rawget(_G, "WebUI")
+    if WebUI then WebUI.write(string.format("品德指数: %d", morale)) end
+end)
+
+-- instruct_53: 看声望
+rawset(_G, "instruct_53", function()
+    local JY = rawget(_G, "JY")
+    local rep = JY and JY.Person and JY.Person[0] and JY.Person[0]["声望"] or 0
+    local WebUI = rawget(_G, "WebUI")
+    if WebUI then WebUI.write(string.format("声望指数: %d", rep)) end
+end)
+
+-- instruct_54: 开放其他场景
+rawset(_G, "instruct_54", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    local CC = rawget(_G, "CC")
+    local sceneNum = (CC and CC.SceneNum) or 100
+    for i = 0, sceneNum - 1 do
+        if JY.Scene[i] then JY.Scene[i]["进入条件"] = 0 end
+    end
+    if JY.Scene[2] then JY.Scene[2]["进入条件"] = 2 end   --云鹤崖
+    if JY.Scene[38] then JY.Scene[38]["进入条件"] = 2 end  --摩天崖
+    if JY.Scene[75] then JY.Scene[75]["进入条件"] = 1 end  --桃花岛
+    if JY.Scene[80] then JY.Scene[80]["进入条件"] = 1 end  --绝情谷底
+end)
+
+-- instruct_55: 判断D*编号的触发事件
+rawset(_G, "instruct_55", function(id, num)
+    local GetD = rawget(_G, "GetD")
+    if not GetD then return false end
+    local JY = rawget(_G, "JY")
+    local sceneId = JY and JY.SubScene or 0
+    return GetD(sceneId, id, 2) == num
+end)
+
+-- instruct_59: 全体队员离队
+rawset(_G, "instruct_59", function()
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    local instruct_21 = rawget(_G, "instruct_21")
+    for i = CC.TeamNum, 2, -1 do
+        local pid = JY.Base["队伍" .. i]
+        if pid and pid >= 0 and instruct_21 then
+            instruct_21(pid)
+        end
+    end
+end)
+
+-- instruct_61: 判断是否放完14天书
+rawset(_G, "instruct_61", function()
+    local GetD = rawget(_G, "GetD")
+    if not GetD then return false end
+    local JY = rawget(_G, "JY")
+    local sceneId = JY and JY.SubScene or 0
+    for i = 11, 24 do
+        if GetD(sceneId, i, 5) ~= 4664 then return false end
+    end
+    return true
+end)
+
+-- instruct_63: 设置性别
+rawset(_G, "instruct_63", function(personid, sex)
+    local JY = rawget(_G, "JY")
+    if JY and JY.Person and JY.Person[personid] then
+        JY.Person[personid]["性别"] = sex
+    end
+end)
+
+-- 兜底: 所有未显式实现的 instruct_* 输出 debug 日志
+for i = 0, 67 do
+    if not rawget(_G, "instruct_" .. i) then
+        rawset(_G, "instruct_" .. i, function(...)
+            EngineAPI.debug.log("instruct_" .. i .. " 未实现(no-op)")
+        end)
+    end
+end
+
+-- 调试函数（在 setmetatable(_G) 之前定义，之后可调用）
+
+-- D* 事件数据访问（event-data-access）
+-- 原版 GetD/SetD 操作 JY.D{sceneId} Lua 运行时表
+-- 首次访问某场景时，从 initDataSource.events 拷贝到 JY.D{sceneId}
+
+local function ensureSceneDEvents(sceneId)
+    local JY = rawget(_G, "JY")
+    if not JY then
+        EngineAPI.debug.log("ensureSceneDEvents: JY is nil")
+        return
+    end
+    JY.D = JY.D or {}
+    EngineAPI.debug.log("ensureSceneDEvents: JY.D=" .. tostring(JY.D) .. ", JY.D[" .. tostring(sceneId) .. "]=" .. tostring(JY.D[sceneId]))
+    if JY.D[sceneId] then return end  -- 已加载
+    
+    local ds = rawget(_G, "initDataSource")
+    local events = ds and ds["events"]
+    if not events then
+        JY.D[sceneId] = {}
+        EngineAPI.debug.log("ensureSceneDEvents: no events data, created empty JY.D[" .. tostring(sceneId) .. "]")
+        return
+    end
+    
+    -- events.json 顶层是 {version, extracted, total, events: [...]} 包装结构，
+    -- 真正的条目在 events.events（数组，每条是 {sceneId, tileIndex, passable, unknown1, eventSpace, eventTouch, eventExtra, ...}）
+    local evList = (type(events) == "table" and events.events) or events
+    if type(evList) ~= "table" then
+        JY.D[sceneId] = {}
+        return
+    end
+    
+    -- 按原版 D* 表格式构建：JY.D[sceneId][tileIndex] = {field0..field10}
+    -- field[2]=eventSpace(空格触发), field[3]=eventTouch(物品触发), field[4]=eventExtra(路过触发)
+    -- 注意：使用 0-based 字典键（[0]=passable..[4]=eventExtra），与 instruct_3/SetD/GetD 一致，
+    --       避免数组格式(evt[1]=passable)导致 GetD(...,4) 读到 evt[4]=eventTouch 的索引错位。
+    local sceneD = {}
+    for _, evt in ipairs(evList) do
+        if evt and evt.sceneId == sceneId then
+            local idx = tonumber(evt.tileIndex) or 0
+            sceneD[idx] = {
+                [0] = evt.passable or -1,
+                [1] = evt.unknown1 or -1,
+                [2] = evt.eventSpace or -1,
+                [3] = evt.eventTouch or -1,
+                [4] = evt.eventExtra or -1,
+                [5] = evt.tileStart or -1,
+                [6] = evt.tileEnd or -1,
+                [7] = evt.tileCurrent or -1,
+                [8] = evt.animDelay or 0,
+                [9] = evt.x or -1,
+                [10] = evt.y or -1,
+            }
+        end
+    end
+    JY.D[sceneId] = sceneD
+    EngineAPI.debug.log("ensureSceneDEvents: loaded " .. tostring(#evList) .. " raw events, " .. tostring(#sceneD) .. " for scene " .. tostring(sceneId))
+end
+_G.ensureSceneDEvents = ensureSceneDEvents  -- 全局暴露，供 mmap_smap_handlers.lua 的 look() 使用
+
+-- D* 条目格式归一化：旧存档/旧 ensureSceneDEvents 可能是数组格式
+-- （evt[1]=passable, evt[2]=unknown1, evt[3]=eventSpace, evt[4]=eventTouch, evt[5]=eventExtra），
+-- 而 SetD/instruct_3 按 dict 格式（evt[field]）写入。读取/写入前统一为 dict 格式，
+-- 避免 SetD 写入 evt[2] 但 dfield 数组路径读 evt[3] 的索引错位。
+local function normalizeDEntry(evt)
+    if type(evt) ~= "table" then return evt end
+    if evt[0] == nil and evt[1] ~= nil and evt[1] ~= false then
+        local d = {}
+        for i = 1, 11 do
+            if evt[i] ~= nil then d[i - 1] = evt[i] end
+        end
+        -- 保留字符串键（存档反序列化可能产生 tostring 键）
+        for k, v in pairs(evt) do
+            if type(k) == "string" then d[k] = v end
+        end
+        return d
+    end
+    return evt
+end
+
+rawset(_G, "GetD", function(sceneId, eventId, field)
+    sceneId = tonumber(sceneId) or sceneId
+    eventId = tonumber(eventId) or 0
+    field = tonumber(field) or 0
+    
+    ensureSceneDEvents(sceneId)
+    local JY = rawget(_G, "JY")
+    local sceneD = JY and JY.D and JY.D[sceneId]
+    if not sceneD then return 0 end
+    
+    local evt = normalizeDEntry(sceneD[eventId])
+    if not evt then return 0 end
+    
+    local val = evt[field]
+    if val == nil then val = evt[tostring(field)] end
+    return val or 0
+end)
+
+rawset(_G, "SetD", function(sceneId, eventId, field, value)
+    sceneId = tonumber(sceneId) or sceneId
+    eventId = tonumber(eventId) or 0
+    field = tonumber(field) or 0
+    
+    ensureSceneDEvents(sceneId)
+    local JY = rawget(_G, "JY")
+    if not JY then return end
+    JY.D = JY.D or {}
+    if not JY.D[sceneId] then
+        JY.D[sceneId] = {}
+    end
+    local sceneD = JY.D[sceneId]
+    if not sceneD[eventId] then
+        sceneD[eventId] = {}
+    end
+    sceneD[eventId] = normalizeDEntry(sceneD[eventId])
+    sceneD[eventId][field] = value
+end)
+
+rawset(_G, "GetS", function(id, x, y, level)
+    return 0  -- 场景格子数据在 MUD 中简化
+end)
+
+rawset(_G, "SetS", function(id, x, y, level, value)
+    -- no-op，MUD 中不需要
+end)
+function _G.__debug_coro_state()
+    local cs = package.loaded["framework.coroutine_scheduler"]
+    if not cs then return {} end
+    local s = cs.getInstance()
+    local all = s:getAllCoroutines()
+    local r = {}
+    for _, id in ipairs(all) do
+        local info = s:getInfo(id)
+        r[#r+1] = {id=id, status=info.status, waitingFor=info.waitingFor}
+    end
+    return r
+end
+
+-- 绘制状态跟踪（必须在前，returnToStartMenu 需要访问）
+local lastDrawState = nil
+
+-- 初始化框架
+function _G.initWebFramework()
+    -- 0. 先加载 config 确保 CONFIG 全局变量存在
+    require("framework.config")
+
+    -- 初始化 __quiet 标志（必须在 setmetatable(_G) 之前存在）
+    _G.__quiet = false
+
+    -- 1. 加载脚本模块
+    -- 先保存我们的 instruct 函数，脚本加载会覆盖它们
+    local _our_instruct = {}
+    for i = 0, 67 do
+        local fn = rawget(_G, "instruct_" .. i)
+        if fn then _our_instruct[i] = fn end
+    end
+    -- 保存 Web MUD 版本的 SetD（jymain.lua 会用 lib.SetD 覆盖，它只操作二进制文件）
+    local _our_SetD = rawget(_G, "SetD")
+    local _our_GetD = rawget(_G, "GetD")
+    local scriptList = {
+        "script/jymain.lua",
+        "script/jyconst.lua",
+        "script/jymodify.lua",
+    }
+    for _, path in ipairs(scriptList) do
+        local source = _G.FrameworkSources[path]
+        if source then
+            local fn, err = load(source, "@" .. path)
+            if fn then
+                local ok, result = pcall(fn)
+                if ok then
+                    EngineAPI.debug.log("  " .. path .. ": OK")
+                else
+                    EngineAPI.debug.log("  " .. path .. ": FAILED " .. tostring(result))
+                end
+            else
+                EngineAPI.debug.log("  " .. path .. ": 编译失败 " .. tostring(err))
+            end
+        else
+            EngineAPI.debug.log("  " .. path .. ": 未找到")
+        end
+    end
+
+    -- 脚本加载后会覆盖 DrawSMap/DrawMMap（jymain.lua 定义了自己的版本），
+    -- 重新安装 Web MUD 空桩版本
+    _G.DrawMMap = function() end
+    _G.DrawSMap = function() end
+    -- script 加载后 jymain.lua 覆盖了 instruct 函数，恢复 Web MUD 版本
+    for i = 0, 67 do
+        if _our_instruct[i] then
+            _G["instruct_" .. i] = _our_instruct[i]
+        end
+    end
+    -- 2. 初始化游戏适配器
+    require("framework.lib_log")
+    _G.EventBridge = require("framework.event_bridge")
+    _G.StateMachine = require("framework.state_machine")
+    _G.MenuAsync = require("framework.menu_async")
+    _G.CoroutineScheduler = require("framework.coroutine_scheduler")
+    _G.AsyncDialog = require("framework.async_dialog")
+    -- 加载游戏状态处理器（注册 GAME_START/GAME_MMAP/GAME_SMAP 等状态到 StateMachine）
+    local GameStates = require("framework.game_states")
+    if GameStates and GameStates.registerAll then GameStates.registerAll() end
+    -- 事件系统集成
+    require("framework.async_globals")
+    require("framework.script_loader")
+    require("framework.async_wrapper")
+    _G.EventExecutor = require("framework.event_executor")
+    -- jymain.lua 也会用 lib.SetD/lib.GetD 覆盖 Web MUD 版本的 SetD/GetD，
+    -- lib.SetD 只操作二进制 D* 文件，不修改 JY.D 运行时表。
+    -- 恢复 Web MUD 版本确保 instruct_3（调用 SetD）修改 JY.D 表。
+    -- 注意：必须放在 require("framework.script_loader") 之后，因为脚本加载会覆盖 SetD！
+    if _our_SetD then rawset(_G, "SetD", _our_SetD) end
+    if _our_GetD then rawset(_G, "GetD", _our_GetD) end
+    -- jymain.lua 在 script_loader 中定义原版 WarDrawMap（访问 WAR.Person[WAR.CurID]），
+    -- 会覆盖文件顶部的 noop。Web MUD 战斗为文本渲染，必须保持 WarDrawMap 为 noop，
+    -- 否则 war_async.lua 的 3 处直接调用会产生 gameLoop error 残留终端（P4 noE 失败根因）。
+    rawset(_G, "WarDrawMap", function() end)
+    
+    -- 覆盖 EventExecutor.oldCallEventCoroutine 以修复 JY.CurrentD 索引不一致问题
+    -- 注意：此 hack 已废弃并会破坏数据！它假设 instruct_3(-2,...) 写入 sceneD[eventnum]，
+    -- 然后同步到 sceneD[savedCurrentD]。但 event_executor 已修复 CurrentD 语义
+    -- （smapUseItemOnNpc 设置 CurrentD=触发事件的 tile 索引，instruct_3 直接写入正确 tile），
+    -- 此覆盖反而会把 sceneD[eventnum]（常为空的残留表）复制覆盖到 sceneD[tile]，
+    -- 导致谢逊 tile2 被清零、oldevent_65 头颅事件永远无法触发（P6 光明顶链失败根因）。
+    -- 禁用：保留原始 oldCallEventCoroutine（CurrentD 由 event_executor 统一管理）。
+    -- do
+    --     local origOldCall = _G.EventExecutor.oldCallEventCoroutine
+    --     _G.EventExecutor.oldCallEventCoroutine = function(eventnum)
+    --         local JY = rawget(_G, "JY")
+    --         local savedCurrentD = JY and JY.CurrentD
+    --         origOldCall(eventnum)
+    --         if JY and JY.D and savedCurrentD and savedCurrentD > 0 and savedCurrentD ~= eventnum then
+    --             for sid, sceneD in pairs(JY.D) do
+    --                 local srcEvt = sceneD[eventnum]
+    --                 if srcEvt then
+    --                     sceneD[savedCurrentD] = sceneD[savedCurrentD] or {}
+    --                     for f = 0, 10 do
+    --                         if srcEvt[f] ~= nil then
+    --                             sceneD[savedCurrentD][f] = srcEvt[f]
+    --                         end
+    --                     end
+    --                 end
+    --             end
+    --         end
+    --     end
+    -- end
+    
+    -- 修补 saveGameState/loadGameState：将数据直接存储到 Lua 全局变量 __saveCache
+    -- 完全绕过 JSBridge 的 save/load 方法，避免 JSON 过大导致的解析问题
+    if not rawget(_G, "__savePatched") then
+        rawset(_G, "__saveCache", {})
+        local origSave = rawget(_G, "saveGameState")
+        if origSave then
+            rawset(_G, "saveGameState", function(slotId)
+                local prefix = "save_"
+                local key = prefix .. tostring(slotId)
+                -- 直接构建 JSON 并存储到 __saveCache（绕过 JSBridge round-trip）
+                local JY = rawget(_G, "JY")
+                if JY then
+                    local data = {
+                        version = "1",
+                        timestamp = os.time() or 0,
+                        base = JY.Base,
+                        persons = JY.Person,
+                        things = JY.Thing,
+                        scenes = JY.Scene,
+                        wugongs = JY.Wugong,
+                        shops = JY.Shop,
+                        status = JY.Status or 2,
+                        subScene = JY.SubScene or 0,
+                        mmapMusic = JY.MmapMusic or -1,
+                        currentD = JY.CurrentD or -1,
+                        d = JY.D,  -- 保存 D* 事件表（与 state_manager.saveGameState 键名一致），保留 instruct_3 的修改
+                    }
+                    local encode = rawget(_G, "encodeSimpleJSON")
+                    if encode then
+                        local json = encode(data)
+                        rawget(_G, "__saveCache")[key] = json
+                        -- 复用同一份 json 直接持久化（跳过 origSave 的二次全量编码，leave 自动存档不再卡顿）
+                        if _G.JSBridge and _G.JSBridge.save then
+                            _G.JSBridge.save(key, json)
+                        end
+                        return true
+                    end
+                end
+                -- 回退到原始 saveGameState
+                return origSave(slotId)
+            end)
+        end
+        local origLoad = rawget(_G, "loadGameState")
+        if origLoad then
+            rawset(_G, "loadGameState", function(slotId)
+                local prefix = "save_"
+                local key = prefix .. tostring(slotId)
+                local cache = rawget(_G, "__saveCache")
+                local json = cache and cache[key]
+                if json then
+                    -- 使用 parseJSON（data_loader.lua 定义的 Lua 解析器）替代 _G.JSON.decode
+                    -- （__index=error 元方法会阻止 _G.JSON 访问）
+                    local ok, data = pcall(parseJSON, json)
+                    if ok and data then
+                        -- 直接设置 JY 属性，完全绕过 JSBridge
+                        if not rawget(_G, "JY") then rawset(_G, "JY", {}) end
+                        local JY = rawget(_G, "JY")
+                        local restoreNumericKeys = rawget(_G, "restoreNumericKeys")
+                        local restoreMap = {
+                            base = "Base",
+                            persons = "Person",
+                            things = "Thing",
+                            scenes = "Scene",
+                            wugongs = "Wugong",
+                            shops = "Shop",
+                            status = "Status",
+                            subScene = "SubScene",
+                            mmapMusic = "MmapMusic",
+                            currentD = "CurrentD",
+                            d = "D",
+                            dTable = "D",
+                        }
+                        for jsonKey, jyKey in pairs(restoreMap) do
+                            local src = data[jsonKey]
+                            if src then
+                                if restoreNumericKeys then
+                                    JY[jyKey] = restoreNumericKeys(src)
+                                else
+                                    JY[jyKey] = src
+                                end
+                            end
+                        end
+                        if JY.Status == nil then JY.Status = 2 end
+                        if JY.SubScene == nil then JY.SubScene = 0 end
+                        -- 同步状态机
+                        local sm = rawget(_G, "StateMachine")
+                        if sm then
+                            local inst = sm.getInstance()
+                            if inst and inst.switchTo then
+                                pcall(inst.switchTo, inst, JY.Status)
+                            end
+                        end
+                        return true
+                    else
+                        EngineAPI.debug.log("loadGameState: parseJSON failed: " .. tostring(data))
+                        EngineAPI.debug.log("loadGameState: json length=" .. tostring(#json) .. " first 200=" .. json:sub(1, 200))
+                    end
+                end
+                -- 回退到原始 loadGameState
+                return origLoad(slotId)
+            end)
+        end
+        rawset(_G, "__savePatched", true)
+    end
+
+    -- 开机启动：把 IndexedDB 中已有的存档读入 Lua 端 __saveCache。
+    -- 关键：开始菜单“载入进度”是在游戏主循环帧内调用 loadGameState(1) 的，
+    -- 而**在帧内 JSBridge.load 会退化返回存档 key 本身（而非 JSON）**，导致
+    -- parseJSON 失败 → 提示“没有存档” —— 而直接/游戏内调用却没有问题（用户 Issue1 的现象）。
+    -- 因此这里在启动阶段（尚未进入主循环、JSBridge.load 正常）把存档刷入 __saveCache，
+    -- 令 loadGameState 优先命中 __saveCache，绕开帧内 JSBridge.load 的退化问题。
+    rawset(_G, "resyncSaveCache", function()
+        local sc = rawget(_G, "__saveCache")
+        if not sc then sc = {}; rawset(_G, "__saveCache", sc) end
+        local lb = rawget(_G, "JSBridge")
+        if sc and lb and lb.listSaves and lb.load then
+            local ok, keys = pcall(function() return lb.listSaves() end)
+            if ok and type(keys) == "table" then
+                for i = 1, #keys do
+                    local k = keys[i]
+                    if type(k) == "string" then
+                        pcall(function()
+                            local v = lb.load(k)
+                            if type(v) == "string" and v ~= "" and v ~= k then
+                                sc[k] = v
+                            end
+                        end)
+                    end
+                end
+            end
+        end
+    end)
+    local _rsync = rawget(_G, "resyncSaveCache")
+    if _rsync then _rsync() end
+
+    -- CommandEngine already loaded as global via loadLuaModule in index.js
+    if not _G.CommandEngine then
+        _G.CommandEngine = require("web_command_engine")
+    end
+    -- 注册内置命令（对所有状态生效）
+    local CE = _G.CommandEngine
+    local builtInCmds = {
+        help = { handler = function(args) CE.showHelp(args) end, description = "显示帮助信息" },
+        choose = { handler = function(args) CE.handleChoose(args) end, description = "选择菜单项: choose <编号>" },
+    }
+    for _, stateId in ipairs({0, 1, 2, 3, 4}) do
+        CE.registerCommands(stateId, builtInCmds)
+    end
+
+    -- 在 init() 之前覆写 JYMainAdapter 的方法
+    -- 注意：init() 内部会调用 showStartMenuCoroutine，所以必须在之前覆写
+    -- init() 会设置 setmetatable(_G, {__index=error, __newindex=error})，
+    -- 因此覆写函数体内必须使用 rawget/rawset 访问 _G
+    local JYMainAdapter = require("framework.jymain_adapter")
+    -- 确保 initCoroutine 中的 JYMainAdapter 引用也看到覆写
+    -- 直接从 package.loaded 获取并写入
+    local target = package.loaded["framework.jymain_adapter"]
+    if not target then target = JYMainAdapter end
+    local startNewGameAdapter = target  -- 模块表引用
+
+    -- 保存原始函数引用，覆写后替换
+    -- 用 rawset 直接写入 _G，因为 initCoroutine 中 JYMainAdapter 是全局引用
+    rawset(_G, "JYMainAdapter", target)
+
+    -- 覆盖 loadGame：Web MUD 开始菜单的“载入进度”按槽位读取存档。
+    -- 历史硬编码成“没有存档”空栈 / 直接读槽位 1，与游戏内 menu 的“读取槽位 N”列表
+    -- 不一致（用户 Issue1：开始载入无可选槽位、游戏内却有完整列表）。
+    -- 现支持 loadGameSlot(slot)，与游戏内读档一致；slot 缺省时回退为槽位 1。
+    startNewGameAdapter.loadGame = function()
+        startNewGameAdapter.loadGameSlot(nil)
+    end
+    startNewGameAdapter.loadGameSlot = function(slot)
+        slot = tonumber(slot) or 1
+        if slot < 1 then slot = 1 end
+        if slot > 10 then slot = 10 end
+        local WebUI = rawget(_G, "WebUI")
+        local loadGS = rawget(_G, "loadGameState")
+        local _rsync = rawget(_G, "resyncSaveCache")
+        -- 自我修复：先同步一次 worker 侧 IndexedDB 的存档到 __saveCache。
+        -- 根因：reload 后 worker 的 luaSaveCache 可能为空（首次 init_save_cache 读到
+        -- 尚未落盘的 IndexedDB），使开始菜单首次“载入进度”被误报为“没有存档”（用户 Issue1：
+        -- “第一次选择无输出，连续 choose 后才成功”）。这里失败时用 JSBridge.requestSync()
+        -- 令主线程按 IndexedDB 真实状态重发 init_save_cache，等若干帧后重试，保证一次 choose。
+        if _rsync then _rsync() end
+        local JSB = rawget(_G, "JSBridge")
+        local CS = rawget(_G, "CoroutineScheduler")
+        local scheduler = CS and CS.getInstance and CS.getInstance()
+        -- 预热：在首次 loadGameState 之前确保 worker 侧存档缓存已就绪。
+        -- 根因（用户 Issue1：开始菜单选“载入进度”后要等一会才显示读取成功/连续 choose 才有输出）：
+        -- reload 后主线程首次 init_save_cache 可能读到尚未落盘的 IndexedDB，导致 worker 的
+        -- luaSaveCache（以及其刷入的 __saveCache）在开始菜单时仍为空，首次 loadGameState(1)
+        -- 立即失败。旧实现只在 attempt>1 时才 requestSync+等待，造成无谓的延迟。
+        -- 这里在 attempt 1 之前先做主线程同步 + 短限等，保证第一次尝试即命中已就绪的缓存。
+        local sKey = "save_" .. tostring(slot)
+        local function hasSave()
+            local sc = rawget(_G, "__saveCache")
+            if sc and sc[sKey] and sc[sKey] ~= "" then return true end
+            local b = rawget(_G, "JSBridge")
+            if b and b.load then
+                local okL, v = pcall(function() return b.load(sKey) end)
+                if okL and type(v) == "string" and v ~= "" and v ~= sKey then
+                    return true
+                end
+            end
+            return false
+        end
+        if not hasSave() and JSB and JSB.requestSync then
+            pcall(function() JSB.requestSync() end)
+            if scheduler and scheduler.waitForCondition then
+                local frames = 0
+                local F_MAX = 60
+                pcall(function()
+                    scheduler:waitForCondition(function()
+                        frames = frames + 1
+                        return frames >= F_MAX or hasSave()
+                    end)
+                end)
+            end
+            if _rsync then _rsync() end
+        end
+        local finalOk = false
+        for attempt = 1, 4 do
+            if attempt > 1 then
+                if JSB and JSB.requestSync then
+                    pcall(function() JSB.requestSync() end)
+                end
+                if scheduler and scheduler.waitForCondition then
+                    local frames = 0
+                    local F_MAX = 90
+                    pcall(function()
+                        scheduler:waitForCondition(function()
+                            frames = frames + 1
+                            return frames >= F_MAX
+                        end)
+                    end)
+                end
+                if _rsync then _rsync() end
+            end
+            if not loadGS then break end
+            local okL, e1 = pcall(loadGS, slot)
+            local isOk = okL and (okL == true or okL == 1)
+            if isOk then finalOk = true break end
+        end
+        if finalOk then
+            if WebUI then WebUI.write(string.format("读取存档成功（槽位%d）。", slot)) end
+            local JY = rawget(_G, "JY")
+            if JY and JY.Status and JY.Status ~= 0 then
+                local sm = rawget(_G, "StateMachine")
+                if sm and sm.getInstance then
+                    local inst
+                    pcall(function() inst = sm.getInstance() end)
+                    if inst and inst.switchTo then pcall(inst.switchTo, inst, JY.Status) end
+                end
+            end
+            local sl = nil
+            if JY and JY.Status == 4 then sl = rawget(_G, "SmapHandlers")
+            elseif JY and JY.Status == 2 then sl = rawget(_G, "MmapHandlers") end
+            if sl and sl.look then sl.look({}) end
+        else
+            if WebUI then WebUI.write("没有存档，输入 choose 1 返回菜单重新开始。") end
+        end
+    end
+    -- 开始菜单“载入进度”的槽位选择器：先同步存档缓存、列出可选槽位并让用户选一个读取。
+    -- 与游戏内 menu>存档管理 的“读取槽位 N”一致，解决用户 Issue1：开始菜单载入无可选槽位
+    -- （原来静默读槽位 1），游戏内却显示完整读取列表。
+    startNewGameAdapter.loadLoadMenu = function()
+        local WebUI = rawget(_G, "WebUI")
+        local _rsync = rawget(_G, "resyncSaveCache")
+        -- 预热存档缓存（与 loadGameSlot 一致，消除 reload 后首次缓存为空导致的延迟）
+        if _rsync then pcall(_rsync) end
+        local JSB = rawget(_G, "JSBridge")
+        local CS = rawget(_G, "CoroutineScheduler")
+        local scheduler = CS and CS.getInstance and CS.getInstance()
+        if JSB and JSB.requestSync then
+            pcall(function() JSB.requestSync() end)
+            if scheduler and scheduler.waitForCondition then
+                local frames = 0
+                pcall(function()
+                    scheduler:waitForCondition(function()
+                        frames = frames + 1
+                        local sc = rawget(_G, "__saveCache")
+                        local any = false
+                        if sc then
+                            for k, v in pairs(sc) do
+                                if type(k) == "string" and k:sub(1, 5) == "save_" and v and v ~= "" then any = true break end
+                            end
+                        end
+                        return frames >= 60 or any
+                    end)
+                end)
+            end
+            if _rsync then pcall(_rsync) end
+        end
+        -- ·列出当前有数据的槽位
+        local slots = {}
+        local sc = rawget(_G, "__saveCache")
+        if sc then
+            for s = 1, 10 do
+                local v = sc["save_" .. tostring(s)]
+                if v and v ~= "" then slots[#slots + 1] = s end
+            end
+        end
+        if #slots == 0 then
+            if WebUI then WebUI.write("没有存档，输入 choose 1 开始新游戏。") end
+            return
+        end
+        -- 显示可选槽位菜单
+        local MenuAsync = rawget(_G, "MenuAsync")
+        local CC = rawget(_G, "CC")
+        if not MenuAsync or not CC then
+            if WebUI then WebUI.write("存档选择菜单不可用，直接读取槽位" .. tostring(slots[1]) .. "。") end
+            startNewGameAdapter.loadGameSlot(slots[1])
+            return
+        end
+        local menu = {}
+        local byIndex = {}
+        for idx, s in ipairs(slots) do
+            menu[#menu + 1] = { string.format("读取槽位%d", s), nil, 1 }
+            byIndex[idx] = s
+        end
+        menu[#menu + 1] = { "0. 返回主菜单", nil, 1 }
+        -- 在终端输出可选槽位（与 CommandEngine 菜单格式一致，供用户选择）
+        if WebUI then
+            WebUI.write("───────────────────────────────────")
+            WebUI.write("--- 载入存档 ---")
+            for idx, item in ipairs(menu) do
+                WebUI.write(string.format("%d. %s", idx, item[1]))
+            end
+            WebUI.write("输入 choose <编号> 选择存档")
+            WebUI.write("选择要读取的存档槽位：")
+        end
+        local sel = MenuAsync.ShowMenuCoroutine(menu, #menu, 0, 0, 0, 0, 0, 0, 1,
+            CC.DefaultFont, rawget(_G, "C_RED"), rawget(_G, "C_WHITE"))
+        local slot = byIndex[sel]
+        if slot then
+            startNewGameAdapter.loadGameSlot(slot)
+        elseif WebUI then
+            WebUI.write("已取消载入，返回开始菜单。")
+        end
+    end
+    -- 覆写 startNewGame：Web MUD 使用纯文字菜单（CommandEngine + choose N）
+    -- 原始 startNewGame 假设有图形菜单和二进制存档，Web MUD 用文字交互代替
+    startNewGameAdapter.startNewGame = function(menux)
+        -- 新游戏：重置终局去重标志与 __gameOver，保证重玩仍能正常显示通关 BANNER 并继续游玩
+        local _reb = rawget(_G, "resetEndBanner")
+        if _reb then _reb() end
+        local JY = rawget(_G, "JY")
+        if not JY then JY = {}; rawset(_G, "JY", JY) end
+
+        -- 调用 initGameState 初始化人物、物品、场景等数据
+        local initGameState = rawget(_G, "initGameState")
+        if initGameState then initGameState() end
+
+        local P0 = JY.Person[0]
+        local CC = rawget(_G, "CC")
+
+        -- 设置主角初始属性
+        P0["姓名"] = CC and CC.NewPersonName or "小虾米"
+        P0["头像"] = 1
+        P0["体力最大值"] = 100
+        P0["体力"] = 100
+        P0["经验"] = 0
+        P0["等级"] = 1
+        P0["声望"] = 0
+        P0["品德"] = 50
+        P0["第一项武功"] = 0
+        P0["武功数量"] = 0
+        P0["人X"] = 364
+        P0["人Y"] = 284
+        P0["人朝向"] = 0
+
+        -- 属性随机生成与确认循环（Web MUD 文字版）
+        local function generateWebAttrs()
+            local P0 = JY.Person[0]
+            P0["内力性质"] = math.random(0, 2)
+            P0["内力最大值"] = math.random(20) + 21
+            P0["攻击力"] = math.random(10) + 21
+            P0["防御力"] = math.random(10) + 21
+            P0["轻功"] = math.random(10) + 21
+            P0["医疗能力"] = math.random(10) + 21
+            P0["用毒能力"] = math.random(10) + 21
+            P0["解毒能力"] = math.random(10) + 21
+            P0["抗毒能力"] = math.random(10) + 21
+            P0["拳掌"] = math.random(10) + 21
+            P0["御剑"] = math.random(10) + 21
+            P0["耍刀"] = math.random(10) + 21
+            P0["特殊武功"] = math.random(10) + 21
+            P0["暗器"] = math.random(10) + 21
+            P0["生命增长"] = math.random(5) + 3
+            P0["生命最大值"] = P0["生命增长"] * 3 + 29
+            local rate = math.random(0, 9)
+            if rate < 2 then
+                P0["资质"] = math.random(35) + 30
+            elseif rate <= 7 then
+                P0["资质"] = math.random(20) + 60
+            else
+                P0["资质"] = math.random(20) + 75
+            end
+            P0["生命"] = P0["生命最大值"]
+            P0["内力"] = P0["内力最大值"]
+        end
+
+        local satisfied = false
+        while not satisfied do
+            generateWebAttrs()
+
+            local WebUI = rawget(_G, "WebUI")
+            WebUI.write(string.format("生命:%d/%d  内力:%d/%d  体力:%d/%d",
+                P0["生命"], P0["生命最大值"],
+                P0["内力"], P0["内力最大值"],
+                P0["体力"], P0["体力最大值"]))
+            WebUI.write(string.format("攻击:%d  防御:%d  轻功:%d  资质:%d",
+                P0["攻击力"], P0["防御力"], P0["轻功"], P0["资质"]))
+            WebUI.write(string.format("拳掌:%d  御剑:%d  耍刀:%d  特殊:%d  暗器:%d",
+                P0["拳掌"], P0["御剑"], P0["耍刀"], P0["特殊武功"], P0["暗器"]))
+            WebUI.write(string.format("医疗:%d  用毒:%d  解毒:%d  抗毒:%d",
+                P0["医疗能力"], P0["用毒能力"], P0["解毒能力"], P0["抗毒能力"]))
+            WebUI.write(string.format("内力性质:%s  生命增长:%d",
+                P0["内力性质"] == 0 and "无" or P0["内力性质"] == 1 and "阳性" or "阴性",
+                P0["生命增长"]))
+
+            WebUI.write("输入 choose 1 (是) 或 choose 2 (否)，choose 0 返回开始菜单，输入 help 查看命令")
+            local menu = {
+                {"是 ", nil, 1},
+                {"否 ", nil, 2},
+            }
+            local MenuAsync = rawget(_G, "MenuAsync")
+            local ok = MenuAsync.ShowMenu2Coroutine(menu, 2, 0,
+                0, 0, 0, 0, 0, 1, CC.DefaultFont, rawget(_G, "C_RED"), rawget(_G, "C_WHITE"))
+
+            if ok == 1 then
+                satisfied = true
+            elseif ok == 0 then
+                local JSBridge = rawget(_G, "JSBridge")
+                if JSBridge then JSBridge.write("返回开始菜单\n") end
+                local CE = rawget(_G, "CommandEngine")
+                CE.registerCommands(0, {
+                    help = { handler = function(args) CE.showHelp(args) end, description = "显示帮助信息" },
+                    choose = { handler = function(args) CE.handleChoose(args) end, description = "选择菜单项: choose <编号>" },
+                })
+                local EventBridge = rawget(_G, "EventBridge")
+                EventBridge.getInstance():switchState(0)
+                return
+            end
+        end
+
+        -- 设置初始队伍（initGameState 从 config 加载，格式为 队伍=[0,-1,...] 数组）
+        local cfg = rawget(_G, "initDataSource") and rawget(_G, "initDataSource").config
+        if cfg and cfg["队伍"] then
+            for i = 1, 6 do
+                JY.Base["队伍" .. i] = cfg["队伍"][i] or -1
+            end
+        else
+            JY.Base["队伍1"] = 0
+            for i = 2, (CC and CC.TeamNum or 6) do
+                JY.Base["队伍" .. i] = -1
+            end
+        end
+
+        JY.Base["人X1"] = 364
+        JY.Base["人Y1"] = 284
+        JY.Base["人X"] = 364
+        JY.Base["人Y"] = 284
+        JY.Base["人方向"] = 0
+        JY.Base["场景X"] = 0
+        JY.Base["场景Y"] = 0
+        JY.Base["场景宽度"] = 64
+        JY.Base["场景高度"] = 64
+
+        JY.Scene = JY.Scene or {}
+        JY.Scene[0] = JY.Scene[0] or {["名称"] = "小虾米居", ["进入条件"] = 0}
+        JY.SubScene = 70  -- 主角的家（原版 CC.NewGameSceneID）
+        JY.EnterSceneXY = JY.EnterSceneXY or {}
+        -- 新游戏从主角的家场景开始，非大地图
+        JY.Base["人X1"] = 19
+        JY.Base["人Y1"] = 20
+        JY.Status = 4  -- GAME_SMAP
+        JY.MmapMusic = -1
+
+        -- 修正主角的家场景类型（提取中类型为"inn"，应为"house"）
+        local dc = rawget(_G, "initDataSource")
+        local sceneTables = dc and dc["scenes"]
+        if sceneTables then
+            local sceneList = sceneTables["scenes"] or sceneTables
+            if type(sceneList) == "table" then
+                for _, s in ipairs(sceneList) do
+                    if type(s) == "table" and s["代号"] == 70 then
+                        s["类型"] = "house"
+                        break
+                    end
+                end
+            end
+        end
+
+        local WebUI = rawget(_G, "WebUI")
+        -- 执行新游戏开场事件（主角独白对话）
+        local EventExecutor = rawget(_G, "EventExecutor")
+        if EventExecutor and EventExecutor.oldCallEventCoroutine then
+            EventExecutor.oldCallEventCoroutine(CC.NewGameEvent)
+        end
+        WebUI.write("新游戏开始！你来到了金庸群侠传的世界。")
+        WebUI.write("输入 help 查看可用命令，choose 查看交互对象")
+        local SmapHandlers = rawget(_G, "SmapHandlers")
+        if SmapHandlers then SmapHandlers.look({}) end
+    end
+
+    -- 覆写 showStartMenuCoroutine：loop 模式，每次循环都输出菜单文本和提示
+    startNewGameAdapter.showStartMenuCoroutine = function()
+        while true do
+            local JY = rawget(_G, "JY")
+            if JY and JY.Status ~= 0 then  -- GAME_START == 0
+                break
+            end
+            local MenuAsync = rawget(_G, "MenuAsync")
+            local CC = rawget(_G, "CC")
+            if not MenuAsync or not CC then
+                break
+            end
+            -- Web MUD: 每次循环输出输入提示（菜单项由主线程 ready 事件输出）
+            local WebUI = rawget(_G, "WebUI")
+            if WebUI then
+                WebUI.write("输入 choose 1 开始新游戏，choose 2 载入进度，choose 3 离开")
+            end
+            local menu = {
+                {"重新开始", nil, 1},
+                {"载入进度", nil, 1},
+                {"离开游戏", nil, 1},
+            }
+            local menuReturn = MenuAsync.ShowMenuCoroutine(menu, 3, 0, 0, 0, 0, 0, 0, 1, CC.DefaultFont, rawget(_G, "C_RED"), rawget(_G, "C_WHITE"))
+            if menuReturn == 1 then
+                startNewGameAdapter.startNewGame(0)
+            elseif menuReturn == 2 then
+                startNewGameAdapter.loadLoadMenu()
+            elseif menuReturn == 3 then
+                -- Web MUD: choose 3 = no-op，显示提示后继续显示开始菜单
+                local WebUI = rawget(_G, "WebUI")
+                if WebUI then
+                    WebUI.write("游戏已退出。输入 choose 1 重新开始，choose 2 载入进度")
+                end
+            end
+        end
+    end
+
+    local ok, err = pcall(function()
+        -- 设置 _G.JYMainAdapter 指向模块表，init 协程通过它访问可看到覆写
+        rawset(_G, "JYMainAdapter", JYMainAdapter)
+        JYMainAdapter.init()
+    end)
+    if not ok then
+        EngineAPI.debug.log("JYMainAdapter.init 失败: " .. tostring(err))
+    end
+
+    -- 初始化 JY.Thing（物品数据）/ JY.Wugong（武功数据），原版 initGameState 运行时未调用
+    -- jymain.lua 的 SetGlobal 会设置 JY.Base/JY.Person 但不填充 JY.Thing/JY.Wugong
+    local ds = rawget(_G, "initDataSource")
+    if ds then
+        if ds.items then
+            local itemList = ds.items["items"] or ds.items
+            if type(itemList) == "table" then
+                JY.Thing = JY.Thing or {}
+                for _, rec in ipairs(itemList) do
+                    if type(rec) == "table" and rec["代号"] ~= nil then
+                        JY.Thing[rec["代号"]] = rec
+                    end
+                end
+            end
+        end
+        if ds.skills then
+            local skillList = ds.skills["skills"] or ds.skills
+            if type(skillList) == "table" then
+                JY.Wugong = JY.Wugong or {}
+                for _, rec in ipairs(skillList) do
+                    if type(rec) == "table" and rec["代号"] ~= nil then
+                        JY.Wugong[rec["代号"]] = rec
+                    end
+                end
+            end
+        end
+    end
+
+    -- 覆写 LoadRecord：Web MUD 改用 save/load 系统，不从二进制文件读取
+    rawset(_G, "LoadRecord", function(id)
+        id = tonumber(id) or 0
+        -- id=0 是"新游戏"（加载初始数据），不走存档；id=1~3 是读档
+        if id == 0 then
+            -- 新游戏：从 config 数据初始化（initGameState 负责格式转换）
+            local initGameState = rawget(_G, "initGameState")
+            if initGameState then
+                initGameState()
+                return true
+            end
+            return false
+        end
+        -- 读档 1~3：从 IndexedDB 加载
+        local loadGameState = rawget(_G, "loadGameState")
+        if loadGameState then
+            return loadGameState(id)
+        end
+        return false
+    end)
+
+    -- 覆写 Init_MMap/Init_SMap：Web MUD 无需加载贴图文件
+    rawset(_G, "Init_MMap", function()
+        JY.EnterSceneXY = nil
+        JY.oldMMapX = -1
+        JY.oldMMapY = -1
+    end)
+    rawset(_G, "Init_SMap", function(showname)
+        JY.oldSMapX = -1
+        JY.oldSMapY = -1
+        JY.SubSceneX = 0
+        JY.SubSceneY = 0
+        JY.OldDPass = -1
+        JY.D_Valid = nil
+    end)
+    rawset(_G, "CleanMemory", function() end)
+    -- 覆写 MMAP/SMAP/WMAP 状态处理器：Web MUD 通过命令处理，无需 game_states 渲染/更新
+    -- 注意：GAME_WMAP（战斗）也必须注册 noop——framework game_states.lua 的 GAME_WMAP 处理器
+    -- 会调用原版 WarDrawMap（访问 WAR.Person[WAR.CurID]），而 Web MUD 的 WAR 结构只有
+    -- teammates/enemies，没有 Person/CurID，会导致 gameLoop error（P4 五毒教战斗 noE 失败根因）
+    local eb = _G.EventBridge and _G.EventBridge.getInstance()
+    if eb then
+        local noop = { enter = function() end, exit = function() end, update = function() end, draw = function() end }
+        eb:registerState(GAME_MMAP, noop)
+        eb:registerState(GAME_SMAP, noop)
+        eb:registerState(GAME_FIRSTMMAP, noop)
+        eb:registerState(GAME_WMAP, noop)
+    end
+
+    -- 注册 MMAP/SMAP 命令（仅在对应状态下可用）
+    if _G.MmapHandlers and _G.SmapHandlers then
+        local mmapCmds = {
+            list  = { handler = _G.MmapHandlers.list,  description = "列出可去场景并选择前往" },
+            look  = { handler = _G.MmapHandlers.look,  description = "查看当前位置、坐标和附近场景" },
+            menu  = { handler = _G.MmapHandlers.menu,  description = "打开主选单（状态/物品/存挡）" },
+            quit  = { handler = _G.MmapHandlers.quit,  description = "退出当前游戏，返回开始菜单" },
+            help  = { handler = CE.showHelp,           description = "显示帮助信息" },
+            choose= { handler = CE.handleChoose,        description = "choose <编号> 选择菜单项" },
+        }
+        local smapCmds = {
+            look  = { handler = _G.SmapHandlers.look,  description = "查看场景并选择交互对象" },
+            menu  = { handler = _G.SmapHandlers.menu,  description = "打开主选单（状态/物品/存挡）" },
+            rest  = { handler = _G.SmapHandlers.rest,  description = "休息恢复体力" },
+            exits = { handler = _G.SmapHandlers.exits, description = "列出出口" },
+            leave = { handler = _G.SmapHandlers.leave, description = "离开场景回到大地图" },
+            go    = { handler = _G.SmapHandlers.go,    description = "go <编号> 经出口前往相邻场景" },
+            help  = { handler = CE.showHelp,           description = "显示帮助信息" },
+            choose= { handler = CE.handleChoose,        description = "choose <编号> 选择交互对象" },
+        }
+        CE.registerCommands(GAME_MMAP, mmapCmds)
+        CE.registerCommands(GAME_SMAP, smapCmds)
+        -- Slice 5: WMAP 战斗命令
+        if _G.WmapHandlers then
+            local wmapCmds = {
+                look  = { handler = _G.WmapHandlers.look,  description = "查看战场态势" },
+                choose= { handler = CE.handleChoose,        description = "choose <编号> 选择行动" },
+            }
+            CE.registerCommands(GAME_WMAP, wmapCmds)
+        end
+    end
+
+    -- 全局函数：从游戏中返回开始菜单（由 MmapHandlers.quit 调用）
+    rawset(_G, "returnToStartMenu", function()
+        -- 重置游戏状态
+        local JY = rawget(_G, "JY")
+        if JY then
+            JY.Base = {}
+            JY.Person = {}
+            JY.Scene = {}
+            JY.Status = 0  -- GAME_START
+        end
+
+        -- 注册开始菜单命令
+        local CE = rawget(_G, "CommandEngine")
+        if CE then
+            CE.registerCommands(0, {
+                help = { handler = function(args) CE.showHelp(args) end, description = "显示帮助信息" },
+                choose = { handler = function(args) CE.handleChoose(args) end, description = "选择菜单项: choose <编号>" },
+            })
+        end
+
+        -- 清除活动菜单
+        local MenuAsync = rawget(_G, "MenuAsync")
+        if MenuAsync and MenuAsync.clear then MenuAsync.clear() end
+
+        -- 显示返回消息
+        local WebUI = rawget(_G, "WebUI")
+        if WebUI then WebUI.write("已返回开始菜单。") end
+
+        -- 强制重绘
+        lastDrawState = nil
+
+        -- 启动新的开始菜单协程
+        local CoroutineScheduler = rawget(_G, "CoroutineScheduler")
+        if CoroutineScheduler then
+            local scheduler = CoroutineScheduler.getInstance()
+            if scheduler then
+                local JYMainAdapter = require("framework.jymain_adapter")
+                scheduler:create(JYMainAdapter.showStartMenuCoroutine, "start-menu")
+            end
+        end
+    end)
+
+    -- 初始状态：保持游戏原有流程（开始菜单），玩家用 choose 1 开始新游戏
+    _G.__quiet = true
+
+    -- 最后再确保 instruct_1 为 Web MUD 文本版（jymain.lua 或 SetModify 可能再次覆盖）
+    rawset(_G, "instruct_1", function(talkId, headId)
+        local dc = rawget(_G, "initDataSource")
+        if not dc then return end
+        local raw = dc["dialogues"]
+        if not raw then return end
+        local dlg = raw["dialogues"] or raw
+        if type(dlg) ~= "table" then return end
+        for _, entry in ipairs(dlg) do
+            if entry.id == tonumber(talkId) then
+                local text = entry.text
+                if type(text) == "table" then
+                    text = text[tostring(headId or 1)]
+                end
+                if text then
+                    local w = rawget(_G, "WebUI")
+                    if w then
+                        local speakerName = "???"
+                        local HEAD_NAME_MAP = {
+                            [0] = "主角",
+                            [4] = "阎基",
+                            [73] = "南贤",
+                            [74] = "北丑",
+                            [105] = "掌柜",
+                            [106] = "店小二",
+                            [111] = "韦小宝",
+                            [112] = "霍青桐",
+                            [114] = "软体娃娃",
+                        }
+                        speakerName = HEAD_NAME_MAP[headId]
+                        if not speakerName then
+                            if headId == 0 then
+                                local JY = rawget(_G, "JY")
+                                speakerName = JY and JY.Person and JY.Person[0] and JY.Person[0]["姓名"] or "主角"
+                            else
+                                local chars = dc["chars"]
+                                if not chars then
+                                    local ds = rawget(_G, "initDataSource")
+                                    chars = ds and ds["chars"]
+                                end
+                                if chars then
+                                    local clist = chars["chars"] or chars
+                                    if type(clist) == "table" then
+                                        for _, c in ipairs(clist) do
+                                            if c["头像代号"] == headId or c["代号"] == headId then
+                                                speakerName = c["姓名"] or "???"
+                                                break
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                        if not speakerName then speakerName = "???" end
+                        w.write("【" .. speakerName .. "】" .. tostring(text))
+                    end
+                else
+                    local w = rawget(_G, "WebUI")
+                    if w then w.write("[对话文本为空, talkId=" .. tostring(talkId) .. "]") end
+                end
+                return
+            end
+        end
+        local w = rawget(_G, "WebUI")
+        if w then w.write("[未找到对话, talkId=" .. tostring(talkId) .. "]") end
+    end)
+end
+
+local function determineDrawState()
+    local AsyncDialog = _G.AsyncDialog or (package.loaded["framework.async_dialog"])
+    if AsyncDialog and AsyncDialog.getInstance():hasDialog() then
+        return "dialog"
+    end
+    local MenuAsync = _G.MenuAsync or (package.loaded["framework.menu_async"])
+    if MenuAsync and MenuAsync.hasActiveMenu and MenuAsync.hasActiveMenu() then
+        return "menu"
+    end
+    return "idle"
+end
+
+-- processEventQueue
+function processEventQueue(timestamp)
+    local AsyncDialog = _G.AsyncDialog or (package.loaded["framework.async_dialog"])
+    local hasDialog = AsyncDialog and AsyncDialog.getInstance():hasDialog()
+    local MenuAsync = _G.MenuAsync or (package.loaded["framework.menu_async"])
+    local hasMenu = MenuAsync and MenuAsync.hasActiveMenu and MenuAsync.hasActiveMenu()
+
+    -- 0. 先更新状态机，确保 JY.Status 与当前状态同步（在事件处理之前）
+    local StateMachine = _G.StateMachine or (package.loaded["framework.state_machine"])
+    if StateMachine then
+        local sm = StateMachine.getInstance()
+        if sm and sm.update then
+            sm:update(0)
+        end
+    end
+
+    -- 1. 处理输入事件（仅当无对话框时消费事件；对话框自己通过 lib.GetKey 消费）
+    if not hasDialog then
+        -- 终局：游戏已结束，不再处理任何场景命令
+        if rawget(_G, "__gameOver") then
+            -- 只在终局第一帧提示一次（后续每 16ms 一帧都会进入此分支，
+            -- 若不守卫会刷屏无限打印“游戏已结束”——Issue2 无限循环打印根因）
+            if not rawget(_G, "__gameOverNotified") then
+                rawset(_G, "__gameOverNotified", true)
+                local wEnd = rawget(_G, "WebUI")
+                if wEnd and wEnd.write then
+                    wEnd.write("游戏已结束。输入 quit 退出。\n")
+                end
+            end
+            local JSG = rawget(_G, "JSBridge")
+            if JSG and JSG.getEventCount and JSG.getEventCount() > 0 then
+                JSG.getEvent() -- 丢弃积压的输入
+            end
+            return
+        end
+        local JSBridge = rawget(_G, "JSBridge")
+        if JSBridge and JSBridge.getEventCount and JSBridge.getEventCount() > 0 then
+            local evt = JSBridge.getEvent()
+            if evt and type(evt) == "table" and evt.type == "input" then
+                local text = evt.data
+                if text and text ~= "" then
+                    local cmd, arg = text:match("^(%S+)%s*(.-)$")
+                    cmd = cmd and cmd:lower() or ""
+
+                    if cmd == "choose" then
+                        local n = tonumber(arg)
+                        -- 优先处理 instruct_4 的用户响应
+                        if rawget(_G, "__instruct4_waiting") and n ~= nil then
+                            rawset(_G, "__instruct4_waiting", false)
+                            rawset(_G, "__instruct4_result", n == 1)
+                        elseif rawget(_G, "__instruct9_waiting") and n ~= nil then
+                            rawset(_G, "__instruct9_waiting", false)
+                            rawset(_G, "__instruct9_result", n == 1)
+                        elseif rawget(_G, "__instruct5_waiting") and n ~= nil then
+                            rawset(_G, "__instruct5_waiting", false)
+                            rawset(_G, "__instruct5_result", n == 1)
+                        elseif hasMenu and n and JY.Status ~= 4 and JY.Status ~= 5 then
+                            MenuAsync.closeMenu(n)
+                            lastDrawState = nil
+                        elseif hasMenu and n and JY.Status == 5 then
+                            -- 战斗中活动菜单必为陈旧菜单（战斗 UI 不用 MenuAsync）：
+                            -- 陈旧场景列表菜单的回调会 goToScene(第1项=一燈居) 劫持 choose
+                            -- （P6 Step14 一燈居根因）。丢弃该 choose 并清掉陈旧菜单。
+                            MenuAsync.clear()
+                            lastDrawState = nil
+                            w("战斗中忽略菜单选择。输入 look 查看战场态势。")
+                        elseif (not hasMenu or JY.Status == 4) and n ~= nil then
+                        local JY = rawget(_G, "JY")
+                        local n = tonumber(arg)
+                        if JY and (JY.Status == 2 or JY.Status == 4 or JY.Status == 5) and n ~= nil then
+                            local handled = RoleMenu_handleChoose(n)
+                            if handled then
+                                -- 角色管理已处理
+                            elseif JY.Status == 5 then
+                                local wh = rawget(_G, "WmapHandlers")
+                                if wh and wh.chooseInteraction then
+                                    wh.chooseInteraction(n)
+                                end
+                            elseif JY.Status == 4 then
+                                local sh = rawget(_G, "SmapHandlers")
+                                if sh and sh.chooseInteraction then
+                                    sh.chooseInteraction(n)
+                                end
+                            elseif JY.Status == 2 then
+                                local mh = rawget(_G, "MmapHandlers")
+                                if mh and mh.chooseInteraction then
+                                    mh.chooseInteraction(n)
+                                end
+                            end
+                        end
+                        end
+                    elseif cmd == "leave" then
+                        local JY = rawget(_G, "JY")
+                        if JY and JY.Status == 4 then
+                            local sh = rawget(_G, "SmapHandlers")
+                            if sh and sh.leave then sh.leave() end
+                            JY.Status = 2
+                        elseif JY and JY.Status == 2 then
+                            local wUI = rawget(_G, "WebUI")
+                            if wUI then wUI.write("未知命令: leave") end
+                        elseif JY and JY.Status == 5 then
+                            -- WMAP: 退出战斗，返回 MMAP
+                            local wUI = rawget(_G, "WebUI")
+                            if wUI then wUI.write("退出战斗。\n") end
+                            JY.War = nil
+                            JY.Status = 2
+                            local mh = rawget(_G, "MmapHandlers")
+                            if mh and mh.look then mh.look({}) end
+                        end
+                    elseif cmd == "menu" then
+                        local JY = rawget(_G, "JY")
+                        if JY and (JY.Status == 2 or JY.Status == 4) then
+                            rawget(_G, "SmapHandlers").menu({})
+                        end
+                    elseif cmd == "look" then
+                        local JY = rawget(_G, "JY")
+                        if JY then
+                            if JY.Status == 4 then
+                                local sh = rawget(_G, "SmapHandlers")
+                                if sh and sh.look then sh.look({}) end
+                            elseif JY.Status == 2 then
+                                local mh = rawget(_G, "MmapHandlers")
+                                if mh and mh.look then mh.look({}) end
+                            elseif JY.Status == 5 then
+                                -- GAME_WMAP(战斗): look 需路由到 WmapHandlers.look 显示战场态势
+                                -- （此前遗漏 Status==5 分支，导致战斗中 look 无输出，war 战斗 e2e 失败）
+                                local wh = rawget(_G, "WmapHandlers")
+                                if wh and wh.look then wh.look({}) end
+                            end
+                        end
+                    elseif cmd == "list" then
+                        -- MMAP: 列出可去场景
+                        local JY = rawget(_G, "JY")
+                        if JY and JY.Status == 2 then
+                            local mh = rawget(_G, "MmapHandlers")
+                            if mh and mh.list then mh.list({}) end
+                        end
+                    elseif cmd == "load" then
+                        -- 直接读档：load <slot>
+                        local n = tonumber(arg)
+                        if n and n >= 1 and n <= 10 then
+                            local loadGS = rawget(_G, "loadGameState")
+                            if loadGS then
+                                local ok = loadGS(n)
+                                if ok then
+                                    local wUI = rawget(_G, "WebUI")
+                                    if wUI then wUI.write("读取完成。\n") end
+                                    local resetMenu = rawget(_G, "resetMenuPhase")
+                                    if resetMenu then resetMenu() end
+                                    local JY = rawget(_G, "JY")
+                                    if JY then
+                                        if JY.Status == 2 then
+                                            local ml = rawget(_G, "MmapHandlers")
+                                            if ml and ml.look then ml.look({}) end
+                                        elseif JY.Status == 4 then
+                                            local sl = rawget(_G, "SmapHandlers")
+                                            if sl and sl.look then sl.look({}) end
+                                        end
+                                    end
+                                else
+                                    local wUI = rawget(_G, "WebUI")
+                                    if wUI then wUI.write("读取失败。\n") end
+                                end
+                            end
+                        end
+                    elseif cmd == "save" then
+                        -- 直接存档：save <slot>
+                        local n = tonumber(arg)
+                        if n and n >= 1 and n <= 10 then
+                            local saveGS = rawget(_G, "saveGameState")
+                            if saveGS then
+                                if saveGS(n) then
+                                    local wUI = rawget(_G, "WebUI")
+                                    if wUI then wUI.write(string.format("已保存到槽位%d。\n", n)) end
+                                end
+                            end
+                        end
+                    else
+                        -- 非 SMAP/WMAP 状态：走 CommandEngine dispatch（原版逻辑）
+                        local CE = rawget(_G, "CommandEngine")
+                        if CE then
+                            local parsed = CE.parseCommand(text)
+                            if parsed then
+                                local handled = CE.dispatchCommand(parsed.cmd, parsed.args)
+                                if not handled then
+                                    local wUI = rawget(_G, "WebUI")
+                                    if wUI then wUI.write("未知命令: " .. cmd) end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 2. 更新对话框（在协程调度器之前执行，确保对话框先消费输入）
+    local AsyncDialog2 = _G.AsyncDialog or (package.loaded["framework.async_dialog"])
+    if AsyncDialog2 then
+        local di = AsyncDialog2.getInstance()
+        if di and di.update then
+            di:update(0)
+        end
+    end
+
+    -- 3. 驱动协程调度器
+    local cs = _G.CoroutineScheduler or (package.loaded["framework.coroutine_scheduler"])
+    if cs then
+        local s = cs.getInstance()
+        if s and s.update then
+            s:update(0)
+        end
+    end
+
+    -- 4. 更新状态机（二次同步，确保协程执行后的状态变化被捕获）
+    if StateMachine then
+        local sm = StateMachine.getInstance()
+        if sm and sm.update then
+            sm:update(0)
+        end
+    end
+
+    -- 5. 更新菜单（不绘制，仅处理逻辑）
+    if MenuAsync then
+        local ma = MenuAsync.getInstance
+        if ma then
+            local mi = ma()
+            if mi and mi.update then
+                mi:update(0)
+            end
+        end
+    end
+end
+
+-- 覆盖 saveGameState 以将数据也存储到 Lua 全局变量 __saveCache
+-- （解决 JSBridge.load 在 __index=error 后不可用的问题）
+local function patchSaveGameState()
+    local origSave = rawget(_G, "saveGameState")
+    if origSave and not rawget(_G, "__savePatched") then
+        rawset(_G, "saveGameState", function(slotId)
+            local result = origSave(slotId)
+            if result then
+                -- 从 luaSaveCache 读取数据并存储到 Lua 全局变量
+                local prefix = "save_"
+                local json = nil
+                pcall(function() json = _G.JSBridge.load(prefix .. tostring(slotId)) end)
+                if json then
+                    rawget(_G, "__saveCache")[prefix .. tostring(slotId)] = json
+                end
+            end
+            return result
+        end)
+        rawset(_G, "__savePatched", true)
+    end
+end
+-- 覆盖 loadGameState 以从 Lua 全局变量 __saveCache 读取
+-- 注意：initWebFramework 内部（第 1158~1252 行）已有更好版本的直接解析实现，
+-- 此函数仅作为补充：若第一批补丁未运行（__savePatched 不存在），则添加后备修补
+local function patchLoadGameState()
+    if rawget(_G, "__savePatched") then return end  -- 第一批补丁已生效，跳过
+    local origLoad = rawget(_G, "loadGameState")
+    if origLoad and not rawget(_G, "__loadPatched") then
+        rawset(_G, "loadGameState", function(slotId)
+            local prefix = "save_"
+            local key = prefix .. tostring(slotId)
+            -- 先尝试从 Lua 全局变量 __saveCache 读取并直接解析
+            local cache = rawget(_G, "__saveCache")
+            local json = cache and cache[key]
+            if json then
+                local parseJSON = rawget(_G, "parseJSON")
+                local restoreNumericKeys = rawget(_G, "restoreNumericKeys")
+                if parseJSON then
+                    local ok, data = pcall(parseJSON, json)
+                    if ok and data then
+                        if not rawget(_G, "JY") then rawset(_G, "JY", {}) end
+                        local JY = rawget(_G, "JY")
+                        local restoreMap = { base = "Base", persons = "Person", things = "Thing", scenes = "Scene", wugongs = "Wugong", shops = "Shop", status = "Status", subScene = "SubScene", mmapMusic = "MmapMusic", currentD = "CurrentD", dTable = "D" }
+                        for jk, jyK in pairs(restoreMap) do
+                            local src = data[jk]
+                            if src then JY[jyK] = (restoreNumericKeys and restoreNumericKeys(src)) or src end
+                        end
+                        if JY.Status == nil then JY.Status = 2 end
+                        if JY.SubScene == nil then JY.SubScene = 0 end
+                        local sm = rawget(_G, "StateMachine")
+                        if sm then local inst = sm.getInstance(); if inst and inst.switchTo then pcall(inst.switchTo, inst, JY.Status) end end
+                        return true
+                    end
+                end
+            end
+            return origLoad(slotId)
+        end)
+        rawset(_G, "__loadPatched", true)
+    end
+end
+rawset(_G, "__saveCache", {})
+-- 注意：patchSaveGameState/patchLoadGameState 在 initWebFramework 内部调用
+-- 确保 saveGameState/loadGameState 已定义后修补

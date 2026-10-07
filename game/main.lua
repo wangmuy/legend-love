@@ -2,25 +2,28 @@
 -- 重构后的标准Love2D回调实现
 
 -- 全局模块引用
-local EventBridge = require("event_bridge")
-local MenuAsync = require("menu_async")
-local JYMainAdapter = require("jymain_adapter")
+local EventBridge = require("framework.event_bridge")
+local MenuAsync = require("framework.menu_async")
+local JYMainAdapter = require("framework.jymain_adapter")
+
+-- 注册 Love2D 按键回调
+function love.keypressed(key, scancode, isrepeat)
+    local InputManager = require("framework.input_manager")
+    InputManager.getInstance():onKeyPressed(key, scancode, isrepeat)
+end
+
+function love.keyreleased(key, scancode)
+    local InputManager = require("framework.input_manager")
+    InputManager.getInstance():onKeyReleased(key, scancode)
+end
 
 function love.load()
-    -- 使用 regular alpha 模式（非预乘）
-    if love.graphics then
-        love.graphics.setBlendMode("alpha")
-        love.graphics.setDefaultFilter("nearest", "nearest")
-        love.graphics.setBackgroundColor(0, 0, 0, 1)
-    end
-    
-    math.randomseed(os.time())
-    math.random()
-    
     -- 加载配置
-    require "config"
-    Byte = require "lib_Byte"
-    lib = require "lib_love"
+    require "framework.config"
+    Byte = require "framework.lib_Byte"
+    require "engine-love2d.lib_love"  -- 保持初始化（加载 jyconst.lua、设置 keymap 等）
+    lib = require "engine-love2d.engine_love2d"  -- EngineAPI 接口，覆盖 lib 全局变量
+    lib.init()  -- Love2D 引擎初始化（图形设置、随机种子等）
     
     -- 加载事件桥接器并初始化
     EventBridge.getInstance():init()
@@ -60,9 +63,6 @@ function love.draw()
         lib.SetDrawLoopFlag(false)
     end
 end
-
--- 按键事件由event_bridge在init()中注册
--- 这里不需要定义love.keypressed/love.keyreleased
 
 function love.quit()
     -- 清理资源

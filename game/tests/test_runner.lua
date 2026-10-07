@@ -10,6 +10,8 @@ local TestByteIO = require("tests.unit.test_byte_io")
 local TestScriptLoader = require("tests.unit.test_script_loader")
 local TestItemAsync = require("tests.unit.test_item_async")
 local TestWarAsync = require("tests.unit.test_war_async")
+local TestEngineAPI = require("tests.unit.test_engine_api")
+local TestEngineTest = require("tests.unit.test_engine_test")
 
 local TestRunner = {}
 
@@ -115,6 +117,28 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + warStats.failed
     allPassed = allPassed and warResult
     
+    print("\n" .. string.rep("-", 60))
+    print("运行 EngineAPI 接口测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local eaResult = TestEngineAPI.runAll()
+    local eaStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + eaStats.total
+    totalStats.passed = totalStats.passed + eaStats.passed
+    totalStats.failed = totalStats.failed + eaStats.failed
+    allPassed = allPassed and eaResult
+    
+    print("\n" .. string.rep("-", 60))
+    print("运行测试引擎测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local etResult = TestEngineTest.runAll()
+    local etStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + etStats.total
+    totalStats.passed = totalStats.passed + etStats.passed
+    totalStats.failed = totalStats.failed + etStats.failed
+    allPassed = allPassed and etResult
+    
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -153,9 +177,13 @@ function TestRunner.runModule(moduleName)
         return TestItemAsync.runAll()
     elseif moduleName == "war_async" then
         return TestWarAsync.runAll()
+    elseif moduleName == "engine_api" then
+        return TestEngineAPI.runAll()
+    elseif moduleName == "engine_test" then
+        return TestEngineTest.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test")
         return false
     end
 end

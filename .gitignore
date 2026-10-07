@@ -4,6 +4,27 @@ game/debug.txt
 builds/
 
 # opencode
-.opencode/
+opencode.json
+.opencode/*
 !.opencode/command/
 !.opencode/skills/
+
+# codex
+.codex/*
+!.codex/skills/
+
+# claude
+.claude/*
+!.claude/commands/
+!.claude/skills/
+
+.atomcode/*
+
+
+# Web MUD build artifacts
+game/engine-web/data-web/
+test-results/
+game/engine-web/node_modules/
+game/engine-web/dist/
+game/engine-web/lib/
+game/engine-web/tests/bridge-*.json
