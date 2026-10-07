@@ -2,7 +2,7 @@
 -- 状态机模块单元测试
 
 local TestHelper = require("tests.test_helper")
-local StateMachine = require("state_machine")
+local StateMachine = require("framework.state_machine")
 
 local TestStateMachine = {}
 

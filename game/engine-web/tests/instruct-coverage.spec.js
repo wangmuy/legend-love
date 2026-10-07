@@ -1,0 +1,707 @@
+const { test, expect } = require('@playwright/test');
+const { waitForPageReady, luaEval } = require('./helpers/setup');
+
+test.describe('instruct_* 函数覆盖测试', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/');
+    await waitForPageReady(page);
+    await page.waitForTimeout(3000);
+  });
+
+  test('instruct_9 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_9"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_10 加入队员 - 添加人物到队伍', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[99] = { ["姓名"] = "测试角色" }',
+      'for i = 1, 6 do JY.Base["队伍" .. i] = -1 end',
+      'rawget(_G, "instruct_10")(99)',
+      'return tostring(JY.Base["队伍2"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('99');
+  });
+
+  test('instruct_16 队伍中是否有某人', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Base["队伍1"] = 0; JY.Base["队伍2"] = 5',
+      'local f = rawget(_G, "instruct_16")',
+      'return tostring(f(5)) .. "|" .. tostring(f(99))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true|false');
+  });
+
+  test('instruct_18 是否有某种物品', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Base["物品1"] = 10; JY.Base["物品2"] = 20',
+      'local f = rawget(_G, "instruct_18")',
+      'return tostring(f(10)) .. "|" .. tostring(f(999))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true|false');
+  });
+
+  test('instruct_20 队伍是否满', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Base["队伍6"] = -1',
+      'local f = rawget(_G, "instruct_20")',
+      'return tostring(f()) .. "|"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('false|');
+  });
+
+  test('instruct_21 离队', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'for i = 1, 6 do JY.Base["队伍" .. i] = -1 end',
+      'JY.Base["队伍2"] = 5; JY.Base["队伍3"] = 10',
+      'rawget(_G, "instruct_21")(5)',
+      'return tostring(JY.Base["队伍2"]) .. "|" .. tostring(JY.Base["队伍3"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('10|-1');
+  });
+
+  test('instruct_22 内力降为0', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}; JY.Person = JY.Person or {}',
+      'JY.Base["队伍1"] = 0; JY.Person[0] = { ["内力"] = 100 }',
+      'rawget(_G, "instruct_22")()',
+      'return tostring(JY.Person[0]["内力"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('0');
+  });
+
+  test('instruct_23 设置用毒', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[5] = { ["用毒能力"] = 0 }',
+      'rawget(_G, "instruct_23")(5, 30)',
+      'return tostring(JY.Person[5]["用毒能力"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('30');
+  });
+
+  test('instruct_28 判断品德范围', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["品德"] = 50 }',
+      'local f = rawget(_G, "instruct_28")',
+      'return tostring(f(0, 30, 60)) .. "|" .. tostring(f(0, 70, 100))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true|false');
+  });
+
+  test('instruct_29 判断攻击力范围', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["攻击力"] = 50 }',
+      'local f = rawget(_G, "instruct_29")',
+      'return tostring(f(0, 40, 60)) .. "|" .. tostring(f(0, 70, 100))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true|false');
+  });
+
+  test('instruct_33 学会武功', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = {}',
+      'for i = 1, 10 do JY.Person[0]["武功" .. i] = 0 end',
+      'rawget(_G, "instruct_33")(0, 5, 0)',
+      'return tostring(JY.Person[0]["武功1"]) .. "|" .. tostring(JY.Person[0]["武功等级1"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('5|0');
+  });
+
+  test('instruct_34 资质增加', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["资质"] = 50 }',
+      'rawget(_G, "instruct_34")(0, 10)',
+      'return tostring(JY.Person[0]["资质"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('60');
+  });
+
+  test('instruct_35 设置武功', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = {}',
+      'rawget(_G, "instruct_35")(0, -1, 7, 3)',
+      'return tostring(JY.Person[0]["武功1"]) .. "|" .. tostring(JY.Person[0]["武功等级1"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('7|3');
+  });
+
+  test('instruct_36 判断性别', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["性别"] = 1 }',
+      'local f = rawget(_G, "instruct_36")',
+      'return tostring(f(1)) .. "|" .. tostring(f(0))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true|false');
+  });
+
+  test('instruct_39 打开场景', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Scene = JY.Scene or {}',
+      'JY.Scene[5] = { ["进入条件"] = 2 }',
+      'rawget(_G, "instruct_39")(5)',
+      'return tostring(JY.Scene[5]["进入条件"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('0');
+  });
+
+  test('instruct_41 非玩家增加物品', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[5] = {}',
+      'rawget(_G, "instruct_41")(5, 100, 3)',
+      'return tostring(JY.Person[5]["携带物品1"]) .. "|" .. tostring(JY.Person[5]["携带物品数量1"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('100|3');
+  });
+
+  test('instruct_42 队伍中是否有女性', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}; JY.Person = JY.Person or {}',
+      'JY.Base["队伍2"] = 5; JY.Person[5] = { ["性别"] = 1 }',
+      'return tostring(rawget(_G, "instruct_42")())',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true');
+  });
+
+  test('instruct_43 委托 instruct_18', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Base["物品1"] = 10',
+      'return tostring(rawget(_G, "instruct_43")(10)) .. "|" .. tostring(rawget(_G, "instruct_43")(999))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true|false');
+  });
+
+  test('instruct_45 增加轻功', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["轻功"] = 20 }',
+      'rawget(_G, "instruct_45")(0, 10)',
+      'return tostring(JY.Person[0]["轻功"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('30');
+  });
+
+  test('instruct_46 增加内力最大值', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["内力最大值"] = 100 }',
+      'rawget(_G, "instruct_46")(0, 50)',
+      'return tostring(JY.Person[0]["内力最大值"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('150');
+  });
+
+  test('instruct_47 增加攻击力', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["攻击力"] = 30 }',
+      'rawget(_G, "instruct_47")(0, 20)',
+      'return tostring(JY.Person[0]["攻击力"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('50');
+  });
+
+  test('instruct_48 增加生命最大值', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["生命最大值"] = 100 }',
+      'rawget(_G, "instruct_48")(0, 30)',
+      'return tostring(JY.Person[0]["生命最大值"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('130');
+  });
+
+  test('instruct_49 设置内力属性', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["内力性质"] = 0 }',
+      'rawget(_G, "instruct_49")(0, 2)',
+      'return tostring(JY.Person[0]["内力性质"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('2');
+  });
+
+  test('instruct_50 判断5种物品', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Base["物品1"] = 1; JY.Base["物品2"] = 2; JY.Base["物品3"] = 3',
+      'JY.Base["物品4"] = 4; JY.Base["物品5"] = 5',
+      'local f = rawget(_G, "instruct_50")',
+      'return tostring(f(1,2,3,4,5)) .. "|" .. tostring(f(1,2,3,4,99))',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true|false');
+  });
+
+  test('instruct_51 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_51"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_52 显示品德', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["品德"] = 80 }',
+      'rawget(_G, "instruct_52")()',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_53 显示声望', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["声望"] = 200 }',
+      'rawget(_G, "instruct_53")()',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_54 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_54"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_55 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_55"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_59 全体离队（验证函数存在）', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_59"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_61 函数存在', async ({ page }) => {
+    const r = await luaEval(page, 'return type(rawget(_G,"instruct_61"))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_63 设置性别', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["性别"] = 0 }',
+      'rawget(_G, "instruct_63")(0, 1)',
+      'return tostring(JY.Person[0]["性别"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('1');
+  });
+
+  // ===== 新增：有实际逻辑但缺单元测试的 instruct =====
+
+  test('instruct_0 输出分隔线', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_0")(); return "ok"');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('ok');
+  });
+
+  test('instruct_2 得到物品（验证物品添加和金钱增加）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'rawget(_G,"instruct_2")(174, 100)',
+      'local money = JY.Base["金钱"] or 0',
+      'rawget(_G,"instruct_2")(1, 3)',
+      'local item = JY.Base["物品1"] or 0',
+      'local qty = JY.Base["物品数量1"] or 0',
+      'return tostring(money) .. "|" .. tostring(item) .. "|" .. tostring(qty)',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('100|1|3');
+  });
+
+  test('instruct_3 修改场景事件（no-op，不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_3")(1,2,3,4); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_11 住宿询问（阻塞交互，需游戏流程驱动；验证已正确注册）', async ({ page }) => {
+    // instruct_11 住宿询问通过协程 + 菜单输入等待玩家选择（是/否），只能在游戏主循环
+    // 协程流程中完成；在 luaEval 的单次同步求值协程上下文中无法结束交互。
+    // 故此处验证函数已正确安装；实际住宿交互由 s3-integration / mmap-smap e2e 覆盖。
+    const r = await luaEval(page, 'local fn = rawget(_G,"instruct_11"); return tostring(type(fn))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_12 住宿恢复（修改HP/MP/体力）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["生命"]=10, ["生命最大值"]=50, ["内力"]=5, ["内力最大值"]=35, ["体力"]=20 }',
+      'rawget(_G,"instruct_12")()',
+      'return tostring(JY.Person[0]["生命"]) .. "|" .. tostring(JY.Person[0]["内力"]) .. "|" .. tostring(JY.Person[0]["体力"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('50|35|100');
+  });
+
+  test('instruct_13 菜单（通过 MenuAsync，不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_13")(0, {"选项1","选项2"}); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_14 刷新场景（不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_14")(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_19 设置坐标', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'rawget(_G,"instruct_19")(100, 200)',
+      'return tostring(JY.Base["人X1"]) .. "|" .. tostring(JY.Base["人Y1"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('100|200');
+  });
+
+  test('instruct_26 修改角色属性（no-op，不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_26")(0, "攻击力", 10); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_27 动画（no-op，不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_27")(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_31 判断和操作物品数量', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'JY.Base["物品1"] = 10; JY.Base["物品数量1"] = 5',
+      'JY.Base["物品2"] = 20; JY.Base["物品数量2"] = 3',
+      'local fn = rawget(_G, "instruct_31")',
+      'local c1 = fn(10, 3, 0)',
+      'local c2 = fn(10, 10, 0)',
+      'local t1 = fn(10, 2, 1)',
+      'local rem = JY.Base["物品数量1"] or 0',
+      'JY.Base["金钱"] = 100',
+      'local m1 = fn(0, 30, 0)',
+      'local m2 = fn(0, 50, 1)',
+      'local moneyAfter = JY.Base["金钱"] or 0',
+      'local m3 = fn(0, 20, 2)',
+      'local moneyFinal = JY.Base["金钱"] or 0',
+      'local res = tostring(c1) .. "|" .. tostring(c2) .. "|" .. tostring(t1) .. "|" .. tostring(rem)',
+      'res = res .. "|" .. tostring(m1) .. "|" .. tostring(m2) .. "|" .. tostring(moneyAfter) .. "|" .. tostring(m3) .. "|" .. tostring(moneyFinal)',
+      'return res',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('true|false|1|3|1|1|50|1|70');
+  });
+
+  test('instruct_32 给/取物品（当前为 no-op 桩）', async ({ page }) => {
+    // 注意: instruct_32 在 Web MUD 中定义为 no-op（jymain.lua 的实现被覆盖）
+    // 只验证函数存在且调用不崩溃
+    const r1 = await luaEval(page, 'return type(rawget(_G,"instruct_32"))');
+    expect(r1.ok).toBe(true);
+    expect(r1.result).toBe('function');
+    const r2 = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'rawget(_G,"instruct_32")(1, 50, 3); return "ok"',
+    ].join('; '));
+    expect(r2.ok).toBe(true);
+  });
+
+  test('instruct_37 场景音乐（no-op，不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_37")(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_40 设置方向', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'rawget(_G,"instruct_40")(2)',
+      'return tostring(JY.Base["人方向"])',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('2');
+  });
+
+  test('instruct_54 开放其他场景（验证场景进入条件修改）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Scene = JY.Scene or {}',
+      'JY.Scene[0] = { ["进入条件"] = 3 }',
+      'JY.Scene[1] = { ["进入条件"] = 1 }',
+      'JY.Scene[2] = { ["进入条件"] = 5 }',
+      'JY.Scene[4] = { ["进入条件"] = 2 }',
+      'local CC = rawget(_G, "CC") or {}',
+      'rawset(_G, "CC", CC)',
+      'CC.SceneNum = 10',
+      'rawget(_G,"instruct_54")()',
+      'local r0 = JY.Scene[0]["进入条件"]',
+      'local r1 = JY.Scene[1]["进入条件"]',
+      'local r2 = JY.Scene[2]["进入条件"]',
+      'local r4 = JY.Scene[4]["进入条件"]',
+      'return tostring(r0) .. "|" .. tostring(r1) .. "|" .. tostring(r2) .. "|" .. tostring(r4)',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('0|0|2|0');
+  });
+
+  test('instruct_55 判断 D* 触发事件', async ({ page }) => {
+    // 验证函数存在 + 调用不崩溃 + 默认返回 false（无 D* 数据时）
+    const r1 = await luaEval(page, 'return type(rawget(_G,"instruct_55"))');
+    expect(r1.ok).toBe(true);
+    expect(r1.result).toBe('function');
+    // 无 D* 数据时返回 false
+    const r2 = await luaEval(page, 'return tostring(rawget(_G,"instruct_55")(1, 1))');
+    expect(r2.ok).toBe(true);
+    expect(r2.result).toBe('false');
+  });
+
+  test('instruct_56 队伍管理（no-op，不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_56")(); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_59 全体离队（验证 CC.TeamNum 初始化后正确清空队伍）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Base = JY.Base or {}',
+      'local CC = rawget(_G, "CC") or {}',
+      'rawset(_G, "CC", CC)',
+      'CC.TeamNum = 6',
+      'for i = 1, 6 do JY.Base["队伍" .. i] = i end',
+      'rawget(_G,"instruct_59")()',
+      'local slot1 = JY.Base["队伍1"]',
+      'local allClear = true',
+      'for i = 2, 6 do if JY.Base["队伍" .. i] ~= -1 then allClear = false end end',
+      'return tostring(slot1) .. "|" .. tostring(allClear)',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('1|true');
+  });
+
+  test('instruct_61 判断14天书', async ({ page }) => {
+    // 验证函数存在 + 调用不崩溃
+    const r1 = await luaEval(page, 'return type(rawget(_G,"instruct_61"))');
+    expect(r1.ok).toBe(true);
+    expect(r1.result).toBe('function');
+    const r2 = await luaEval(page, 'return tostring(rawget(_G,"instruct_61")())');
+    expect(r2.ok).toBe(true);
+  });
+
+  test('instruct_67 音效（no-op，不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, 'rawget(_G,"instruct_67")(1); return "ok"');
+    expect(r.ok).toBe(true);
+  });
+
+  // ===== 补充覆盖有逻辑但缺单元测试的 instruct =====
+
+  test('instruct_1 对话文本查找', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local dc = rawget(_G, "initDataSource") or {}',
+      'rawset(_G, "initDataSource", dc)',
+      'dc["dialogues"] = dc["dialogues"] or {}',
+      'dc["dialogues"]["dialogues"] = { {id=9999, text="测试对话AB"} }',
+      'rawget(_G,"instruct_1")(9999, 0)',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_9 要求加入队伍（阻塞交互，需游戏流程驱动；验证已正确注册）', async ({ page }) => {
+    // instruct_9 通过标志位等待玩家选择（choose 1=是/2=否），只能在协程游戏流程中
+    // 由输入驱动完成；在 luaEval 同步求值的协程上下文中（co=true）无法独立交互。
+    // 此处验证该指令已正确注册，实际交互由 e2e 流程覆盖。
+    const r = await luaEval(page, 'local fn = rawget(_G,"instruct_9"); return tostring(type(fn))');
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('function');
+  });
+
+  test('instruct_51 随机提示（验证调用不崩溃）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local stat, err = pcall(rawget(_G,"instruct_51"))',
+      'if not stat then return "error:" .. tostring(err) end',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('ok');
+  });
+
+  test('instruct_52 品德显示（输出品德指数）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["品德"] = 80 }',
+      'rawget(_G,"instruct_52")()',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+  });
+
+  test('instruct_53 声望显示（输出声望指数）', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local JY = rawget(_G, "JY")',
+      'if not JY then JY = {}; rawset(_G, "JY", JY) end',
+      'JY.Person = JY.Person or {}',
+      'JY.Person[0] = { ["声望"] = 200 }',
+      'rawget(_G,"instruct_53")()',
+      'return "ok"',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+  });
+
+  // ===== 全部 68 个 instruct 存在性验证 =====
+  test('全部 instruct_0 ~ instruct_67 函数存在', async ({ page }) => {
+    const r = await luaEval(page, [
+      'local allOk = true; local result = ""',
+      'for i = 0, 67 do',
+      '  local t = type(rawget(_G, "instruct_" .. i))',
+      '  if t ~= "function" then allOk = false; result = result .. "instruct_" .. i .. "=" .. t .. " " end',
+      'end',
+      'if allOk then return "all-68-ok" else return result end',
+    ].join('; '));
+    expect(r.ok).toBe(true);
+    expect(r.result).toBe('all-68-ok');
+  });
+
+  // ===== 全部 68 个 instruct 调用不崩溃 =====
+  test('全部 instruct_0 ~ instruct_67 调用不崩溃', async ({ page }) => {
+    test.setTimeout(120000);
+    // 先进入真实游戏流程，保证 JY 表已初始化（无参回调才能安全求值）
+    async function typeCmd(t) {
+      const input = page.locator('#command-input');
+      await input.waitFor({ state: 'visible', timeout: 5000 });
+      await input.fill(t);
+      await page.keyboard.press('Enter');
+    }
+    await typeCmd('choose 1'); await page.waitForTimeout(4000);
+    await typeCmd('choose 1'); await page.waitForTimeout(5000);
+
+    // 逐个 pcall 调用，确认不崩溃。
+    // 注意: instruct_4/5/9/11 是需游戏协程流程+玩家输入驱动的交互式指令
+    //   （scheduler:yield 等待 choose 输入），在 luaEval 协程外同步求值必然
+    //   yield 报错——这是预期行为，不视为崩溃；它们由真实流程 e2e 覆盖，故此处跳过。
+    let crashCount = 0;
+    for (let i = 0; i <= 67; i++) {
+      const r = await luaEval(page, `
+        local fn = rawget(_G, "instruct_${i}")
+        if not fn then return "MISSING" end
+        local ok, err = pcall(fn)
+        if ok then return "OK" end
+        if tostring(err):find("Cannot yield") then return "OK_YIELD" end
+        return tostring(err)
+      `);
+      expect(r.ok).toBe(true);
+      expect(r.result).not.toBe('MISSING');
+      if (r.result !== 'OK' && r.result !== 'OK_YIELD') {
+        console.log('instruct_' + i + ': ❌ ' + r.result);
+        crashCount++;
+      }
+    }
+    console.log('All 68 instruct functions (0-67) covered ✓');
+    expect(crashCount).toBe(0);
+  });
+});

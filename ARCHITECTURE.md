@@ -46,28 +46,36 @@
 - **WarMainCoroutine 战斗入口函数**
 - 所有战斗菜单（攻击、移动、物品等）协程版本
 - 战斗动画、自动战斗协程版本
+- 支持移动范围显示、攻击方向选择
 
-### 8. 事件指令系统 (instruct_async.lua)
-- 所有 67 个 instruct_XXX 函数的协程版本
-- 替换所有阻塞调用为异步版本
-- 与事件执行器集成
+### 8. 人物状态系统 (person_status_async.lua)
+- 异步显示人物属性面板
+- 支持翻页查看多个队友
+- 在 draw 中渲染，协程中等待按键
 
-### 9. 事件执行器 (event_executor.lua)
+### 9. 物品系统 (item_async.lua)
+- 异步物品分类选择（剧情/装备/秘籍/药品/暗器）
+- 物品使用（装备/修炼/使用）的协程版本
+
+### 10. 事件指令系统
+- 所有 instruct_XXX 函数通过 async_globals.lua 自动替换为异步版本
+
+### 11. 事件执行器 (event_executor.lua)
 - 自动在协程中执行事件脚本
 - 安装异步全局函数替换
 - 支持 EventExecuteSync 入口
 
-### 10. 异步全局替换 (async_globals.lua)
+### 12. 异步全局替换 (async_globals.lua)
 - 自动检测是否在协程中
 - 在协程中自动使用异步版本
 - 支持安装/卸载替换
 
-### 11. 事件桥接 (event_bridge.lua)
+### 13. 事件桥接 (event_bridge.lua)
 - 集成所有模块
 - 提供统一的 update/draw 入口
 - 向后兼容原有 API
 
-### 12. 游戏状态处理器 (game_states.lua)
+### 14. 游戏状态处理器 (game_states.lua)
 - 定义所有游戏状态的行为
 - 包含 GAME_START、GAME_MMAP、GAME_SMAP、GAME_WMAP、GAME_FIRSTMMAP
 - 状态 enter/update/draw/exit 生命周期
@@ -104,7 +112,7 @@ AsyncDialog.getInstance():showYesNo("确定吗？", function(result)
 end)
 
 -- 协程版本
-local result = AsyncDialog.getInstance():showYesNoCoroutine("确定吗？")
+local result = AsyncMessageBox.ShowYesNoCoroutine(-1, -1, "确定吗？")
 ```
 
 ### 等待按键
@@ -132,44 +140,59 @@ EventExecutor.startEvent(id, flag, callback)
 ```
 game/
 ├── main.lua                    # 主入口，Love2D 回调
-├── config.lua                  # 游戏配置
 ├── conf.lua                    # Love2D 配置
 │
-├── lib_love.lua                # 图形/音频封装
-├── lib_Byte.lua                # 二进制数据工具
-├── lib_log.lua                 # 日志工具
+├── engine-love2d/              # Love2D 引擎实现（可整体替换）
+│   ├── engine_api.lua          # EngineAPI 接口定义
+│   ├── engine_love2d.lua       # EngineAPI Love2D 实现
+│   └── lib_love.lua            # 原始 Love2D 实现，被委托
 │
-├── coroutine_scheduler.lua     # 协程调度器
-├── state_machine.lua           # 状态机
-├── input_manager.lua           # 输入管理器
-├── input_async.lua             # 异步输入函数
+├── engine-mud/                 # MUD 文本引擎（预留）
+│   └── engine_mud.lua
 │
-├── async_dialog.lua            # 异步对话框
-├── async_message_box.lua       # 异步消息框
-├── async_wrapper.lua           # 异步函数包装器
-├── async_globals.lua           # 异步全局替换
+├── framework/                  # 引擎无关框架，只通过 EngineAPI 调用
+│   ├── event_bridge.lua        # 事件桥接
+│   ├── state_machine.lua       # 状态机
+│   ├── game_states.lua         # 游戏状态定义
+│   ├── input_manager.lua       # 输入管理器
+│   ├── coroutine_scheduler.lua # 协程调度器
+│   ├── input_async.lua         # 异步输入函数
+│   ├── async_dialog.lua        # 异步对话框
+│   ├── async_message_box.lua   # 异步消息框
+│   ├── async_globals.lua       # 异步全局替换
+│   ├── async_wrapper.lua       # 异步函数包装器
+│   ├── menu_state_machine.lua  # 菜单状态机
+│   ├── menu_async.lua          # 异步菜单
+│   ├── talk_async.lua          # 异步对话系统
+│   ├── war_async.lua           # 异步战斗系统
+│   ├── event_executor.lua      # 事件执行器
+│   ├── jymain_adapter.lua      # 主逻辑适配器
+│   ├── jymain_async.lua        # 主逻辑异步版本
+│   ├── person_status_async.lua # 人物状态异步
+│   ├── item_async.lua          # 物品系统异步
+│   ├── lib_Byte.lua            # 二进制数据工具
+│   ├── lib_file.lua            # 文件操作封装
+│   ├── lib_log.lua             # 日志工具
+│   ├── luabit.lua              # 位运算库
+│   ├── perf_log.lua            # 性能日志
+│   ├── config.lua              # 游戏配置
+│   └── script_loader.lua       # 脚本加载器
 │
-├── menu_state_machine.lua      # 菜单状态机
-├── menu_async.lua              # 异步菜单
+├── script/                     # 游戏脚本
+│   ├── jymain.lua              # 游戏主逻辑
+│   ├── jyconst.lua             # 游戏常量
+│   ├── jymodify.lua            # 游戏修改
+│   ├── oldevent/               # 旧版事件脚本 (1018个)
+│   └── newevent/               # 新版事件脚本
 │
-├── talk_async.lua              # 异步对话系统
-├── war_async.lua               # 异步战斗系统
-├── instruct_async.lua          # 异步事件指令
-│
-├── event_executor.lua          # 事件执行器
-├── event_bridge.lua            # 事件桥接
-├── game_states.lua             # 游戏状态定义
-│
-├── jymain_adapter.lua          # 主逻辑适配器
-├── jymain_async.lua            # 主逻辑异步版本
-│
-└── script/
-    ├── jymain.lua              # 游戏主逻辑（已添加废弃警告）
-    ├── jyconst.lua             # 游戏常量
-    ├── jymodify.lua            # 游戏修改
-    ├── oldevent/               # 旧版事件脚本
-    └── newevent/               # 新版事件脚本
+├── data/ / pic/ / sound/       # 资源文件
+└── tests/                      # 单元测试 + engine_test.lua
+└── tests/                      # 单元测试
 ```
+
+> **废弃文件**（不参与运行）：
+> - `event_coroutine.lua` - 已废弃，被 event_executor.lua 替代
+> **废弃文件**（不参与运行）：`convert.lua`
 
 ## 废弃的阻塞函数
 
@@ -186,8 +209,10 @@ game/
 ## 注意事项
 
 1. **所有阻塞式代码已改造为协程版本**
-2. **事件脚本执行时自动安装异步全局替换**
+2. **事件脚本执行时自动安装异步全局替换**（async_globals.lua）
 3. **状态机自动同步 JY.Status**
 4. **战斗结束后自动返回之前状态**
 5. **协程调度器每帧自动更新所有挂起的协程**
 6. **输入管理器每帧自动重置按键状态**
+7. **事件脚本独立于游戏框架，运行时动态加载**
+8. **图片/地图/音乐等资源通过 lib_love.lua 统一获取**

@@ -1,0 +1,101 @@
+name: external-ingest
+version: 1
+description: >
+  Ingestion of EXTERNAL vendor/brownfield documents into OpenSpec.
+  Handles documents from outside the project: Swagger specs from vendors,
+  PDF design docs, Word requirements, Wiki pages, Postman collections.
+  Confidence is variable (High/Medium/Low) because documents may be
+  incomplete or outdated. Outputs shadow specs in openspec/vendor-specs/.
+
+  FOR INTERNAL CODE without documentation, use the code-to-spec schema
+  instead — it reads source code directly (higher confidence, ground truth).
+
+artifacts:
+  - id: source-manifest
+    generates: source-manifest.md
+    description: >
+      Inventory of external sources: documents, APIs, repositories
+      to be ingested.
+    template: source-manifest.md
+    instruction: |
+      Create a manifest of all external source materials.
+
+      For each source, record in a table:
+      | ID | Type | Location | Provider | Version | Relevance |
+      |----|------|----------|----------|---------|-----------|
+
+      - **Source ID**: Unique identifier (VNDR-XXX for vendors, LEGACY-XXX for brownfield)
+      - **Type**: Swagger/OpenAPI, PDF, Word, Wiki, Postman, source code
+      - **Location**: File path, URL, or repository reference
+      - **Provider**: Vendor name, team, or contact
+      - **Version/Date**: When this source was delivered
+      - **Relevance**: Which domain(s) or epic(s) this source relates to
+      - **Format Notes**: Language, encoding, parsing challenges
+    requires: []
+
+  - id: spec-extraction
+    generates: spec-extraction.md
+    description: >
+      Converts external sources into OpenSpec-compatible BDD
+      shadow specs with vendor traceability IDs.
+    template: spec-extraction.md
+    instruction: |
+      For each source in the manifest, extract behavioral specifications.
+
+      Output for each source:
+      - **Extracted Specifications**: BDD-format requirements with
+        `[REQ-VENDOR-XXX]` or `[REQ-LEGACY-XXX]` IDs.
+        Given/When/Then scenarios. Focus on EXTERNAL BEHAVIOR.
+      - **Fidelity Assessment**: Confidence (High/Medium/Low),
+        assumptions made, missing information.
+      - **Integration Contract**: Input/output contracts,
+        error handling, SLA expectations.
+
+      Mark all extracted specs as "Shadow Specs — vendor-maintained."
+      They do NOT participate in delta merge during archive.
+      Store in `openspec/vendor-specs/<source-name>/spec.md`.
+    requires: [source-manifest]
+
+  - id: gap-analysis
+    generates: gap-analysis.md
+    description: >
+      Analysis of conflicts, gaps, and integration risks between
+      ingested external specs and the project's own specs.
+    template: gap-analysis.md
+    instruction: |
+      Compare extracted external specs against existing OpenSpec specs.
+
+      Sections:
+      - **Conflict Analysis**: External specs contradicting or
+        overlapping with existing specs.
+      - **Gap Analysis**: What the external system expects that
+        we don't yet account for.
+      - **Integration Risk Assessment**: Risk level, description,
+        mitigation, monitoring for each external dependency.
+      - **Architecture Impact**: Changes needed to architecture.md?
+      - **Recommended Actions**: Concrete next steps — create
+        spec-driven changes, update architecture, create tests.
+    requires: [spec-extraction]
+
+apply:
+  requires: [gap-analysis]
+  tracks: null
+  instruction: >
+    External ingest is a documentation workflow, not a code workflow.
+    After creating all artifacts:
+
+    1. Verify spec-extraction covers all sources in the manifest
+    2. Confirm gap-analysis identifies concrete actionable items
+    3. Create shadow specs in `openspec/vendor-specs/`
+    4. If gap analysis recommends changes, create spec-driven changes
+    5. Update project-profile to reference ingested vendor specs
+
+    The ingest change can be archived — outputs persist independently.
+
+    Before creating, check `openspec/skills-profile.yaml`
+    for suggested skills (key: `external-ingest.gap-analysis`).
+
+    ## UX Rule
+
+    When presenting choices (source types, risk levels, recommended actions),
+    always include "Other — write your own" as the LAST option.

@@ -1,0 +1,364 @@
+local extract = {}
+
+local function escapeJsonString(s)
+    local result = s:gsub("\\", "\\\\")
+    result = result:gsub('"', '\\"')
+    result = result:gsub("\n", "\\n")
+    result = result:gsub("\r", "\\r")
+    result = result:gsub("\t", "\\t")
+    local buf = {}
+    for i = 1, #result do
+        local byte = result:byte(i)
+        if byte < 0x20 then
+            buf[#buf + 1] = string.format("\\u%04x", byte)
+        else
+            buf[#buf + 1] = result:sub(i, i)
+        end
+    end
+    return table.concat(buf)
+end
+
+local function encodeJson(val, indent)
+    indent = indent or 0
+    local pad = string.rep("  ", indent)
+    local childPad = string.rep("  ", indent + 1)
+    local t = type(val)
+    if t == "nil" then
+        return "null"
+    elseif t == "boolean" then
+        return tostring(val)
+    elseif t == "number" then
+        if val == math.floor(val) then
+            return tostring(val)
+        end
+        return tostring(val)
+    elseif t == "string" then
+        return '"' .. escapeJsonString(val) .. '"'
+    elseif t == "table" then
+        local isArray = true
+        local maxIdx = 0
+        for k, _ in pairs(val) do
+            if type(k) ~= "number" or k < 1 then
+                isArray = false
+                break
+            end
+            if k > maxIdx then
+                maxIdx = k
+            end
+        end
+        if isArray then
+            local parts = {}
+            for i = 1, #val do
+                parts[i] = encodeJson(val[i], indent + 1)
+            end
+            if #parts == 0 then
+                return "[]"
+            end
+            return "[\n" .. childPad .. table.concat(parts, ",\n" .. childPad) .. "\n" .. pad .. "]"
+        else
+            local parts = {}
+            local keys = {}
+            for k, _ in pairs(val) do
+                table.insert(keys, k)
+            end
+            table.sort(keys)
+            for _, k in ipairs(keys) do
+                local v = val[k]
+                table.insert(parts, encodeJson(k) .. ": " .. encodeJson(v, indent + 1))
+            end
+            if #parts == 0 then
+                return "{}"
+            end
+            return "{\n" .. childPad .. table.concat(parts, ",\n" .. childPad) .. "\n" .. pad .. "}"
+        end
+    else
+        return tostring(val)
+    end
+end
+
+local function readU16(data, offset)
+    return data:byte(offset + 1) + data:byte(offset + 2) * 256
+end
+
+local function readString(data, offset, length)
+    local str = data:sub(offset + 1, offset + length)
+    return str:match("^[^%z]+") or ""
+end
+
+local function inferType(name)
+    if name == "" then return "outdoor" end
+    if name:find("客栈") or name:find("店") or name:find("楼") then return "inn" end
+    if name:find("洞") or name:find("穴") or name:find("墓") then return "cave" end
+    if name:find("寺") or name:find("庙") or name:find("庵") then return "temple" end
+    if name:find("铺") or name:find("坊") or name:find("市") then return "shop" end
+    if name:find("居") or name:find("宅") or name:find("庄") then return "house" end
+    return "outdoor"
+end
+
+local function readIdx(filename)
+    local f = io.open(filename, "rb")
+    if not f then
+        error("Cannot open " .. filename)
+    end
+    local data = f:read(24)
+    f:close()
+    if not data or #data < 24 then
+        error("idx file too short: " .. filename)
+    end
+    local idx = {0}
+    for i = 1, 6 do
+        idx[i] = readU16(data, (i - 1) * 4) + readU16(data, (i - 1) * 4 + 2) * 65536
+    end
+    return idx
+end
+
+local function readGrp(filename, offset, size)
+    local f = io.open(filename, "rb")
+    if not f then
+        error("Cannot open " .. filename)
+    end
+    f:seek("set", offset)
+    local data = f:read(size)
+    f:close()
+    if not data or #data < size then
+        error("grp file too short: " .. filename .. " (expected " .. size .. " bytes, got " .. tostring(#data) .. ")")
+    end
+    return data
+end
+
+local function readSceneHead(data, offset)
+    local id = readU16(data, offset)
+    if id == 65535 then
+        return nil
+    end
+    local name = readString(data, offset + 2, 20)
+    local exitScene = readU16(data, offset + 26)
+    local exitData = {}
+    if exitScene ~= 0 and exitScene ~= 65535 then
+        for j = 0, 2 do
+            local ex = readU16(data, offset + 42 + j * 2)
+            local ey = readU16(data, offset + 48 + j * 2)
+            if ex ~= 65535 and ey ~= 65535 then
+                local entry = {
+                    ["方向"] = "跳转",
+                    ["目标场景"] = exitScene,
+                    ["X"] = ex,
+                    ["Y"] = ey,
+                }
+                if j < 2 then
+                    entry["目标X"] = readU16(data, offset + 54 + j * 2)
+                    entry["目标Y"] = readU16(data, offset + 56 + j * 2)
+                end
+                table.insert(exitData, entry)
+            end
+        end
+    end
+    return {
+        id = id,
+        name = name,
+        exitScene = exitScene,
+        exitData = exitData,
+        entranceX = readU16(data, offset + 38),
+        entranceY = readU16(data, offset + 40),
+        mapX = readU16(data, offset + 30),
+        mapY = readU16(data, offset + 32),
+        mapX2 = readU16(data, offset + 34),
+        mapY2 = readU16(data, offset + 36),
+        exitMusic = readU16(data, offset + 22),
+        enterMusic = readU16(data, offset + 24),
+        enterCondition = readU16(data, offset + 28),
+    }
+end
+
+function extract.run(dataDir, outputFile)
+    local idxPath = dataDir .. "/ranger.idx"
+    local grpPath = dataDir .. "/ranger.grp"
+
+    local idx = readIdx(idxPath)
+    local sceneStart = idx[3]
+    local sceneEnd = idx[4]
+    local sceneCount = (sceneEnd - sceneStart) / 62
+
+    local data = readGrp(grpPath, sceneStart, sceneEnd - sceneStart)
+
+    -- 读取 allsin.grp（场景 tile 数据，6层，layer 3=事件索引）
+    local allsinGrpPath = dataDir .. "/allsin.grp"
+    local allsinIdxPath = dataDir .. "/allsin.idx"
+    local allsinIdx = {}
+    do
+        local f = io.open(allsinIdxPath, "rb")
+        if f then
+            local idxData = f:read(500)
+            f:close()
+            for i = 0, 99 do
+                allsinIdx[i + 1] = readU16(idxData, i * 4) + readU16(idxData, i * 4 + 2) * 65536
+            end
+        end
+    end
+
+    -- 读取 events.json 建立 tileIndex → 事件映射
+    local eventMap = {}  -- eventMap[sceneId][tileIndex] = {eventTouch, eventSpace, tileCurrent, tileStart, tileEnd, x, y}
+    do
+        local f = io.open("engine-web/data-web/events.json", "rb")
+        if f then
+            local json = f:read("*a")
+            f:close()
+            -- 简易 JSON 解析: 提取 event 对象数组
+            for entry in json:gmatch('{[^}]+}') do
+                local sceneId = tonumber(entry:match('"sceneId"[%s:]*([0-9-]+)'))
+                local tileIndex = tonumber(entry:match('"tileIndex"[%s:]*([0-9-]+)'))
+                local eventSpace = tonumber(entry:match('"eventSpace"[%s:]*([0-9-]+)'))
+                local eventTouch = tonumber(entry:match('"eventTouch"[%s:]*([0-9-]+)'))
+                local tileCurrent = tonumber(entry:match('"tileCurrent"[%s:]*([0-9-]+)'))
+                local tileStart = tonumber(entry:match('"tileStart"[%s:]*([0-9-]+)'))
+                local tileEnd = tonumber(entry:match('"tileEnd"[%s:]*([0-9-]+)'))
+                local x = tonumber(entry:match('"x"[%s:]*([0-9-]+)'))
+                local y = tonumber(entry:match('"y"[%s:]*([0-9-]+)'))
+                if sceneId then
+                    if not eventMap[sceneId] then eventMap[sceneId] = {} end
+                    eventMap[sceneId][tileIndex] = {
+                        eventSpace = eventSpace or 0,
+                        eventTouch = eventTouch or 0,
+                        tileCurrent = tileCurrent or 0,
+                        tileStart = tileStart or 0,
+                        tileEnd = tileEnd or 0,
+                        x = x or 0,
+                        y = y or 0,
+                    }
+                end
+            end
+        end
+    end
+
+    local scenes = {}
+    for i = 0, sceneCount - 1 do
+        local offset = i * 62
+        local sh = readSceneHead(data, offset)
+        if sh then
+            local entry = {
+                ["代号"] = sh.id,
+                ["名称"] = sh.name,
+                ["类型"] = inferType(sh.name),
+                ["宽度"] = 64,
+                ["高度"] = 64,
+                ["出口"] = sh.exitData,
+                ["入口"] = { ["地图X"] = sh.mapX, ["地图Y"] = sh.mapY, ["地图X2"] = sh.mapX2, ["地图Y2"] = sh.mapY2 },
+                ["出口音乐"] = sh.exitMusic,
+                ["入口音乐"] = sh.enterMusic,
+                ["进入条件"] = sh.enterCondition,
+                ["NPC"] = {},
+                ["物品"] = {},
+                ["事件"] = {},
+            }
+
+            -- 从 events.json 提取 NPC（eventSpace>0 = 空格触发事件 = NPC 对话）
+            local sceneEvents = eventMap[sh.id]
+            if sceneEvents then
+                local npcList = {}
+                local seenNpcs = {}
+                for tileIdx, ev in pairs(sceneEvents) do
+                    local evtSpace = ev.eventSpace
+                    if evtSpace and evtSpace > 0 then
+                        if not seenNpcs[evtSpace] then
+                            seenNpcs[evtSpace] = true
+                            -- 尝试从 oldevent 脚本第一行获取 NPC 名
+                            local npcName = nil
+                            local scriptPath = string.format("script/oldevent/oldevent_%d.lua", evtSpace)
+                            local f = io.open(scriptPath, "r")
+                            if f then
+                                local content = f:read("*a")
+                                f:close()
+                                if content:find("instruct_51") then
+                                    npcName = "软体娃娃"
+                                else
+                                    -- 判断是否为复杂 NPC 事件（对话、招人、战斗、事件修改等）
+                                    -- 简单事件（单人对话、给物品等）不应提取说话者名作为 NPC 名
+                                    local hasComplexNPC = content:find("instruct_9") or       -- 招人
+                                                          content:find("instruct_3") or       -- 事件修改
+                                                          content:find("instruct_6") or       -- 战斗
+                                                          content:find("instruct_14") or      -- 场景变黑
+                                                          content:find("instruct_13") or      -- 重新显示场景
+                                                          content:find("instruct_10") or      -- 加入队伍
+                                                          false
+                                    -- 统计 instruct_1 调用次数（多次对话=复杂事件）
+                                    local _, i1count = content:gsub("instruct_1%b()", "")
+                                    if hasComplexNPC or i1count >= 3 then
+                                        -- 复杂 NPC 事件：从 instruct_1 注释中提取说话者名
+                                        for commentName in content:gmatch("%[([^%]]+)%]说:") do
+                                            if commentName ~= "WWW" and commentName ~= "???" then
+                                                npcName = commentName
+                                                break
+                                            end
+                                        end
+                                    end
+                                    -- 简单事件（1-2句对话、给物品等）不应提取说话者名作为 NPC 名
+                                    -- 只有复杂 NPC 事件才使用 headId 映射
+                                    if not npcName and (hasComplexNPC or i1count >= 3) then
+                                        local headId = nil
+                                        -- 提取第一个 instruct_1 调用的 headId
+                                        for h in content:gmatch("instruct_1%b()") do
+                                            -- instruct_1(talkId,headId,pos)
+                                            local id = tonumber(h:match(",(%d+),"))
+                                            if id and id ~= 0 then
+                                                headId = id
+                                                break
+                                            end
+                                        end
+                                        if headId then
+                                            local HEAD_MAP = {
+                                                [73] = "南贤", [74] = "北丑",
+                                                [105] = "掌柜", [106] = "店小二",
+                                                [111] = "韦小宝",
+                                                [114] = "软体娃娃",
+                                            }
+                                            npcName = HEAD_MAP[headId]
+                                        end
+                                    end
+                                end
+                            end
+                            if not npcName then
+                                npcName = string.format("oldevent_%d", evtSpace)
+                            end
+                            table.insert(npcList, {
+                                ["代号"] = 0,
+                                ["名称"] = npcName,
+                                ["X"] = ev.x,
+                                ["Y"] = ev.y,
+                                ["事件编号"] = evtSpace,
+                            })
+                        end
+                    end
+                end
+                if #npcList > 0 then
+                    entry["NPC"] = npcList
+                end
+            end
+            table.insert(scenes, entry)
+        end
+    end
+
+    local result = {
+        version = "1.0",
+        extracted = os.date("%Y-%m-%d"),
+        total = #scenes,
+        scenes = scenes,
+    }
+
+    local json = encodeJson(result)
+    local f = io.open(outputFile, "w")
+    if not f then
+        error("Cannot write " .. outputFile)
+    end
+    f:write(json)
+    f:write("\n")
+    f:close()
+    print("Extracted " .. #scenes .. " scenes to " .. outputFile)
+end
+
+if arg and arg[0] and arg[0]:match("extract_scenes%.lua$") then
+    local dataDir = arg[1] or "data"
+    local outputFile = arg[2] or "engine-web/data-web/scenes.json"
+    extract.run(dataDir, outputFile)
+end
+
+return extract

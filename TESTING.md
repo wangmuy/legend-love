@@ -26,7 +26,6 @@
 game/tests/
 ├── test_runner.lua              # 测试运行器
 ├── test_helper.lua              # 测试工具集
-├── README.md                    # 测试目录说明
 └── unit/                        # 单元测试
     ├── test_state_machine.lua   # 状态机测试
     ├── test_input_manager.lua   # 输入管理器测试
@@ -34,7 +33,8 @@ game/tests/
     ├── test_coroutine_scheduler.lua  # 协程调度器测试
     ├── test_byte_io.lua         # Byte I/O 测试
     ├── test_item_async.lua      # 物品系统测试
-    └── test_war_async.lua       # 战斗系统测试
+    ├── test_war_async.lua       # 战斗系统测试
+    └── test_script_loader.lua   # 脚本加载器测试
 ```
 
 ### 测试文件命名规范
@@ -108,6 +108,7 @@ cd game && lua tests/unit/test_input_manager.lua
 | `event_bridge` | 事件桥接测试 |
 | `coroutine_scheduler` | 协程调度器测试 |
 | `byte_io` | Byte I/O 测试 |
+| `script_loader` | 脚本加载器测试 |
 | `item_async` | 物品系统测试 |
 | `war_async` | 战斗系统测试 |
 

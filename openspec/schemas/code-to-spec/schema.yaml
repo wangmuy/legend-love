@@ -1,0 +1,87 @@
+name: code-to-spec
+version: 1
+description: >
+  Reverse-engineer specs from INTERNAL source code when implementation
+  predates documentation. Reads your OWN codebase — not external documents.
+  Confidence is generally High because code is ground truth.
+  Outputs shadow specs in openspec/vendor-specs/ (shared destination
+  with external-ingest, but different source and confidence).
+
+  FOR EXTERNAL vendor/brownfield DOCUMENTS (Swagger, PDF, Word, Wiki),
+  use the external-ingest schema instead — it handles heterogeneous document
+  formats with variable confidence.
+
+artifacts:
+  - id: reverse-engineering
+    generates: reverse-engineering.md
+    description: >
+      Reads source code and reverse-engineers observable behavior
+      into BDD specifications.
+    template: reverse-engineering.md
+    instruction: |
+      Read the specified source code files and extract behavioral specs.
+
+      Sections:
+      - **Source Inventory**: Files analyzed.
+        | File | Language | Lines | Domain |
+
+      - **Extracted Specifications**: BDD requirements with
+        `[REQ-CODE-XXX]` IDs. Given/When/Then scenarios.
+        Focus on OBSERVABLE BEHAVIOR:
+        - What inputs does this code accept?
+        - What outputs does it produce?
+        - What error conditions does it handle?
+        - What side effects (DB writes, API calls)?
+        Do NOT describe internal implementation details.
+        Report only what the code actually does.
+
+      - **Fidelity Notes**: Confidence (High/Medium/Low),
+        uncovered behavior, dead code suspects.
+
+      - **Integration Surface**: APIs, public functions, module exports
+        forming the boundary with the rest of the system.
+
+      Store in `openspec/vendor-specs/<module-name>/spec.md`
+      with `[REQ-CODE-XXX]` IDs. Shadow specs — reference only.
+    requires: []
+
+  - id: fidelity-report
+    generates: fidelity-report.md
+    description: >
+      Detailed fidelity assessment and recommendations for gaps.
+    template: fidelity-report.md
+    instruction: |
+      Assess the reverse-engineered specs for completeness and risks.
+
+      Sections:
+      - **Coverage Assessment**: Percentage of code paths documented.
+      - **Ambiguity Report**: Behaviors not confidently extracted.
+      - **Gap Recommendations**: Concrete actions — create changes
+        for tests, documentation, or integration surface updates.
+      - **Spec Promotion Candidates**: High-confidence specs that
+        should be promoted from shadow to authoritative.
+        Requires human review before promotion.
+    requires: [reverse-engineering]
+
+apply:
+  requires: [fidelity-report]
+  tracks: null
+  instruction: >
+    Code-to-spec is a documentation workflow, not a code workflow.
+    After creating all artifacts:
+
+    1. Verify all source files were analyzed
+    2. Create shadow specs in `openspec/vendor-specs/<module-name>/`
+    3. If fidelity report recommends changes, create spec-driven changes
+    4. If spec promotion is recommended, flag for human review
+    5. Update project-profile to note the newly documented module
+
+    The code-to-spec change can be archived.
+
+    ## UX Rule
+
+    When presenting choices (files to analyze, promotion candidates),
+    always include "Other — write your own" as the LAST option.
+
+    Before starting, check `openspec/skills-profile.yaml`
+    for suggested skills (key: `code-to-spec.reverse-engineering`).
