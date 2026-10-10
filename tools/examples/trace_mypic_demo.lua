@@ -1,0 +1,36 @@
+-- tools/examples/trace_mypic_demo.lua
+-- trace_global 的启用示例：以"追踪 JY.MyPic 被谁改写"（开场卧姿调查同款）为例。
+--
+-- 这不是运行时模块，而是照抄即可用的启用配方。临时诊断用，用完删除调用点。
+--
+-- 启用步骤（3 步）:
+--
+-- 1) game/main.lua（或任何早期加载的文件）顶部加：
+--
+--      package.path = package.path .. ";./?.lua;./tools/?.lua"
+--      local TRACE = require "tools.trace_global"
+--
+-- 2) 配置要追踪的字段（惰性求值，log 时才调用；字段函数抛错不影响游戏）：
+--
+--      TRACE.fields = {
+--          MyPic    = function() return JY and JY.MyPic end,
+--          dir      = function() return JY and JY.Base and JY.Base["人方向"] end,
+--          CurrentD = function() return JY and JY.CurrentD end,
+--          anim     = function() return JY and JY.AnimationState and JY.AnimationState.active end,
+--          talk     = function()
+--              local TA = rawget(_G, "TalkAsync")
+--              return TA and TA.getCurrentTalk and (TA.getCurrentTalk() ~= nil) or false
+--          end,
+--      }
+--
+-- 3) 在每个可疑写点插入一行调用（tag 建议 "文件:行号" 风格）：
+--
+--      JY.MyPic = GetMyPic()
+--      TRACE.log("game_states:GAME_SMAP.update")
+--
+-- 输出: tools/trace_out.txt（每次加载清空重记，不受 CONFIG.Debug 控制）
+-- 每行: [ms] tag | 调用方 file:line | MyPic=.. dir=.. CurrentD=.. anim=.. talk=..
+--
+-- 调查完成后: 删除 TRACE.log 调用点与第 1 步的 require，删除 trace_out.txt。
+
+return true

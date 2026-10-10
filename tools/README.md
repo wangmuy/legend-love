@@ -1,12 +1,12 @@
 # tools/
 
 开发辅助脚本（不属于游戏运行时，不被 game/ 代码 require）。
+解码逻辑均与 `game/engine-love2d/lib_love.lua` 的对应实现保持一致，调查期一次性脚本已清理。
 
 ## 通用工具
 
-### smap_tool.lua — grp 贴图提取与排查
+### smap_tool.lua — grp 贴图提取与排查（纯 Lua）
 
-解码逻辑与 `game/engine-love2d/lib_love.lua` 的 `LoadPic`/`PicLoadFile` 完全一致：
 idx 条目为图结束偏移（小端 u32），显示 picid → 图序号 `slot = floor(picid/2)`，
 帧头 `w,h(u16) xoff,yoff(i16)`，RLE 逐行（trans/solid/调色板索引），
 调色板 `mmap.col`（256×3 字节，0..63 → ×4）。
@@ -25,10 +25,45 @@ lua tools/smap_tool.lua hexdump game/data 1 3009849 [--len 32]
 lua tools/smap_tool.lua entries game/data 3445 3466
 ```
 
+### scene_tool.lua — 子场景 S*/D* 数据排查（纯 Lua）
+
+直接读 base 模板数据 `allsin.grp`/`alldef.grp`，与 `LoadSMap/GetS/GetD` 索引公式一致：
+S 每格 i16（level 3 = 事件层，≥0 表示该格挂着 D* 实体）；D 每实体 11 个 i16 字段
+（2/3/4 = 空格/物品/路过触发事件号，9/10 = 实体坐标）。
+
+```bash
+# 单格: S 层 0-5 值 + 挂接实体的全部 D 字段
+lua tools/scene_tool.lua tile game/data 70 19 20
+
+# 打印场景(或区域)某层 S 数据网格
+lua tools/scene_tool.lua dump game/data 70 3
+lua tools/scene_tool.lua dump game/data 70 3 17 18 23 22
+
+# 列出场景全部有效 D* 实体（坐标/不可通过/三类触发事件号/动画帧范围）
+lua tools/scene_tool.lua ents game/data 70
+
+# 打印 ranger.grp 新游戏 base 段基础字段（乘船/人X/人方向/队伍...）
+lua tools/scene_tool.lua base game/data
+```
+
+### render_frames.py — grp 帧渲染为 PNG（Python + Pillow）
+
+任意前缀的 grp/idx 都能渲染（smap/mmap/fightNNN/wmap/thing...），
+输出透明 PNG + 白底 `_white.png`，并打印不透明像素 bbox。
+
+```bash
+python3 tools/render_frames.py game/data <outdir> 6890 6932 4988          # smap 贴图
+python3 tools/render_frames.py game/data <outdir> 1000 --prefix mmap      # 主地图贴图
+python3 tools/render_frames.py game/data <outdir> 6890 --scale 4          # 放大 4 倍
+```
+
+> 无 Pillow 时可用 `smap_tool.lua extract` 出 PPM 再自行转 PNG。
+
 ### trace_global.lua — 游戏内全局状态时序追踪
 
 在 game/ 代码的写点插入一行 `TRACE.log("tag")`，按帧时序记录目标全局变量快照，
-用于定位"谁在什么时候改了 X"（通用化自开场卧姿调查的 diag_mypic）。
+用于定位"谁在什么时候改了 X"。启用配方见 `examples/trace_mypic_demo.lua`
+（以追踪 JY.MyPic 的开场卧姿调查为例，3 步照抄即可用）。
 
 ```lua
 -- 需在 package.path 含仓库根目录: package.path = ... ";/path/to/legend-love/?.lua"
@@ -43,10 +78,8 @@ TRACE.log("startNewGame:348")  -- 调用点
 输出 `tools/trace_out.txt`（每次加载清空重记）；不受 CONFIG.Debug 控制，
 调查完成后请移除调用点。
 
-## 一次性调查脚本（2026-10 开场卧姿 bug 调查产物，待清理）
+## 输出物
 
-`check_scene70_tile.lua`（allsin 场景 S 层数据）、`diag_smap_hdr.lua`、
-`diag_smap_idx.lua`、`idx_check.lua`/`idx_check.py`（idx 映射假设验证）、
-`extract_frame_v2.lua`/`extract_smap_frames.lua`（早期提取版）、
-`render_frame.py`/`render_smap_frames.lua`（早期渲染版）、`scan_smap_hdr.lua`
-——功能已并入 `smap_tool.lua`；`frames/`、`frames2/` 为上述脚本的输出目录。
+- `tools/trace_out.txt`（trace_global）— 已 gitignore
+- 提取/渲染输出目录建议放仓库外（如 `/tmp/frames`）；历史调查输出
+  `tools/frames/`、`tools/frames2/` 已 gitignore
