@@ -25,6 +25,22 @@ lua tools/smap_tool.lua hexdump game/data 1 3009849 [--len 32]
 lua tools/smap_tool.lua entries game/data 3445 3466
 ```
 
+### sdata_tool.lua — 子场景 S*/D* 数据排查（纯 Lua）
+
+直接读 base 模板数据 `allsin.grp`/`alldef.grp`，与 `LoadSMap/GetS/GetD` 索引公式一致：
+S 每格 i16（level 3 = 事件层，≥0 表示该格挂着 D* 实体）；D 每实体 11 个 i16 字段。
+
+```bash
+# 单格: 6 层数据 + 邻域 level3 网格（半径可调）
+lua tools/sdata_tool.lua tile game/data 70 19 20 [半径=2]
+
+# 打印某个 D* 的全部或指定字段
+lua tools/sdata_tool.lua dentity game/data 70 0 [字段i...]
+
+# 列出场景内 level 值 >= min 的所有 tile
+lua tools/sdata_tool.lua find game/data 70 [level=3] [min=0]
+```
+
 ### scene_tool.lua — 子场景 S*/D* 数据排查（纯 Lua）
 
 直接读 base 模板数据 `allsin.grp`/`alldef.grp`，与 `LoadSMap/GetS/GetD` 索引公式一致：
