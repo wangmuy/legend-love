@@ -53,12 +53,14 @@ function EventExecutor.oldEventExecuteCoroutine(flag)
         eventnum = GetD(JY.SubScene, JY.CurrentD, 4)
     end
     
-    if eventnum == nil or eventnum <= 0 then
-        eventnum = JY.CurrentD  -- fallback: 直接用事件 ID
-    end
+    lib.Debug(string.format("oldEventExecuteCoroutine: flag=%d, CurrentD=%d, eventnum=%s",
+        flag, JY.CurrentD, tostring(eventnum)))
     
-    lib.Debug(string.format("oldEventExecuteCoroutine: eventnum=%d", eventnum or -1))
-    
+    -- 与原版 oldEventExecute 一致：eventnum<=0 表示该触发方式为"无事件"，
+    -- 不执行。切勿在 eventnum 为空时回退为 JY.CurrentD（D* tile 索引）：
+    -- 那会把"路过/空格无事件"的 tile 当 oldevent 编号执行，触发无关事件
+    -- （典型：河洛客栈外出口 tile 无路过事件，回退后误执行 oldevent_17
+    -- "这箱子似乎被锁住了"）。
     if eventnum and eventnum > 0 then
         EventExecutor.oldCallEventCoroutine(eventnum)
     end
@@ -68,7 +70,6 @@ end
 function EventExecutor.oldCallEventCoroutine(eventnum)
     local eventfilename = string.format("oldevent_%d.lua", eventnum)
     lib.Debug(string.format("oldCallEventCoroutine: %s START", eventfilename))
-    
     -- 保存进入时的 JY.CurrentD（调用方可能已设置为触发事件的 tile 索引，
     -- 事件结束后恢复它，避免本事件内部嵌套执行其他事件时被覆盖污染）
     local savedCurrentD = JY and JY.CurrentD
@@ -115,7 +116,7 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     -- （典型：611 战斗胜利后 612 写 D71[611]、tile3 仍 611 需再选一次才得鹿鼎记；
     --   616 战后 tile5 仍 616，蓝凤凰已加入仍重复"是否加入"询问——P6 Step12/13 根因）。
     if JY then JY.CurrentD = savedCurrentD or -1 end
-    
+
     lib.Debug(string.format("oldCallEventCoroutine: %s FINISHED", eventfilename))
 end
 

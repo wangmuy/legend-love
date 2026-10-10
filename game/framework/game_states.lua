@@ -10,6 +10,7 @@ local EventExecutor = require("framework.event_executor")
 local JyMainAsync = require("framework.jymain_async")
 local CoroutineScheduler = require("framework.coroutine_scheduler")
 local MenuAsync = require("framework.menu_async")
+local TalkAsync = require("framework.talk_async")
 local PerfLog = require("framework.perf_log")
 
 -- 游戏状态处理器表
@@ -141,11 +142,11 @@ handlers["GAME_MMAP"] = {
             lib.Debug("Setting JY.Status to GAME_SMAP: " .. tostring(newState))
             JY.Status = newState
             JY.MmapMusic = -1
-            
+
             JY.MyPic = GetMyPic()
             JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
             JY.Base["人Y1"] = JY.Scene[JY.SubScene]["入口Y"]
-            
+
             lib.Debug("Subscene transition completed")
         end
     end,
@@ -302,8 +303,12 @@ handlers["GAME_SMAP"] = {
         if InputManager.disableInput then
             keypress = -1  -- 忽略按键
         end
-        
-        if keypress ~= -1 then
+
+        -- 事件执行期间（JY.CurrentD >= 0，含开场强制对话）冻结玩家输入：
+        -- 原版 Game_SMap 是阻塞式，事件执行时主循环不轮询按键。事件驱动下若不冻结，
+        -- 玩家连按的方向键会让主角在对话期间移动（甚至走进路过事件实体），
+        -- 空格键会触发面向 tile 的事件，破坏强制流程并污染 JY.CurrentD/MyPic。
+        if keypress ~= -1 and not (JY and JY.CurrentD >= 0) then
             JY.MyTick = 0
             if keypress == VK_ESCAPE then
                 startMenuCoroutine()
@@ -354,8 +359,21 @@ handlers["GAME_SMAP"] = {
         end
         
         -- 更新主角贴图（根据方向和走路帧）
-        -- 只有在动画播放期间才跳过更新
-        if not JY.AnimationState.active then
+        -- 跳过条件：
+        --   1. 动画播放期间（instruct_27 等）：动画帧贴图由 update 驱动，不能被覆盖
+        --   2. 事件执行期间（JY.CurrentD >= 0）：原版 Game_SMap 是阻塞式，事件执行
+        --      时主循环暂停，贴图保持不变。事件驱动下事件协程挂起（instruct_1 对话
+        --      yield 等按键）期间 update 仍在跑，若照常重算 GetMyPic()，开场新游戏
+        --      （卧姿 3445）的卧姿贴图会在对话期间被覆盖成站立（GetMyPic 只能算出
+        --      站立/行走帧 2494~2522，永远算不出卧姿），直到 instruct_27 动画
+        --      开始才恢复卧姿（用户报告的开场 bug 根因）。
+        --   3. 对话框显示中（TalkAsync.currentTalk ~= nil）：兜底守卫。CurrentD 是
+        --      共享全局，若开场事件被内联执行（startNewGame 内联路径）而玩家连按
+        --      空格触发面向 tile 的嵌套事件协程，其结束时会把 CurrentD 复位 -1，
+        --      条件 2 失效、卧姿仍会被覆盖；对话显示中贴图必须保持不变，故以
+        --      currentTalk 为第二道闸。
+        local _talkActive = TalkAsync.getCurrentTalk() ~= nil
+        if not JY.AnimationState.active and not _talkActive and not (JY and JY.CurrentD >= 0) then
             JY.MyPic = GetMyPic()
         end
         DtoSMap()

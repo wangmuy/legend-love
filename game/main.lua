@@ -27,7 +27,7 @@ function love.load()
     
     -- 加载事件桥接器并初始化
     EventBridge.getInstance():init()
-    
+
     -- 加载游戏主逻辑
     require(CONFIG.ScriptPath .. "jymain")
     

@@ -347,7 +347,6 @@ function JYMainAdapter.startNewGame(menux)
     -- 必须在 Init_SMap 之前设置，因为 Init_SMap 会调用 DrawSMap
     JY.MyPic = 3445  -- 躺着
     lib.Debug("startNewGame: set initial MyPic to lying pose (3445)")
-    
     -- 注意：不设置动画状态，让主角保持躺着姿势
     -- 动画将在事件脚本中的 instruct_27 中播放
     -- 设置 currentFrame=0 表示初始状态，GAME_SMAP.update 不会重置 JY.MyPic
@@ -362,6 +361,17 @@ function JYMainAdapter.startNewGame(menux)
     lib.Debug("startNewGame: switched to GAME_SMAP state, JY.Status=" .. tostring(JY.Status))
     
     if CC.NewGameEvent > 0 then
+        -- 关键去重：出生格 (19,20) 自带路过事件——S层3=0，且 D70[0][4]=691（即开场事件本身）。
+        -- 若不抑制，主角站在出生格时 GAME_SMAP.update 的路过检查（d_pass=0 ~= OldDPass=-1）
+        -- 会在下面显式 oldCallEventCoroutine(691) 之外再起一个 event_0 协程，导致开场事件
+        -- 被并行执行两次（抢按键、动画/对话各播一遍），且第二个协程结束时把共享全局
+        -- JY.CurrentD 复位为 -1，使 GAME_SMAP.update 的卧姿守卫失效、GetMyPic() 把卧姿
+        -- 覆盖成站立（开场"前几句站着、起身动画第一帧才躺下"的根因）。
+        -- 这里把 OldDPass 预设为出生格的路过值 0，复用游戏自带的路过事件去重机制
+        -- （d_pass ~= OldDPass 才触发），让出生格的 691 不再二次触发——与原版单发一致。
+        JY.OldDPass = 0
+        lib.Debug("startNewGame: OldDPass preset to 0 (suppress spawn-tile double-fire of NewGameEvent)")
+
         -- 在协程中执行新游戏事件
         -- 使用 event_executor 中的 oldCallEventCoroutine，避免 C-call boundary 问题
         local EventExecutor = require("framework.event_executor")
@@ -370,9 +380,12 @@ function JYMainAdapter.startNewGame(menux)
         PerfLog.finish(tEvent, "event=" .. tostring(CC.NewGameEvent))
     end
     
-    -- 事件执行完毕后，恢复主角贴图为默认值
-    JY.MyPic = CC.NewPersonPic
-    lib.Debug("startNewGame: restored MyPic to " .. tostring(JY.MyPic))
+    -- 事件执行完毕后，按当前方向/走路帧重算主角贴图。
+    -- 原版语义：阻塞式事件结束后 MyPic 保持事件最后设置的状态（691 末尾 instruct_40(0)
+    -- 已把主角转为站立方向0）。不能恢复成 CC.NewPersonPic(3445,卧姿)——那会让刚起身的
+    -- 主角多显示一帧卧姿；GetMyPic() 与下一帧 GAME_SMAP.update 的计算一致，无跳变。
+    JY.MyPic = GetMyPic()
+    lib.Debug("startNewGame: updated MyPic to " .. tostring(JY.MyPic) .. " after NewGameEvent")
     PerfLog.finish(tAll)
 end
 
