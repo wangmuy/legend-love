@@ -21,6 +21,13 @@ opencode.json
 .atomcode/*
 
 
+# tools 输出物
+tools/trace_out.txt
+tools/frames/
+tools/frames2/
+tools/__pycache__/
+game/mypic_diag.txt
+
 # Web MUD build artifacts
 game/engine-web/data-web/
 test-results/
