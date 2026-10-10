@@ -3550,7 +3550,6 @@ function instruct_27(id,startpic,endpic)           --显示动画
             frameDuration = CC.AnimationFrame,
         }
         lib.Debug(string.format("instruct_27: set AnimationState id=%d, startFrame=%d, endFrame=%d", id, startpic, endpic))
-        
         -- 等待动画完成
         -- 使用 yield 让出协程，让 GAME_SMAP.update 播放动画
         while JY.AnimationState.active do
