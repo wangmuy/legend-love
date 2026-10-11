@@ -310,7 +310,7 @@ function NewGame()     --选择新游戏，设置主角初始属性
         local menu={{"是 ",nil,1},
                     {"否 ",nil,2},
                    };
-        local ok=ShowMenu2(menu,2,0,x1+11*fontsize,CC.NewGameY-CC.MenuBorderPixel,0,0,0,0,fontsize,C_RED, C_WHITE)
+        local ok=ShowMenu2(menu,2,0,x1+11*fontsize,CC.NewGameY-CC.MenuBorderPixel,0,0,0,0,fontsize,C_WHITE, C_RED)
         if ok==1 then
             break;
         end
@@ -4473,6 +4473,12 @@ function WarMain(warid,isexp)           --战斗主函数
     end
 
     War_EndPersonData(isexp,warStatus);    --战斗后设置人物参数
+
+    --本场战斗经验清零，避免下场所持 WAR.Person["经验"] 残留（原版 WAR 数据每场重建，
+    --事件驱动架构下 WAR 表跨场复用，不清零会叠加）
+    for i=0,WAR.PersonNum-1 do
+        WAR.Person[i]["经验"]=0;
+    end
 
     lib.ShowSlow(50,1);
 

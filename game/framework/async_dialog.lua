@@ -337,9 +337,10 @@ function AsyncDialog:drawYesNo(dialog, x, y, w, h)
     DrawString(x + CC.MenuBorderPixel, msgY, dialog.message, C_WHITE, CC.DefaultFont)
     
     -- 绘制选项（上下排列，配合上下方向键选择）
-    -- 使用 C_GOLD（黄色）作为选中颜色，与游戏其他界面保持一致
-    local yesColor = dialog.selected == 1 and C_GOLD or C_WHITE
-    local noColor = dialog.selected == 2 and C_GOLD or C_WHITE
+    -- 使用 C_RED（红色）作为选中颜色，与主菜单/属性页"是否"菜单（C_RED 底 C_WHITE 选中）
+    -- 风格一致；黄色（C_GOLD）与未选项白色对比不明显，用户反馈易混淆
+    local yesColor = dialog.selected == 1 and C_RED or C_WHITE
+    local noColor = dialog.selected == 2 and C_RED or C_WHITE
     
     -- 计算选项起始Y位置（在消息下方）
     local optionStartY = msgY + CC.DefaultFont + CC.RowPixel
