@@ -153,8 +153,13 @@ function JyMainAsync.Menu_ReadRecord()
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
         -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
         -- ShowScreen()
-        LoadRecord(r)
-        JY.Status = GAME_FIRSTMMAP
+        local ok = LoadRecord(r)
+        if ok then
+            JY.Status = GAME_FIRSTMMAP
+        else
+            Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+            AsyncMessageBox.ShowMessageCoroutine(-1, -1, "该存档不存在或已损坏", C_WHITE, CC.DefaultFont)
+        end
     end
 end
 
