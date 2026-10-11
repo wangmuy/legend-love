@@ -383,8 +383,31 @@ end
 -- thingId: 物品ID
 -- 返回: true表示使用成功，false表示使用失败或取消
 function ItemAsync.UseThingAsync(thingId)
+    -- 对齐原版 UseThing：先查自定义物品函数（JY.ThingUseFunction，
+    -- SetModify 中注册，如罗盘 Show_Position）。命中则调用（需在协程中安装
+    -- AsyncGlobals，见下方）；不命中才按 type 分发缺省处理。
+    local useFn = JY.ThingUseFunction and JY.ThingUseFunction[thingId]
+    if useFn ~= nil then
+        -- 自定义物品函数（罗盘/醉生梦死酒/还魂液）内部使用原版阻塞式 UI
+        --（DrawStrBoxWaitKey/DrawStrBoxYesNo/ShowMenu/WaitKey 等）。在事件驱动协程
+        -- 中直接调用会卡死：原版 WaitKey 是 while 轮询 lib.GetKey + lib.Delay，而
+        -- 事件驱动版 lib.GetKey 依赖 love.keypressed 填队列、lib.Delay 用
+        -- love.timer.sleep 阻塞主循环 → 键盘事件进不来 → 永久死循环（罗盘卡死根因）。
+        -- 安装 AsyncGlobals 把这些全局替换为协程版（可 yield 等键），调用后卸载，
+        -- 与 event_executor / Menu_PersonExit 调用原版阻塞函数的既有模式一致。
+        local AsyncGlobals = require("framework.async_globals")
+        AsyncGlobals.install()
+        local ok, result = pcall(useFn, thingId)
+        AsyncGlobals.uninstall()
+        if not ok then
+            lib.Debug("ItemAsync.UseThingAsync: custom thing function error: " .. tostring(result))
+            return false
+        end
+        return result == 1
+    end
+
     local thingType = JY.Thing[thingId]["类型"]
-    
+
     if thingType == 0 then
         return ItemAsync.UseThing_Type0Async(thingId)
     elseif thingType == 1 then
