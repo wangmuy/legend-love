@@ -402,13 +402,28 @@ function ItemAsync.UseThingAsync(thingId)
 end
 
 -- 剧情物品使用（类型0）
+-- 对齐原版 UseThing_Type0：主角面朝格的 D*>=0 时，设置 JY.CurrentThing 并
+-- 触发物品事件（flag=2，事件脚本内 instruct_4 据此判断触发物品）。
 function ItemAsync.UseThing_Type0Async(thingId)
     -- 剧情物品触发事件
     if JY.SubScene >= 0 then
-        -- 检查是否有对应的事件
-        -- 这里简化处理，实际应该根据物品ID和场景查找对应事件
-        AsyncMessageBox.ShowMessageCoroutine(-1, -1, JY.Thing[thingId]["名称"] .. "已使用", C_ORANGE, CC.DefaultFont)
-        return true
+        local x = JY.Base["人X1"] + CC.DirectX[JY.Base["人方向"] + 1]
+        local y = JY.Base["人Y1"] + CC.DirectY[JY.Base["人方向"] + 1]
+        local d_num = GetS(JY.SubScene, x, y, 3)
+        if d_num >= 0 then
+            JY.CurrentThing = thingId
+            EventExecuteSync(d_num, 2)
+            -- 原版在 EventExecute 返回后复位；事件驱动版事件在协程中异步执行
+            -- （含跨帧对话），故延迟 2 帧复位：事件协程首帧内已读取 JY.CurrentThing
+            --（instruct_4），之后复位避免污染下一次触发
+            scheduler:create(function()
+                scheduler:yield("time")
+                scheduler:yield("time")
+                JY.CurrentThing = -1
+            end, "current_thing_reset")
+            return true
+        end
+        return false
     else
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "此处无法使用" .. JY.Thing[thingId]["名称"], C_WHITE, CC.DefaultFont)
         return false

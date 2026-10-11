@@ -184,6 +184,22 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     
     War_EndPersonData(warState.isExp, warStatus)
     
+    -- 恢复场景贴图与音乐（对齐原版 WarMain 收尾：ShowSlow/进门音乐/贴图重载。
+    -- 战斗期间 PicInit 清空了 SMAP 贴图（槽0=WMAP），不重载则回场景后渲染缺图）
+    lib.ShowSlow(50, 1)
+    if JY.Scene and JY.Scene[JY.SubScene] and JY.Scene[JY.SubScene]["进门音乐"] >= 0 then
+        PlayMIDI(JY.Scene[JY.SubScene]["进门音乐"])
+    else
+        PlayMIDI(0)
+    end
+    CleanMemory()
+    lib.PicInit()
+    lib.PicLoadFile(CC.SMAPPicFile[1], CC.SMAPPicFile[2], 0)
+    lib.PicLoadFile(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
+    if CC.LoadThingPic == 1 then
+        lib.PicLoadFile(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
+    end
+    
     -- 恢复状态
     JY.Status = prevState
     warState.status = "ended"
@@ -448,33 +464,19 @@ War_AutoCoroutine = function()
 end
 
 -- 战斗结算（协程版本）
+-- 对齐原版 WarMain：结算只显示"战斗胜利/失败"，经验分配、升级、修炼
+-- 统一由随后的 War_EndPersonData 处理（原版即如此）。
+-- 注意：旧实现在这里调用 AddPersonAttrib(pid, "经验值", ...)，但人物字段
+-- 只有"经验"（jyconst.lua Person_S），没有"经验值"，加法必然报错 →
+-- 战斗协程死亡 → JY.Status 永不恢复 → 胜利后卡在战斗场景（P 根因）。
 War_SettlementCoroutine = function(warStatus)
     local scheduler = CoroutineScheduler.getInstance()
+    
+    WAR.ShowHead = 0
     
     if warStatus == 1 then
         -- 胜利
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗胜利", C_WHITE, CC.DefaultFont)
-        
-        -- 分配经验
-        for i = 0, WAR.PersonNum - 1 do
-            if WAR.Person[i]["我方"] == true and WAR.Person[i]["死亡"] == false then
-                local pid = WAR.Person[i]["人物编号"]
-                local exp = WAR.Person[i]["经验"] or 0
-                
-                AddPersonAttrib(pid, "经验值", exp)
-                
-                -- 检查升级
-                local newExp = JY.Person[pid]["经验值"]
-                local levelUpExp = JY.Person[pid]["等级"] * 100
-                
-                if newExp >= levelUpExp then
-                    JY.Person[pid]["等级"] = JY.Person[pid]["等级"] + 1
-                    JY.Person[pid]["经验值"] = newExp - levelUpExp
-                    AsyncMessageBox.ShowMessageCoroutine(-1, -1, 
-                        JY.Person[pid]["姓名"] .. " 升级了！", C_WHITE, CC.DefaultFont)
-                end
-            end
-        end
     elseif warStatus == 2 then
         -- 失败
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗失败", C_WHITE, CC.DefaultFont)

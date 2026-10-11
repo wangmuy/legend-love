@@ -308,7 +308,7 @@ function JYMainAdapter.startNewGame(menux)
         local fontsize = CC.NewGameFontSize
         local x1 = (CC.ScreenW - fontsize * 4 * 4) / 2
         local tMenu = PerfLog.begin("startNewGame.attributeMenu")
-        local ok = MenuAsync.ShowMenu2Coroutine(menu, 2, 0, x1 + 11 * fontsize, CC.NewGameY - CC.MenuBorderPixel, 0, 0, 0, 1, fontsize, C_RED, C_WHITE)
+        local ok = MenuAsync.ShowMenu2Coroutine(menu, 2, 0, x1 + 11 * fontsize, CC.NewGameY - CC.MenuBorderPixel, 0, 0, 0, 1, fontsize, C_WHITE, C_RED)
         PerfLog.finish(tMenu, "choice=" .. tostring(ok))
         
         -- 清除绘制回调
