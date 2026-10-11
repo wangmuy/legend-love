@@ -80,6 +80,11 @@ python3 tools/render_frames.py game/data <outdir> 6890 --scale 4          # 放�
 在 game/ 代码的写点插入一行 `TRACE.log("tag")`，按帧时序记录目标全局变量快照，
 用于定位"谁在什么时候改了 X"。启用配方见 `examples/trace_mypic_demo.lua`
 （以追踪 JY.MyPic 的开场卧姿调查为例，3 步照抄即可用）。
+`demo/trace_mypic_demo.lua` 是独立可运行示例（模拟开场时序，无需 Love2D/游戏数据）：
+
+```bash
+lua tools/demo/trace_mypic_demo.lua   # 输出并打印 tools/trace_out.txt
+```
 
 ```lua
 -- 需在 package.path 含仓库根目录: package.path = ... ";/path/to/legend-love/?.lua"
@@ -93,6 +98,12 @@ TRACE.log("startNewGame:348")  -- 调用点
 
 输出 `tools/trace_out.txt`（每次加载清空重记）；不受 CONFIG.Debug 控制，
 调查完成后请移除调用点。
+
+#### demo/trace_mypic_demo.lua — 可运行 demo
+
+`lua tools/demo/trace_mypic_demo.lua`（任意目录，无需 Love2D / 游戏数据），
+模拟开场卧姿调查的写点时序并打印 `tools/trace_out.txt` 输出，
+用于快速验证 trace_global 工作方式；真实用法仍见上方启用配方。
 
 ## 输出物
 
