@@ -65,6 +65,28 @@ function JYMainAdapter.initCoroutine()
     
     SetGlobalConst()
     lib.Debug("SetGlobalConst done")
+
+    -- MOD ini 覆盖（REQ-DATA-4 / Contract A）：激活 MOD 时解析并 Apply kysmod.ini
+    -- （分辨率、常量等）。映射表同时覆盖 CONFIG.* 与 CC.*，故无需重跑 SetGlobalConst。
+    -- 未激活时为 no-op，保持默认值不变。
+    do
+        local ok, ModData = pcall(require, "framework.mod_data")
+        if ok and ModData and ModData.LoadIni then
+            local parsed = ModData.LoadIni()
+            if parsed then
+                lib.Debug("ModData.LoadIni applied: " .. tostring(ModData.Active()))
+            end
+        end
+        -- REQ-LBIN-2：list/effect.bin → CC.Effect 惰性装载。
+        -- 必须在 SetGlobalConst() 之后（CC 已建）+ SetGlobal() 之前（战鬬逻辑还没用）。
+        -- 读不到文件时为 no-op，CC.Effect 保持 jyconst.lua 的 53 项兜底（REQ-LBIN-5）。
+        if ok and ModData and ModData.LoadEffectTable then
+            local loaded, n = ModData.LoadEffectTable(_G.CC)
+            if loaded then
+                lib.Debug("ModData.LoadEffectTable: " .. tostring(n) .. " entries")
+            end
+        end
+    end
     
     SetGlobal()
     lib.Debug("SetGlobal done")

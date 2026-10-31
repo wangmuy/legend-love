@@ -624,5 +624,15 @@ function SetGlobalConst()
     CC.LoadThingPic=1           --读取物品贴图方式 0 从mmap/smap/wmap中读取  1 读取独立的thing.idx/grp
 	CC.StartThingPic=0          --物品贴图在mmap/smap/wmap中的起始编号。CC.LoadThingPic=0有效
 
-
+    -- MOD 数据回退：若激活 MOD，则把 CC.* 路径常量重定向到 mods/<mod>/data|script/（存在则用）
+    -- 未激活 MOD 时为空操作，路径与现状逐字节一致（REQ-DATA-4）
+    local ok, ModData = pcall(require, "framework.mod_data")
+    if ok and ModData and ModData.RewriteConstants then
+        ModData.RewriteConstants(CC, CONFIG)
+        -- MOD 记录布局与原版不同（Person 202->182 等），必须覆盖，
+        -- 否则 LoadRecord 会算出错误记录数并读到错位数据。
+        if ModData.ApplyLayout then
+            ModData.ApplyLayout(CC)
+        end
+    end
 end
