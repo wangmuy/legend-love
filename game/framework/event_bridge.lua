@@ -95,7 +95,7 @@ end
 -- 进入子状态
 function EventBridge:pushSubState(subStateId, data)
     local sm = StateMachine.getInstance()
-    sm:pushSubState(subStateId, data)
+    return sm:pushSubState(subStateId, data)
 end
 
 -- 退出子状态

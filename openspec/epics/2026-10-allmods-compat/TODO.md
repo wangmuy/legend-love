@@ -385,25 +385,51 @@
       ③ `WaitKey()` 在 `async_globals` 下按 `EngineAPI.coroutine.isRunning()` 分流，而该判定
       `return coroutine.running() ~= nil` 在 **LuaJIT 主线程也返回 true**（返回主线程对象 +
       `ismain=true`），导致主线程误走异步分支。
-      **修复**：
-      - `script/jymain.lua` 新增 `JY.SceneNameShow` / `JY.SceneNameWaiter` 两个状态，
-        `ShowSceneName()`（置标志 + 协程内等键 / 非协程交给 update）、`DrawSceneName()`（绘制）、
-        `ClearSceneNameOnKey()`（非协程路径轮询清标志）。
-      - `framework/game_states.lua`：`GAME_SMAP.draw` 在 `DrawSMap(0)` **之后**调用 `DrawSceneName()`；
-        `GAME_SMAP.update` 在提示期间先 `ClearSceneNameOnKey()` 并 **return 吞掉该帧输入**
-        （避免同一按键既关提示又触发走路）。
+      **修复（事件驱动：状态机子状态，非标志轮询）**：
+      - `framework/state_machine.lua`：新增 `getCurrentSubStateContext()`；`pushSubState` 把
+        `data` 放进子状态 `context`（原先丢弃，子状态拿不到自己的数据）。
+      - `framework/game_states.lua`：`GAME_SMAP` 注册 `subStates.SCENE_NAME`
+        （`enter` 读名称 / `update` 消费一次按键后 `popSubState` / `draw` 调 `DrawSceneName`）；
+        `GAME_SMAP.installSceneNameHook()` 在 `registerAll()` 末尾把实现注入 jymain 的钩子；
+        `GameStates.pushSceneNamePrompt(name)` 是唯一入口（协程内 `waitForKey` 挂起，非协程直接返回）。
+      - `script/jymain.lua`：**不再持有任何提示状态**。`GetSceneName()` 取名称，
+        `DrawSceneName(name)` 绘制，`ShowSceneName()` 经可注入的
+        `SetSceneNameShowHook` 转发（`script/` 不依赖 `framework/`，严格 `_G` 下也读不到
+        `GameStates` 这类模块 local）。空串/纯空白视为无名称。
       - `engine-love2d/engine_love2d.lua` + `tests/engine_test.lua`：
         `isRunning()` 改用 `coroutine.running()` 的第二个返回值 `ismain` 排除主线程。
+      **为什么用子状态而不是标志轮询**：
+      - `StateMachine:update` 在有子状态时只更新子状态并 `return` → **父状态行走逻辑自动被抑制**，
+        无需手工 `return` 吞帧，也不存在「同一按键既关提示又走路」；
+      - `StateMachine:draw` 先画父状态再画子状态 → **`DrawSceneName` 天然在 `DrawSMap` 之后**，
+        不依赖调用顺序的人为约定；
+      - 按键由子状态**独占消费一次**，不再需要 `SceneNameWaiter` 之类的双读保护。
       **几何与原版一致**：`DrawStrBox(-1, 10, 名称, C_WHITE, CC.DefaultFont)`。
-      **真机实测（LÖVE 11.5，pascal MOD，`Init_SMap(1)` 真实调用）**：
-      顶部中间区域（y=5..50，x=屏幕中线±100）亮点 `232`（场景名框+白字）→ 注入按键后 `0`；
-      白框实测全屏坐标 `x=435..587, y=10..42`，与公式复算 `x=438..585, y=10..37` 吻合。
-      **负向对照**：还原旧行为（只画一次 + 移除每帧绘制）→ LÖVE 进程在 `Init_SMap(1)` **卡死超时**
-      （即原缺陷表现）；恢复后通过。
-      **测试**：新增 `tests/unit/test_scene_name.lua`（26 项）；`test_engine_test` 增 2 条断言
+      **真机实测（LÖVE 11.5，pascal MOD，真实 `switchState(GAME_SMAP)` → `Init_SMap(1)`）**：
+      `子状态=SCENE_NAME`、`携带名称=河洛客棧`、白框 `x=435..588, y=10..43`
+      （公式复算 `x=438..585, y=10..37` 吻合，差异为抗锯齿与字形外延）；
+      顶部中间区域亮点 `232` → 注入按键后子状态 `nil`、亮点 `0`；
+      **同一按键未触发走路**（人物坐标前后均为 `0,0`）。
+      **负向对照（5 项，全部生效）**：
+      ① 父状态 draw 在 `DrawSMap` 之前画场景名 → FAIL「父状态 draw 内不应出现 DrawSceneName」；
+      ② 子状态 draw 漏掉 `DrawSceneName` → FAIL「SCENE_NAME 子状态的 draw 必须调用 DrawSceneName」；
+      ③ `state_machine` 有子状态时不再 `return` → FAIL「提示期间父状态 update 不应被调用」；
+      ④ 撤掉 `GAME_INIT` 定义 → FAIL「GAME_INIT 应在 _G 中定义」；
+      ⑤ 恢复裸全局 `JY_D_Valld_Num` → FAIL「不应向 _G 泄漏 JY_D_Valld_Num」。
+      **测试**：新增 `tests/unit/test_scene_name.lua`（**66 项**，刻意不调用 `LoadRecord`、
+      手工构造最小 `JY`，对套件运行顺序免疫）；`test_engine_test` 增 2 条断言
       （含「主线程必须 false」，植回旧实现 → `expected false, got true`）。
-      **注**：`game/active_mod.txt` 残留 `SweeOan` 会让 `script_loader` 4 项测试失败——是环境残留，
+      **注**：`game/active_mod.txt` 残留会让 `script_loader` 4 项测试失败——环境残留，
       跑全量前须 `rm -f game/active_mod.txt`。
+
+- [x] **顺带修复的两个既有缺陷**（同批）：
+      ① `GAME_INIT` 常量**从未定义**（`script/jyconst.lua` 游戏状态区只有 `GAME_START..GAME_END`），
+      而 `SetGlobal()` 会读它；非严格模式下静默得到 `JY.Status=nil`（初始化状态丢失），
+      严格 `_G` 下直接报 `attempt read read to undeclared variable GAME_INIT`。
+      → 补 `GAME_INIT = -1`（不与既有 0..7 冲突）。
+      ② `script/jymain.lua:98` 把 `JY.D_Valid_Num` 误写成**裸全局** `JY_D_Valld_Num`
+      （既漏 `JY.` 前缀、又拼错 `Valid`），导致真正的 `JY.D_Valid_Num` 从未被初始化，
+      且向 `_G` 泄漏一个无意义变量。→ 改为 `JY.D_Valid_Num=0`。
 
 ## 已完成（Slice 0/1 期间）
 
