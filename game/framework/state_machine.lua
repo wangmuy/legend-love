@@ -131,7 +131,7 @@ function StateMachine:pushSubState(subStateId, data)
     table.insert(subStateStack, {
         id = subStateId,
         data = data,
-        context = {}
+        context = { data = data }
     })
     
     -- 进入子状态
@@ -178,6 +178,17 @@ function StateMachine:getCurrentSubState()
         return nil
     end
     return subStateStack[#subStateStack].id
+end
+
+-- 获取当前子状态的上下文数据
+-- 子状态在 pushSubState 时传入的 data 会存进 context，
+-- 供子状态的 update/draw 读取（避免子状态自己维护一份全局变量）。
+-- @return: 当前子状态的 context 表或nil
+function StateMachine:getCurrentSubStateContext()
+    if #subStateStack == 0 then
+        return nil
+    end
+    return subStateStack[#subStateStack].context
 end
 
 -- 更新当前状态

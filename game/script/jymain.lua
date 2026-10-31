@@ -79,8 +79,6 @@ function SetGlobal()   --设置游戏内部使用的全程变量
    JY.oldMMapPic=-1;        --上次显示主地图主角贴图
 
    JY.SubScene=-1;          --当前子场景编号
-   JY.SceneNameShow=0;      --场景名提示：0 不显示，1 显示中（任意键取消）
-   JY.SceneNameWaiter=0;    --1=协程正在等键（此时 update 不得消费按键）
    JY.SubSceneX=0;          --子场景显示位置偏移，场景移动指令使用
    JY.SubSceneY=0;
 
@@ -97,7 +95,7 @@ function SetGlobal()   --设置游戏内部使用的全程变量
    JY.oldSMapPic=-1;        --上次显示场景地图主角贴图
 
    JY.D_Valid=nil           --记录当前场景有效的D的编号，提高速度，不用每次显示都计算了。若为nil则重新计算
-   JY_D_Valld_Num=0;        --当前场景有效的D个数
+   JY.D_Valid_Num=0;        --当前场景有效的D个数（原名误写为裸全局 JY_D_Valld_Num）
 
    JY.D_PicChange={}        --记录事件动画改变，以计算Clip
    JY.NumD_PicChange=0;     --事件动画改变的个数
@@ -506,61 +504,69 @@ function Init_SMap(showname)   --初始化场景数据
     lib.ShowSlow(50,0)
     lib.GetKey();
 
+    --showname=1 时提示场景名（原版此处是阻塞的
+    --DrawStrBox/ShowScreen/WaitKey/Cls/ShowScreen）。
+    --
+    --事件驱动下不能在这里画也不能在这里等键：
+    --   1. ShowScreen() 已被 async_globals 替换为空操作（love.draw 每帧自动 present）
+    --   2. GAME_SMAP.draw 每帧无条件 DrawSMap(0) 全屏重绘，
+    --      任何不在 draw 回调里画的东西都会在下一帧被覆盖
+    --故只向状态机请求「推入场景名提示子状态」，由子状态自己负责
+    --绘制和等键。jymain 不直接依赖状态机，通过 GameStates 提供的钩子转接。
     if showname==1 then
         ShowSceneName();
     end
 
 end
 
--- 显示场景名提示（屏幕顶部中间），任意键取消。
+-- 场景名提示：取当前场景名称。
 --
--- 原版（SDL）实现是一段阻塞流程：
+-- 原版（SDL）在 Init_SMap(1) 里是一段阻塞流程：
 --     DrawStrBox(-1,10,名称); ShowScreen(); WaitKey(); Cls(); ShowScreen()
--- 即「画一帧 → present → 阻塞等键 → 重画场景 → present」。
---
--- LÖVE 版不能照搬，原因有二：
---   1. ShowScreen() 已被 async_globals 替换为空操作（love.draw 每帧自动 present）
---   2. GAME_SMAP.draw 每帧无条件 DrawSMap(0) 全屏重绘，
---      在不属于 draw 回调的地方画的场景名会在下一帧被覆盖
--- 故改为「状态 + 每帧绘制」：这里只置标志并异步等键，
--- 由 GAME_SMAP.draw 在 DrawSMap 之后画出名称；按键后清标志。
-function ShowSceneName()
-    local name = JY.Scene[JY.SubScene] and JY.Scene[JY.SubScene]["名称"];
+-- LÖVE 版不能照搬（ShowScreen 已被 async_globals 置空，且
+-- GAME_SMAP.draw 每帧全屏重绘会覆盖非 draw 回调里画的内容），
+-- 因此改成事件驱动的「子状态」：
+--     GAME_SMAP.update 推入 SCENE_NAME 子状态
+--       → 子状态 enter 记录名称
+--       → 子状态 update 消费一次按键后 popSubState
+--       → 子状态 draw 在父状态 DrawSMap 之后画出名称
+-- jymain 这里只提供数据和绘制原语，不持有提示状态，也不等键。
+-- @return: 场景名称字符串；无名称（nil/空串/纯空白）时返回 nil
+function GetSceneName()
+    local scene = JY.Scene and JY.Scene[JY.SubScene];
+    if scene == nil then return nil end
+    local name = scene["名称"];
     -- 空串或纯空白视为无名称：否则会画出一个空框
-    if name==nil or name:match("^%s*$") then return end
-
-    JY.SceneNameShow=1;
-
-    -- 协程内（事件指令触发的场景跳转）：挂起当前协程，等任意键。
-    -- GetKey 是消费式读取，协程路径必须独占该按键，否则 update 轮询会把它吃掉，
-    -- 导致 waitForKey 永远等不到。故这里等键并清标志，update 侧不介入。
-    if EngineAPI and EngineAPI.coroutine and EngineAPI.coroutine.isRunning() then
-        JY.SceneNameWaiter=1;    -- 标记「协程正在等键」
-        EngineAPI.input.waitForKey();
-        JY.SceneNameWaiter=0;
-        JY.SceneNameShow=0;
-    else
-        JY.SceneNameWaiter=0;    -- 非协程：交给 update 轮询
-    end
+    if name == nil or name:match("^%s*$") then return nil end
+    return name;
 end
 
--- 任意键取消场景名提示（由 GAME_SMAP.update 每帧调用）。
--- 原版用阻塞 WaitKey 实现；LÖVE 版改为轮询，避免卡住主线程。
--- 仅在非协程路径生效：协程路径由 ShowSceneName 自己消费按键。
-function ClearSceneNameOnKey()
-    if JY.SceneNameShow~=1 then return end
-    if JY.SceneNameWaiter==1 then return end
-    if lib.GetKey()~=-1 then
-        JY.SceneNameShow=0;
-    end
+-- 场景名提示的「请求」钩子。
+--
+-- script/ 属于游戏逻辑层，不允许直接依赖 framework/ 的状态机
+-- （严格 _G 下也读不到 GameStates 这类模块 local）。
+-- 因此这里只保留一个可注入的钩子，由 framework/game_states.lua 在
+-- 注册状态时注入真正实现（pushSubState("SCENE_NAME", ...)）。
+-- 未注入时降级为 no-op，保证 jymain 单独加载也不会崩。
+-- 用 rawset 显式写入 _G：严格元表安装后（jymain_adapter.lua）普通赋值
+-- 会被 __newindex 拦截，但该变量必须是文件加载期就存在的全局。
+rawset(_G, "SetSceneNameShowHook", nil);   -- 形如 function(name)
+
+-- 请求显示场景名提示。
+-- 真正的显示/等键/关闭由 GAME_SMAP 的 SCENE_NAME 子状态负责。
+function ShowSceneName()
+    local name = GetSceneName();
+    if name == nil then return end
+    if SetSceneNameShowHook == nil then return end   -- 未接入框架：静默跳过
+    SetSceneNameShowHook(name);
 end
 
--- 绘制场景名提示框（供 GAME_SMAP.draw 调用）。
+-- 绘制场景名提示框（由 SCENE_NAME 子状态的 draw 调用）。
 -- 位置与原版一致：x 居中（-1），y=10，白色边框 + 白字。
-function DrawSceneName()
-    if JY.SceneNameShow~=1 then return end
-    local name = JY.Scene[JY.SubScene] and JY.Scene[JY.SubScene]["名称"];
-    if name==nil or name:match("^%s*$") then return end
+-- @param name: 场景名称，省略时取当前场景
+function DrawSceneName(name)
+    name = name or GetSceneName();
+    if name == nil then return end
     DrawStrBox(-1,10,name,C_WHITE,CC.DefaultFont);
 end
 

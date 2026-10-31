@@ -191,12 +191,9 @@ handlers["GAME_SMAP"] = {
     end,
     
     update = function(dt)
-        -- 场景名提示：任意键取消（原版由阻塞 WaitKey 实现，这里改为轮询）
-        if JY.SceneNameShow == 1 then
-            ClearSceneNameOnKey()
-            -- 提示期间吞掉本帧输入，避免同一个按键既关提示又触发走路
-            return
-        end
+        -- 场景名提示期间，StateMachine 会优先更新子状态并跳过本函数
+        -- （见 state_machine.lua 的 update：有子状态时直接 return），
+        -- 因此这里不需要再判断提示状态。
         
         -- 如果有活动菜单，不处理游戏输入
         if MenuAsync.hasActiveMenu() then
@@ -394,14 +391,46 @@ handlers["GAME_SMAP"] = {
         JY.Base["人Y1"] = limitX(JY.Base["人Y1"], 1, CC.SHeight - 2)
     end,
     
+    -- 子状态：场景名提示（原版 Init_SMap(1) 的 DrawStrBox + WaitKey）
+    --
+    -- 用状态机的子状态而非在 update 里轮询标志，是因为：
+    --   * StateMachine:update 在有子状态时只更新子状态并 return，
+    --     父状态的场景行走逻辑自动被抑制，天然实现「提示期间不响应移动」
+    --   * StateMachine:draw 先画父状态再画子状态，
+    --     无需手工保证 DrawSMap 与 DrawSceneName 的先后顺序
+    --   * 按键由子状态独占地从 InputManager 消费一次，不存在
+    --     「update 与协程抢同一个按键」的问题
+    subStates = {
+        SCENE_NAME = {
+            enter = function(data)
+                -- data.name 由 pushSubState 携带，避免子状态回头读全局 JY
+                lib.Debug("SCENE_NAME.enter: " .. tostring(data and data.name))
+            end,
+
+            update = function(dt, context)
+                -- 任意键取消。只消费一次（getKey 是消费式读取），
+                -- 消费后立刻弹出子状态，父状态的输入处理从下一帧恢复正常。
+                local key = lib.GetKey()
+                if key ~= -1 then
+                    lib.Debug("SCENE_NAME.update: key=" .. tostring(key) .. " -> dismiss")
+                    EventBridge.getInstance():popSubState(key)
+                end
+            end,
+
+            draw = function(context)
+                DrawSceneName(context.data.name)
+            end,
+        },
+    },
+
     draw = function()
         -- 在 Love2D 中，每一帧都需要重新绘制
         -- 禁用 FastShowScreen 优化以避免黑屏
         DrawSMap(0)
         
-        -- 场景名提示（原版 Init_SMap(1) 的 DrawStrBox 部分）。
-        -- 必须在 DrawSMap 之后：DrawSMap 会全屏重绘，先画会被覆盖。
-        DrawSceneName()
+        -- 场景名提示由 SCENE_NAME 子状态的 draw 负责：
+        -- StateMachine:draw 先画父状态、再画子状态，
+        -- 因此天然位于 DrawSMap 全屏重绘之后，不会被覆盖。
         
         if CC.ShowXY == 1 then
             DrawString(10, CC.ScreenH - 20, string.format("%s %d %d", JY.Scene[JY.SubScene]["名称"], JY.Base["人X1"], JY.Base["人Y1"]), C_GOLD, 16)
@@ -589,6 +618,9 @@ function GameStates.registerAll()
             eb:registerState(stateId, handler)
         end
     end
+
+    -- 注册完 GAME_SMAP 的 subStates 后，才能把场景名提示接入 jymain
+    GameStates.installSceneNameHook()
 end
 
 -- 获取处理器(用于测试)
@@ -599,6 +631,44 @@ end
 -- 获取状态ID
 function GameStates.getStateId(stateName)
     return getStateId(stateName)
+end
+
+-- 请求显示场景名提示。
+--
+-- 分两种情况：
+--   1. 在协程中（事件指令触发的场景跳转）：压入子状态后挂起协程等键，
+--      保证后续事件脚本在提示关闭之后才继续执行（等价原版阻塞 WaitKey）。
+--   2. 不在协程中（状态机自身的 update 里发生的跳转）：只压入子状态，
+--      由子状态的 update 消费按键，不阻塞主线程。
+-- 两条路径共用同一个子状态，绘制与关闭逻辑只有一处。
+-- @param name: 场景名称；nil 时不提示
+-- @return: 是否压入成功
+function GameStates.pushSceneNamePrompt(name)
+    name = name or GetSceneName()
+    if name == nil then return false end
+
+    local eb = EventBridge.getInstance()
+    local pushed = eb:pushSubState("SCENE_NAME", { name = name })
+    if not pushed then return false end
+
+    -- 协程内：挂起等键，等子状态弹出后继续（对齐原版「提示关闭才继续」语义）
+    if EngineAPI and EngineAPI.coroutine and EngineAPI.coroutine.isRunning() then
+        EngineAPI.input.waitForKey()
+    end
+
+    return true
+end
+
+-- 把场景名提示接入 jymain.lua 的注入钩子。
+--
+-- script/jymain.lua 属于游戏逻辑层，不依赖 framework/（严格 _G 下也读不到
+-- GameStates 这样的模块 local）。因此它只暴露一个 SetSceneNameShowHook 钩子，
+-- 由这里在注册状态时注入真正实现。
+-- 必须在 registerAll() 之后调用（此时 GAME_SMAP 的 subStates 已注册）。
+function GameStates.installSceneNameHook()
+    rawset(_G, "SetSceneNameShowHook", function(name)
+        return GameStates.pushSceneNamePrompt(name)
+    end)
 end
 
 return GameStates
