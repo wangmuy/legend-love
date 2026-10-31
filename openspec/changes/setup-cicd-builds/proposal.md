@@ -1,3 +1,7 @@
+---
+status: active
+---
+
 ## Why
 
 当前项目使用 `love src/` 命令手动运行，缺乏自动化构建流程。为了支持多平台发布（Android APK、Linux AppImage、Windows ZIP），需要引入基于 GitHub Actions 的 CI/CD 构建系统，同时支持本地构建 .love 文件进行测试。
