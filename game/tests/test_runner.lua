@@ -21,6 +21,7 @@ local TestModAudit = require("tests.unit.test_mod_audit")
 local TestFormatSpec = require("tests.unit.test_format_spec")
 local TestModE2E = require("tests.unit.test_mod_e2e")
 local TestModBoot = require("tests.unit.test_mod_boot")
+local TestSceneName = require("tests.unit.test_scene_name")
 
 local TestRunner = {}
 
@@ -250,6 +251,19 @@ function TestRunner.runAll()
     totalStats.passed = totalStats.passed + bootStats.passed
     totalStats.failed = totalStats.failed + bootStats.failed
     allPassed = allPassed and bootResult
+
+    -- 场景名测试放在最后：它会 LoadRecord 并设置全局 JY 状态，
+    -- 而 test_mod_boot 要求"必须在最后运行"且不能被前面用例污染。
+    print("\n" .. string.rep("-", 60))
+    print("运行场景名提示测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local snResult = TestSceneName.runAll()
+    local snStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + snStats.total
+    totalStats.passed = totalStats.passed + snStats.passed
+    totalStats.failed = totalStats.failed + snStats.failed
+    allPassed = allPassed and snResult
     
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
