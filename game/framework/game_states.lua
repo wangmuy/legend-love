@@ -191,6 +191,13 @@ handlers["GAME_SMAP"] = {
     end,
     
     update = function(dt)
+        -- 场景名提示：任意键取消（原版由阻塞 WaitKey 实现，这里改为轮询）
+        if JY.SceneNameShow == 1 then
+            ClearSceneNameOnKey()
+            -- 提示期间吞掉本帧输入，避免同一个按键既关提示又触发走路
+            return
+        end
+        
         -- 如果有活动菜单，不处理游戏输入
         if MenuAsync.hasActiveMenu() then
             return
@@ -391,6 +398,10 @@ handlers["GAME_SMAP"] = {
         -- 在 Love2D 中，每一帧都需要重新绘制
         -- 禁用 FastShowScreen 优化以避免黑屏
         DrawSMap(0)
+        
+        -- 场景名提示（原版 Init_SMap(1) 的 DrawStrBox 部分）。
+        -- 必须在 DrawSMap 之后：DrawSMap 会全屏重绘，先画会被覆盖。
+        DrawSceneName()
         
         if CC.ShowXY == 1 then
             DrawString(10, CC.ScreenH - 20, string.format("%s %d %d", JY.Scene[JY.SubScene]["名称"], JY.Base["人X1"], JY.Base["人Y1"]), C_GOLD, 16)

@@ -312,7 +312,10 @@ end
 -- coroutine 模块
 --------------------------------------------------------------------
 EngineAPI.coroutine.isRunning = function()
-    return coroutine.running() ~= nil
+    local co, ismain = coroutine.running()
+    if co == nil then return false end
+    if ismain == true then return false end
+    return true
 end
 
 EngineAPI.coroutine.yieldPoint = function()

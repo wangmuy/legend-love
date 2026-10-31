@@ -373,6 +373,38 @@
 `mod_check_one.lua` 与旁路表审计都看不见的 565 个控制符会漏到引擎。影响全 20 MOD 中
 7 个有跳过字段的 MOD（ptt/pineapple/dream/HeavenSword/GodsDevils/lyff/pig3dos）。
 
+## 原版移植缺陷修复（非 MOD 兼容范畴）
+
+- [x] **小场景名称提示未移植**：原版进小场景在屏幕顶部中间显示场景名，任意键取消；
+      LÖVE 版完全看不到。
+      **根因（三层）**：
+      ① `Init_SMap(1)` 内 `ShowScreen()` 已被 `framework/async_globals.lua:96` 替换为**空函数**
+      （事件驱动下 `love.draw` 每帧自动 present），故画了也从未上屏；
+      ② `GAME_SMAP.draw` 每帧无条件 `DrawSMap(0)` **全屏重绘**，在非 `draw` 回调里画的场景名
+      必被下一帧覆盖；
+      ③ `WaitKey()` 在 `async_globals` 下按 `EngineAPI.coroutine.isRunning()` 分流，而该判定
+      `return coroutine.running() ~= nil` 在 **LuaJIT 主线程也返回 true**（返回主线程对象 +
+      `ismain=true`），导致主线程误走异步分支。
+      **修复**：
+      - `script/jymain.lua` 新增 `JY.SceneNameShow` / `JY.SceneNameWaiter` 两个状态，
+        `ShowSceneName()`（置标志 + 协程内等键 / 非协程交给 update）、`DrawSceneName()`（绘制）、
+        `ClearSceneNameOnKey()`（非协程路径轮询清标志）。
+      - `framework/game_states.lua`：`GAME_SMAP.draw` 在 `DrawSMap(0)` **之后**调用 `DrawSceneName()`；
+        `GAME_SMAP.update` 在提示期间先 `ClearSceneNameOnKey()` 并 **return 吞掉该帧输入**
+        （避免同一按键既关提示又触发走路）。
+      - `engine-love2d/engine_love2d.lua` + `tests/engine_test.lua`：
+        `isRunning()` 改用 `coroutine.running()` 的第二个返回值 `ismain` 排除主线程。
+      **几何与原版一致**：`DrawStrBox(-1, 10, 名称, C_WHITE, CC.DefaultFont)`。
+      **真机实测（LÖVE 11.5，pascal MOD，`Init_SMap(1)` 真实调用）**：
+      顶部中间区域（y=5..50，x=屏幕中线±100）亮点 `232`（场景名框+白字）→ 注入按键后 `0`；
+      白框实测全屏坐标 `x=435..587, y=10..42`，与公式复算 `x=438..585, y=10..37` 吻合。
+      **负向对照**：还原旧行为（只画一次 + 移除每帧绘制）→ LÖVE 进程在 `Init_SMap(1)` **卡死超时**
+      （即原缺陷表现）；恢复后通过。
+      **测试**：新增 `tests/unit/test_scene_name.lua`（26 项）；`test_engine_test` 增 2 条断言
+      （含「主线程必须 false」，植回旧实现 → `expected false, got true`）。
+      **注**：`game/active_mod.txt` 残留 `SweeOan` 会让 `script_loader` 4 项测试失败——是环境残留，
+      跑全量前须 `rm -f game/active_mod.txt`。
+
 ## 已完成（Slice 0/1 期间）
 
 - [x] **存档目录隔离**：MOD 存档写 `mods/<mod>/save/`，各 MOD 不共享/不读取彼此存档；首次保存自动从

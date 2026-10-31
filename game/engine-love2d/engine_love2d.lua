@@ -296,8 +296,14 @@ EngineAPI.debug.log = function(...)
 end
 
 -- coroutine 模块
+-- 注意：LuaJIT/Lua5.1 的 coroutine.running() 在主线程也返回非 nil
+-- （返回主线程对象 + ismain=true），所以不能只用 ~= nil 判断。
+-- 必须用第二个返回值 ismain 排除主线程；Lua5.2+ 主线程返回 nil。
 EngineAPI.coroutine.isRunning = function()
-    return coroutine.running() ~= nil
+    local co, ismain = coroutine.running()
+    if co == nil then return false end
+    if ismain == true then return false end
+    return true
 end
 
 EngineAPI.coroutine.yieldPoint = function()

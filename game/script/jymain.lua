@@ -79,6 +79,8 @@ function SetGlobal()   --设置游戏内部使用的全程变量
    JY.oldMMapPic=-1;        --上次显示主地图主角贴图
 
    JY.SubScene=-1;          --当前子场景编号
+   JY.SceneNameShow=0;      --场景名提示：0 不显示，1 显示中（任意键取消）
+   JY.SceneNameWaiter=0;    --1=协程正在等键（此时 update 不得消费按键）
    JY.SubSceneX=0;          --子场景显示位置偏移，场景移动指令使用
    JY.SubSceneY=0;
 
@@ -505,13 +507,61 @@ function Init_SMap(showname)   --初始化场景数据
     lib.GetKey();
 
     if showname==1 then
-        DrawStrBox(-1,10,JY.Scene[JY.SubScene]["名称"],C_WHITE,CC.DefaultFont);
-        ShowScreen();
-        WaitKey();
-        Cls();
-        ShowScreen();
+        ShowSceneName();
     end
 
+end
+
+-- 显示场景名提示（屏幕顶部中间），任意键取消。
+--
+-- 原版（SDL）实现是一段阻塞流程：
+--     DrawStrBox(-1,10,名称); ShowScreen(); WaitKey(); Cls(); ShowScreen()
+-- 即「画一帧 → present → 阻塞等键 → 重画场景 → present」。
+--
+-- LÖVE 版不能照搬，原因有二：
+--   1. ShowScreen() 已被 async_globals 替换为空操作（love.draw 每帧自动 present）
+--   2. GAME_SMAP.draw 每帧无条件 DrawSMap(0) 全屏重绘，
+--      在不属于 draw 回调的地方画的场景名会在下一帧被覆盖
+-- 故改为「状态 + 每帧绘制」：这里只置标志并异步等键，
+-- 由 GAME_SMAP.draw 在 DrawSMap 之后画出名称；按键后清标志。
+function ShowSceneName()
+    local name = JY.Scene[JY.SubScene] and JY.Scene[JY.SubScene]["名称"];
+    -- 空串或纯空白视为无名称：否则会画出一个空框
+    if name==nil or name:match("^%s*$") then return end
+
+    JY.SceneNameShow=1;
+
+    -- 协程内（事件指令触发的场景跳转）：挂起当前协程，等任意键。
+    -- GetKey 是消费式读取，协程路径必须独占该按键，否则 update 轮询会把它吃掉，
+    -- 导致 waitForKey 永远等不到。故这里等键并清标志，update 侧不介入。
+    if EngineAPI and EngineAPI.coroutine and EngineAPI.coroutine.isRunning() then
+        JY.SceneNameWaiter=1;    -- 标记「协程正在等键」
+        EngineAPI.input.waitForKey();
+        JY.SceneNameWaiter=0;
+        JY.SceneNameShow=0;
+    else
+        JY.SceneNameWaiter=0;    -- 非协程：交给 update 轮询
+    end
+end
+
+-- 任意键取消场景名提示（由 GAME_SMAP.update 每帧调用）。
+-- 原版用阻塞 WaitKey 实现；LÖVE 版改为轮询，避免卡住主线程。
+-- 仅在非协程路径生效：协程路径由 ShowSceneName 自己消费按键。
+function ClearSceneNameOnKey()
+    if JY.SceneNameShow~=1 then return end
+    if JY.SceneNameWaiter==1 then return end
+    if lib.GetKey()~=-1 then
+        JY.SceneNameShow=0;
+    end
+end
+
+-- 绘制场景名提示框（供 GAME_SMAP.draw 调用）。
+-- 位置与原版一致：x 居中（-1），y=10，白色边框 + 白字。
+function DrawSceneName()
+    if JY.SceneNameShow~=1 then return end
+    local name = JY.Scene[JY.SubScene] and JY.Scene[JY.SubScene]["名称"];
+    if name==nil or name:match("^%s*$") then return end
+    DrawStrBox(-1,10,name,C_WHITE,CC.DefaultFont);
 end
 
 --计算贴图改变形成的Clip裁剪
