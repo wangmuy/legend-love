@@ -564,6 +564,93 @@ end
 
 local currentMusic = nil
 
+-- ---------------------------------------------------------------------------
+-- Audio path resolution (REQ-MIDI-1 / REQ-MIDI-2)
+--
+-- 1) MOD/原版 prefix must NOT be re-prefixed with CONFIG.SoundPath.
+--    Previously a MOD-overridden path such as "mods/<slug>/sound/game27.ogg"
+--    did not start with "sound/", so it was rewritten into the nonexistent
+--    "sound/mods/<slug>/sound/game27.ogg" and playback silently failed.
+--    Any path already carrying a directory prefix that exists is left alone.
+--
+-- 2) LÖVE picks its decoder by *file extension* (verified: a MIDI file renamed
+--    to .ogg fails with "Could not read Ogg bitstream"). LÖVE 11.5 does decode
+--    .mid/.mp3 natively (libmodplug), so when the caller supplies an extension-
+--    less path we probe the candidates in order.
+--
+--    Probe order is .ogg -> .mp3 -> .mid. The bundled 25 themes ship only as
+--    .ogg so they stay bit-identical regardless of order. For MOD music an
+--    optional pre-rendered .ogg (rendered with a real SoundFont) must win over
+--    the source .mid, because LÖVE's bundled libmodplug ignores SoundFonts and
+--    renders MIDI with a thin built-in wavetable (measured: ~2.1x the high-
+--    frequency energy of a SoundFont render). .mid is last so it acts purely
+--    as the fallback when no rendered version has been produced yet.
+-- ---------------------------------------------------------------------------
+
+-- Extensions probed for an extension-less music path, in priority order.
+local MUSIC_EXTS = { ".ogg", ".mp3", ".mid" }
+
+-- Cheap existence probe that works for both bare names (LÖVE source dir) and
+-- relative paths (Chromium-style fuse mount), without touching love.filesystem.
+local function audioFileExists(path)
+    local f = io.open(path, "rb")
+    if f then f:close() return true end
+    -- Packed .love / mobile builds expose assets only through love.filesystem.
+    if love and love.filesystem and love.filesystem.getInfo then
+        local rel = path:gsub("^%./", "")
+        local ok, info = pcall(love.filesystem.getInfo, rel)
+        if ok and info then return true end
+    end
+    return false
+end
+
+local function hasExtension(path)
+    -- Only a trailing ".<letters/digits>" counts; "1.2" style names are not exts.
+    return path:match("%.%w+$") ~= nil
+end
+
+-- First existing candidate for an extension-less path, or nil.
+local function firstExisting(stem)
+    for _, ext in ipairs(MUSIC_EXTS) do
+        if audioFileExists(stem .. ext) then
+            return stem .. ext
+        end
+    end
+    return nil
+end
+
+-- REQ-MIDI-3: built-in fallback.
+--
+-- A MOD may reference more music ids than it actually ships (measured:
+-- BookCalamity references up to id 51 but only ships music/0..23). Without a
+-- fallback those scenes would be *worse* than before this feature, because the
+-- MOD path shadows the bundled sound/gameNN.ogg that used to play.
+--
+-- So when a MOD music path cannot be resolved, retry the same basename under
+-- the bundled sound directory. Scenes with no bundled track either stay silent
+-- (the previous, non-crashing behaviour).
+local function bundledFallback(filepath, basePath)
+    local base = filepath:match("([^/]+)$")
+    if not base then return nil end
+    local soundPath = (CONFIG and CONFIG.SoundPath) or "sound/"
+    -- Do not fall back when we are already looking at the bundled directory.
+    if filepath:sub(1, #soundPath) == soundPath then return nil end
+    return firstExisting(soundPath .. base)
+end
+
+-- Returns the concrete file to decode for a music path, or nil when nothing
+-- exists. Extension-carrying paths are returned untouched (so the original
+-- sound/gameNN.ogg behaviour is byte-for-byte unchanged).
+local function resolveMusicFile(filepath)
+    if hasExtension(filepath) then
+        if audioFileExists(filepath) then return filepath end
+        return bundledFallback(filepath) or filepath
+    end
+    local found = firstExisting(filepath)
+    if found then return found end
+    return bundledFallback(filepath, nil) or filepath
+end
+
 function PlayMIDI(filename)
     if not love.audio then return end
     
@@ -578,11 +665,16 @@ function PlayMIDI(filename)
     local filepath = filename
     Debug("PlayMIDI: filename=" .. tostring(filename))
     
+    -- REQ-MIDI-1: only apply CONFIG.SoundPath when the caller passed a bare
+    -- file name. Paths that already name a directory (sound/, mods/... /,
+    -- absolute) are used as-is.
     if not filepath:match("^/") and not filepath:match("^%a:") then
-        if not filepath:match("^sound/") then
+        local bareName = not filepath:match("/")
+        if bareName and not filepath:match("^sound/") then
             filepath = CONFIG.SoundPath .. filepath
         end
     end
+    filepath = resolveMusicFile(filepath)
     Debug("PlayMIDI: filepath=" .. filepath)
     
     local success, source_or_err = pcall(love.audio.newSource, filepath, "stream")
@@ -607,8 +699,11 @@ function PlayWAV(filename)
     end
     
     local filepath = filename
+    -- REQ-MIDI-1 (same prefix defect as PlayMIDI): keep directory-carrying
+    -- paths intact so MOD sound effects resolve under mods/<slug>/sound/.
     if not filepath:match("^/") and not filepath:match("^%a:") then
-        if not filepath:match("^sound/") then
+        local bareName = not filepath:match("/")
+        if bareName and not filepath:match("^sound/") then
             filepath = CONFIG.SoundPath .. filepath
         end
     end
