@@ -1,3 +1,7 @@
+---
+status: done
+---
+
 ## 为什么
 
 当前 `engine-web` 的 Lua 引擎（Fengari）和游戏循环全部跑在浏览器主线程。初始化时加载 30+ 个 Lua 文件、解析 10 个 JSON 数据包、执行 `initWebFramework()`，这些同步 Lua 操作会长时间阻塞主线程。期间 xterm.js 无法渲染、输入框无法点击、DOM 事件无法处理——用户看到的"界面卡住"实际上是主线程被 Lua 占满。

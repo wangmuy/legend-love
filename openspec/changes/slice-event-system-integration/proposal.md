@@ -1,3 +1,7 @@
+---
+status: done
+---
+
 ## 为什么
 
 Slice 4 实现了 SMAP 菜单驱动交互，但 NPC 对话触发 `EventExecutor.startEvent()` 后显示"事件系统不可用"。原因是 `event_executor.lua` 模块未加载，且 `instruct_*` 函数在 Web MUD 中大量缺失。
