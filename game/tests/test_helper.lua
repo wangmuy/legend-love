@@ -267,6 +267,15 @@ function TestHelper.mockGlobals()
 end
 
 function TestHelper.mockEngineAPI()
+    -- love 风格的 open mode（"r"/"w"/"a"/"c"）转成 io.open 能接受的形式。
+    -- lib_file.toLoveOpenMode 把含 "+" 的模式（如 "r+b"）映射为 "c"，
+    -- 但 io.open 不认 "c"，必须先转回 "r+b"/"w+b"。
+    local function toIOOpenMode(mode)
+        mode = mode or "r"
+        if mode == "c" then return "r+b" end
+        return mode
+    end
+
     _G.EngineAPI = {
         time = {
             getTime = function() return love and love.timer and love.timer.getTime and love.timer.getTime() * 1000 or 0 end,
@@ -274,15 +283,45 @@ function TestHelper.mockEngineAPI()
             sleep = function() end,
         },
         file = {
-            exists = function() return false end,
-            getSize = function() return -1 end,
-            open = function() end,
-            openFile = function() end,
-            read = function() return nil end,
-            write = function() return false end,
-            lines = function() return function() end end,
+            -- 真实文件访问：lib_file 已迁移到 EngineAPI.file，mock 必须委托到 io.*
+            -- 否则所有读文件路径返回 nil（历史遗留：本 mock 曾返回恒 false/nil）
+            exists = function(p)
+                local f = io.open(p, "r")
+                if f then f:close() return true end
+                return false
+            end,
+            getSize = function(p)
+                local f = io.open(p, "rb")
+                if f then local s = f:seek("end") f:close() return s end
+                return -1
+            end,
+            open = function(p, mode) return io.open(p, toIOOpenMode(mode)) end,
+            openFile = function(p, mode) return io.open(p, toIOOpenMode(mode)) end,
+            read = function(p)
+                local f = io.open(p, "rb")
+                if not f then return nil end
+                local d = f:read("*a")
+                f:close()
+                return d
+            end,
+            write = function(p, d)
+                local f = io.open(p, "wb")
+                if not f then return false end
+                f:write(d)
+                f:close()
+                return true
+            end,
+            lines = function(p)
+                local f = io.open(p, "r")
+                if not f then return function() return nil end end
+                return function()
+                    local l = f:read("*line")
+                    if not l then f:close() end
+                    return l
+                end
+            end,
             createDirectory = function() end,
-            remove = function() return false end,
+            remove = function(p) return os.remove(p) end,
         },
         debug = { log = function() end },
         coroutine = {
@@ -775,6 +814,89 @@ function TestHelper.teardown()
     _G.VK_RIGHT = nil
     _G.C_ORANGE = nil
     _G.C_WHITE = nil
+end
+
+-- ---------------------------------------------------------------------------
+-- 自愈：产物 save/ 与源 save/ 逐字节对齐（MOD 存档槽自愈）
+-- ---------------------------------------------------------------------------
+-- 背景：存档 round-trip 测试（mod_boot round-trip、mod_check_one SAVE 自检）
+-- 先删槽文件再写引擎存档。若进程中途被杀（provider 断连、超时 kill 等），
+-- 产物 save/ 会停在「引擎存档」状态：r1.grp 内容不符、s1.grp/d1.grp 缺失、
+-- r1.idx/r1.ovr 播种残留。这会污染下一次全量运行：mod_resources 的字节比对
+-- 与 mod_audit 的「必需但未进产物」矛盾检查会报出假失败，且失败面随每次
+-- 中断位置漂移（同一套件多次运行结果不一致的根因）。
+-- 源包 save/ 是唯一规范态：构建从源→产物逐字节复制，测试结束也应恢复源态。
+-- 本函数在套件入口（runAll/runModule）与 mod_check_one 入口各做一次归一化，
+-- 让每次运行从干净基线开始；它不掩盖运行内缺陷——套件开始后的所有检查
+-- 仍是纯断言（运行内任何模块再次破坏 save/ 仍会被后续检查捕获）。
+--
+-- 返回修复的文件数（0 = 无需修复）。
+function TestHelper.healModSave(slug)
+    -- 只对已存在的产物目录自愈（产物目录由构建创建）。防止 reference 下
+    -- 临时出现的非规范目录（如并行实验的 kys-s-* 暂存）被误自愈成幻影
+    -- mods/<slug>/ 或误报缺失。
+    local function dirExists(d)
+        local p = io.popen('test -d "' .. d .. '" && echo y', "r")
+        if not p then return false end
+        local ok = p:read() == "y\n"
+        p:close()
+        return ok
+    end
+    if not dirExists("mods/" .. slug) then return 0 end
+    local function listDir1(d)
+        local out, p = {}, io.popen('ls -1 "' .. d .. '" 2>/dev/null', "r")
+        if not p then return out end
+        for line in p:lines() do out[#out + 1] = line end
+        p:close()
+        return out
+    end
+    local function readAll(p)
+        local f = io.open(p, "rb")
+        if not f then return nil end
+        local d = f:read("*a"); f:close()
+        return d
+    end
+    local srcDir = "../reference/allmods/kys-" .. slug .. "/save/"
+    local dstDir = "mods/" .. slug .. "/save/"
+    local srcFiles = listDir1(srcDir)
+    if #srcFiles == 0 then return 0 end
+    os.execute('mkdir -p "' .. dstDir .. '"')
+    local healed = 0
+    local srcSet = {}
+    for _, n in ipairs(srcFiles) do
+        srcSet[n] = true
+        local sd = readAll(srcDir .. n)
+        if sd == nil then goto cont end
+        local dd = readAll(dstDir .. n)
+        if dd ~= sd then
+            local out = io.open(dstDir .. n, "wb")
+            if out then out:write(sd); out:close(); healed = healed + 1 end
+        end
+        ::cont::
+    end
+    for _, n in ipairs(listDir1(dstDir)) do
+        if not srcSet[n] then
+            os.remove(dstDir .. n)
+            healed = healed + 1
+        end
+    end
+    return healed
+end
+
+-- 全部 20 个 MOD 产物 save/ 自愈（套件入口调用）
+function TestHelper.healAllModSaves()
+    local total, p = 0, io.popen("ls -1d ../reference/allmods/kys-* 2>/dev/null", "r")
+    if p then
+        for d in p:lines() do
+            local slug = d:match("kys-(.+)")
+            if slug then total = total + TestHelper.healModSave(slug) end
+        end
+        p:close()
+    end
+    if total > 0 then
+        print("[heal] 修复 " .. total .. " 个存档槽文件（上次运行中断残留）")
+    end
+    return total
 end
 
 return TestHelper
