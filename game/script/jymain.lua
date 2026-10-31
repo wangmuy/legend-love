@@ -1616,6 +1616,70 @@ end
 -- 读取游戏进度
 -- id=0 新进度，=1/2/3 进度
 --
+-- MOD 旁路字符串表接入（allmods 编码转换）
+-- MOD 的字符串字段在 ranger.grp 中被替换为固定宽度 hint（如 "P0002"），
+-- 真实 UTF-8 值在 data/ranger.str。未激活 MOD 时 ModData 为空操作，
+-- 行为与原版逐字节一致（零回归）。
+-- 注意：这三个 helper 必须在 LoadRecord/SaveRecord 之前定义（局部函数
+-- 需先声明后使用），故放在文件此处。
+local _modDataHooked = false
+local _modDataCache = nil
+local function modDataForStrings()
+    if _modDataHooked then return _modDataCache end
+    _modDataHooked = true
+    local ok, m = pcall(require, "framework.mod_data")
+    _modDataCache = (ok and m) or false
+    return _modDataCache
+end
+
+-- 解析从缓冲区读到的字符串：若是 hint 且能查到旁路表，返回真实值。
+-- 当前存档覆盖表（若有）优先。
+-- 对「未转换」字段（缓冲区里是纯 ASCII 原文），则用合成键查覆盖表。
+local function resolveModString(v, t, offset)
+    local m = modDataForStrings()
+    if not m or not m.Active() then return v end
+    local ovr = m._currentOverrides
+    -- 1) 真实 hint 键
+    if ovr and ovr[v] ~= nil then return ovr[v] end
+    -- 2) 合成键（未转换字段的改写）
+    if ovr and t and m.IdentifyStringField and m.SyntheticKey then
+        local seg, field = m.IdentifyStringField(t[1])
+        if seg then
+            local k = m.SyntheticKey(seg, field, offset)
+            if k and ovr[k] ~= nil then return ovr[k] end
+        end
+    end
+    return m.ResolveString(v)
+end
+
+-- 写入字符串字段：MOD 激活时记录到存档覆盖表（而非写缓冲区），
+-- 以便存档回写时能保留玩家修改的字符串（UTF-8 放不回定长字段）。
+-- 键的选择：
+--   * 缓冲区是真实 hint（构建期已转换）→ 用 hint 作键
+--   * 缓冲区是纯 ASCII 原文（构建期未转换）→ 用合成键（段+字段+记录偏移）
+local function writeModString(data, t, offset, v)
+    local m = modDataForStrings()
+    if m and m.Active() and m._currentOverrides then
+        local hint = Byte.getstr(data, t[1]+offset, t[3])
+        if hint and hint ~= "" and m.ParseHint and m.ParseHint(hint) then
+            m._currentOverrides[hint] = v
+            return true
+        end
+        -- 无 hint：用合成键，避免 UTF-8 被截断进定长字段
+        if m.IdentifyStringField and m.SyntheticKey then
+            local seg, field = m.IdentifyStringField(t[1])
+            if seg then
+                local k = m.SyntheticKey(seg, field, offset)
+                if k then
+                    m._currentOverrides[k] = v
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 --这里是先把数据读入Byte数组中。然后定义访问相应表的方法，在访问表时直接从数组访问。
 --与以前的实现相比，从文件中读取和保存到文件的时间显著加快。而且内存占用少了
 function LoadRecord(id)       -- 读取游戏进度
@@ -1646,6 +1710,16 @@ function LoadRecord(id)       -- 读取游戏进度
     --读取R*.idx文件
     local data=Byte.create(6*4);
     Byte.loadfile(data,idxFile,0,6*4);
+
+    -- MOD 存档覆盖表：读档时先加载 rN.ovr（未激活 MOD / 无文件时为空表）
+    do
+        local m = modDataForStrings()
+        if m and m.Active() and m.SaveOverrides then
+            m._currentOverrides = m.SaveOverrides(id)
+        else
+            if m then m._currentOverrides = nil end
+        end
+    end
 
     local idx={};
     idx[0]=0;
@@ -1772,6 +1846,20 @@ function SaveRecord(id)         -- 写游戏进度
     --读取R*.idx文件
     local t1=lib.GetTime();
 
+    -- 首次保存该槽时，存档目录里还没有 rN.idx（分段偏移表），
+    -- 先从 MOD/原版的基础数据模板（ranger.idx）播种一份，否则会读到全 0 idx，
+    -- 导致写出的存档各段长度为 0（损坏）。
+    if id > 0 then
+        local ok, ModData = pcall(require, "framework.mod_data")
+        if ok and ModData and ModData.SeedSaveSlot then
+            ModData.EnsureSaveDir()
+            local seeded = ModData.SeedSaveSlot(id)
+            if seeded then
+                lib.Debug(string.format("SaveRecord: seeded idx from template -> %s", seeded))
+            end
+        end
+    end
+
     lib.Debug("SaveRecord: reading idx file")
     local data=Byte.create(6*4);
     Byte.loadfile(data,CC.R_IDXFilename[id],0,6*4);
@@ -1798,6 +1886,15 @@ function SaveRecord(id)         -- 写游戏进度
 
     lib.Debug("SaveRecord: calling SaveSMap")
     lib.SaveSMap(CC.S_Filename[id],CC.D_Filename[id]);
+
+    -- MOD 存档覆盖表：把本次会话中修改过的字符串写入 rN.ovr
+    do
+        local m = modDataForStrings()
+        if m and m.Active() and m._currentOverrides and m.WriteSaveOverrides then
+            m.WriteSaveOverrides(id, m._currentOverrides)
+        end
+    end
+
     lib.Debug(string.format("SaveRecord time=%d",lib.GetTime()-t1));
     lib.Debug("SaveRecord: done")
 
@@ -1857,6 +1954,7 @@ function GetDataFromStruct(data,offset,t_struct,key)  --从数据的结构中翻
         r=Byte.getu16(data,t[1]+offset);
     elseif t[2]==2 then
         r=Byte.getstr(data,t[1]+offset,t[3]);
+        r=resolveModString(r, t, offset);
     end
     return r;
 end
@@ -1870,6 +1968,8 @@ function getTableKeys(t)
     return keys
 end
 
+-- 写入字符串字段：MOD 激活时记录到存档覆盖表（而非写缓冲区 hint），
+-- 以便存档回写时能保留玩家修改的字符串。
 function SetDataFromStruct(data,offset,t_struct,key,v)  --从数据的结构中翻译数据，保存数据
     local t=t_struct[key];
     if t[2]==0 then
@@ -1877,9 +1977,11 @@ function SetDataFromStruct(data,offset,t_struct,key,v)  --从数据的结构中�
     elseif t[2]==1 then
         Byte.setu16(data,t[1]+offset,v);
     elseif t[2]==2 then
-        local s;
-        s=v;
-        Byte.setstr(data,t[1]+offset,t[3],s);
+        if not writeModString(data, t, offset, v) then
+            local s;
+            s=v;
+            Byte.setstr(data,t[1]+offset,t[3],s);
+        end
     end
 end
 
@@ -4340,6 +4442,17 @@ end
 --加载战斗数据
 function WarLoad(warid)              --加载战斗数据
     WarSetGlobal();         --初始化战斗变量
+    -- 边界校验（MOD 的 war.sta 大小不同）：warid 越界时报错而非静默加载失败
+    do
+        local ok, ModData = pcall(require, "framework.mod_data")
+        if ok and ModData and ModData.WarRecordCount then
+            local n = ModData.WarRecordCount(CC.WarFile, CC.WarDataSize)
+            if n and (warid < 0 or warid >= n) then
+                JY_Error("WarLoad: warid=%d out of range (war.sta has %d records)", warid, n)
+                return
+            end
+        end
+    end
     local data=Byte.create(CC.WarDataSize);      --读取战斗数据
     Byte.loadfile(data,CC.WarFile,warid*CC.WarDataSize,CC.WarDataSize);
     LoadData(WAR.Data,CC.WarData_S,data);
