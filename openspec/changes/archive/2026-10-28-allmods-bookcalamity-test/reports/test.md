@@ -1,0 +1,36 @@
+---
+status: done
+created: 2026-10-18
+---
+
+# 天书劫 (BookCalamity) — 测试验证
+
+## 测试模块
+
+mod_encoding（TrimControl 用例）
+
+## 用例与结果
+
+| 用例 | 断言内容 | 结果 |
+|------|----------|------|
+| `testTrimControlTrailingCrLf` | 尾部 CR/LF 被剥离 |
+| `testTrimControlInteriorCrLf` | 内部 CR/LF 被折叠删除 |
+| `testTrimControlRealBookCalamityField` | 真实字段 `大燕傳國玉璽` 从 `...0d0a` 还原 |
+| `testConvertRangerNoControlCharsAllMods` | 全 20 MOD 转换后无控制符 |
+| `testFullBootChainForProblematicMods/BookCalamity` | 独立进程真实启动：800/550/139/398，主角「主角」，扫描 3787 字段，0 U+FFFD、0 控制符 |
+
+## 运行命令
+
+```bash
+cd game && rm -f active_mod.txt && lua tests/test_runner.lua          # 全量 364/364
+cd game && lua tests/unit/test_mod_encoding.lua                        # mod_encoding 45/45
+cd game && lua tests/unit/test_mod_ini.lua                             # mod_ini 81/81
+cd game && lua tests/unit/boot_one_mod.lua bookcalamity ...                  # 单 MOD 真实启动链路
+cd game && rm -f active_mod.txt && lua tests/test_runner.lua mod_boot  # 5 MOD 启动链路（子进程）
+```
+
+## 结论
+
+全部用例通过，且**真实启动链路**（独立进程 `lib.init → LoadRecord(0)`）验证
+分段记录数、主角姓名与全量字符串合法性。**0 回归**：全 20 MOD 自检 20/20，
+pascal 基线 PASS，全量测试 364/364。
