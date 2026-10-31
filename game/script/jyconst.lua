@@ -60,6 +60,7 @@ function SetGlobalConst()
 
 
    -- 游戏状态定义
+    GAME_INIT = -1      --游戏刚初始化，尚未进入任何画面（SetGlobal 的初始值）
     GAME_START =0       --开始画面
     GAME_FIRSTMMAP = 1  --第一次显示主地图
     GAME_MMAP =2;       --主地图
