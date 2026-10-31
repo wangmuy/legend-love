@@ -3,8 +3,8 @@
 # MOD 激活示例文件。
 #
 # 用法：
-#   1) 把本文件复制为 game/active_mod.txt
-#   2) 编辑 game/active_mod.txt：**只保留一行 slug**（删除全部 # 注释行），例如：
+#   1) 把本文件复制为 game/active_mod.txt（说明文字可以整份保留，无需删注释）
+#   2) 把末尾的示例行改成你要的 slug，例如：
 #          mingdong
 #   3) 启动游戏：
 #          cd game && love .
@@ -16,7 +16,8 @@
 #          rm game/active_mod.txt
 #
 # 格式说明：
-#   * active_mod.txt 只读第一行有效内容；空行/空文件 = 未激活（原版，零回归）
+#   * active_mod.txt 只取**第一个有效行**；空行与 # 注释行一律跳过
+#   * 空文件 / 只有注释 = 未激活（原版路径，零回归）
 #   * 前后空白、\r\n 会被自动忽略
 #   * 可写 "mingdong" 或 "kys-mingdong"（前缀 kys- 会被自动去掉，二者等价）
 #   * 内容为 MOD 目录名去掉 "kys-" 前缀后的部分（见下方可用列表）
@@ -49,5 +50,5 @@
 #   books         天书奇侠试玩
 #   dream         （未标注名称）
 #
-# ↓↓↓ 复制到 active_mod.txt 时，只保留下面这一行（改成你要的 slug） ↓↓↓
+# ↓↓↓ 下面这一行才是实际生效的 slug（改成你要的即可，可整份复制本文件） ↓↓↓
 mingdong

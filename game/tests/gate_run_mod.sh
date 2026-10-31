@@ -218,6 +218,59 @@ else
     fi
 fi
 
+# -------------------------- J. active_mod.txt 解析（注释行容错）
+# 回归：旧实现用 gsub("\n","") 把所有行拼接，active_mod.sample.txt
+# 直接复制会得到 2000+ 字符乱串并静默回退到原版。
+log ""
+log "--- J. active_mod.txt 解析容错 ---"
+
+if [ -f game/active_mod.sample.txt ]; then
+    SAMPLE_RESULT=$( cd game && lua -e '
+package.path="./?.lua;./?/init.lua;"..package.path
+local f=io.open("active_mod.sample.txt","rb")
+if not f then print("NOFILE") os.exit(0) end
+local c=f:read("*a"); f:close()
+local MD=require("framework.mod_data")
+MD.readActiveFile=function() return c end
+local s=MD.Active()
+if s==nil then print("NIL") else print(s.."|"..#s) end
+' 2>/dev/null )
+
+    SAMPLE_SLUG=${SAMPLE_RESULT%%|*}
+    SAMPLE_LEN=${SAMPLE_RESULT##*|}
+
+    if [ "$SAMPLE_SLUG" = "NIL" ] || [ "$SAMPLE_SLUG" = "NOFILE" ]; then
+        log "  [FAIL] sample 文件复制后解析为 nil（应能激活 MOD）"
+        fail=$((fail + 1))
+    elif [ "$SAMPLE_LEN" -ge 40 ] 2>/dev/null; then
+        log "  [FAIL] sample 解析出 $SAMPLE_LEN 字符的乱串（注释行未跳过）"
+        fail=$((fail + 1))
+    else
+        log "  [PASS] sample 文件可直接复制生效（slug=$SAMPLE_SLUG, ${SAMPLE_LEN} 字符）"
+    fi
+
+    # 全注释 / 空文件必须回退原版
+    for CASE in "comment:# 只有注释" "empty:"; do
+        NAME=${CASE%%:*}; CONTENT=${CASE#*:}
+        R=$( cd game && CONTENT="$CONTENT" lua -e '
+package.path="./?.lua;./?/init.lua;"..package.path
+local MD=require("framework.mod_data")
+local c=os.getenv("CONTENT")
+MD.readActiveFile=function() return c end
+print(MD.Active()==nil and "NIL" or MD.Active())
+' 2>/dev/null )
+        if [ "$R" = "NIL" ]; then
+            log "  [PASS] $NAME 文件 -> 未激活（原版路径）"
+        else
+            log "  [FAIL] $NAME 文件 -> 解析出 '$R'（应为 nil）"
+            fail=$((fail + 1))
+        fi
+    done
+else
+    log "  [FAIL] 缺少 game/active_mod.sample.txt"
+    fail=$((fail + 1))
+fi
+
 log ""
 if [ "$fail" -eq 0 ]; then
     log "GATE_PASS"
