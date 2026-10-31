@@ -47,3 +47,6 @@ game/mods/
 game/active_mod.txt
 # 用户存档目录（运行时生成，非仓库内容）
 game/save/
+
+# 临时调试脚本（用完即删，不属于测试套件；正式门禁见 game/tests/gate_*.sh）
+game/tests/scratch_*.lua
