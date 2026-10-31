@@ -1,6 +1,9 @@
 bin/*.txt
 bin/jy
 game/debug.txt
+# 运行时日志（JY_Error / perf_log 生成）
+game/error.txt
+game/perf.txt
 builds/
 
 # opencode
@@ -35,3 +38,12 @@ game/engine-web/node_modules/
 game/engine-web/dist/
 game/engine-web/lib/
 game/engine-web/tests/bridge-*.json
+
+reference/
+
+# allmods MOD 构建产物（由 tools/mod_build.lua 生成，可重复构建）
+game/mods/
+# MOD 激活状态（每用户运行时状态，非仓库内容）
+game/active_mod.txt
+# 用户存档目录（运行时生成，非仓库内容）
+game/save/
