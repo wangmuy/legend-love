@@ -87,10 +87,25 @@ local activeSlug = nil
 local activeLoaded = false
 
 -- 归一化 slug：去空白、去 kys- 前缀（"kys-mingdong" 与 "mingdong" 等价）
+-- 取首个有效行：跳过空行与 # 注释行。
+-- active_mod.txt 允许保留说明文字（见 active_mod.sample.txt），只有第一个
+-- 有效行生效；空文件/全注释 = 未激活（原版路径）。
+-- 旧实现用 gsub("\n","") 把所有行直接拼接，导致带注释的文件被解析成
+-- 一个 2000+ 字符的乱串，静默失效却不报错。
+local function firstMeaningfulLine(text)
+    for line in text:gmatch("[^\r\n]+") do
+        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+        if line ~= "" and line:sub(1, 1) ~= "#" then
+            return line
+        end
+    end
+    return nil
+end
+
 local function normalizeSlug(slug)
     if type(slug) ~= "string" then return nil end
-    slug = slug:gsub("^%s+", ""):gsub("%s+$", "")
-    slug = slug:gsub("\r", ""):gsub("\n", "")
+    slug = firstMeaningfulLine(slug)
+    if not slug then return nil end
     slug = slug:gsub("^kys%-", "")
     if slug == "" then return nil end
     return slug

@@ -287,6 +287,61 @@ function TestModData.testActiveReadsFile()
     TestHelper.assertEquals("mingdong", ModData.Active(), "slug read from file")
 end
 
+-- 回归：旧实现用 gsub("\n","") 把所有行拼接，带注释的文件会被解析成
+-- 一个 2000+ 字符的乱串并静默失效（active_mod.sample.txt 直接复制不可用）。
+function TestModData.testActiveSkipsCommentAndBlankLines()
+    print("\n=== Test: Active 跳过注释行与空行 ===")
+    local cases = {
+        { "单行",            "mingdong\n",                    "mingdong" },
+        { "kys- 前缀",       "kys-mingdong\n",                "mingdong" },
+        { "前置空行",        "\n\n  mingdong  \n",          "mingdong" },
+        { "CRLF",            "mingdong\r\n",                 "mingdong" },
+        { "前有注释",        "# 说明\n# 更多\nmingdong\n",  "mingdong" },
+        { "多行取第一",      "mingdong\nawaken\n",           "mingdong" },
+        { "注释后跟多行",    "# x\nDragon\nawaken\n",        "Dragon" },
+    }
+    for _, c in ipairs(cases) do
+        local ModData = freshModData()
+        local content = c[2]
+        ModData.readActiveFile = function() return content end
+        TestHelper.assertEquals(c[3], ModData.Active(), c[1])
+    end
+end
+
+function TestModData.testActiveAllCommentsMeansVanilla()
+    print("\n=== Test: 全注释/空文件 = 未激活 ===")
+    local cases = {
+        { "全注释",   "# 说明\n# 更多\n" },
+        { "空文件",   "" },
+        { "仅空白",   "   \n\n  \n" },
+    }
+    for _, c in ipairs(cases) do
+        local ModData = freshModData()
+        local content = c[2]
+        ModData.readActiveFile = function() return content end
+        TestHelper.assertNil(ModData.Active(), c[1] .. " -> nil（原版）")
+    end
+end
+
+-- sample 文件本身必须可直接复制生效，否则说明与实现不符。
+function TestModData.testActiveModSampleFileWorks()
+    print("\n=== Test: active_mod.sample.txt 可直接复制生效 ===")
+    local ModData = freshModData()
+    local f = io.open("active_mod.sample.txt", "rb")
+    TestHelper.assertNotNil(f, "sample 文件存在")
+    if not f then return end
+    local content = f:read("*a")
+    f:close()
+    ModData.readActiveFile = function() return content end
+    local slug = ModData.Active()
+    TestHelper.assertNotNil(slug, "sample 复制后应能激活某个 MOD")
+    -- 必须是一个真实存在的 MOD slug，而非被拼成的大字符串
+    TestHelper.assertTrue(#slug < 40,
+        "解析结果应是短 slug 而非拼接乱串（实际长度 " .. tostring(#slug) .. "）")
+    TestHelper.assertTrue(ModData.dirExists("mods/" .. slug) or slug == "mingdong",
+        "解析出的 slug 应指向真实 MOD 目录")
+end
+
 function TestModData.testWarRecordCount()
     print("\n=== Test: WarRecordCount ===")
     local ModData = freshModData()
@@ -653,6 +708,9 @@ function TestModData.runAll()
     TestModData.testDirExistsFunction()
     TestModData.testSetActiveNormalizesSlug()
     TestModData.testActiveReadsFile()
+    TestModData.testActiveSkipsCommentAndBlankLines()
+    TestModData.testActiveAllCommentsMeansVanilla()
+    TestModData.testActiveModSampleFileWorks()
     TestModData.testWarRecordCount()
     TestModData.testSaveDirNoActive()
     TestModData.testSaveDirModActive()
