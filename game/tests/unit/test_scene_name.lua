@@ -57,6 +57,13 @@ local function bootHeadless()
 
     GameStates = require("framework.game_states")
     StateMachine = require("framework.state_machine")
+
+    -- 注册所有状态并注入场景名钩子（与 jymain_adapter.init 的真实流程一致）。
+    -- 不跑这步时 SetSceneNameShowHook 为 nil，ShowSceneName 会静默跳过——
+    -- 正是真机上「什么都没有」的隐患形状，测试必须覆盖到。
+    GameStates.registerAll()
+    TestHelper.assertNotNil(rawget(_G, "SetSceneNameShowHook"),
+        "registerAll 后应注入 SetSceneNameShowHook")
 end
 
 local function IM()
@@ -494,7 +501,122 @@ function TestSceneName.testIsRunningDistinguishesMainThread()
 end
 
 -- ============================================================
--- 8. GAME_INIT 常量已定义（SetGlobal 的依赖）
+-- 8. 真实入口：主地图进小场景必须带 showname=1
+-- ============================================================
+
+function TestSceneName.testMmapSubscenePassesShowname()
+    print("\n=== Test: 主地图进小场景时 switchState 传 showname=1 ===")
+    local f = io.open("framework/game_states.lua", "r")
+    if not f then
+        TestHelper.assertTrue(false, "无法打开 framework/game_states.lua")
+        return
+    end
+    local src = f:read("*a")
+    f:close()
+
+    -- 缺陷形状：GAME_MMAP.update 里只写 JY.Status = newState 就完事，
+    -- 不走 switchState(..., {showname=1})，于是 GAME_SMAP.enter 拿到 nil
+    -- 只跑 Init_SMap(0)，进客栈等小场景永远不显示场景名。
+    local mmapStart = src:find('handlers%["GAME_MMAP"%]')
+    TestHelper.assertNotNil(mmapStart, "应能找到 handlers[\"GAME_MMAP\"]")
+    local smapStart = src:find('handlers%["GAME_SMAP"%]')
+    TestHelper.assertNotNil(smapStart, "应能找到 handlers[\"GAME_SMAP\"]")
+    if not (mmapStart and smapStart) then return end
+
+    local mmapSrc = src:sub(mmapStart, smapStart - 1)
+    TestHelper.assertNotNil(mmapSrc:match("switchState%(%s*newState%s*,%s*{%s*showname%s*=%s*1%s*}%)"),
+        "GAME_MMAP 进子场景必须 switchState(newState, { showname = 1 })")
+end
+
+function TestSceneName.testSmapEnterHonorsShowname()
+    print("\n=== Test: GAME_SMAP.enter 把 data.showname 传给 Init_SMap ===")
+    local f = io.open("framework/game_states.lua", "r")
+    if not f then
+        TestHelper.assertTrue(false, "无法打开 framework/game_states.lua")
+        return
+    end
+    local src = f:read("*a")
+    f:close()
+
+    local body = src:match('handlers%["GAME_SMAP"%]%s*=%s*{%s*enter%s*=%s*function%(prevState,%s*data%)%s*(.-)%s*end,')
+    TestHelper.assertNotNil(body, "GAME_SMAP.enter 应接收 (prevState, data)")
+    if body then
+        TestHelper.assertNotNil(body:match("data%.showname"), "enter 应读取 data.showname")
+        TestHelper.assertNotNil(body:match("Init_SMap%(showname%)"),
+            "enter 应调用 Init_SMap(showname) 而不是写死 0")
+    end
+end
+
+-- 用 Init_SMap 桩跑真实 GAME_SMAP.enter：
+-- 真实 Init_SMap(1) 需要完整的存档/贴图/音乐数据，本套件刻意不装载，
+-- 因此把 Init_SMap 换成只记录 showname 的桩，专测「调用参数是否正确」。
+local function enterWithShowname(showname)
+    bootHeadless()
+    JY.SubScene = 1
+    local sm = setupStateMachine()
+
+    local seen = {}
+    local origInitSMap = _G.Init_SMap
+    _G.Init_SMap = function(v)
+        seen[#seen + 1] = v
+        -- 真实 Init_SMap 末尾的 showname==1 分支：转成子状态
+        if v == 1 then ShowSceneName() end
+    end
+
+    local handler = GameStates.getHandler("GAME_SMAP")
+    sm:register(4, {
+        enter = handler.enter,
+        exit = function() end,
+        update = function() end,
+        draw = function() end,
+        subStates = handler.subStates,
+    })
+    sm:register(2, { enter = function() end, exit = function() end,
+                     update = function() end, draw = function() end })
+    IM():clear()
+
+    sm:switchTo(2)
+    local ok, err
+    if showname == nil then
+        ok, err = pcall(function() sm:switchTo(4) end)
+    else
+        ok, err = pcall(function() sm:switchTo(4, { showname = showname }) end)
+    end
+
+    _G.Init_SMap = origInitSMap
+    return ok, err, seen, sm
+end
+
+function TestSceneName.testEnterWithShownameShowsPrompt()
+    print("\n=== Test: switchTo(GAME_SMAP,{showname=1}) → Init_SMap(1) → 子状态就位 ===")
+    local ok, err, seen, sm = enterWithShowname(1)
+    TestHelper.assertTrue(ok, "switchTo(GAME_SMAP, {showname=1}) 不应报错: " .. tostring(err))
+    TestHelper.assertEquals(#seen, 1, "应调用一次 Init_SMap")
+    TestHelper.assertEquals(seen[1], 1, "应把 showname=1 传给 Init_SMap")
+    TestHelper.assertEquals(sm:getCurrentSubState(), "SCENE_NAME",
+        "带 showname=1 进 GAME_SMAP 应压入场景名子状态")
+end
+
+function TestSceneName.testEnterWithoutShownameShowsNoPrompt()
+    print("\n=== Test: 不带 showname 进 GAME_SMAP → Init_SMap(0)，不提示 ===")
+    local ok, err, seen, sm = enterWithShowname(nil)
+    TestHelper.assertTrue(ok, "无 data 切状态不应报错: " .. tostring(err))
+    TestHelper.assertEquals(#seen, 1, "仍应调用一次 Init_SMap")
+    TestHelper.assertEquals(seen[1], 0, "无 showname 时应传 0（原版 Init_SMap(0) 不显示）")
+    TestHelper.assertNil(sm:getCurrentSubState(),
+        "无 showname 时不应提示场景名")
+end
+
+function TestSceneName.testEnterWithShownameZeroShowsNoPrompt()
+    print("\n=== Test: showname=0 显式传入也不提示 ===")
+    local ok, err, seen, sm = enterWithShowname(0)
+    TestHelper.assertTrue(ok, "showname=0 不应报错: " .. tostring(err))
+    TestHelper.assertEquals(seen[1], 0, "应传 0")
+    TestHelper.assertNil(sm:getCurrentSubState(), "showname=0 不提示")
+end
+
+-- ============================================================
+-- 9. GAME_INIT 常量已定义（SetGlobal 的依赖）
 -- ============================================================
 
 function TestSceneName.testGameInitConstantDefined()
@@ -580,6 +702,12 @@ function TestSceneName.runAll()
     TestSceneName.testNoBlockingPollingRemains()
     TestSceneName.testStateDrawDoesNotDrawSceneNameDirectly()
     TestSceneName.testIsRunningDistinguishesMainThread()
+
+    TestSceneName.testMmapSubscenePassesShowname()
+    TestSceneName.testSmapEnterHonorsShowname()
+    TestSceneName.testEnterWithShownameShowsPrompt()
+    TestSceneName.testEnterWithoutShownameShowsNoPrompt()
+    TestSceneName.testEnterWithShownameZeroShowsNoPrompt()
 
     TestSceneName.testGameInitConstantDefined()
     TestSceneName.testSetGlobalInitializesStatus()
