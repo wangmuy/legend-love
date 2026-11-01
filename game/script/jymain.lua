@@ -504,15 +504,16 @@ function Init_SMap(showname)   --初始化场景数据
     lib.ShowSlow(50,0)
     lib.GetKey();
 
-    --showname=1 时提示场景名（原版此处是阻塞的
-    --DrawStrBox/ShowScreen/WaitKey/Cls/ShowScreen）。
+    --showname=1 时提示场景名。
     --
+    --原版此处是阻塞流程：
+    --    DrawStrBox(-1,10,名称); ShowScreen(); WaitKey(); Cls(); ShowScreen()
     --事件驱动下不能在这里画也不能在这里等键：
-    --   1. ShowScreen() 已被 async_globals 替换为空操作（love.draw 每帧自动 present）
+    --   1. ShowScreen() 已被 async_globals 替换为空操作（draw 每帧自动 present）
     --   2. GAME_SMAP.draw 每帧无条件 DrawSMap(0) 全屏重绘，
     --      任何不在 draw 回调里画的东西都会在下一帧被覆盖
-    --故只向状态机请求「推入场景名提示子状态」，由子状态自己负责
-    --绘制和等键。jymain 不直接依赖状态机，通过 GameStates 提供的钩子转接。
+    --故改为：异步模块起一条等键协程并置 currentName，
+    --绘制由 EventBridge:draw() 里的 SceneNameAsync.draw() 每帧完成。
     if showname==1 then
         ShowSceneName();
     end
@@ -521,16 +522,10 @@ end
 
 -- 场景名提示：取当前场景名称。
 --
--- 原版（SDL）在 Init_SMap(1) 里是一段阻塞流程：
---     DrawStrBox(-1,10,名称); ShowScreen(); WaitKey(); Cls(); ShowScreen()
--- LÖVE 版不能照搬（ShowScreen 已被 async_globals 置空，且
--- GAME_SMAP.draw 每帧全屏重绘会覆盖非 draw 回调里画的内容），
--- 因此改成事件驱动的「子状态」：
---     GAME_SMAP.update 推入 SCENE_NAME 子状态
---       → 子状态 enter 记录名称
---       → 子状态 update 消费一次按键后 popSubState
---       → 子状态 draw 在父状态 DrawSMap 之后画出名称
--- jymain 这里只提供数据和绘制原语，不持有提示状态，也不等键。
+-- jymain 这里只提供数据（GetSceneName）和绘制原语（DrawSceneName），
+-- 不持有提示状态、也不等键。显示/等键由
+-- framework/scene_name_async.lua 负责（对齐 person_status_async.lua 样板：
+-- 协程挂起等键 + draw() 每帧渲染 + InputManager.disableInput 屏蔽行走）。
 -- @return: 场景名称字符串；无名称（nil/空串/纯空白）时返回 nil
 function GetSceneName()
     local scene = JY.Scene and JY.Scene[JY.SubScene];
@@ -541,27 +536,20 @@ function GetSceneName()
     return name;
 end
 
--- 场景名提示的「请求」钩子。
---
--- script/ 属于游戏逻辑层，不允许直接依赖 framework/ 的状态机
--- （严格 _G 下也读不到 GameStates 这类模块 local）。
--- 因此这里只保留一个可注入的钩子，由 framework/game_states.lua 在
--- 注册状态时注入真正实现（pushSubState("SCENE_NAME", ...)）。
--- 未注入时降级为 no-op，保证 jymain 单独加载也不会崩。
--- 用 rawset 显式写入 _G：严格元表安装后（jymain_adapter.lua）普通赋值
--- 会被 __newindex 拦截，但该变量必须是文件加载期就存在的全局。
-rawset(_G, "SetSceneNameShowHook", nil);   -- 形如 function(name)
-
 -- 请求显示场景名提示。
--- 真正的显示/等键/关闭由 GAME_SMAP 的 SCENE_NAME 子状态负责。
+--
+-- 只转发到全局 ShowSceneName（由 framework/scene_name_async.lua 通过
+-- AsyncGlobals.install() 注入）。script/ 不直接依赖 framework/——
+-- 严格 _G 下确实读不到 GameStates 这类模块 local。
+-- 未接入框架时降级为 no-op，保证 jymain 单独加载也不会崩。
 function ShowSceneName()
     local name = GetSceneName();
     if name == nil then return end
-    if SetSceneNameShowHook == nil then return end   -- 未接入框架：静默跳过
-    SetSceneNameShowHook(name);
+    if _G.ShowSceneNameAsyncImpl == nil then return end
+    _G.ShowSceneNameAsyncImpl(name);
 end
 
--- 绘制场景名提示框（由 SCENE_NAME 子状态的 draw 调用）。
+-- 绘制场景名提示框（由 framework/scene_name_async.lua 的 draw() 调用）。
 -- 位置与原版一致：x 居中（-1），y=10，白色边框 + 白字。
 -- @param name: 场景名称，省略时取当前场景
 function DrawSceneName(name)
