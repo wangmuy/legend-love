@@ -435,6 +435,28 @@ function MenuStateMachine:draw()
     end
     
     local menu = self.activeMenu
+
+    -- 回调执行期间不绘制菜单。
+    --
+    -- 原版 ShowMenu 是阻塞实现：选中某项后菜单已完全关闭，回调
+    -- （Menu_Sale / Menu_Task / Menu_Go …）是在「屏幕上没有菜单」的状态下跑的。
+    -- 本项目把回调交给 menu_callback 协程异步执行，菜单对象仍然存活，
+    -- 于是出现这条链路：
+    --
+    --   外层菜单（典当/地下市场/佣兵行会/瞬息千里）selectMenuItem
+    --     → callbackCo 被设置，回调 Menu_Task 在协程里跑
+    --     → Menu_Task 内部再 ShowMenu(3 项) → openMenu 把外层压进 menuStack
+    --     → 内层关闭时 doCloseMenu 从 menuStack 恢复外层为 activeMenu
+    --     → Menu_Task 继续执行 WarMain，战斗全程外层菜单都在 activeMenu
+    --
+    -- 结果就是「进入战斗后韦大宝的选项单仍显示在战斗画面上」。
+    --
+    -- 判据用 menu.callbackCo：它由 selectMenuItem（设置）与 pollCallback
+    -- （清除）这对事件点维护，生命周期天然成对，draw 只需读字段——
+    -- 不遍历协程、不依赖调度器，等价于原版「回调运行时菜单已关闭」的语义。
+    if menu.callbackCo then
+        return
+    end
     
     -- 只有在 open 状态才绘制
     if menu.animationState ~= "open" then
