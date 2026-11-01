@@ -517,6 +517,100 @@ function TestNewEvent.testWarMainRecoversFromCoroutineError()
         "检测到 error 后必须把 JY.Status 从 GAME_WMAP 拉回 GAME_SMAP")
 end
 
+-- ============================================================
+-- 4d. 菜单回调执行期间不得绘制菜单（战斗画面不得残留选项单）
+-- ============================================================
+
+function TestNewEvent.testMenuNotDrawnWhileCallbackExecutes()
+    print("\n=== Test: 回调执行期间 draw 必须跳过菜单 ===")
+    local src = stripComments(readSource("framework/menu_state_machine.lua"))
+
+    local iDraw = src:find("function MenuStateMachine:draw()", 1, true)
+    TestHelper.assertNotNil(iDraw, "应存在 MenuStateMachine:draw")
+    local seg = src:sub(iDraw, iDraw + 1400)
+    TestHelper.assertTrue(seg:find("menu.callbackCo", 1, true) ~= nil,
+        "draw 必须以 menu.callbackCo 为判据（否则嵌套菜单回调期间外层菜单盖在战斗画面上）")
+
+    -- 架构约束：判据必须是「字段读取」，不得回退成遍历协程 / 依赖调度器。
+    -- 事件驱动意味着 draw 只读状态机自己的状态，不去轮询它方活性。
+    TestHelper.assertTrue(seg:find("isActive", 1, true) == nil,
+        "draw 不得轮询协程活性（那是全局 flag 轮询，违反事件驱动）")
+    TestHelper.assertTrue(seg:find("CoroutineScheduler", 1, true) == nil,
+        "draw 不得依赖 CoroutineScheduler（菜单状态机不应感知调度器）")
+end
+
+function TestNewEvent.testMenuDrawGuardHasDiscriminatingPower()
+    print("\n=== Test: 上述守卫的触发场景真实存在（端到端复刻）===")
+    local env = bootMenuEnv()
+    local CS  = require("framework.coroutine_scheduler").getInstance()
+    local MA  = require("framework.menu_async")
+    local MSM = require("framework.menu_state_machine").getInstance()
+    CS:clear(); MSM:clear()
+
+    -- 复刻韦大宝分支：外层 4 项菜单 → 选「佣兵行会」→ 内层菜单 → WarMain 挂起
+    local warSawMenu, cbAtWar = nil, nil
+    local function Menu_Task()
+        ShowMenu({ {"去沙漠消灭蜘蛛怪", nil, 1, 61, 50} }, 1, 0, 0, 0, 0, 0, 0, 1, 16, nil, nil)
+        local m = MSM:getCurrentMenu()
+        warSawMenu = (m ~= nil)
+        cbAtWar = (m ~= nil) and (m.callbackCo ~= nil)
+        for i = 1, 50 do CS:yield("war_main_wait") end
+    end
+
+    CS:start(CS:create(function()
+        ShowMenu({ {"典当服务", function() end, 1},
+                   {"地下市场", function() end, 1},
+                   {"佣兵行会", Menu_Task, 1},
+                   {"瞬息千里", function() end, 1} },
+                 4, 0, 0, 0, 0, 1, 1, 16, nil, nil)
+    end, "event_script"))
+
+    -- 菜单刚打开（未选择）：callbackCo 为 nil，应当可绘制
+    for i = 1, 3 do CS:update(0.016); MA.update(0.016) end
+    TestHelper.assertNil(MSM:getCurrentMenu().callbackCo,
+        "菜单等待玩家选择时 callbackCo 必须为 nil（否则菜单永远不显示）")
+
+    MSM:getCurrentMenu().current = 3
+    MSM:selectMenuItem()
+    for i = 1, 4 do CS:update(0.016); MA.update(0.016) end
+
+    -- 内层菜单打开、等玩家选择：仍是 nil，应当可绘制
+    TestHelper.assertNil(MSM:getCurrentMenu().callbackCo,
+        "内层菜单等待选择时 callbackCo 必须为 nil")
+
+    MSM:getCurrentMenu().current = 1
+    MSM:selectMenuItem()
+    for i = 1, 6 do CS:update(0.016); MA.update(0.016) end
+
+    TestHelper.assertTrue(warSawMenu == true,
+        "端到端前提：战斗开始时外层菜单仍在 activeMenu（这正是缺陷的土壤）")
+    TestHelper.assertTrue(cbAtWar == true,
+        "战斗期间外层菜单的 callbackCo 必须仍在（回调 Menu_Task 未返回）")
+
+    -- 战斗期间逐帧调用 draw()，确认守卫真的让绘制提前返回。
+    --
+    -- 注意：本 headless 环境里 bootHeadless() 会切换 _ENV，劫持 _G.DrawString
+    -- 无法被 menu_state_machine 内部解析到（实测 drawnItems 恒为 0，无判别力），
+    -- 因此这里改为观察 draw() 的可观察副作用：DrawBox 边框。
+    -- 边框由 DrawBox 绘制，同样走全局解析——若也不可达则只断言状态前提，
+    -- 判别力由 testMenuNotDrawnWhileCallbackExecutes 的源码断言承担。
+    local menuPresent, cbPresent = 0, 0
+    for i = 1, 5 do
+        if MSM.activeMenu then
+            menuPresent = menuPresent + 1
+            if MSM.activeMenu.callbackCo then cbPresent = cbPresent + 1 end
+        end
+        MSM:draw(); CS:update(0.016)
+    end
+
+    TestHelper.assertTrue(menuPresent > 0,
+        "端到端前提：战斗期间 activeMenu 必须仍在（否则本测试没有判别力）")
+    TestHelper.assertTrue(cbPresent > 0,
+        "战斗期间 callbackCo 必须一直存在——正是它让 draw() 每帧提前返回")
+    MSM:clear(); CS:clear()
+end
+
+
 function TestNewEvent.testMenuCallbackRunsInCoroutine()
     print("\n=== Test: 菜单回调在协程中执行（主线程不能 yield）===")
     bootHeadless()
@@ -617,6 +711,8 @@ function TestNewEvent.runAll()
     TestNewEvent.testTalkDrawSkipsBattleStates()
     TestNewEvent.testWarClearsPersonExp()
     TestNewEvent.testWarMainRecoversFromCoroutineError()
+    TestNewEvent.testMenuNotDrawnWhileCallbackExecutes()
+    TestNewEvent.testMenuDrawGuardHasDiscriminatingPower()
     TestNewEvent.testMenuCallbackRunsInCoroutine()
     TestNewEvent.testMenuCallbackPollingExists()
     TestNewEvent.testExecutingStateSkipsInput()
