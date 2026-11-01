@@ -375,6 +375,43 @@
 
 ## 原版移植缺陷修复（非 MOD 兼容范畴）
 
+- [x] **重新开始后无动画无对话、画面像挂住（6e7471f）**：用户实测反馈，重新开始
+      游戏、确认属性进入后完全没有动画和对话。
+      **根因**：`framework/jymain_adapter.lua:101` 会给 `_G` 装严格元表，
+      `__newindex` / `__index` 一律 `error("attempt read ... undeclared variable")`。
+      **关键语义容易看漏**：只有「键已存在」的赋值才被放行；对不存在的键做
+      `_G.X = ...` 依然触发 `__newindex` 并抛错。
+      `df7adb1` 在 `AsyncGlobals.install()` **中段**新增了
+      `_G.ShowSceneNameAsyncImpl = SceneNameAsync.Show`，该键此前不存在 → 裸赋值抛错。
+      **后果之所以严重，因为它是「中段崩溃」**：该行**之前**的替换已生效
+      （`WaitKey`/`ShowMenu`/`ShowMenu2`/`TalkEx`/`ShowScreen`/`lib.Delay`
+      全换成异步版），抛错后 `install()` 中断、调用方
+      `event_executor.oldCallEventCoroutine` 随之中断，
+      **`AsyncGlobals.uninstall()` 永不执行**，全局函数停在「已替换」状态，
+      开场事件（691）无法推进 → 画面完全静止。
+      **修复**：`async_globals.lua` 改用 `rawset` 写入；`jymain.lua` 的
+      `ShowSceneName()` 改用 `rawget` 读取（未注入时安全降级为 no-op）。
+      **为什么先前自测没抓到**：测试里用 `rawset` 手工注入该全局，恰好绕过严格元表，
+      掩盖了 bug。现补 `withStrictG()` 辅助，装上与 `jymain_adapter` 相同的严格元表跑用例。
+      **新增 5 项测试**（`test_scene_name` 73 → 81）：`install()/uninstall()` 在严格
+      `_G` 下不抛错、`install()` 用 `rawset` 注入成功、未注入时 `ShowSceneName()`
+      静默跳过、已注入时正确转发、源码级断言两个文件不得对该全局裸赋值。
+      **负向对照（3 项全部生效）**：退回裸赋值后报
+      `attempt read write to undeclared variable ShowSceneNameAsyncImpl`，
+      与用户实测报错文本完全一致。
+      **真机验证**（LÖVE 11.5，真实 `startNewGame` 路径，菜单精确应答「是」）：
+      | 判据 | 修复后 | 撤掉修复 |
+      |---|---|---|
+      | `startNewGame` | OK | ★ERROR★ `attempt read write to undeclared variable` |
+      | 开场对话页数 | **1** | **0** |
+      | `JY.Status` | 4（`GAME_SMAP`） | 4 |
+      | 场景名 | 徐小侠居 | 徐小侠居 |
+      撤掉修复时开场事件完全没执行，正是用户看到的「无动画无对话」。
+      **同类隐患全仓库扫描**：14 处 `_G.*` 裸赋值中，5 处目标未被 `function` 定义
+      （`EngineAPI`/`lib`/`bit32`×2/注释内示例），前者均在严格元表安装前创建，无残留隐患。
+      全套测试 **2115/2115/0**，`gate_run_mod.sh` = `GATE_PASS`。
+
+
 - [x] **小场景名称提示未移植**：原版进小场景在屏幕顶部中间显示场景名，任意键取消；
       LÖVE 版完全看不到。
       **根因（三层）**：
