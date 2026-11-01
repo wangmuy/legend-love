@@ -202,6 +202,12 @@ function MenuStateMachine:update(dt)
         menu.selectAnimationProgress = math.min(menu.selectAnimationTime / ANIMATION_CONFIG.selectDuration, 1)
     end
     
+    -- 回调协程执行中：只轮询结果，不处理输入（避免重复触发菜单项）
+    if menu.state == MENU_STATE.EXECUTING then
+        self:pollCallback()
+        return
+    end
+
     -- 处理输入
     self:handleInput()
 end
@@ -209,6 +215,11 @@ end
 -- 处理输入
 function MenuStateMachine:handleInput()
     if not self.activeMenu then
+        return
+    end
+
+    -- 回调执行期间不接受输入
+    if self.activeMenu.state == MENU_STATE.EXECUTING then
         return
     end
     
@@ -284,34 +295,91 @@ function MenuStateMachine:handleInput()
 end
 
 -- 选择菜单项
+--
+-- 回调必须在【独立协程】里执行，不能在本函数（主线程）里直接调用。
+--
+-- 原版 ShowMenu 是阻塞式的，菜单回调里可以任意写 TalkEx / SelectThing /
+-- lib.Delay 这类会「等玩家输入」的调用——因为整个原版事件循环本来就是阻塞的。
+-- newevent 脚本正是这么用的，例如
+-- script/newevent/scene_1_event_19.lua（韦大宝）：
+--     ShowMenu({ {"典当服务", Menu_Sale, 1}, ... })
+--     Menu_Sale() → SelectThing(thing, thingnum) → yield
+--
+-- 本项目的 update() 跑在主线程上，主线程不能 yield。直接调用回调会抛
+--   framework/coroutine_scheduler.lua:130: Cannot yield from outside a coroutine
+-- 这正是「选『典当』报错」的根因。
+--
+-- 因此这里改为：把回调扔进调度器协程执行，菜单进入 EXECUTING 状态；
+-- 每帧 update() 轮询协程是否结束，结束后再按原版语义收尾：
+--   回调返回 1     → closeMenu(-item[4])（原版 returnValue = -newMenu[current][4]）
+--   回调返回其它   → 重绘本菜单，继续导航
 function MenuStateMachine:selectMenuItem()
     local menu = self.activeMenu
     local item = menu.newMenu[menu.current]
-    
+
     if not item then
         return
     end
-    
-    -- 如果菜单项有回调函数，执行它
-    if item[2] then
-        menu.state = MENU_STATE.EXECUTING
-        local result = item[2](menu.newMenu, menu.current)
-        menu.state = MENU_STATE.NAVIGATING
-        
-        if result == 1 then
-            -- 子菜单返回，关闭当前菜单
-            self:closeMenu(-item[4])
-            return
-        else
-            -- 子菜单关闭，重绘当前菜单
-            Cls(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h)
-            if menu.isBox == 1 then
-                DrawBox(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
-            end
-        end
-    else
-        -- 没有回调，直接返回选中项
+
+    -- 没有回调：直接返回选中项
+    if not item[2] then
         self:closeMenu(item[4])
+        return
+    end
+
+    menu.state = MENU_STATE.EXECUTING
+    menu.pendingCallback = item
+    menu.callbackResult = nil
+    menu.callbackDone = false
+
+    local CoroutineScheduler = require("framework.coroutine_scheduler")
+    local scheduler = CoroutineScheduler.getInstance()
+    local currentItem = item
+    local menuRef = menu
+
+    local co = scheduler:create(function()
+        return currentItem[2](menuRef.newMenu, menuRef.current)
+    end, "menu_callback")
+
+    -- 记录到菜单上，供 update() 轮询
+    menu.callbackCo = co
+    scheduler:start(co)
+end
+
+-- 轮询菜单回调协程的结果（由 update() 每帧调用）
+function MenuStateMachine:pollCallback()
+    local menu = self.activeMenu
+    if not menu or not menu.callbackCo then
+        return
+    end
+
+    local CoroutineScheduler = require("framework.coroutine_scheduler")
+    local scheduler = CoroutineScheduler.getInstance()
+
+    if scheduler:isActive(menu.callbackCo) then
+        return    -- 回调仍在跑（可能正在等玩家输入）
+    end
+
+    -- 协程已结束，取出返回值
+    local result = scheduler:getResult(menu.callbackCo)
+    local item = menu.pendingCallback
+    menu.callbackCo = nil
+    menu.pendingCallback = nil
+    menu.state = MENU_STATE.NAVIGATING
+
+    if menu ~= self.activeMenu then
+        return    -- 回调期间菜单已被换掉，不做事
+    end
+
+    if result == 1 then
+        self:closeMenu(-item[4])
+        return
+    end
+
+    -- 子菜单关闭，重绘当前菜单
+    Cls(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h)
+    if menu.isBox == 1 then
+        DrawBox(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
     end
 end
 
