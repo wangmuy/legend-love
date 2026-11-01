@@ -312,6 +312,114 @@ end
 -- 5. 菜单回调必须协程化（韦大宝「典当」Cannot yield 根因）
 -- ============================================================
 
+-- ============================================================
+-- 4b. 嵌套菜单必须成对保存/恢复回调（键盘无响应根因）
+-- ============================================================
+
+-- 引导菜单专用环境：补齐 menu_state_machine 依赖的脚本全局
+local menuBooted = false
+local function bootMenuEnv()
+    if menuBooted then return end
+    menuBooted = true
+    bootHeadless()
+    rawset(_G, "Cls", function() end)
+    rawset(_G, "DrawBox", function() end)
+    rawset(_G, "DrawStr", function() end)
+    rawset(_G, "C_WHITE", 0xFFFFFFFF)
+    rawset(_G, "C_ORANGE", 0xFFFF8000)
+    for _, n in ipairs({"ShowMenu", "ShowMenu2", "WaitKey", "ShowScreen",
+                        "DrawStrBoxWaitKey", "WarMain"}) do
+        rawset(_G, n, function() return 0 end)
+    end
+    rawset(_G, "TalkEx", function() end)
+    rawset(_G, "DrawStrBoxYesNo", function() return 1 end)
+    require("framework.async_globals").install()
+end
+
+function TestNewEvent.testNestedMenuRestoresOuterCallback()
+    print("\n=== Test: 嵌套菜单关闭后外层回调必须恢复（否则事件协程永久挂起）===")
+    bootMenuEnv()
+    local CS  = require("framework.coroutine_scheduler").getInstance()
+    local MA  = require("framework.menu_async")
+    local MSM = require("framework.menu_state_machine").getInstance()
+    MSM:clear()
+    CS:clear()
+
+    local returned, value = false, nil
+    -- 复刻韦大宝「瞬息千里」：外层 ShowMenu 在协程里，回调内再 ShowMenu
+    local outer = { {"瞬息千里", function()
+        ShowMenu({ {"客栈A", nil, 1} }, 1, 0, 200, 200, 0, 0, 1, 1, 24, nil, nil)
+        return 1
+    end, 1} }
+
+    CS:start(CS:create(function()
+        value = ShowMenu(outer, 1, 0, 100, 100, 0, 0, 1, 1, 16, nil, nil)
+        returned = true
+    end, "event_script"))
+    for _ = 1, 4 do CS:update(0.016); MA.update(0.016) end
+
+    -- 选外层项 → 回调内弹嵌套菜单
+    MSM:getCurrentMenu().current = 1
+    MSM:selectMenuItem()
+    for _ = 1, 4 do CS:update(0.016); MA.update(0.016) end
+    TestHelper.assertNotNil(MSM:getCurrentMenu(), "嵌套菜单应已弹出")
+
+    -- 关闭嵌套菜单
+    MSM:closeMenu(0)
+    for _ = 1, 20 do CS:update(0.016); MA.update(0.016) end
+
+    TestHelper.assertTrue(returned,
+        "嵌套菜单关闭后外层 ShowMenuCoroutine 必须返回（否则事件协程永久挂起、JY.CurrentD 不复位、键盘全失效）")
+    MSM:clear()
+    CS:clear()
+end
+
+function TestNewEvent.testCallbackStackPairedWithMenuStack()
+    print("\n=== Test: callback 与 menuStack 成对压栈/出栈 ===")
+    bootMenuEnv()
+    local MSM = require("framework.menu_state_machine").getInstance()
+    MSM:clear()
+
+    local outerCb = function() end
+    local innerCb = function() end
+    MSM:openMenu(MSM:createMenu({ {"A", nil, 1} }, 1, 0, 0, 0, 0, 0, 0, 1, 16, nil, nil), outerCb)
+    MSM:openMenu(MSM:createMenu({ {"B", nil, 1} }, 1, 0, 0, 0, 0, 0, 0, 1, 16, nil, nil), innerCb)
+
+    TestHelper.assertEquals(#MSM.menuStack, 1, "嵌套打开后菜单栈深度应为 1")
+    TestHelper.assertEquals(#MSM.callbackStack, 1, "嵌套打开后回调栈深度也应为 1（成对）")
+    TestHelper.assertEquals(MSM.callback, innerCb, "当前回调应属内层")
+
+    MSM:closeMenu(0)
+    TestHelper.assertEquals(MSM.callback, outerCb,
+        "关闭内层后当前回调必须恢复为外层（否则外层协程永远醒不来）")
+    MSM:clear()
+end
+
+function TestNewEvent.testClearNotifiesAllCallbacks()
+    print("\n=== Test: clear() 必须通知所有层级回调（防外部清理致挂起）===")
+    bootMenuEnv()
+    local CS  = require("framework.coroutine_scheduler").getInstance()
+    local MA  = require("framework.menu_async")
+    local MSM = require("framework.menu_state_machine").getInstance()
+    MSM:clear()
+    CS:clear()
+
+    local returned = false
+    CS:start(CS:create(function()
+        ShowMenu({ {"甲", nil, 1} }, 1, 0, 0, 0, 0, 0, 0, 1, 16, nil, nil)
+        returned = true
+    end, "event_script"))
+    for _ = 1, 4 do CS:update(0.016); MA.update(0.016) end
+    TestHelper.assertTrue(MSM:hasActiveMenu(), "菜单应已弹出")
+
+    MA.clear()   -- 外部强制清理（如切场景）
+    for _ = 1, 6 do CS:update(0.016); MA.update(0.016) end
+    TestHelper.assertTrue(returned,
+        "clear() 必须回调所有层级，否则 ShowMenuCoroutine 永久挂起")
+    MSM:clear()
+    CS:clear()
+end
+
 function TestNewEvent.testMenuCallbackRunsInCoroutine()
     print("\n=== Test: 菜单回调在协程中执行（主线程不能 yield）===")
     bootHeadless()
@@ -403,6 +511,9 @@ function TestNewEvent.runAll()
     TestNewEvent.testWarMainFallsBackOutsideCoroutine()
     TestNewEvent.testWeiDabaoUsesWarMain()
     TestNewEvent.testNoBareFrameworkRequire()
+    TestNewEvent.testNestedMenuRestoresOuterCallback()
+    TestNewEvent.testCallbackStackPairedWithMenuStack()
+    TestNewEvent.testClearNotifiesAllCallbacks()
     TestNewEvent.testMenuCallbackRunsInCoroutine()
     TestNewEvent.testMenuCallbackPollingExists()
     TestNewEvent.testExecutingStateSkipsInput()

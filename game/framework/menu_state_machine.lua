@@ -48,6 +48,16 @@ function MenuStateMachine:init()
     self.activeMenu = nil
     self.menuStack = {}
     self.callback = nil
+    -- 与 menuStack 一一对应的回调栈。
+    --
+    -- callback 原先是单槽字段，嵌套菜单时被内层 openMenu 直接覆盖：
+    -- 内层关闭后 activeMenu 能从 menuStack 恢复，但外层 callback 永久丢失，
+    -- 于是外层 ShowMenuCoroutine 的 menuClosed 永远等不到置位，
+    -- `while not menuClosed do scheduler:yield("menu") end` 永久挂起。
+    -- 事件协程因此永不结束 → JY.CurrentD 停在触发事件的 tile 编号（不复位 -1）
+    -- → GAME_SMAP.update 的 `not (JY.CurrentD >= 0)` 守卫恒为假
+    -- → 玩家按键全部被吞，表现为「对话结束后键盘无响应」。
+    self.callbackStack = {}
 end
 
 -- 创建菜单数据
@@ -126,9 +136,11 @@ end
 function MenuStateMachine:openMenu(menuData, callback)
     self:_debug("MenuStateMachine:openMenu called, self=" .. tostring(self) .. ", activeMenu before=" .. tostring(self.activeMenu))
     
-    -- 如果有活动的菜单，先暂停
+    -- 如果有活动的菜单，先暂停（菜单与回调必须成对压栈）
     if self.activeMenu then
         table.insert(self.menuStack, self.activeMenu)
+        self.callbackStack = self.callbackStack or {}
+        table.insert(self.callbackStack, self.callback)
     end
     
     self.activeMenu = menuData
@@ -398,16 +410,21 @@ function MenuStateMachine:doCloseMenu()
         self.activeMenu.x1 + self.activeMenu.w + 1, 
         self.activeMenu.y1 + self.activeMenu.h + 1, 0, 1)
     
-    -- 恢复上一个菜单（如果有）
+    -- 本菜单的回调（回调属于「刚关闭的这层」，必须在恢复上层之前取出）
+    local closingCallback = self.callback
+
+    -- 恢复上一个菜单（如果有）——回调与菜单同步出栈
     if #self.menuStack > 0 then
         self.activeMenu = table.remove(self.menuStack)
+        self.callback = self.callbackStack and table.remove(self.callbackStack) or nil
     else
         self.activeMenu = nil
+        self.callback = nil
     end
     
     -- 调用回调
-    if self.callback then
-        self.callback(returnValue)
+    if closingCallback then
+        closingCallback(returnValue)
     end
 end
 
@@ -468,9 +485,36 @@ end
 -- 清空所有菜单
 function MenuStateMachine:clear()
     self:_debug("MenuStateMachine:clear called, activeMenu before=" .. tostring(self.activeMenu))
+
+    -- 先把所有层级的回调都通知掉，再丢弃菜单。
+    --
+    -- 直接置 nil 会让 ShowMenuCoroutine 里的
+    --     while not menuClosed do scheduler:yield("menu") end
+    -- 永久挂起（回调永不触发 → menuClosed 永远 false），
+    -- 而挂起的那个协程往往就是事件协程，于是 JY.CurrentD 不复位、
+    -- GAME_SMAP 永久吞按键。这里按「由内向外」的顺序逐个回调，
+    -- 保证每层 ShowMenuCoroutine 都能醒来。
+    local pending = {}
+    if self.callback then table.insert(pending, self.callback) end
+    if self.callbackStack then
+        for i = #self.callbackStack, 1, -1 do
+            if self.callbackStack[i] then
+                table.insert(pending, self.callbackStack[i])
+            end
+        end
+    end
+
     self.activeMenu = nil
     self.menuStack = {}
     self.callback = nil
+    self.callbackStack = {}
+
+    for _, cb in ipairs(pending) do
+        local ok, err = pcall(cb, 0)
+        if not ok then
+            self:_debug("MenuStateMachine:clear callback error: " .. tostring(err))
+        end
+    end
 end
 
 -- 重置
