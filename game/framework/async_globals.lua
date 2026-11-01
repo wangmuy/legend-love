@@ -158,7 +158,16 @@ function AsyncGlobals.install()
 
     local ItemAsync = require("framework.item_async")
     if _G.SelectThing then
-        _G.SelectThing = function() return ItemAsync.SelectThingAsync() end
+        -- 必须转发入参！原版签名是 SelectThing(thing, thingnum)，
+        -- 调用方会传入自己的物品数组（韦大宝典当就是先快照背包再传进来）。
+        -- 之前写死成无参 SelectThingAsync()，会忽略调用方的数组、改读全局背包，
+        -- 典当列表因此与玩家实际背包不符。
+        _G.SelectThing = function(thing, thingnum)
+            if thing then
+                return ItemAsync.SelectThingByArrayAsync(thing, thingnum, CC.MyThingNum)
+            end
+            return ItemAsync.SelectThingAsync()
+        end
     end
     if _G.UseThing then
         _G.UseThing = function(thingId)

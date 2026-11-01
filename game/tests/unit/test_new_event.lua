@@ -308,6 +308,74 @@ function TestNewEvent.testNoBareFrameworkRequire()
         "存在裸名 require（实测跑不起来）: " .. table.concat(hits, ", "))
 end
 
+-- ============================================================
+-- 5. 菜单回调必须协程化（韦大宝「典当」Cannot yield 根因）
+-- ============================================================
+
+function TestNewEvent.testMenuCallbackRunsInCoroutine()
+    print("\n=== Test: 菜单回调在协程中执行（主线程不能 yield）===")
+    bootHeadless()
+    local MSM = require("framework.menu_state_machine")
+    local src = readSource("framework/menu_state_machine.lua")
+    local code = stripComments(src)
+    local start = code:find("function MenuStateMachine:selectMenuItem", 1, true)
+    TestHelper.assertNotNil(start, "应能定位 selectMenuItem")
+    local body = code:sub(start, start + 2500)
+
+    TestHelper.assertTrue(body:find("scheduler:create", 1, true) ~= nil,
+        "selectMenuItem 必须把回调放进协程（否则回调里的 SelectThing/TalkEx 会抛 Cannot yield）")
+    -- 危险写法：直接在主线程调 item[2](...)（赋值形式 `= item[2](` 或裸调用）
+    TestHelper.assertNil(body:find("= item[2](menu.newMenu", 1, true),
+        "不得在主线程直接调用菜单回调")
+end
+
+function TestNewEvent.testMenuCallbackPollingExists()
+    print("\n=== Test: 提供 pollCallback 供 update 轮询 ===")
+    bootHeadless()
+    local MSM = require("framework.menu_state_machine")
+    local inst = MSM.getInstance()
+    TestHelper.assertEquals(type(inst.pollCallback), "function",
+        "MenuStateMachine:pollCallback 应存在")
+end
+
+function TestNewEvent.testExecutingStateSkipsInput()
+    print("\n=== Test: EXECUTING 期间不接受输入（避免重复触发）===")
+    bootHeadless()
+    local src = readSource("framework/menu_state_machine.lua")
+    local code = stripComments(src)
+    local start = code:find("function MenuStateMachine:handleInput", 1, true)
+    TestHelper.assertNotNil(start, "应能定位 handleInput")
+    local body = code:sub(start, start + 800)
+    TestHelper.assertTrue(body:find("EXECUTING", 1, true) ~= nil,
+        "handleInput 应在 EXECUTING 状态下直接 return")
+end
+
+-- ============================================================
+-- 6. SelectThing 必须转发调用方的物品数组
+-- ============================================================
+
+function TestNewEvent.testSelectThingForwardsArgs()
+    print("\n=== Test: 替换版 SelectThing 转发入参（不得忽略调用方数组）===")
+    bootHeadless()
+    local src = readSource("framework/async_globals.lua")
+    local code = stripComments(src)
+    local idx = code:find('_G.SelectThing = function', 1, true)
+    TestHelper.assertNotNil(idx, "应能定位 SelectThing 替换")
+    local body = code:sub(idx, idx + 400)
+    TestHelper.assertTrue(body:find("SelectThingByArrayAsync", 1, true) ~= nil,
+        "带参数的调用必须转发到 SelectThingByArrayAsync（否则典当列表读错背包）")
+    TestHelper.assertTrue(body:find("thing", 1, true) ~= nil,
+        "替换版应接受并转发 thing 参数")
+end
+
+function TestNewEvent.testSelectThingByArrayExists()
+    print("\n=== Test: ItemAsync.SelectThingByArrayAsync 存在 ===")
+    bootHeadless()
+    local ItemAsync = require("framework.item_async")
+    TestHelper.assertEquals(type(ItemAsync.SelectThingByArrayAsync), "function",
+        "SelectThingByArrayAsync 应存在")
+end
+
 function TestNewEvent.testNewEventPathConfigured()
     print("\n=== Test: CONFIG.NewEventPath 指向 newevent/ ===")
     bootHeadless()
@@ -335,6 +403,11 @@ function TestNewEvent.runAll()
     TestNewEvent.testWarMainFallsBackOutsideCoroutine()
     TestNewEvent.testWeiDabaoUsesWarMain()
     TestNewEvent.testNoBareFrameworkRequire()
+    TestNewEvent.testMenuCallbackRunsInCoroutine()
+    TestNewEvent.testMenuCallbackPollingExists()
+    TestNewEvent.testExecutingStateSkipsInput()
+    TestNewEvent.testSelectThingForwardsArgs()
+    TestNewEvent.testSelectThingByArrayExists()
     TestNewEvent.testNewEventPathConfigured()
 
     TestHelper.printSummary()
