@@ -236,9 +236,32 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
     lib.Debug("TalkExCoroutine: finished")
 end
 
+-- 清除当前对话状态（含绘制状态）
+--
+-- 用于「协程已被打断、但 currentTalk 还挂着」的场合：最典型是事件里
+-- 先 TalkEx 再开战（韦大宝「佣兵行会」），对话协程被战斗夺走焦点后
+-- 再也没机会走到清空语句。不清掉的话 EventBridge:draw() 会一直把
+-- 韦大宝的对话框画在战斗画面之上。
+function TalkAsync.clear()
+    currentTalk = nil
+    lib.Debug("TalkAsync.clear: currentTalk cleared")
+end
+
 -- 绘制对话（在draw函数中调用）
 function TalkAsync.draw()
     if not currentTalk then
+        return
+    end
+
+    -- 战斗/死亡/开始画面不画对话气泡。
+    --
+    -- currentTalk 是模块级状态，只在 TalkExCoroutine 的两处等键点被清空。
+    -- 若战斗在对话挂起期间开始（韦大宝「佣兵行会」：TalkEx("祝你好运！")
+    -- → WarMain 开战），currentTalk 会一直留着，而 EventBridge:draw()
+    -- 每帧无条件调用本函数，于是对话框被反复画在战斗画面之上，
+    -- 表现为「进入战斗后韦大宝的对话框没有消失」。
+    if JY and JY.Status and (JY.Status == GAME_WMAP or JY.Status == GAME_DEAD
+                             or JY.Status == GAME_START) then
         return
     end
     

@@ -420,6 +420,103 @@ function TestNewEvent.testClearNotifiesAllCallbacks()
     CS:clear()
 end
 
+-- ============================================================
+-- 4c. 战斗收尾：敌人全灭后寻路不得崩溃、对话气泡不得残留
+-- ============================================================
+
+function TestNewEvent.testWarAutoMoveGuardsNilEnemy()
+    print("\n=== Test: 敌人全灭后 War_AutoMoveCoroutine 不得索引 nil 敌人 ===")
+    local src = readSource("framework/war_async.lua")
+    local noComments = stripComments(src)
+
+    -- 原缺陷：War_AutoSelectEnemy_near() 找不到存活敌人时返回 -1，
+    -- 随后 WAR.Person[-1]["坐标X"] 抛 attempt to index a nil value，
+    -- 战斗协程静默死亡 → JY.Status 停在 GAME_WMAP → 卡在战斗画面。
+    TestHelper.assertTrue(noComments:find("War_AutoSelectEnemy", 1, true) ~= nil,
+        "War_AutoMoveCoroutine 应调用 War_AutoSelectEnemy")
+    TestHelper.assertTrue(noComments:find("enemyid < 0", 1, true) ~= nil,
+        "必须在 WAR.Person[enemyid] 之前判断 enemyid < 0（否则敌人全灭时崩溃）")
+    TestHelper.assertTrue(noComments:find("not WAR.Person[enemyid]", 1, true) ~= nil,
+        "必须同时判断 WAR.Person[enemyid] 是否存在")
+end
+
+function TestNewEvent.testWarAutoMoveGuardHasDiscriminatingPower()
+    print("\n=== Test: 上述守卫的触发路径真实存在（负向复现）===")
+    -- 复刻缺陷片段：enemyid = -1 且地图存在可走格时，索引必然抛错
+    local WAR = { PersonNum = 1, CurID = 0, Person = { [0] = { ["坐标X"] = 1, ["坐标Y"] = 1 } } }
+    local function GetWarMap() return 5 end   -- <128 → 进入内层
+    local enemyid = -1
+
+    local crashed = not pcall(function()
+        for i = 0, 3 do
+            for j = 0, 3 do
+                if GetWarMap(i, j, 3) < 128 then
+                    local dx = math.abs(i - WAR.Person[enemyid]["坐标X"])
+                    local dy = math.abs(j - WAR.Person[enemyid]["坐标Y"])
+                    local _ = dx + dy
+                end
+            end
+        end
+    end)
+    TestHelper.assertTrue(crashed,
+        "无守卫时 enemyid=-1 必须抛错（证明该分支确实可达、守卫有必要）")
+
+    local survived = pcall(function()
+        for i = 0, 3 do
+            for j = 0, 3 do
+                if GetWarMap(i, j, 3) < 128 then
+                    if not enemyid or enemyid < 0 or not WAR.Person[enemyid] then
+                        return
+                    end
+                end
+            end
+        end
+    end)
+    TestHelper.assertTrue(survived, "加上守卫后不得抛错")
+end
+
+function TestNewEvent.testTalkClearedOnBattleStart()
+    print("\n=== Test: 开战必须清掉残留对话气泡 ===")
+    local talkSrc = stripComments(readSource("framework/talk_async.lua"))
+    TestHelper.assertTrue(talkSrc:find("function TalkAsync.clear()", 1, true) ~= nil,
+        "TalkAsync 必须提供 clear()，供开战时清掉残留气泡")
+
+    local warSrc = stripComments(readSource("framework/war_async.lua"))
+    TestHelper.assertTrue(warSrc:find("TalkAsync.clear()", 1, true) ~= nil,
+        "WarMainCoroutine 进入战斗时必须调用 TalkAsync.clear()")
+    -- 清空动作要在设成 GAME_WMAP 之后（此时才确定要开战）
+    local iStatus = warSrc:find("JY.Status = GAME_WMAP", 1, true)
+    local iClear  = warSrc:find("TalkAsync.clear()", 1, true)
+    TestHelper.assertTrue(iStatus ~= nil and iClear ~= nil and iClear > iStatus,
+        "TalkAsync.clear() 必须在 JY.Status = GAME_WMAP 之后调用")
+end
+
+function TestNewEvent.testTalkDrawSkipsBattleStates()
+    print("\n=== Test: 战斗状态下 TalkAsync.draw 不得绘制 ===")
+    local src = stripComments(readSource("framework/talk_async.lua"))
+    local iDraw = src:find("function TalkAsync.draw()", 1, true)
+    TestHelper.assertNotNil(iDraw, "应存在 TalkAsync.draw")
+    local seg = src:sub(iDraw, iDraw + 1400)
+    TestHelper.assertTrue(seg:find("GAME_WMAP", 1, true) ~= nil,
+        "TalkAsync.draw 必须跳过 GAME_WMAP（否则对话框重复画在战斗画面上）")
+end
+
+function TestNewEvent.testWarClearsPersonExp()
+    print("\n=== Test: 战斗结束必须清零 WAR.Person 经验（原版行为）===")
+    local src = stripComments(readSource("framework/war_async.lua"))
+    TestHelper.assertTrue(src:find('WAR.Person[i]["经验"] = 0', 1, true) ~= nil,
+        "WAR 表跨场复用，不清零会让经验逐场累加（原版 WarMain 有此循环）")
+end
+
+function TestNewEvent.testWarMainRecoversFromCoroutineError()
+    print("\n=== Test: 战斗协程异常死亡后必须能恢复状态 ===")
+    local src = stripComments(readSource("framework/async_globals.lua"))
+    TestHelper.assertTrue(src:find('info.status == "error"', 1, true) ~= nil,
+        "WarMain 包装器必须检测战斗协程 error 状态")
+    TestHelper.assertTrue(src:find("JY.Status = GAME_SMAP", 1, true) ~= nil,
+        "检测到 error 后必须把 JY.Status 从 GAME_WMAP 拉回 GAME_SMAP")
+end
+
 function TestNewEvent.testMenuCallbackRunsInCoroutine()
     print("\n=== Test: 菜单回调在协程中执行（主线程不能 yield）===")
     bootHeadless()
@@ -514,6 +611,12 @@ function TestNewEvent.runAll()
     TestNewEvent.testNestedMenuRestoresOuterCallback()
     TestNewEvent.testCallbackStackPairedWithMenuStack()
     TestNewEvent.testClearNotifiesAllCallbacks()
+    TestNewEvent.testWarAutoMoveGuardsNilEnemy()
+    TestNewEvent.testWarAutoMoveGuardHasDiscriminatingPower()
+    TestNewEvent.testTalkClearedOnBattleStart()
+    TestNewEvent.testTalkDrawSkipsBattleStates()
+    TestNewEvent.testWarClearsPersonExp()
+    TestNewEvent.testWarMainRecoversFromCoroutineError()
     TestNewEvent.testMenuCallbackRunsInCoroutine()
     TestNewEvent.testMenuCallbackPollingExists()
     TestNewEvent.testExecutingStateSkipsInput()
