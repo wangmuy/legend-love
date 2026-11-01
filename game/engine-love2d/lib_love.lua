@@ -1391,4 +1391,10 @@ function DrawWarMap(flag, x, y, v1, v2, v3)
     end
 end
 
+-- 导出字体获取，供 engine_love2d 的 M.dialog 做真实字体度量。
+-- 实测 simsun.ttf@24: 汉字 24.00px (1.0em)、ASCII 12.00px (0.5em)、
+-- font:getHeight() = 27.00px。用真实度量而非 CC.DefaultFont 常量，
+-- 才能自适应未来换字体 / 换字号 / 换分辨率。
+M.getFont = getFont
+
 return M
