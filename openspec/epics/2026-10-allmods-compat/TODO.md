@@ -398,12 +398,12 @@
         `GameStates` 这类模块 local）。空串/纯空白视为无名称。
       - `engine-love2d/engine_love2d.lua` + `tests/engine_test.lua`：
         `isRunning()` 改用 `coroutine.running()` 的第二个返回值 `ismain` 排除主线程。
-      **为什么用子状态而不是标志轮询**：
-      - `StateMachine:update` 在有子状态时只更新子状态并 `return` → **父状态行走逻辑自动被抑制**，
-        无需手工 `return` 吞帧，也不存在「同一按键既关提示又走路」；
-      - `StateMachine:draw` 先画父状态再画子状态 → **`DrawSceneName` 天然在 `DrawSMap` 之后**，
-        不依赖调用顺序的人为约定；
-      - 按键由子状态**独占消费一次**，不再需要 `SceneNameWaiter` 之类的双读保护。
+      **为什么用协程而不是标志轮询（也不是子状态，见下条）**：
+      与 `person_status_async.lua` 的既有样板一致——协程 `WaitKeyCoroutine()` 挂起，
+      按键事件到来时由 `CoroutineScheduler:update` 唤醒（事件驱动，非轮询）；
+      绘制由模块的 `draw()` 每帧完成；`InputManager.disableInput = true` 让
+      `GAME_SMAP.update` 的 `lib.GetKey()` 返回 -1，行走逻辑自然停摆，
+      **不存在「同一按键既关提示又走路」**。
       **几何与原版一致**：`DrawStrBox(-1, 10, 名称, C_WHITE, CC.DefaultFont)`。
       **真机实测（LÖVE 11.5，pascal MOD，真实 `switchState(GAME_SMAP)` → `Init_SMap(1)`）**：
       `子状态=SCENE_NAME`、`携带名称=河洛客棧`、白框 `x=435..588, y=10..43`
@@ -461,12 +461,56 @@
       `SetSceneNameShowHook` 为 nil，`ShowSceneName` 会静默跳过，正是真机
       「什么都没有」的隐患形状，测试必须覆盖到。
 
-- [ ] **新发现（未修，超出本次范围）**：`lib.DrawStr` 的 `size` 参数从未被使用。
-      `engine-love2d/lib_love.lua:103` 签名含 `size`，但函数体只用
-      `getFont(fontname)`，而 `getFont` 把字号硬编码为 20（`love.graphics.newFont(fontname, 20)`），
-      `fontTbl` 也只按文件名缓存、不含字号。后果：全游戏所有 `DrawString`/`DrawStrBox`
-      的 `size` 实参（`CC.DefaultFont=16` / `24`）全部失效，文字一律 20px。
-      修它需要让 `getFont(fontname, size)` 参与缓存键，属引擎层改动，需单独评估。
+- [x] **场景名提示再重构：子状态 → 事件驱动协程**（`df7adb1`）：
+      上一条的 `SCENE_NAME` 子状态实现虽然能正常工作，但入口是
+      `GameStates.pushSceneNamePrompt` 里 `rawset(_G, "SetSceneNameShowHook", ...)`
+      ——**自定义全局钩子变量**，与项目既有的解耦约定不一致：`framework/` 里
+      其它所有「`script/` 需要调用框架能力」的场合（`WaitKey` / `ShowMenu` /
+      `TalkEx` / `DrawStrBoxWaitKey` …）都走 `AsyncGlobals.install()` **覆写全局函数**，
+      而不是注入钩子变量。
+      **重构**：新增 `framework/scene_name_async.lua`，完全对齐
+      `person_status_async.lua` 的样板：
+      ① `Show()` 起协程置 `currentName` + `InputManager.disableInput = true`；
+      ② 协程内 `InputAsync.WaitKeyCoroutine()` 挂起，按键事件由
+      `CoroutineScheduler:update` 唤醒（**非轮询**）；
+      ③ `draw()` 每帧渲染，由 `EventBridge:draw()` 调用且**排在
+      `StateMachine:draw()`（含 `DrawSMap` 全屏重绘）之后**；
+      ④ 退出时清 `currentName` 并恢复 `disableInput`。
+      删除 `SCENE_NAME` 子状态、`pushSceneNamePrompt`、`installSceneNameHook`、
+      `rawset(_G,"SetSceneNameShowHook",nil)`；改为 `AsyncGlobals.install()` 注入
+      `_G.ShowSceneNameAsyncImpl`，并在 `GAME_SMAP.enter` 的 `showname==1` 分支
+      兜底再注入一次（`AsyncGlobals.install` 只在事件脚本路径触发，
+      主地图进场景时可能尚未装）。`script/jymain.lua` 的 `ShowSceneName()`
+      仅转发该全局，未注入时空转。
+      **测试**：`tests/unit/test_scene_name.lua` 重写为 **73 项**，含源码级断言
+      （`EventBridge:draw` 真正调用而非注释、且排在 `StateMachine:draw` 之后；
+      `scene_name_async` 用 `WaitKeyCoroutine` 且无手工轮询循环；
+      `SetSceneNameShowHook` 与 `SCENE_NAME` 均已彻底移除）。
+      **负向对照（3 项，全部生效）**：
+      ① 去掉 `disableInput = true` → FAIL「提示期间必须 disableInput」；
+      ② 注释掉 `EventBridge:draw` 里的 `SceneNameAsync.draw()` → FAIL；
+      ③ 把 `SceneNameAsync.draw()` 挪到 `StateMachine:draw()` 之前 → FAIL
+      「必须在 StateMachine:draw（含 DrawSMap）之后」。
+
+- [x] **`lib.DrawStr` 的 `size` 参数从未生效**（`262130f`）：
+      `engine-love2d/lib_love.lua` 的 `getFont(fontname)` 把字号硬编码为 20，
+      缓存表 `fontTbl` 也只按文件名做键；`DrawStr` 收下 `size` 却没用它。
+      另有 `engine-love2d/engine_love2d.lua` 的 `EngineAPI.render.text`
+      包装丢掉 `fontname`（原版 `luafun.c:25` 是 `JY_DrawStr(x,y,str,color,size,fontname)`
+      六参数全传）。后果：`CC.DefaultFont` 取 16 或 24 全部失效，游戏内所有
+      文字（对话/菜单/场景名框）一律 20px。
+      **修复**：`getFont(fontname, size)` 的缓存键改为 `fontname..":"..size`；
+      无字体名时的内置字体也按字号分表（原单例 `defaultFont` → 表）；
+      `size` 缺省值收敛为具名常量 `DEFAULT_FONT_SIZE = 20`；
+      `DrawStr` 透传 `size`；`EngineAPI.render.text` 补回 `fontname` 形参与透传。
+      **验证**：新增 `tests/unit/test_font_size.lua`（16 项，用可观测的
+      `love.graphics` 探针断言 `newFont` 收到调用方字号、不同字号建不同缓存项、
+      缺省回落 20、无字体名时按字号分表，并做源码级断言）。
+      **真机 LÖVE 11.5 渲染量测**（同一段「河洛客棧」，统计墨迹包围盒）：
+      `size=16 → ink=290 bboxW=63 bboxH=16`；`size=20 → ink=596 bboxW=78 bboxH=19`；
+      `size=24 → ink=778 bboxW=94 bboxH=23`。把 `setFont` 退回硬编码 20 后
+      三者完全相同（均 `ink=596 / 78x19`），恢复后重新变成三种结果，
+      确认修复真实改变了渲染输出。
 
 - [x] **顺带修复的两个既有缺陷**（同批）：
       ① `GAME_INIT` 常量**从未定义**（`script/jyconst.lua` 游戏状态区只有 `GAME_START..GAME_END`），
