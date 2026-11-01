@@ -24,6 +24,7 @@ local TestModBoot = require("tests.unit.test_mod_boot")
 local TestSceneName = require("tests.unit.test_scene_name")
 local TestFontSize = require("tests.unit.test_font_size")
 local TestNewEvent = require("tests.unit.test_new_event")
+local TestDialogLayout = require("tests.unit.test_dialog_layout")
 
 local TestRunner = {}
 
@@ -288,6 +289,17 @@ function TestRunner.runAll()
     totalStats.passed = totalStats.passed + neStats.passed
     totalStats.failed = totalStats.failed + neStats.failed
     allPassed = allPassed and neResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行对话框排版测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local dlgResult = TestDialogLayout.runAll()
+    local dlgStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + dlgStats.total
+    totalStats.passed = totalStats.passed + dlgStats.passed
+    totalStats.failed = totalStats.failed + dlgStats.failed
+    allPassed = allPassed and dlgResult
     
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
@@ -351,9 +363,11 @@ function TestRunner.runModule(moduleName)
         return TestModE2E.runAll()
     elseif moduleName == "mod_boot" then
         return TestModBoot.runAll()
+    elseif moduleName == "dialog_layout" then
+        return TestDialogLayout.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout")
         return false
     end
 end
