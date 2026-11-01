@@ -227,6 +227,87 @@ function TestNewEvent.testWeiDabaoScriptHasBlockingApis()
         "韦大宝脚本应使用多个阻塞式接口（实际找到: " .. table.concat(found, ",") .. "）")
 end
 
+-- ============================================================
+-- 4. WarMain 异步替换（韦大宝「佣兵行会」依赖）
+-- ============================================================
+
+function TestNewEvent.testWarMainGetsAsyncWrapper()
+    print("\n=== Test: install() 期间 WarMain 被替换为异步包装 ===")
+    bootHeadless()
+    local original = rawget(_G, "WarMain")
+    TestHelper.assertNotNil(original, "jymain 应已定义全局 WarMain")
+
+    local during
+    local ok, err = withPlainG(function()
+        AsyncGlobals.install()
+        during = rawget(_G, "WarMain")
+        AsyncGlobals.uninstall()
+    end)
+    TestHelper.assertTrue(ok, "install/uninstall 不应抛错: " .. tostring(err))
+    TestHelper.assertTrue(during ~= original,
+        "install() 期间 WarMain 应被替换（否则韦大宝佣兵行会会阻塞主线程）")
+end
+
+function TestNewEvent.testWarMainRestoredAfterUninstall()
+    print("\n=== Test: uninstall() 后 WarMain 还原 ===")
+    bootHeadless()
+    local original
+    local after
+    local ok = withPlainG(function()
+        original = rawget(_G, "WarMain")
+        AsyncGlobals.install()
+        AsyncGlobals.uninstall()
+        after = rawget(_G, "WarMain")
+    end)
+    TestHelper.assertTrue(ok, "install/uninstall 不应抛错")
+    TestHelper.assertEquals(after, original, "uninstall() 后 WarMain 应还原为原版")
+end
+
+function TestNewEvent.testWarMainFallsBackOutsideCoroutine()
+    print("\n=== Test: 非协程上下文时 WarMain 保持原版行为（不误用协程调度）===")
+    bootHeadless()
+    -- 用一个可识别的假原版 WarMain，确认非协程分支会调用它
+    local saved = rawget(_G, "WarMain")
+    local called = false
+    local ok = withPlainG(function()
+        rawset(_G, "WarMain", function() called = true; return "orig" end)
+        AsyncGlobals.install()
+        local r = rawget(_G, "WarMain")(1, 1)   -- 主线程调用
+        called = called and (r == "orig")
+        AsyncGlobals.uninstall()
+        rawset(_G, "WarMain", saved)
+    end)
+    TestHelper.assertTrue(ok, "不应抛错")
+    TestHelper.assertTrue(called, "非协程上下文应回退到原版 WarMain")
+end
+
+function TestNewEvent.testWeiDabaoUsesWarMain()
+    print("\n=== Test: 韦大宝脚本确实调用 WarMain（佣兵行会）===")
+    bootHeadless()
+    local src = readSource("script/newevent/scene_1_event_19.lua")
+    local code = stripComments(src)
+    TestHelper.assertTrue(code:find("WarMain", 1, true) ~= nil,
+        "韦大宝脚本应调用 WarMain（佣兵行会任务战斗）")
+end
+
+function TestNewEvent.testNoBareFrameworkRequire()
+    print("\n=== Test: script/ 中不得出现缺少 framework. 前缀的框架模块 require ===")
+    bootHeadless()
+    local src = readSource("script/jymain.lua")
+    local code = stripComments(src)
+    local bad = { "coroutine_scheduler", "war_async", "event_executor",
+                  "input_manager", "state_machine", "menu_async" }
+    local hits = {}
+    for _, name in ipairs(bad) do
+        -- 匹配 require("name") 且前面没有 framework.
+        if code:find('require("' .. name .. '")', 1, true) then
+            hits[#hits + 1] = name
+        end
+    end
+    TestHelper.assertEquals(#hits, 0,
+        "存在裸名 require（实测跑不起来）: " .. table.concat(hits, ", "))
+end
+
 function TestNewEvent.testNewEventPathConfigured()
     print("\n=== Test: CONFIG.NewEventPath 指向 newevent/ ===")
     bootHeadless()
@@ -249,6 +330,11 @@ function TestNewEvent.runAll()
     TestNewEvent.testRestoresCurrentD()
     TestNewEvent.testWeiDabaoScriptLoads()
     TestNewEvent.testWeiDabaoScriptHasBlockingApis()
+    TestNewEvent.testWarMainGetsAsyncWrapper()
+    TestNewEvent.testWarMainRestoredAfterUninstall()
+    TestNewEvent.testWarMainFallsBackOutsideCoroutine()
+    TestNewEvent.testWeiDabaoUsesWarMain()
+    TestNewEvent.testNoBareFrameworkRequire()
     TestNewEvent.testNewEventPathConfigured()
 
     TestHelper.printSummary()
