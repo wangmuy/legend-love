@@ -454,12 +454,13 @@
       「GAME_MMAP 进子场景必须 switchState(newState, { showname = 1 })」；
       ② `enter` 里把 `Init_SMap(showname)` 写死成 `Init_SMap(0)` → 3 项 FAIL
       （含「应把 showname=1 传给 Init_SMap: expected 0, got 1」）。
-      **测试**：`tests/unit/test_scene_name.lua` 增至 **84 项**（新增 6 项覆盖真实入口：
+      **测试**：`tests/unit/test_scene_name.lua` 当时增至 **84 项**（新增 6 项覆盖真实入口：
       源码断言 `switchState(..., {showname=1})`、`enter` 读 `data.showname` 且调
       `Init_SMap(showname)`；端到端用 `Init_SMap` 桩验 `showname=1/0/nil` 三种入参）。
       `bootHeadless()` 补 `GameStates.registerAll()`——不跑这步时
       `SetSceneNameShowHook` 为 nil，`ShowSceneName` 会静默跳过，正是真机
       「什么都没有」的隐患形状，测试必须覆盖到。
+      （后续协程化重构时该套件整体重写为 73 项，见下一条。）
 
 - [x] **场景名提示再重构：子状态 → 事件驱动协程**（`df7adb1`）：
       上一条的 `SCENE_NAME` 子状态实现虽然能正常工作，但入口是
