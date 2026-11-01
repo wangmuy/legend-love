@@ -26,8 +26,11 @@ local lib = require("engine-love2d.lib_love")
 
 -- 将 lib_love 中的函数映射到 EngineAPI 各模块
 -- render 模块
-EngineAPI.render.text = function(x, y, str, color, size)
-    lib.DrawStr(x, y, str, color, size)
+-- fontname 必须透传：原版 luafun.c:25 是
+--   JY_DrawStr(x, y, str, color, size, fontname)
+-- 六个参数全传。丢掉 fontname 会让中文回落到 LÖVE 内置字体（无中文字形）。
+EngineAPI.render.text = function(x, y, str, color, size, fontname)
+    lib.DrawStr(x, y, str, color, size, fontname)
 end
 
 EngineAPI.render.fillRect = function(x1, y1, x2, y2, color)

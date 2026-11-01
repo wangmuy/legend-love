@@ -77,32 +77,56 @@ function GetTime()
     return love.timer.getTime() * 1000  -- LOVE 11.x returns seconds, convert to ms
 end
 
+-- 字体缓存。
+-- 键必须是「字体名 + 字号」：原版 charset.c:68 的 GetFont 正是按
+-- (Font[i].size == size && strcmp(filename, Font[i].name)==0) 查表的，
+-- 只按文件名缓存会让后请求的字号复用先前的字号（游戏内 16/24 全被画成 20）。
 local fontTbl = {}
 local defaultFont = nil
-local function getFont(fontname)
-    if fontname==nil then 
+
+-- 原版 DefaultFont 的兜底字号
+local DEFAULT_FONT_SIZE = 20
+
+local function getFont(fontname, size)
+    size = size or DEFAULT_FONT_SIZE
+
+    -- 无字体名：使用 LÖVE 内置字体，按字号分别缓存
+    if fontname==nil then
         if defaultFont == nil then
-            defaultFont = love.graphics.newFont(20)
+            defaultFont = {}
         end
-        return defaultFont
+        local f = defaultFont[size]
+        if f == nil then
+            f = love.graphics.newFont(size)
+            defaultFont[size] = f
+        end
+        return f
     end
-    if fontTbl[fontname] == nil then
-        local success, font = pcall(function() return love.graphics.newFont(fontname, 20) end)
+
+    local key = fontname .. ":" .. tostring(size)
+    if fontTbl[key] == nil then
+        local success, font = pcall(function() return love.graphics.newFont(fontname, size) end)
         if success then
-            fontTbl[fontname] = font
+            fontTbl[key] = font
         else
+            -- 字体文件打不开：退回 LÖVE 内置字体（同样按字号缓存）
             if defaultFont == nil then
-                defaultFont = love.graphics.newFont(20)
+                defaultFont = {}
             end
-            fontTbl[fontname] = defaultFont
+            local f = defaultFont[size]
+            if f == nil then
+                f = love.graphics.newFont(size)
+                defaultFont[size] = f
+            end
+            fontTbl[key] = f
         end
     end
-    return fontTbl[fontname]
+    return fontTbl[key]
 end
   
 function DrawStr(x, y, str, color, size, fontname)
     local oldR, oldG, oldB, oldA = love.graphics.getColor()
-    love.graphics.setFont(getFont(fontname))
+    love.graphics.setFont(getFont(fontname, size))
     local r, g, b = GetRGB(color)
     love.graphics.setColor(r, g, b, 1)
     love.graphics.print(str, x, y)
