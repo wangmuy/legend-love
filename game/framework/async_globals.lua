@@ -18,6 +18,7 @@ local _ShowMenu2
 local _TalkEx
 local _ShowScreen
 local _libDelay
+local _WarMain
 
 -- 替换的 DrawStrBoxWaitKey
 function AsyncGlobals.DrawStrBoxWaitKey_Async(s, color, size)
@@ -97,6 +98,7 @@ function AsyncGlobals.install()
     _TalkEx = _G.TalkEx
     _ShowScreen = _G.ShowScreen
     _libDelay = lib and lib.Delay
+    _WarMain = _G.WarMain
 
     _G.DrawStrBoxWaitKey = AsyncGlobals.DrawStrBoxWaitKey_Async
     _G.DrawStrBoxYesNo = AsyncGlobals.DrawStrBoxYesNo_Async
@@ -122,6 +124,38 @@ function AsyncGlobals.install()
     local SceneNameAsync = require("framework.scene_name_async")
     rawset(_G, "ShowSceneNameAsyncImpl", SceneNameAsync.Show)
 
+    -- 战斗入口 WarMain 的异步替换。
+    --
+    -- 韦大宝（script/newevent/scene_1_event_19.lua）的「佣兵行会」直接调用
+    -- WarMain(warid,1)，而 jymain.lua 里的 WarMain 是纯阻塞实现
+    -- （内部就是 `while true do ... end` 战斗主循环 + 阻塞版 GetKey），
+    -- 在主线程调用会把 love.update 彻底锁死。
+    --
+    -- 注意：WarMain 是全仓库唯一没有异步替代的原版阻塞入口，且唯一调用者
+    -- 就是 newevent 韦大宝脚本（oldevent 走 instruct_6，后者早已有协程分支）。
+    -- 因此这里按 instruct_6 的既有做法接管：开战斗子协程 → 等在协程里跑完 →
+    -- 返回 warState.result（true=胜）。调用方仍可写 `if WarMain(id,1)==true`。
+    rawset(_G, "WarMain", function(warid, isexp)
+        if not EngineAPI.coroutine.isRunning() then
+            -- 非协程上下文：保持原版行为（主线程阻塞），避免语义突变
+            return _WarMain(warid, isexp)
+        end
+        local CoroutineScheduler = require("framework.coroutine_scheduler")
+        local WarAsync = require("framework.war_async")
+        local scheduler = CoroutineScheduler.getInstance()
+
+        local warCo = scheduler:create(function()
+            return WarAsync.WarMainCoroutine(warid, isexp)
+        end, "war_main_sub")
+        scheduler:start(warCo)
+
+        -- 与 instruct_6 相同：每帧把控制权交回调度器，直到战斗协程结束
+        while scheduler:isActive(warCo) do
+            scheduler:yield("war_main_wait")
+        end
+        return scheduler:getResult(warCo)
+    end)
+
     local ItemAsync = require("framework.item_async")
     if _G.SelectThing then
         _G.SelectThing = function() return ItemAsync.SelectThingAsync() end
@@ -143,6 +177,7 @@ function AsyncGlobals.uninstall()
     _G.ShowMenu2 = _ShowMenu2
     _G.TalkEx = _TalkEx
     _G.ShowScreen = _ShowScreen
+    if _WarMain then _G.WarMain = _WarMain end
 
     if lib and _libDelay then
         lib.Delay = _libDelay
