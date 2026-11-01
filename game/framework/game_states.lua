@@ -137,15 +137,20 @@ handlers["GAME_MMAP"] = {
             PerfLog.mark("GAME_MMAP entering subscene", tostring(JY.SubScene))
             lib.Debug("Entering subscene: " .. tostring(JY.SubScene))
             
-            -- 先切换状态，让exit处理资源清理
             local newState = getStateId("GAME_SMAP")
-            lib.Debug("Setting JY.Status to GAME_SMAP: " .. tostring(newState))
-            JY.Status = newState
+            lib.Debug("Entering GAME_SMAP: " .. tostring(newState))
             JY.MmapMusic = -1
 
             JY.MyPic = GetMyPic()
             JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
             JY.Base["人Y1"] = JY.Scene[JY.SubScene]["入口Y"]
+
+            -- 对齐原版 Game_MMap：进子场景后调用 Init_SMap(1) 提示场景名
+            -- （原版 jymain.lua:430）。这里通过 switchTo 的 data 把
+            -- showname 传给 GAME_SMAP.enter，避免在 update 里直接调
+            -- Init_SMap 造成「先画一帧无名、再画一帧有名」的闪烁。
+            PerfLog.mark("GAME_MMAP.switchState(GAME_SMAP, showname=1)")
+            EventBridge.getInstance():switchState(newState, { showname = 1 })
 
             lib.Debug("Subscene transition completed")
         end
@@ -178,11 +183,15 @@ handlers["GAME_MMAP"] = {
 
 -- GAME_SMAP 状态处理器
 handlers["GAME_SMAP"] = {
-    enter = function()
+    enter = function(prevState, data)
         lib.Debug("Enter GAME_SMAP state")
-        -- 在enter中调用Init_SMap，确保状态已经切换
-        local t = PerfLog.begin("GAME_SMAP.enter.Init_SMap(0)")
-        Init_SMap(0)
+        -- showname=1 表示要提示场景名。原版两处调用带 1：
+        --   Game_MMap 进子场景（jymain.lua:430）、场景内跳转（jymain.lua:1331）
+        -- LÖVE 版把「主地图进子场景」改成 switchTo 传参，必须在这里接住，
+        -- 否则进客栈等小场景时永远只走 Init_SMap(0)，场景名不显示。
+        local showname = (data and data.showname) or 0
+        local t = PerfLog.begin("GAME_SMAP.enter.Init_SMap(" .. tostring(showname) .. ")")
+        Init_SMap(showname)
         PerfLog.finish(t)
     end,
     

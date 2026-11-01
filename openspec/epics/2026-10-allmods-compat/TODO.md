@@ -422,6 +422,52 @@
       **注**：`game/active_mod.txt` 残留会让 `script_loader` 4 项测试失败——环境残留，
       跑全量前须 `rm -f game/active_mod.txt`。
 
+- [x] **场景名提示「真机从主地图进客栈仍不显示」补修**（`80b0152` + `ba8572a` 之后的新发现）：
+      前两次修复都只覆盖了「场景内跳转」和「直接调 `Init_SMap(1)`」两条路径，
+      **真实玩法路径漏了**。
+      **根因**：LÖVE 版 `GAME_MMAP.update` 检测到 `JY.SubScene >= 0` 时只做了
+      `JY.Status = newState`，随后靠 `GAME_SMAP.enter` 里的 `Init_SMap(0)` 初始化场景。
+      而原版 `Game_MMap` 在同一位置调用的是 **`Init_SMap(1)`**
+      （`~/project/legend-mac-orig/bin/script/jymain.lua:430`）。
+      `showname` 参数在迁移中被丢掉 → 从主地图走进任何小场景都静默走 `Init_SMap(0)`，
+      场景名永远不出现。
+      **修复**：`GAME_MMAP.update` 改为
+      `EventBridge.getInstance():switchState(newState, { showname = 1 })`，
+      `GAME_SMAP.enter(prevState, data)` 接住 `data.showname` 调 `Init_SMap(showname)`。
+      用 `switchTo` 的 `data` 传递而不是在 `update` 里直接调 `Init_SMap(1)`，
+      避免「先画一帧无名、下一帧才有名」的闪烁；同时删掉与新流程重复的
+      `JY.Status = newState`（`EventBridge:switchState` 内部会同步 `JY.Status`）。
+      **真机实测（LÖVE 11.5，pascal MOD，完全走真实玩法路径）**：
+      切 `GAME_MMAP` → `Cal_EnterSceneXY()` 找到「河洛客棧」外景入口 `(359,228)` →
+      主角置于该格 → 让 `GAME_MMAP.update` 自己跑 `CanEnterScene(359,228)=1`
+      → `当前状态=4`、`JY.SubScene=1`、`子状态=SCENE_NAME`、`携带名称=河洛客棧`、
+      白框 `x=435..588, y=10..43`、顶部中间亮点 `94`（真实字形，非 tofu 的 `233`）→
+      注入按键后子状态 `nil`、亮点 `0`、人物坐标前后不变（同一按键未触发走路）。
+      **踩坑记录（探针环境，非产品缺陷）**：
+      ① 探针目录 `/tmp/snaptest` 起初没有 `simsun.ttf`，导致中文渲染成 4 个空心方框
+      （tofu），一度误判为字体缺陷——补拷字体后正常；
+      ② 刚进游戏时属性分配菜单仍挂着，`GAME_MMAP.update` 第一行
+      `if MenuAsync.hasActiveMenu() then return end` 会吞掉全部逻辑，
+      探针须先 `MenuAsync.clear()` 才能走到进场景分支。
+      **负向对照（2 项，直接复现用户报的现象）**：
+      ① 撤掉 `switchState` 的 `{showname=1}` 传参 → FAIL
+      「GAME_MMAP 进子场景必须 switchState(newState, { showname = 1 })」；
+      ② `enter` 里把 `Init_SMap(showname)` 写死成 `Init_SMap(0)` → 3 项 FAIL
+      （含「应把 showname=1 传给 Init_SMap: expected 0, got 1」）。
+      **测试**：`tests/unit/test_scene_name.lua` 增至 **84 项**（新增 6 项覆盖真实入口：
+      源码断言 `switchState(..., {showname=1})`、`enter` 读 `data.showname` 且调
+      `Init_SMap(showname)`；端到端用 `Init_SMap` 桩验 `showname=1/0/nil` 三种入参）。
+      `bootHeadless()` 补 `GameStates.registerAll()`——不跑这步时
+      `SetSceneNameShowHook` 为 nil，`ShowSceneName` 会静默跳过，正是真机
+      「什么都没有」的隐患形状，测试必须覆盖到。
+
+- [ ] **新发现（未修，超出本次范围）**：`lib.DrawStr` 的 `size` 参数从未被使用。
+      `engine-love2d/lib_love.lua:103` 签名含 `size`，但函数体只用
+      `getFont(fontname)`，而 `getFont` 把字号硬编码为 20（`love.graphics.newFont(fontname, 20)`），
+      `fontTbl` 也只按文件名缓存、不含字号。后果：全游戏所有 `DrawString`/`DrawStrBox`
+      的 `size` 实参（`CC.DefaultFont=16` / `24`）全部失效，文字一律 20px。
+      修它需要让 `getFont(fontname, size)` 参与缓存键，属引擎层改动，需单独评估。
+
 - [x] **顺带修复的两个既有缺陷**（同批）：
       ① `GAME_INIT` 常量**从未定义**（`script/jyconst.lua` 游戏状态区只有 `GAME_START..GAME_END`），
       而 `SetGlobal()` 会读它；非严格模式下静默得到 `JY.Status=nil`（初始化状态丢失），
