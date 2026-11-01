@@ -3357,8 +3357,11 @@ function instruct_6(warid,tmp,tmp2,flag)      --战斗
     local isexp = (flag == 0) and 0 or (flag or 1)
     if co then
         lib.Debug("instruct_6: running in coroutine, warid=" .. warid .. ", flag=" .. tostring(flag) .. ", isexp=" .. tostring(isexp))
-        local scheduler = require("coroutine_scheduler")
-        local WarAsync = require("war_async")
+        -- 注意：必须写全 framework.* 前缀。裸名 "coroutine_scheduler"/"war_async"
+        -- 在 package.path 下找不到（实测 require 直接失败），会让 instruct_6
+        -- 在协程分支抛错、整场战斗无法开始。
+        local scheduler = require("framework.coroutine_scheduler").getInstance()
+        local WarAsync = require("framework.war_async")
         
         lib.Debug("instruct_6: creating battle sub-coroutine")
         local warCo = scheduler:create(function()
@@ -3686,7 +3689,7 @@ function instruct_27(id,startpic,endpic)           --显示动画
     -- 获取协程调度器
     local scheduler = nil
     if coroutine.running() then
-        scheduler = require("coroutine_scheduler").getInstance()
+        scheduler = require("framework.coroutine_scheduler").getInstance()
     end
     
     if scheduler then
