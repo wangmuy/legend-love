@@ -23,6 +23,7 @@ local TestModE2E = require("tests.unit.test_mod_e2e")
 local TestModBoot = require("tests.unit.test_mod_boot")
 local TestSceneName = require("tests.unit.test_scene_name")
 local TestFontSize = require("tests.unit.test_font_size")
+local TestNewEvent = require("tests.unit.test_new_event")
 
 local TestRunner = {}
 
@@ -276,6 +277,17 @@ function TestRunner.runAll()
     totalStats.passed = totalStats.passed + fsStats.passed
     totalStats.failed = totalStats.failed + fsStats.failed
     allPassed = allPassed and fsResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行 newevent 事件分派测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local neResult = TestNewEvent.runAll()
+    local neStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + neStats.total
+    totalStats.passed = totalStats.passed + neStats.passed
+    totalStats.failed = totalStats.failed + neStats.failed
+    allPassed = allPassed and neResult
     
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")

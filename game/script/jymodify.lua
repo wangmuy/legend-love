@@ -264,7 +264,7 @@ function newSceneEvent_1(flag)
     end
     
     -- 检查是否在协程中，如果在协程中使用异步版本
-    local EventExecutor = require("event_executor")
+    local EventExecutor = require("framework.event_executor")
     if JY.CurrentD<=18 then     --对以前编号的D*，仍然调用旧的处理函数
         lib.Debug("newSceneEvent_1: calling oldEventExecuteCoroutine");
         EventExecutor.oldEventExecuteCoroutine(flag);
@@ -294,7 +294,9 @@ function newCallEvent(flag)
     if eventnum>=0 then           --只有大于或等于0时才调用lua文件。
 	--按照给定格式生成要调用的D*处理文件名。然后加载运行
 		local eventfilename=string.format(CONFIG.NewEventPath .. "scene_%d_event_%d.lua",JY.SubScene,JY.CurrentD);
-		dofile(eventfilename);
+		-- 必须走异步路径，原因见下方 newCallEvent 的注释。
+		local EventExecutor = require("framework.event_executor")
+		EventExecutor.newCallEventCoroutine(eventfilename);
     end
 
     JY.CurrentEventType=-1;
