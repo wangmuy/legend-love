@@ -538,15 +538,20 @@ end
 
 -- 请求显示场景名提示。
 --
--- 只转发到全局 ShowSceneName（由 framework/scene_name_async.lua 通过
+-- 只转发到全局 ShowSceneNameAsyncImpl（由 framework/scene_name_async.lua 经
 -- AsyncGlobals.install() 注入）。script/ 不直接依赖 framework/——
 -- 严格 _G 下确实读不到 GameStates 这类模块 local。
--- 未接入框架时降级为 no-op，保证 jymain 单独加载也不会崩。
+--
+-- 必须用 rawget：严格 _G 元表（jymain_adapter.lua 的 __index）对不存在的键
+-- 会直接抛「attempt read read to undeclared variable」。该全局可能尚未注入
+-- （例如从主地图进场景、AsyncGlobals.install() 还没跑过），此时必须能安全
+-- 读到 nil 并降级为 no-op，而不是把整个 Init_SMap 炸掉。
 function ShowSceneName()
     local name = GetSceneName();
     if name == nil then return end
-    if _G.ShowSceneNameAsyncImpl == nil then return end
-    _G.ShowSceneNameAsyncImpl(name);
+    local impl = rawget(_G, "ShowSceneNameAsyncImpl");
+    if impl == nil then return end   -- 未接入框架：静默跳过
+    impl(name);
 end
 
 -- 绘制场景名提示框（由 framework/scene_name_async.lua 的 draw() 调用）。

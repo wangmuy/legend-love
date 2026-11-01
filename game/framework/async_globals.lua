@@ -111,11 +111,16 @@ function AsyncGlobals.install()
     end
 
     -- 场景名提示：把 SceneNameAsync.Show 注入为全局实现。
-    -- script/jymain.lua 的 ShowSceneName() 只做转发，不直接依赖 framework/。
-    -- 与上面其它阻塞函数（WaitKey/ShowMenu/TalkEx）同样是被 install 替换的全局，
-    -- 区别只是 jymain 侧留了 nil 检查以便单独加载时降级为 no-op。
+    --
+    -- 必须用 rawset！严格 _G 元表（jymain_adapter.lua 安装的 __newindex）
+    -- 只放行「已存在键」的赋值；ShowSceneNameAsyncImpl 是本文件新引入的
+    -- 全新全局，裸赋值 `_G.X = ...` 会抛
+    --   attempt read write to undeclared variable ShowSceneNameAsyncImpl
+    -- 而这一行位于 install() 中段——一旦抛错，上面已换好的
+    -- WaitKey/ShowMenu/TalkEx 停留在「已替换」状态、后面的 uninstall()
+    -- 永不执行，开场事件直接卡死（表现为画面完全静止）。
     local SceneNameAsync = require("framework.scene_name_async")
-    _G.ShowSceneNameAsyncImpl = SceneNameAsync.Show
+    rawset(_G, "ShowSceneNameAsyncImpl", SceneNameAsync.Show)
 
     local ItemAsync = require("framework.item_async")
     if _G.SelectThing then

@@ -326,6 +326,88 @@ function TestSceneName.testGameStatesHasNoSubStateLeftover()
     TestHelper.assertNil(src:match("pushSceneNamePrompt"), "不应残留 pushSceneNamePrompt")
 end
 
+-- ============================================================
+-- 3. 严格 _G 兼容性（回归：曾导致开场事件 hang 死）
+-- ============================================================
+--
+-- jymain_adapter.lua 会给 _G 装严格元表：
+--     __newindex / __index 一律 error("attempt read ... undeclared variable")
+-- 关键语义：**只有「键已存在」的赋值才放行**。
+-- 此前 AsyncGlobals.install() 里用裸赋值 `_G.ShowSceneNameAsyncImpl = ...`
+-- 写入一个全新全局 → 抛错 → install() 在替换完 WaitKey/ShowMenu/TalkEx
+-- 之后中途崩溃 → uninstall() 永不执行 → 开场事件直接卡死（画面全静止）。
+-- 自测用的 rawset 掩盖了这个 bug，所以这里必须用真实严格元表复现。
+
+local function withStrictG(fn)
+    local saved = getmetatable(_G)
+    setmetatable(_G, {
+        __newindex = function(_, n) error("attempt read write to undeclared variable " .. n, 2) end,
+        __index    = function(_, n) error("attempt read read to undeclared variable " .. n, 2) end,
+    })
+    local ok, err = pcall(fn)
+    setmetatable(_G, saved)
+    return ok, err
+end
+
+function TestSceneName.testInstallWorksUnderStrictG()
+    print("\n=== Test: AsyncGlobals.install() 在严格 _G 下不抛错 ===")
+    local AsyncGlobals = require("framework.async_globals")
+    local ok, err = withStrictG(function()
+        AsyncGlobals.install()
+        AsyncGlobals.uninstall()
+    end)
+    TestHelper.assertTrue(ok, "install/uninstall 不应抛错: " .. tostring(err))
+end
+
+function TestSceneName.testInstallInjectsImplViaRawset()
+    print("\n=== Test: install() 用 rawset 注入，全新全局也能写 ===")
+    local AsyncGlobals = require("framework.async_globals")
+    rawset(_G, "ShowSceneNameAsyncImpl", nil)
+    local ok, err = withStrictG(function() AsyncGlobals.install() end)
+    AsyncGlobals.uninstall()
+    TestHelper.assertTrue(ok, "install 在严格 _G 下应成功: " .. tostring(err))
+    TestHelper.assertNotNil(rawget(_G, "ShowSceneNameAsyncImpl"),
+        "ShowSceneNameAsyncImpl 应已注入")
+end
+
+function TestSceneName.testShowSceneNameSafeWhenNotInjected()
+    print("\n=== Test: 未注入时 ShowSceneName 静默跳过（不因 __index 抛错）===")
+    rawset(_G, "ShowSceneNameAsyncImpl", nil)
+    local ok, err = withStrictG(function()
+        JY.SubScene = 1
+        ShowSceneName()   -- 未注入 → 必须安静返回
+    end)
+    TestHelper.assertTrue(ok, "未注入时 ShowSceneName 不应抛错: " .. tostring(err))
+end
+
+function TestSceneName.testShowSceneNameCallsImplWhenInjected()
+    print("\n=== Test: 已注入时 ShowSceneName 转发并传名称 ===")
+    local got = nil
+    rawset(_G, "ShowSceneNameAsyncImpl", function(n) got = n end)
+    local ok, err = withStrictG(function()
+        JY.SubScene = 1
+        ShowSceneName()
+    end)
+    TestHelper.assertTrue(ok, "已注入时不应抛错: " .. tostring(err))
+    TestHelper.assertEquals(got, "河洛客棧", "应把场景名转发给实现")
+    rawset(_G, "ShowSceneNameAsyncImpl", SceneNameAsync.Show)
+end
+
+function TestSceneName.testNoBareGlobalWriteForNewKeys()
+    print("\n=== Test: 源码级——不许对 ShowSceneNameAsyncImpl 裸赋值 ===")
+    for _, path in ipairs({ "framework/async_globals.lua", "framework/game_states.lua" }) do
+        local f = io.open(path, "r")
+        if f then
+            local src = f:read("*a"); f:close()
+            -- 裸赋值：_G.ShowSceneNameAsyncImpl = / _G["ShowSceneNameAsyncImpl"] =
+            local bare = src:match("_G%.ShowSceneNameAsyncImpl%s*=")
+                or src:match('_G%["ShowSceneNameAsyncImpl"%]%s*=')
+            TestHelper.assertNil(bare,
+                path .. ": 新全局必须用 rawset 写入（严格 _G 会拦截裸赋值）")
+        end
+    end
+end
+
 function TestSceneName.testIsRunningDistinguishesMainThread()
     print("\n=== Test: isRunning 能区分主线程与协程 ===")
     bootHeadless()
@@ -530,6 +612,11 @@ function TestSceneName.runAll()
     TestSceneName.testSceneNameModuleUsesCoroutineWait()
     TestSceneName.testNoGlobalHookRemains()
     TestSceneName.testGameStatesHasNoSubStateLeftover()
+    TestSceneName.testInstallWorksUnderStrictG()
+    TestSceneName.testInstallInjectsImplViaRawset()
+    TestSceneName.testShowSceneNameSafeWhenNotInjected()
+    TestSceneName.testShowSceneNameCallsImplWhenInjected()
+    TestSceneName.testNoBareGlobalWriteForNewKeys()
     TestSceneName.testIsRunningDistinguishesMainThread()
 
     TestSceneName.testMmapSubscenePassesShowname()
