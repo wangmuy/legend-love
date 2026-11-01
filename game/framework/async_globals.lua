@@ -110,6 +110,13 @@ function AsyncGlobals.install()
         lib.Delay = AsyncGlobals.lib_Delay_Async
     end
 
+    -- 场景名提示：把 SceneNameAsync.Show 注入为全局实现。
+    -- script/jymain.lua 的 ShowSceneName() 只做转发，不直接依赖 framework/。
+    -- 与上面其它阻塞函数（WaitKey/ShowMenu/TalkEx）同样是被 install 替换的全局，
+    -- 区别只是 jymain 侧留了 nil 检查以便单独加载时降级为 no-op。
+    local SceneNameAsync = require("framework.scene_name_async")
+    _G.ShowSceneNameAsyncImpl = SceneNameAsync.Show
+
     local ItemAsync = require("framework.item_async")
     if _G.SelectThing then
         _G.SelectThing = function() return ItemAsync.SelectThingAsync() end

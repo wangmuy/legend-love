@@ -2,11 +2,12 @@
 -- 场景名提示（原版 Init_SMap(1) 的 DrawStrBox + WaitKey）单元测试
 --
 -- 原版是一段阻塞流程：DrawStrBox → ShowScreen → WaitKey → Cls → ShowScreen。
--- LÖVE 版改为事件驱动的状态机子状态：
---   GAME_SMAP.update → GameStates.pushSceneNamePrompt()
---     → StateMachine:pushSubState("SCENE_NAME", {name=...})
---     → 子状态 update 消费一次按键后 popSubState
---     → 子状态 draw 在父状态 DrawSMap 之后画出名称
+-- LÖVE 版按 person_status_async.lua 的既有样板改造成事件驱动：
+--   Init_SMap(1) → jymain 的 ShowSceneName() → 全局 ShowSceneNameAsyncImpl
+--     → SceneNameAsync.Show() 起协程并置 currentName + disableInput
+--     → 协程 WaitKeyCoroutine() 挂起，按键事件到来时由 CoroutineScheduler 唤醒
+--     → 绘制由 EventBridge:draw() 里的 SceneNameAsync.draw() 每帧完成
+--       （排在 StateMachine:draw() 的 DrawSMap 全屏重绘之后）
 --
 -- 本套件刻意不使用 LoadRecord：只测这一小段逻辑，手工构造最小 JY，
 -- 从而对套件运行顺序完全免疫（test_mod_boot 会不可逆地污染全局 JY）。
@@ -20,7 +21,7 @@ local TestSceneName = {}
 -- ============================================================
 
 local booted = false
-local GameStates, EventBridge, StateMachine
+local GameStates, EventBridge, StateMachine, SceneNameAsync
 
 local function bootHeadless()
     if booted then return end
@@ -58,34 +59,22 @@ local function bootHeadless()
     GameStates = require("framework.game_states")
     StateMachine = require("framework.state_machine")
 
-    -- 注册所有状态并注入场景名钩子（与 jymain_adapter.init 的真实流程一致）。
-    -- 不跑这步时 SetSceneNameShowHook 为 nil，ShowSceneName 会静默跳过——
-    -- 正是真机上「什么都没有」的隐患形状，测试必须覆盖到。
     GameStates.registerAll()
-    TestHelper.assertNotNil(rawget(_G, "SetSceneNameShowHook"),
-        "registerAll 后应注入 SetSceneNameShowHook")
+
+    -- 注入场景名实现（正常由 AsyncGlobals.install() 或 GAME_SMAP.enter 兜底完成）。
+    -- 不注入时 jymain 的 ShowSceneName() 会静默跳过——正是真机
+    -- 「什么都没有」的隐患形状，测试必须覆盖到。
+    -- 严格 _G 元表可能已被前序测试（jymain_adapter）安装，
+    -- 因此这里必须用 rawset 写全局，不能用裸赋值。
+    rawset(_G, "SceneNameAsync_", require("framework.scene_name_async"))
+    SceneNameAsync = rawget(_G, "SceneNameAsync_")
+    rawset(_G, "ShowSceneNameAsyncImpl", SceneNameAsync.Show)
+    TestHelper.assertNotNil(rawget(_G, "ShowSceneNameAsyncImpl"),
+        "应注入 ShowSceneNameAsyncImpl")
 end
 
 local function IM()
     return require("framework.input_manager").getInstance()
-end
-
--- 注册状态机里用于测试的最小状态（SCENE_NAME 只挂在 GAME_SMAP 下）
-local function setupStateMachine()
-    local sm = StateMachine.getInstance()
-    sm:init()
-    -- 直接注册 GAME_SMAP 的真实处理器，取其 subStates
-    local handler = GameStates.getHandler("GAME_SMAP")
-    sm:register(4, {
-        enter = function() end,
-        exit = function() end,
-        -- 父状态 update/draw 用探针替换，避免真正跑场景行走逻辑
-        update = function() end,
-        draw = function() end,
-        subStates = handler.subStates,
-    })
-    sm:switchTo(4)
-    return sm
 end
 
 -- ============================================================
@@ -175,317 +164,166 @@ end
 -- 3. 子状态注册与切换
 -- ============================================================
 
-function TestSceneName.testSubStateRegistered()
-    print("\n=== Test: GAME_SMAP 注册了 SCENE_NAME 子状态 ===")
-    bootHeadless()
-    local handler = GameStates.getHandler("GAME_SMAP")
-    TestHelper.assertNotNil(handler.subStates, "GAME_SMAP 应有 subStates")
-    TestHelper.assertNotNil(handler.subStates.SCENE_NAME, "应注册 SCENE_NAME 子状态")
-    local sub = handler.subStates.SCENE_NAME
-    TestHelper.assertTrue(type(sub.enter) == "function", "子状态应有 enter")
-    TestHelper.assertTrue(type(sub.update) == "function", "子状态应有 update")
-    TestHelper.assertTrue(type(sub.draw) == "function", "子状态应有 draw")
-end
-
-function TestSceneName.testPushSceneNamePromptPushesSubState()
-    print("\n=== Test: pushSceneNamePrompt 压入子状态并携带名称 ===")
-    bootHeadless()
-    JY.SubScene = 1
-    local sm = setupStateMachine()
-    IM():clear()
-
-    local ok = GameStates.pushSceneNamePrompt()
-    TestHelper.assertTrue(ok, "pushSceneNamePrompt 应返回 true")
-    TestHelper.assertEquals(sm:getCurrentSubState(), "SCENE_NAME", "当前子状态应为 SCENE_NAME")
-
-    local ctx = sm:getCurrentSubStateContext()
-    TestHelper.assertNotNil(ctx, "子状态 context 应可读取")
-    TestHelper.assertEquals(ctx.data.name, "河洛客棧", "子状态应携带场景名称")
-end
-
-function TestSceneName.testPushSceneNamePromptSkipsBlankName()
-    print("\n=== Test: 无名称时不压入子状态 ===")
-    bootHeadless()
-    JY.SubScene = 2
-    local sm = setupStateMachine()
-    IM():clear()
-
-    local ok = GameStates.pushSceneNamePrompt()
-    TestHelper.assertFalse(ok, "无名称时应返回 false")
-    TestHelper.assertNil(sm:getCurrentSubState(), "不应压入子状态")
-end
-
 -- ============================================================
--- 4. 子状态 draw：在父状态之后
+-- 2. SceneNameAsync：事件驱动显示（协程等键 + draw 每帧渲染）
 -- ============================================================
 
-function TestSceneName.testSubStateDrawAfterParentDraw()
-    print("\n=== Test: StateMachine.draw 先父状态后子状态 ===")
-    bootHeadless()
-    JY.SubScene = 1
-    local sm = setupStateMachine()
-
-    -- 给子状态打点（用真实 draw，但拦 DrawStrBox）
-    local order = {}
-    local handler = GameStates.getHandler("GAME_SMAP")
-    local realDraw = handler.subStates.SCENE_NAME.draw
-
-    -- 重新注册，父 draw 与子 draw 都记录顺序
-    sm:register(4, {
-        enter = function() end,
-        exit = function() end,
-        update = function() end,
-        draw = function() order[#order + 1] = "parent" end,
-        subStates = {
-            SCENE_NAME = {
-                enter = handler.subStates.SCENE_NAME.enter,
-                update = handler.subStates.SCENE_NAME.update,
-                draw = function(ctx)
-                    order[#order + 1] = "child"
-                    realDraw(ctx)
-                end,
-            },
-        },
-    })
-    sm:switchTo(4)
-
-    IM():clear()
-    GameStates.pushSceneNamePrompt()
-
-    local orig = _G.DrawStrBox
-    _G.DrawStrBox = function() end
-    sm:draw()
-    _G.DrawStrBox = orig
-
-    TestHelper.assertEquals(#order, 2, "应分别绘制父状态与子状态各一次")
-    TestHelper.assertEquals(order[1], "parent", "父状态（DrawSMap）应先画")
-    TestHelper.assertEquals(order[2], "child", "子状态（场景名）应后画，才不会被覆盖")
+function TestSceneName.testShowSkipsBlankName()
+    print("\n=== Test: 空名称不起协程、不置状态 ===")
+    SceneNameAsync.clear()
+    TestHelper.assertEquals(SceneNameAsync.Show(nil), false, "nil 名称应返回 false")
+    TestHelper.assertEquals(SceneNameAsync.Show("  "), false, "纯空白名称应返回 false")
+    TestHelper.assertEquals(SceneNameAsync.isActive(), false, "不应处于显示中")
 end
 
--- ============================================================
--- 5. 子状态 update：父状态被抑制 + 任意键取消
--- ============================================================
-
-function TestSceneName.testParentUpdateSuppressedDuringPrompt()
-    print("\n=== Test: 提示期间父状态 update 被抑制（不会走路）===")
-    bootHeadless()
-    JY.SubScene = 1
-
-    local parentUpdated = 0
-    local handler = GameStates.getHandler("GAME_SMAP")
-    local sm = StateMachine.getInstance()
-    sm:init()
-    sm:register(4, {
-        enter = function() end,
-        exit = function() end,
-        update = function() parentUpdated = parentUpdated + 1 end,
-        draw = function() end,
-        subStates = handler.subStates,
-    })
-    sm:switchTo(4)
-
-    IM():clear()
-    GameStates.pushSceneNamePrompt()
-
-    -- 无按键：子状态 update 跑，父状态 update 被跳过
-    sm:update(0.016)
-    TestHelper.assertEquals(parentUpdated, 0, "提示期间父状态 update 不应被调用")
-
-    -- 消费按键后子状态弹出，父状态恢复
-    IM():onKeyPressed("space", nil, false)
-    sm:update(0.016)
-    TestHelper.assertNil(sm:getCurrentSubState(), "按任意键后子状态应弹出")
-
-    sm:update(0.016)
-    TestHelper.assertEquals(parentUpdated, 1, "提示关闭后父状态 update 应恢复")
+function TestSceneName.testShowSetsActiveAndName()
+    print("\n=== Test: Show 后进入显示态并带名称 ===")
+    SceneNameAsync.clear()
+    local ok = SceneNameAsync.Show("河洛客棧")
+    TestHelper.assertTrue(ok, "Show 应返回 true")
+    TestHelper.assertTrue(SceneNameAsync.isActive(), "应处于显示中")
+    SceneNameAsync.clear()
+    TestHelper.assertEquals(SceneNameAsync.isActive(), false, "clear 后应退出显示态")
 end
 
-function TestSceneName.testAnyKeyDismisses()
-    print("\n=== Test: 任意键取消提示 ===")
-    bootHeadless()
-    JY.SubScene = 1
-    local sm = setupStateMachine()
-    IM():clear()
-    GameStates.pushSceneNamePrompt()
-    TestHelper.assertEquals(sm:getCurrentSubState(), "SCENE_NAME", "初始应在提示中")
+function TestSceneName.testDrawRendersBoxAndText()
+    print("\n=== Test: draw 画出白框与文字（几何与原版一致）===")
+    SceneNameAsync.clear()
+    SceneNameAsync.Show("河洛客棧")
 
-    IM():onKeyPressed("space", nil, false)
-    sm:update(0.016)
-    TestHelper.assertNil(sm:getCurrentSubState(), "按空格应关闭提示")
+    local boxes, strs = {}, {}
+    local origBox, origStr = _G.DrawBox, _G.DrawString
+    _G.DrawBox = function(x1, y1, x2, y2, c)
+        boxes[#boxes + 1] = { x1 = x1, y1 = y1, x2 = x2, y2 = y2 }
+        if origBox then return origBox(x1, y1, x2, y2, c) end
+    end
+    _G.DrawString = function(x, y, str, c, size)
+        strs[#strs + 1] = { x = x, y = y, str = str, size = size }
+        if origStr then return origStr(x, y, str, c, size) end
+    end
+    SceneNameAsync.draw()
+    _G.DrawBox, _G.DrawString = origBox, origStr
+
+    TestHelper.assertEquals(#boxes, 1, "应画一个框")
+    TestHelper.assertEquals(#strs, 1, "应画一段文字")
+    if #boxes == 1 then
+        TestHelper.assertEquals(boxes[1].y1, 10, "框顶 y 应为 10（原版位置）")
+        TestHelper.assertTrue(boxes[1].y2 - boxes[1].y1 >= CC.DefaultFont - 1,
+            "框高应容纳 CC.DefaultFont")
+    end
+    if #strs == 1 then
+        TestHelper.assertEquals(strs[1].str, "河洛客棧", "文字内容应为场景名")
+    end
+    SceneNameAsync.clear()
+end
+
+function TestSceneName.testDrawNoopWhenInactive()
+    print("\n=== Test: 未显示时 draw 不画任何东西 ===")
+    SceneNameAsync.clear()
+    local n = 0
+    local origBox = _G.DrawBox
+    _G.DrawBox = function(...) n = n + 1; if origBox then return origBox(...) end end
+    SceneNameAsync.draw()
+    _G.DrawBox = origBox
+    TestHelper.assertEquals(n, 0, "未显示时不应画框")
+end
+
+function TestSceneName.testShowDisablesInput()
+    print("\n=== Test: 显示期间 disableInput=true（挡住 GAME_SMAP 行走）===")
+    SceneNameAsync.clear()
+    local IM = require("framework.input_manager").getInstance()
+    TestHelper.assertEquals(IM.disableInput, false, "前置：disableInput 应为 false")
+    SceneNameAsync.Show("河洛客棧")
+    TestHelper.assertEquals(IM.disableInput, true,
+        "提示期间必须 disableInput，否则同一按键既关提示又走路")
+    SceneNameAsync.clear()
+    TestHelper.assertEquals(IM.disableInput, false, "clear 后应恢复输入")
+end
+
+function TestSceneName.testKeyDismissesAndRestoresInput()
+    print("\n=== Test: 按键事件唤醒协程 → 提示消失 + 恢复输入 ===")
+    SceneNameAsync.clear()
+    local im = require("framework.input_manager").getInstance()
+    im:clear()
+
+    SceneNameAsync.Show("河洛客棧")
+    TestHelper.assertTrue(SceneNameAsync.isActive(), "应显示中")
+
+    -- 注入按键 + 只驱动协程调度器。
+    -- 不调 EventBridge:update()——它会同步 JY.Status 触发状态切换，
+    -- 进而跑真实 Init_SMap（需要完整存档/贴图数据，本套件刻意不装载）。
+    im:onKeyPressed("space", nil, false)
+    require("framework.coroutine_scheduler").getInstance():update(0)
+
+    TestHelper.assertEquals(SceneNameAsync.isActive(), false,
+        "按键后提示应消失（协程被唤醒并走完）")
+    TestHelper.assertEquals(im.disableInput, false, "按键后应恢复输入")
 end
 
 function TestSceneName.testNoKeyKeepsPrompt()
-    print("\n=== Test: 无按键时提示保持 ===")
-    bootHeadless()
-    JY.SubScene = 1
-    local sm = setupStateMachine()
-    IM():clear()
-    GameStates.pushSceneNamePrompt()
-
-    for _ = 1, 10 do sm:update(0.016) end
-    TestHelper.assertEquals(sm:getCurrentSubState(), "SCENE_NAME", "无按键时提示应一直保持")
-end
-
-function TestSceneName.testKeyConsumedOnce()
-    print("\n=== Test: 按键只被消费一次（不会连带触发走路）===")
-    bootHeadless()
-    JY.SubScene = 1
-    local sm = setupStateMachine()
-    IM():clear()
-    GameStates.pushSceneNamePrompt()
-
-    IM():onKeyPressed("space", nil, false)
-    sm:update(0.016)   -- 子状态消费该按键并弹出
-    TestHelper.assertNil(sm:getCurrentSubState(), "按键后子状态应弹出")
-
-    -- 按键已被子状态消费，队列里不应再有残留
-    local leftover = IM():_peekKeyInternal()
-    TestHelper.assertEquals(leftover, -1, "按键应已被消费，不残留给父状态")
-end
-
-function TestSceneName.testParentDrawStillRunsDuringPrompt()
-    print("\n=== Test: 提示期间父状态仍每帧重绘（地图不能黑屏）===")
-    bootHeadless()
-    JY.SubScene = 1
-    local parentDrew = 0
-    local handler = GameStates.getHandler("GAME_SMAP")
-    local sm = StateMachine.getInstance()
-    sm:init()
-    sm:register(4, {
-        enter = function() end,
-        exit = function() end,
-        update = function() end,
-        draw = function() parentDrew = parentDrew + 1 end,
-        subStates = handler.subStates,
-    })
-    sm:switchTo(4)
-    IM():clear()
-    GameStates.pushSceneNamePrompt()
-
-    local orig = _G.DrawStrBox
-    _G.DrawStrBox = function() end
-    sm:draw(); sm:draw()
-    _G.DrawStrBox = orig
-
-    TestHelper.assertEquals(parentDrew, 2, "父状态每帧都应重绘")
-end
-
--- ============================================================
--- 6. 协程路径：等键不阻塞主线程（非协程）/ 挂起协程（协程内）
--- ============================================================
-
-function TestSceneName.testNonCoroutineDoesNotBlock()
-    print("\n=== Test: 非协程路径不阻塞主线程 ===")
-    bootHeadless()
-    JY.SubScene = 1
-    setupStateMachine()
-    IM():clear()
-
-    -- 非协程内调用应立即返回（若实现里误用 waitForKey 会在此卡死）
-    local ok = GameStates.pushSceneNamePrompt()
-    TestHelper.assertTrue(ok, "非协程调用应立即返回 true")
-    TestHelper.assertFalse(EngineAPI.coroutine.isRunning(), "主线程 isRunning 应为 false")
-end
-
-function TestSceneName.testCoroutinePathWaitsForKey()
-    print("\n=== Test: 协程路径压入子状态并调用 waitForKey ===")
-    bootHeadless()
-    JY.SubScene = 1
-    local sm = setupStateMachine()
-    IM():clear()
-
-    -- 测试环境里 EngineAPI.input.waitForKey 立即返回，无法观测真正的挂起；
-    -- 这里改为验证「协程内走的是 waitForKey 分支，而非靠父状态轮询」。
-    local waited = 0
-    local origWait = EngineAPI.input.waitForKey
-    EngineAPI.input.waitForKey = function()
-        waited = waited + 1
-        return 32
+    print("\n=== Test: 无按键时提示持续存在（不会自己消失）===")
+    SceneNameAsync.clear()
+    local im = require("framework.input_manager").getInstance()
+    im:clear()
+    SceneNameAsync.Show("河洛客棧")
+    for _ = 1, 10 do
+        require("framework.coroutine_scheduler").getInstance():update(0)
     end
-
-    local co = coroutine.create(function()
-        GameStates.pushSceneNamePrompt()
-    end)
-    local ok, err = coroutine.resume(co)
-    EngineAPI.input.waitForKey = origWait
-
-    TestHelper.assertTrue(ok, "协程不应报错: " .. tostring(err))
-    TestHelper.assertEquals(waited, 1, "协程路径应调用一次 waitForKey（而不是靠轮询）")
-    TestHelper.assertEquals(sm:getCurrentSubState(), "SCENE_NAME", "协程路径也应压入子状态")
+    TestHelper.assertTrue(SceneNameAsync.isActive(), "无按键时应持续显示")
+    SceneNameAsync.clear()
 end
 
-function TestSceneName.testNonCoroutineDoesNotCallWaitForKey()
-    print("\n=== Test: 非协程路径不调用 waitForKey（不阻塞）===")
-    bootHeadless()
-    JY.SubScene = 1
-    setupStateMachine()
-    IM():clear()
+function TestSceneName.testDrawIsCalledFromEventBridge()
+    print("\n=== Test: EventBridge:draw 里调用 SceneNameAsync.draw ===")
+    local f = io.open("framework/event_bridge.lua", "r")
+    if not f then TestHelper.assertTrue(false, "无法打开 event_bridge.lua"); return end
+    local src = f:read("*a"); f:close()
 
-    local waited = 0
-    local origWait = EngineAPI.input.waitForKey
-    EngineAPI.input.waitForKey = function() waited = waited + 1; return 32 end
-    local ok = GameStates.pushSceneNamePrompt()
-    EngineAPI.input.waitForKey = origWait
+    -- 只匹配「行首非注释」的真实调用，避免把 -- SceneNameAsync.draw() 当成调用
+    local callPat = "\n%s*SceneNameAsync%.draw%(%)"
+    TestHelper.assertNotNil(src:match(callPat),
+        "EventBridge:draw 应真正调用 SceneNameAsync.draw()（未被注释）")
 
-    TestHelper.assertTrue(ok, "应压入子状态成功")
-    TestHelper.assertEquals(waited, 0, "非协程路径不应调用阻塞的 waitForKey")
+    -- 必须排在 StateMachine:draw() 之后（否则被 DrawSMap 全屏重绘覆盖）
+    local iSm = src:find("\n%s*StateMachine%.getInstance%(%)%:draw%(%)")
+    local iSn = src:find(callPat)
+    TestHelper.assertNotNil(iSm, "应能找到 StateMachine:draw()")
+    if iSm and iSn then
+        TestHelper.assertTrue(iSn > iSm,
+            "SceneNameAsync.draw 必须在 StateMachine:draw（含 DrawSMap）之后")
+    end
 end
 
--- ============================================================
--- 7. 源码级不变量
--- ============================================================
+function TestSceneName.testSceneNameModuleUsesCoroutineWait()
+    print("\n=== Test: 用协程等键，不在 update 里轮询 ===")
+    local f = io.open("framework/scene_name_async.lua", "r")
+    if not f then TestHelper.assertTrue(false, "无法打开 scene_name_async.lua"); return end
+    local src = f:read("*a"); f:close()
 
-function TestSceneName.testNoBlockingPollingRemains()
-    print("\n=== Test: 源码中不再有标志轮询实现残留 ===")
+    TestHelper.assertNotNil(src:match("WaitKeyCoroutine"), "应用 InputAsync.WaitKeyCoroutine 挂起等键")
+    TestHelper.assertNotNil(src:match("disableInput%s*=%s*true"), "应置 disableInput 屏蔽行走")
+    -- 不得出现自己轮询 GetKey 的循环
+    TestHelper.assertNil(src:match("while%s+true%s+do"),
+        "不应有手工轮询循环（应交给 CoroutineScheduler 唤醒）")
+end
+
+function TestSceneName.testNoGlobalHookRemains()
+    print("\n=== Test: 旧全局钩子 SetSceneNameShowHook 已彻底移除 ===")
     local f = io.open("script/jymain.lua", "r")
-    if not f then
-        TestHelper.assertTrue(false, "无法打开 script/jymain.lua")
-        return
-    end
-    local src = f:read("*a")
-    f:close()
-
-    -- 注意：不能只匹配 "SceneNameShow"，否则会命中允许存在的
-    -- SetSceneNameShowHook 钩子名。这里要求带 JY. 前缀。
-    TestHelper.assertNil(src:match("JY%.SceneNameShow"), "不应再有 JY.SceneNameShow 标志轮询")
-    TestHelper.assertNil(src:match("JY%.SceneNameWaiter"), "不应再有 JY.SceneNameWaiter 双读保护")
-    TestHelper.assertNil(src:match("ClearSceneNameOnKey"), "不应再有 ClearSceneNameOnKey 轮询函数")
-    TestHelper.assertNotNil(src:match("SetSceneNameShowHook"), "应保留注入钩子 SetSceneNameShowHook")
+    if not f then TestHelper.assertTrue(false, "无法打开 jymain.lua"); return end
+    local src = f:read("*a"); f:close()
+    TestHelper.assertNil(src:match("SetSceneNameShowHook"),
+        "不应再有 SetSceneNameShowHook 全局钩子")
+    TestHelper.assertNil(src:match("JY%.SceneNameShow"), "不应再回到标志轮询")
 end
 
-function TestSceneName.testStateDrawDoesNotDrawSceneNameDirectly()
-    print("\n=== Test: 父状态 draw 不再直接画场景名（只由子状态画）===")
+function TestSceneName.testGameStatesHasNoSubStateLeftover()
+    print("\n=== Test: game_states 不再有 SCENE_NAME 子状态 ===")
     local f = io.open("framework/game_states.lua", "r")
-    if not f then
-        TestHelper.assertTrue(false, "无法打开 framework/game_states.lua")
-        return
-    end
-    local src = f:read("*a")
-    f:close()
-
-    -- 先定位到 GAME_SMAP 处理器，避免匹配到前面 GAME_MMAP 的 draw
-    local smapStart = src:find('handlers%["GAME_SMAP"%]')
-    TestHelper.assertNotNil(smapStart, "应能找到 handlers[\"GAME_SMAP\"]")
-    local smapSrc = smapStart and src:sub(smapStart) or src
-
-    -- 取出 GAME_SMAP 处理器中「父状态 draw」的函数体：
-    -- 从 "    draw = function()" 开始（subStates 内部的是 "draw = function(context)"，
-    -- 缩进更深），到下一个同缩进的 "    end" 结束。
-    local body = smapSrc:match("\n    draw = function%(%)%s*\n(.-)\n    end%s*[},]")
-    TestHelper.assertNotNil(body, "应能定位 GAME_SMAP 的父状态 draw 函数体")
-    if body then
-        TestHelper.assertNil(body:match("DrawSceneName"),
-            "父状态 draw 内不应出现 DrawSceneName —— 否则会被同函数末尾/下一帧的 DrawSMap 覆盖")
-        TestHelper.assertNotNil(body:match("DrawSMap%(0%)"), "父状态 draw 仍应调用 DrawSMap(0)")
-    end
-
-    -- 子状态的 draw 必须画场景名
-    local subDraw = smapSrc:match("\n            draw = function%(context%)%s*\n(.-)\n            end,")
-    TestHelper.assertNotNil(subDraw, "应能定位 SCENE_NAME 子状态的 draw 函数体")
-    if subDraw then
-        TestHelper.assertNotNil(subDraw:match("DrawSceneName"),
-            "SCENE_NAME 子状态的 draw 必须调用 DrawSceneName")
-    end
+    if not f then TestHelper.assertTrue(false, "无法打开 game_states.lua"); return end
+    local src = f:read("*a"); f:close()
+    TestHelper.assertNil(src:match("SCENE_NAME"), "不应残留 SCENE_NAME 子状态")
+    TestHelper.assertNil(src:match("pushSceneNamePrompt"), "不应残留 pushSceneNamePrompt")
 end
 
 function TestSceneName.testIsRunningDistinguishesMainThread()
@@ -552,28 +390,29 @@ end
 -- 因此把 Init_SMap 换成只记录 showname 的桩，专测「调用参数是否正确」。
 local function enterWithShowname(showname)
     bootHeadless()
+    SceneNameAsync.clear()
     JY.SubScene = 1
-    local sm = setupStateMachine()
 
     local seen = {}
     local origInitSMap = _G.Init_SMap
     _G.Init_SMap = function(v)
         seen[#seen + 1] = v
-        -- 真实 Init_SMap 末尾的 showname==1 分支：转成子状态
+        -- 真实 Init_SMap 末尾的 showname==1 分支就是调 ShowSceneName()
         if v == 1 then ShowSceneName() end
     end
 
+    local sm = StateMachine.getInstance()
+    sm:init()
     local handler = GameStates.getHandler("GAME_SMAP")
     sm:register(4, {
         enter = handler.enter,
         exit = function() end,
         update = function() end,
         draw = function() end,
-        subStates = handler.subStates,
     })
     sm:register(2, { enter = function() end, exit = function() end,
                      update = function() end, draw = function() end })
-    IM():clear()
+    require("framework.input_manager").getInstance():clear()
 
     sm:switchTo(2)
     local ok, err
@@ -584,40 +423,37 @@ local function enterWithShowname(showname)
     end
 
     _G.Init_SMap = origInitSMap
-    return ok, err, seen, sm
+    return ok, err, seen
 end
 
 function TestSceneName.testEnterWithShownameShowsPrompt()
-    print("\n=== Test: switchTo(GAME_SMAP,{showname=1}) → Init_SMap(1) → 子状态就位 ===")
-    local ok, err, seen, sm = enterWithShowname(1)
+    print("\n=== Test: switchTo(GAME_SMAP,{showname=1}) → Init_SMap(1) → 提示激活 ===")
+    local ok, err, seen = enterWithShowname(1)
     TestHelper.assertTrue(ok, "switchTo(GAME_SMAP, {showname=1}) 不应报错: " .. tostring(err))
     TestHelper.assertEquals(#seen, 1, "应调用一次 Init_SMap")
     TestHelper.assertEquals(seen[1], 1, "应把 showname=1 传给 Init_SMap")
-    TestHelper.assertEquals(sm:getCurrentSubState(), "SCENE_NAME",
-        "带 showname=1 进 GAME_SMAP 应压入场景名子状态")
+    TestHelper.assertTrue(SceneNameAsync.isActive(),
+        "带 showname=1 进 GAME_SMAP 应激活场景名提示")
+    SceneNameAsync.clear()
 end
 
 function TestSceneName.testEnterWithoutShownameShowsNoPrompt()
     print("\n=== Test: 不带 showname 进 GAME_SMAP → Init_SMap(0)，不提示 ===")
-    local ok, err, seen, sm = enterWithShowname(nil)
+    local ok, err, seen = enterWithShowname(nil)
     TestHelper.assertTrue(ok, "无 data 切状态不应报错: " .. tostring(err))
     TestHelper.assertEquals(#seen, 1, "仍应调用一次 Init_SMap")
     TestHelper.assertEquals(seen[1], 0, "无 showname 时应传 0（原版 Init_SMap(0) 不显示）")
-    TestHelper.assertNil(sm:getCurrentSubState(),
+    TestHelper.assertEquals(SceneNameAsync.isActive(), false,
         "无 showname 时不应提示场景名")
 end
 
 function TestSceneName.testEnterWithShownameZeroShowsNoPrompt()
     print("\n=== Test: showname=0 显式传入也不提示 ===")
-    local ok, err, seen, sm = enterWithShowname(0)
+    local ok, err, seen = enterWithShowname(0)
     TestHelper.assertTrue(ok, "showname=0 不应报错: " .. tostring(err))
     TestHelper.assertEquals(seen[1], 0, "应传 0")
-    TestHelper.assertNil(sm:getCurrentSubState(), "showname=0 不提示")
+    TestHelper.assertEquals(SceneNameAsync.isActive(), false, "showname=0 不提示")
 end
-
--- ============================================================
--- 9. GAME_INIT 常量已定义（SetGlobal 的依赖）
--- ============================================================
 
 function TestSceneName.testGameInitConstantDefined()
     print("\n=== Test: GAME_INIT 常量已定义（SetGlobal 依赖它）===")
@@ -683,24 +519,17 @@ function TestSceneName.runAll()
     TestSceneName.testDrawSceneNameSkipsBlank()
     TestSceneName.testDrawSceneNameAcceptsExplicitName()
 
-    TestSceneName.testSubStateRegistered()
-    TestSceneName.testPushSceneNamePromptPushesSubState()
-    TestSceneName.testPushSceneNamePromptSkipsBlankName()
-
-    TestSceneName.testSubStateDrawAfterParentDraw()
-    TestSceneName.testParentDrawStillRunsDuringPrompt()
-
-    TestSceneName.testParentUpdateSuppressedDuringPrompt()
-    TestSceneName.testAnyKeyDismisses()
+    TestSceneName.testShowSkipsBlankName()
+    TestSceneName.testShowSetsActiveAndName()
+    TestSceneName.testDrawRendersBoxAndText()
+    TestSceneName.testDrawNoopWhenInactive()
+    TestSceneName.testShowDisablesInput()
+    TestSceneName.testKeyDismissesAndRestoresInput()
     TestSceneName.testNoKeyKeepsPrompt()
-    TestSceneName.testKeyConsumedOnce()
-
-    TestSceneName.testNonCoroutineDoesNotBlock()
-    TestSceneName.testCoroutinePathWaitsForKey()
-    TestSceneName.testNonCoroutineDoesNotCallWaitForKey()
-
-    TestSceneName.testNoBlockingPollingRemains()
-    TestSceneName.testStateDrawDoesNotDrawSceneNameDirectly()
+    TestSceneName.testDrawIsCalledFromEventBridge()
+    TestSceneName.testSceneNameModuleUsesCoroutineWait()
+    TestSceneName.testNoGlobalHookRemains()
+    TestSceneName.testGameStatesHasNoSubStateLeftover()
     TestSceneName.testIsRunningDistinguishesMainThread()
 
     TestSceneName.testMmapSubscenePassesShowname()
