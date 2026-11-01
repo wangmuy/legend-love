@@ -153,6 +153,26 @@ function AsyncGlobals.install()
         while scheduler:isActive(warCo) do
             scheduler:yield("war_main_wait")
         end
+
+        -- 兜底：战斗协程可能因未捕获错误而 dead，此时 WarMainCoroutine 的
+        -- 收尾段（恢复 JY.Status、重载 SMAP 贴图与音乐、写 warState.result）
+        -- 一行都没执行。协程错误只会被调度器静默记录到 error.txt，调用方
+        -- 拿不到任何信号，玩家就永久卡在战斗画面、回不到原场景。
+        --
+        -- 这里只做最小的状态修复：把 JY.Status 从 GAME_WMAP 拉回 SMAP，
+        -- 让状态机下一帧切回场景，避免死锁。正常结束时 WarMainCoroutine
+        -- 已把 Status 设成 prevState，本分支不会触发。
+        local info = nil
+        if type(scheduler.getInfo) == "function" then
+            info = scheduler:getInfo(warCo)
+        end
+        if info and info.status == "error" then
+            lib.Debug("WarMain: battle coroutine died with error, recovering state")
+            if JY and (JY.Status == nil or JY.Status == GAME_WMAP) then
+                JY.Status = GAME_SMAP
+            end
+        end
+
         return scheduler:getResult(warCo)
     end)
 
