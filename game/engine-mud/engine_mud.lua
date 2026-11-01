@@ -240,6 +240,27 @@ EngineAPI.font.get = function(fontName, size)
 end
 
 --------------------------------------------------------------------
+-- dialog 模块 - 空实现（MUD 无图形对话框，只需记录调用）
+--------------------------------------------------------------------
+-- MUD 引擎是纯文本输出，对话框的「框宽 / 框高 / 行高 / 锚点」全都无意义。
+-- 排版算法在 framework/dialog_layout.lua（引擎无关纯函数），
+-- 需要对话框语义的引擎才调它；mud 只需把调用记录下来便于调试。
+EngineAPI.dialog = {}
+
+EngineAPI.dialog.measure = function(spec)
+    logCall("dialog.measure", spec and spec.text, spec and spec.flag)
+    return nil
+end
+
+EngineAPI.dialog.draw = function(spec, layout)
+    logCall("dialog.draw", spec and spec.text, layout and layout.width)
+end
+
+EngineAPI.dialog.clear = function()
+    logCall("dialog.clear")
+end
+
+--------------------------------------------------------------------
 -- color 模块 - 正常实现
 --------------------------------------------------------------------
 EngineAPI.color.pack = function(r, g, b)

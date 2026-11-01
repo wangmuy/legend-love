@@ -246,6 +246,52 @@ M.font = {}
 function M.font.get(fontName, size) end
 
 --------------------------------------------------------------------
+-- dialog - 对话框（语义级）
+--------------------------------------------------------------------
+-- 为什么是语义级而不是原语级：
+--   对话框的排版（换行 / 框宽 / 行高 / 锚点）属于「渲染介质相关」决策。
+--   Love2D 有真实字体度量（font:getWidth / getHeight），可以精确排版；
+--   mud 无图形输出（对话框无意义）；web 的字体是浏览器决定。
+--   Lua 层若自己算坐标，就得读 CC.DefaultFont 这类常量，在 mud/web 上
+--   纯属浪费且不反映真实排版。
+--
+--   这与本 EngineAPI 中已有的语义级调用保持一致：
+--     M.map.drawScene(sceneId, x, y, offX, offY, playerPic)
+--   Lua 只说「画这个场景」，引擎自己决定怎么画。
+--
+-- 为什么是三段式（measure / draw / clear）而不是单个 showDialog：
+--   engine-love2d/lib_love.lua 的 ShowSurface 只在 inDrawLoop 为真时
+--   调用 love.graphics.present()，而 inDrawLoop 只在 love.draw() 内为真。
+--   引擎无法在 showDialog 内部阻塞式画完再返回，因此必须拆成：
+--     measure  纯计算（可随时调用，无副作用，便于单测）
+--     draw     仅在 love.draw() 内调用
+--     clear    清除状态
+M.dialog = {}
+
+--- 排版计算（纯函数，不绘制、不阻塞、不写全局状态）
+-- @param spec table 对话描述
+--   text    string 对话文本，`*` 为强制断行符
+--   headId  number 头像编号，-1 表示不显示
+--   flag    number 对话框位置 0-5
+-- @return table|nil layout
+--   width       number 框宽（像素，已含内边距）
+--   height      number 框高（像素）
+--   lineHeight  number 行高（像素，取真实 getHeight）
+--   lines       table  行数组
+--   pages       number 总页数
+--   headBox     table  { x, y, w, h } 头像框，headId<0 时无
+--   textBox     table  { x, y, w, h } 对话框
+function M.dialog.measure(spec) end
+
+--- 绘制对话（只能在 love.draw() 内调用）
+-- @param spec table 与 measure 相同的对话描述
+-- @param layout table measure 的返回值
+function M.dialog.draw(spec, layout) end
+
+--- 清除对话状态（幂等）
+function M.dialog.clear() end
+
+--------------------------------------------------------------------
 -- color - 颜色工具
 --------------------------------------------------------------------
 M.color = {}
