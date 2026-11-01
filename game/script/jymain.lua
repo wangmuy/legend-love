@@ -3034,88 +3034,69 @@ end
 --s 字符串，必须加上*作为分行，如果里面没有*,则会自动加上
 function TalkEx(s,headid,flag)          --复杂版本对话
     lib.Debug(string.format("TalkEx called: headid=%d, flag=%d, s=%s", headid, flag, string.sub(s, 1, 30)));
-    
-    local picw=100;       --最大头像图片宽高
-    local pich=100;
-    local talkxnum=12;         --对话一行字数
-    local talkynum=3;          --对话行数
-    local dx=2;
-    local dy=2;
-    local boxpicw=picw+10;
-    local boxpich=pich+10;
-    local boxtalkw=12*CC.DefaultFont+10;
-    local boxtalkh=boxpich;
-
-    local talkBorder=(pich-talkynum*CC.DefaultFont)/(talkynum+1);
-
-    --显示头像和对话的坐标
-    local xy={ [0]={headx=dx,heady=dy,
-                    talkx=dx+boxpicw+2,talky=dy,
-                    showhead=1},
-                   {headx=CC.ScreenW-1-dx-boxpicw,heady=CC.ScreenH-dy-boxpich,
-                    talkx=CC.ScreenW-1-dx-boxpicw-boxtalkw-2,talky= CC.ScreenH-dy-boxpich,
-                    showhead=1},
-                   {headx=dx,heady=dy,
-                   talkx=dx+boxpicw+2,talky=dy,
-                   showhead=0},
-                   {headx=CC.ScreenW-1-dx-boxpicw,heady=CC.ScreenH-dy-boxpich,
-                   talkx=CC.ScreenW-1-dx-boxpicw-boxtalkw-2,talky= CC.ScreenH-dy-boxpich,
-                    showhead=1},
-                   {headx=CC.ScreenW-1-dx-boxpicw,heady=dy,
-                    talkx=CC.ScreenW-1-dx-boxpicw-boxtalkw-2,talky=dy,showhead=1},
-                   {headx=dx,heady=CC.ScreenH-dy-boxpich,talkx=dx+boxpicw+2,talky=CC.ScreenH-dy-boxpich,showhead=1}, }
 
     if flag<0 or flag>5 then
         flag=0;
     end
 
-    if xy[flag].showhead==0 then
-        headid=-1;
-    end
-
-    if string.find(s,"*") ==nil then
-        s=GenTalkString(s,12);
-    end
+    -- 排版交由引擎：对话框属于渲染介质相关决策。
+    -- EngineAPI.dialog.measure 是纯函数（Love2D 用真实 font:getWidth/getHeight，
+    -- 汉字 1.0em、ASCII 0.5em、行高 27px），因此本函数不再自算坐标。
+    local spec = { text = s, headId = headid, flag = flag };
+    local layout = EngineAPI.dialog.measure(spec);
+    local dialog = EngineAPI.dialog;
 
     if CONFIG.KeyRepeat==0 then
          lib.EnableKeyRepeat(0,CONFIG.KeyRepeatInterval);
     end
     lib.GetKey();
 
-    local startp=1
-    local endp;
-    local dy=0;
-    while true do
-        if dy==0 then
-            Cls();
-            if headid>=0 then
-                DrawBox(xy[flag].headx, xy[flag].heady, xy[flag].headx + boxpicw, xy[flag].heady + boxpich,C_WHITE);
-                lib.Debug(string.format("TalkEx: loading headid=%d, picid=%d", headid, headid*2));
-                local w,h=lib.PicGetXY(1,headid*2);
-                lib.Debug(string.format("TalkEx: PicGetXY returned w=%s, h=%s", tostring(w), tostring(h)));
-                local x=(picw-w)/2;
-                local y=(pich-h)/2;
-                lib.PicLoadCache(1,headid*2,xy[flag].headx+5+x,xy[flag].heady+5+y,1);
-                lib.Debug("TalkEx: PicLoadCache called");
-            end
-            DrawBox(xy[flag].talkx, xy[flag].talky, xy[flag].talkx +boxtalkw, xy[flag].talky + boxtalkh,C_WHITE);
+    if not layout or not layout.lines or #layout.lines == 0 then
+        -- 引擎未实现排版（非图形引擎）：直接结束
+        if CONFIG.KeyRepeat==0 then
+             lib.EnableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);
         end
-        endp=string.find(s,"*",startp);
-        if endp==nil then
-            DrawString(xy[flag].talkx + 5, xy[flag].talky + 5+talkBorder + dy * (CC.DefaultFont+talkBorder),string.sub(s,startp),C_WHITE,CC.DefaultFont);
-            ShowScreen();
-            WaitKey();
-            break;
-        else
-            DrawString(xy[flag].talkx + 5, xy[flag].talky + 5+talkBorder + dy * (CC.DefaultFont+talkBorder),string.sub(s,startp,endp-1),C_WHITE,CC.DefaultFont);
+        Cls();
+        return;
+    end
+
+    -- 按每页行数分页
+    local perPage = layout.linesPerPage or 3;
+    local total = #layout.lines;
+    local pageStart = 1;
+
+    while pageStart <= total do
+        -- 取当前页的行
+        local pageLines = {};
+        for i = pageStart, math.min(pageStart + perPage - 1, total) do
+            pageLines[#pageLines + 1] = layout.lines[i];
         end
-        dy=dy+1;
-        startp=endp+1;
-        if dy>=talkynum then
-            ShowScreen();
-            WaitKey();
-            dy=0;
-        end
+
+        Cls();
+
+        -- 构造单页视图（框宽/锚点/行高沿用整段排版，只有 lines 换成本页）
+        local pageLayout = {
+            width = layout.width,
+            height = layout.height,
+            lineHeight = layout.lineHeight,
+            lines = pageLines,
+            pages = layout.pages,
+            linesPerPage = perPage,
+            headId = layout.headId,
+            flag = layout.flag,
+            headBox = layout.headBox,
+            textBox = layout.textBox,
+            border = layout.border,
+            lineY = layout.lineY,
+            fontSize = layout.fontSize,
+            showHead = layout.showHead,
+        };
+
+        dialog.draw(spec, pageLayout);
+        ShowScreen();
+        WaitKey();
+
+        pageStart = pageStart + perPage;
     end
 
     if CONFIG.KeyRepeat==0 then
@@ -3124,6 +3105,7 @@ function TalkEx(s,headid,flag)          --复杂版本对话
 
     Cls();
 end
+
 
 --测试指令，占位置用
 function instruct_test(s)
