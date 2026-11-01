@@ -120,6 +120,53 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     lib.Debug(string.format("oldCallEventCoroutine: %s FINISHED", eventfilename))
 end
 
+-- 协程版本的新场景事件（newevent/scene_X_event_Y.lua）执行器。
+--
+-- 背景：newevent/ 脚本用的是 TalkEx / Talk / ShowMenu / DrawStrBoxWaitKey /
+-- DrawStrBoxYesNo / lib.Delay / WarMain 这些「阻塞式」原版接口。在原版里整个
+-- 事件循环本来就是阻塞的，所以直接 dofile 没问题；但在本项目的事件驱动架构下，
+-- 主线程一旦进到阻塞版 WaitKey 里死等按键，love.update 再也不返回，
+-- 整个游戏表现就是「对话没反应、画面像挂住」——韦大宝（河洛客栈 D*19）就是
+-- 这个症状：newCallEvent 走 dofile，newevent 脚本里的 TalkEx 用的是未替换的
+-- 阻塞版。
+--
+-- 修法与 oldevent 完全一致（见 oldCallEventCoroutine）：
+--   1. AsyncGlobals.install() 把阻塞全局换成协程版
+--   2. 在调用方已提供的协程上下文里执行脚本（EventExecuteSync 已经把
+--      newSceneEvent_1 跑在协程内）
+--   3. AsyncGlobals.uninstall() 还原
+-- 区别仅在于脚本来源是 CONFIG.NewEventPath 而不是 OldEventPath。
+--
+-- @param eventfilename: 已拼好的脚本路径（含 newevent/ 前缀）
+function EventExecutor.newCallEventCoroutine(eventfilename)
+    lib.Debug(string.format("newCallEventCoroutine: %s START", tostring(eventfilename)))
+
+    -- 与 oldCallEventCoroutine 同样保存/恢复 JY.CurrentD：
+    -- 脚本内部可能嵌套触发别的事件，内层结束会把 CurrentD 重置为 -1，
+    -- 外层后续指令（instruct_3 用 id=-2 写回本 tile）就会写到孤儿槽。
+    local savedCurrentD = JY and JY.CurrentD
+
+    AsyncGlobals.install()
+
+    local chunk, err = ScriptLoader.load(eventfilename)
+    if chunk then
+        chunk()
+    else
+        lib.Debug("newCallEventCoroutine: failed to load " .. tostring(eventfilename)
+            .. ": " .. tostring(err))
+        if JY_Error then
+            JY_Error("newCallEventCoroutine load failed: %s (%s)",
+                tostring(eventfilename), tostring(err))
+        end
+    end
+
+    AsyncGlobals.uninstall()
+
+    if JY then JY.CurrentD = savedCurrentD or -1 end
+
+    lib.Debug(string.format("newCallEventCoroutine: %s FINISHED", tostring(eventfilename)))
+end
+
 -- 启动事件协程
 -- @param id: 事件ID
 -- @param flag: 触发类型
