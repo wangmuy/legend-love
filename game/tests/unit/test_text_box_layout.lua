@@ -292,6 +292,270 @@ local function testStrictGlobals()
 end
 
 -- ============================================
+-- ⑩ 列对齐：padToWidth 必须按显示宽度补齐
+-- ============================================
+local function testPadToWidth()
+    withEngine(function()
+        local TL = require("framework.text_box_layout")
+
+        -- 3 汉字 = 72px，补到 96px（4 汉字）需要 2 个半角空格（各 12px）
+        local padded = TL.padToWidth("牛家村", 96, 24)
+        assertEquals(96, TL.textWidth(padded, 24), "补齐后宽度应恰为 96px")
+        assertEquals(72 + 12 * 2, TL.textWidth(padded, 24), "96 = 72 + 2×12")
+        assertTrue(#padded > #"牛家村", "补齐后应更长")
+
+        -- 已达标：原样返回，不加空格
+        assertEquals("牛家村", TL.padToWidth("牛家村", 72, 24), "恰等时应原样返回")
+        assertEquals("牛家村", TL.padToWidth("牛家村", 50, 24), "超出时不应截断")
+
+        -- 精确对齐的关键：汉字宽是 1.0em，空格 0.5em，
+        -- 所以目标宽度只要是 0.5em 的整数倍就能精确命中
+        for _, target in ipairs({ 72, 84, 96, 108, 120, 132 }) do
+            local w = TL.textWidth(TL.padToWidth("梅庄", target, 24), 24)
+            assertEquals(target, w, "目标 " .. target .. "px 应精确达到")
+        end
+
+        -- 纯 ASCII：3 字符 = 36px，补到 48px 需 1 个空格
+        assertEquals(48, TL.textWidth(TL.padToWidth("abc", 48, 24), 24), "ASCII 补齐")
+
+        -- 空串
+        assertEquals(24, TL.textWidth(TL.padToWidth("", 24, 24), 24), "空串补到 24px")
+
+        -- nil 不能崩
+        assertEquals(0, TL.textWidth(TL.padToWidth(nil, 0, 24), 24), "nil 安全")
+    end)
+end
+
+-- ============================================
+-- ⑪ 列对齐判别力：旧 %-Ns 公式必须被判为不对齐
+-- ============================================
+local function testOldBytePaddingMisaligns()
+    withEngine(function()
+        local TL = require("framework.text_box_layout")
+
+        -- 复刻旧写法：string.format("%-12s", name)
+        -- 真实商店数据里的名字（3/4/5 字混杂）
+        local names = { "玉靈散", "冰魄銀針", "九轉熊蛇丸", "凝碧劍", "龍象般若功" }
+
+        -- 旧写法的价格列起点（= 补齐后名称的显示宽度 + 1 个空格）
+        local oldStarts = {}
+        for i, nm in ipairs(names) do
+            oldStarts[i] = TL.textWidth(string.format("%-12s", nm) .. " ", 24)
+        end
+
+        -- 判别力核心：旧写法必然产生多个不同的起点
+        local mn, mx = math.huge, -math.huge
+        for _, x in ipairs(oldStarts) do
+            if x < mn then mn = x end
+            if x > mx then mx = x end
+        end
+        assertTrue(mx - mn > 0,
+            "旧 %-12s 写法必然错位（实测抖动 " .. (mx - mn) .. "px），"
+            .. "若此处为 0 说明测试本身失效")
+
+        -- 实测抖动应为整整 1 个汉字（24px）：
+        -- 3/4/5 字名经 %-12s 后分别落在 3 档
+        assertEquals(24, mx - mn, "旧写法抖动应恰为 1 个汉字宽")
+
+        -- 新写法：先用 formatColumns 归一到同一列宽
+        local rows = {}
+        for i, nm in ipairs(names) do
+            rows[i] = { nm, "100" }
+        end
+        local lines = TL.formatColumns(rows, 24)
+
+        -- 新写法的价格列起点必须全部一致
+        local newStarts = {}
+        for i, line in ipairs(lines) do
+            local nameCell = TL.padToWidth(names[i], TL.columnWidth(rows, 1, 24), 24)
+            newStarts[i] = TL.textWidth(nameCell .. " ", 24)
+        end
+        local nmn, nmx = math.huge, -math.huge
+        for _, x in ipairs(newStarts) do
+            if x < nmn then nmn = x end
+            if x > nmx then nmx = x end
+        end
+        assertEquals(0, nmx - nmn,
+            "新写法价格列必须完全对齐（抖动应为 0）")
+    end)
+end
+
+-- ============================================
+-- ⑫ formatColumns：列宽取该列最大值，最后一列不补
+-- ============================================
+local function testFormatColumns()
+    withEngine(function()
+        local TL = require("framework.text_box_layout")
+
+        local rows = {
+            { "梅庄", "80" },
+            { "牛家村", "1200" },
+            { "要查阅谁的状态", "5" },
+        }
+        local lines = TL.formatColumns(rows, 24)
+
+        assertEquals(3, #lines, "行数应与输入一致")
+
+        -- 第 1 列宽 = 最长名「要查阅谁的状态」7 字 = 168px
+        assertEquals(168, TL.columnWidth(rows, 1, 24), "第 1 列宽取最大值")
+
+        -- 每一行的第 1 列都必须补齐到 168px，这样第 2 列才对齐
+        for i = 1, 3 do
+            local padded = TL.padToWidth(rows[i][1], 168, 24)
+            assertEquals(168, TL.textWidth(padded, 24),
+                "第 " .. i .. " 行第 1 列应补齐到 168px")
+        end
+
+        -- 最后一列不补齐（右侧无下一列）
+        local last = lines[1]:sub(-2)
+        assertEquals("80", last, "最后一列不应补空格")
+    end)
+end
+
+-- ============================================
+-- ⑬ 列对齐的纯函数性与严格 _G
+-- ============================================
+local function testColumnPurity()
+    withEngine(function()
+        local TL = require("framework.text_box_layout")
+        local rows = { { "梅庄", "80" }, { "牛家村", "1200" } }
+
+        local a = TL.formatColumns(rows, 24)
+        local b = TL.formatColumns(rows, 24)
+        for i = 1, #a do
+            assertEquals(a[i], b[i], "formatColumns 必须纯函数，第 " .. i .. " 行")
+        end
+
+        -- 输入不能被修改
+        assertEquals("梅庄", rows[1][1], "不得修改输入")
+        assertEquals("80", rows[1][2], "不得修改输入")
+    end)
+end
+
+-- ============================================
+-- ⑭ 数字列必须右对齐（原版 %4d 语义），文本列左对齐
+-- ============================================
+local function testNumericColumnRightAligned()
+    withEngine(function()
+        local TL = require("framework.text_box_layout")
+
+        -- 原版 string.format("%-10s%4d", 姓名, 值) 里 %4d 是右对齐数字。
+        -- 修掉字节数缺陷时不能顺手把数字改成左对齐，否则观感与原版不符。
+        local rows = {
+            { "胡斐", "29" },
+            { "程靈素", "5" },
+            { "金花婆婆", "100" },
+        }
+        local lines = TL.formatColumns(rows, 24)
+
+        -- 所有行宽度必须一致（列对齐的前提）
+        local w0 = TL.textWidth(lines[1], 24)
+        for i = 1, #lines do
+            assertEquals(w0, TL.textWidth(lines[i], 24),
+                "第 " .. i .. " 行宽度应与首行一致")
+        end
+
+        -- 数字列必须是右对齐：所有行**右边缘**一致
+        local ends = {}
+        for i = 1, #lines do
+            ends[i] = TL.textWidth(lines[i], 24)
+        end
+        assertEquals(ends[1], ends[#ends], "数字右边缘应对齐")
+
+        -- 具体验证：数值前的空格数应随数值位数变化
+        -- 「29」补到 3 位宽 -> 前面 1 空格；「5」-> 2 空格；「100」-> 0 空格
+        -- 右对齐 => 数字前有空格，行尾就是数字
+        assertTrue(lines[2]:match("%s+5$") ~= nil,
+            "「5」应被左补空格（右对齐），实际: [" .. lines[2] .. "]")
+        assertTrue(lines[3]:match("100$") ~= nil, "「100」应在行尾")
+        assertTrue(lines[3]:match("100$") ~= nil,
+            "「100」右侧不应有多余空格")
+
+        -- 文本列仍是左对齐：姓名从行首开始
+        assertTrue(lines[1]:sub(1, #"胡斐") == "胡斐", "姓名应在行首（左对齐）")
+        assertTrue(lines[3]:sub(1, #"金花婆婆") == "金花婆婆", "长姓名应在行首")
+    end)
+end
+
+-- ============================================
+-- ⑮ 判别力：数字列改成左对齐必须被判错
+-- ============================================
+local function testLeftAlignedNumbersDetected()
+    withEngine(function()
+        local TL = require("framework.text_box_layout")
+        local rows = {
+            { "胡斐", "29" },
+            { "程靈素", "5" },
+            { "金花婆婆", "100" },
+        }
+
+        -- 用 3 列（姓名 / 数值 / 备注），让数值列不是末列，
+        -- 这样左对齐与右对齐的差异才可观测（末列左对齐按约定不补齐）。
+        local rows3 = {
+            { "胡斐", "29", "甲" },
+            { "程靈素", "5", "乙" },
+            { "金花婆婆", "100", "丙" },
+        }
+
+        -- 显式强制数值列左对齐（模拟「忘了保留 %4d 右对齐」的错误实现）
+        local bad = TL.formatColumns(rows3, 24, nil, " ",
+            { aligns = { "left", "left", "left" } })
+        -- 显式强制数值列右对齐（正确行为）
+        local good = TL.formatColumns(rows3, 24, nil, " ",
+            { aligns = { "left", "right", "left" } })
+        -- 默认（自动识别数字列 -> 第 2 列右对齐）
+        local auto = TL.formatColumns(rows3, 24)
+
+        -- 错误的左对齐写法里，短的「5」右侧补空格，数值左边缘对齐
+        assertTrue(bad[2]:match("5%s") ~= nil,
+            "强制左对齐时「5」右侧应有空格（用于证明判别力），实际: [" .. bad[2] .. "]")
+        -- 正确写法里「5」左侧补空格，数值右边缘对齐
+        assertTrue(good[2]:match("%s+5%s") ~= nil,
+            "强制右对齐时「5」应左补空格，实际: [" .. good[2] .. "]")
+        -- 两种写法必须产生不同结果，否则本对照无判别力
+        assertTrue(bad[2] ~= good[2],
+            "左对齐与右对齐的结果必须不同，否则对照无判别力")
+
+        -- 默认应与显式右对齐一致（自动识别数字列）
+        for i = 1, #rows3 do
+            assertEquals(good[i], auto[i],
+                "默认（自动识别数字列）应与显式右对齐一致，第 " .. i .. " 行")
+        end
+    end)
+end
+
+-- ============================================
+-- ⑯ 末列左对齐不补空格（避免行尾空白）
+-- ============================================
+local function testLastTextColumnNoTrailingSpace()
+    withEngine(function()
+        local TL = require("framework.text_box_layout")
+
+        -- 最后一列是文本（非数字）-> 左对齐 -> 不补空格
+        local rows = {
+            { "80", "梅庄" },
+            { "1200", "牛家村" },
+        }
+        local lines = TL.formatColumns(rows, 24)
+        for i = 1, #lines do
+            assertTrue(lines[i]:match("%s$") == nil,
+                "末列文本左对齐时行尾不应有空格，第 " .. i .. " 行: [" .. lines[i] .. "]")
+        end
+
+        -- 但末列若是数字 -> 右对齐 -> 允许左侧补齐，且行尾仍是数字
+        local rows2 = {
+            { "梅庄", "80" },
+            { "牛家村", "1200" },
+        }
+        local lines2 = TL.formatColumns(rows2, 24)
+        for i = 1, #lines2 do
+            assertTrue(lines2[i]:match("%d$") ~= nil,
+                "末列数字右对齐时行尾应是数字，第 " .. i .. " 行: [" .. lines2[i] .. "]")
+        end
+    end)
+end
+
+-- ============================================
 -- 入口
 -- ============================================
 function M.runAll()
@@ -306,6 +570,13 @@ function M.runAll()
     testDifferentSizes()
     testPurity()
     testStrictGlobals()
+    testPadToWidth()
+    testOldBytePaddingMisaligns()
+    testFormatColumns()
+    testColumnPurity()
+    testNumericColumnRightAligned()
+    testLeftAlignedNumbersDetected()
+    testLastTextColumnNoTrailingSpace()
     TestHelper.printSummary("text_box_layout")
     return TestHelper.getStats().failed == 0
 end
