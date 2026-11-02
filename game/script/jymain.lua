@@ -9,6 +9,9 @@
 
 local FileUtil = require "lib_file"
 local ScriptLoader = require "script_loader"
+-- 单行文本的框尺寸计算（引擎无关纯模块）。
+-- DrawStrBox 需要按真实像素宽定框，手边又拿不到字体对象，统一走这里。
+local TextBoxLayout = require("framework.text_box_layout")
 
 --本模块是lua主模块，由C主程序JYLua.exe调用。C程序主要提供游戏需要的视频、音乐、键盘等API函数，供lua调用。
 --游戏的所有逻辑都在lua代码中，以方便大家对代码的修改。
@@ -2110,19 +2113,40 @@ end
 
 --显示带框的字符串
 --(x,y) 坐标，如果都为-1,则在屏幕中间显示
+--
+-- 框宽按文本的**真实像素宽**算，不再用 `size*#str/2`。
+--
+-- 原版 C 层 JY_DrawStr 用 TTF_SizeUTF8 量真实宽（charset.c:150），
+-- 上式在原版是准的。但 Lua 的 #str 是 **UTF-8 字节数**：一个汉字 3 字节，
+-- 于是中文字符串的框宽被算成约 4.5 倍字号，比实际宽一大截；
+-- 而 ASCII 恰好只占 1 字节，算出来是对的。这就是「中文提示框右边空一大块、
+-- 英文框却正常」的原因。
+--
+-- 实测（simsun@24）：
+--   梅庄               真实 48px   旧公式  82px   多 29px
+--   牛家村             真实 72px   旧公式 118px   多 41px
+--   得到物品:倚天剑 1  真实 204px  旧公式 298px   多 89px
+--
+-- 框高仍用字号（size + 2*pad）：单行文本要的是光学居中，
+-- 而 getHeight（27）比字形墨迹高（23）大 4px，多出的空间是给下伸部
+-- 预留的，中文单行用不上，反而让文字偏上（实测 上7/下10）。
+--
+-- 注意：ShowMenu 的自动定宽（jymain.lua:2333）里还有同一处 `string.len`
+-- 字节数公式，影响全游戏所有菜单框宽，改动面远大于本函数，暂未动。
 function DrawStrBox(x,y,str,color,size)         --显示带框的字符串
-    local ll=#str;
-    local w=size*ll/2+2*CC.MenuBorderPixel;
-    local h=size+2*CC.MenuBorderPixel;
+    size = size or CC.DefaultFont;
+    local box = TextBoxLayout.measure(str, {size=size});
+    local w = box.width;
+    local h = box.height;
     if x==-1 then
-        x=(CC.ScreenW-size/2*ll-2*CC.MenuBorderPixel)/2;
+        x=(CC.ScreenW-w)/2;
     end
     if y==-1 then
-        y=(CC.ScreenH-size-2*CC.MenuBorderPixel)/2;
+        y=(CC.ScreenH-h)/2;
     end
 
     DrawBox(x,y,x+w-1,y+h-1,C_WHITE);
-    DrawString(x+CC.MenuBorderPixel,y+CC.MenuBorderPixel,str,color,size);
+    DrawString(x+box.pad,y+box.pad,str,color,size);
 end
 
 --显示并询问Y/N，如果点击Y，则返回true, N则返回false
@@ -2130,14 +2154,17 @@ end
 --改为用菜单询问是否
 function DrawStrBoxYesNo(x,y,str,color,size)        --显示字符串并询问Y/N
     lib.GetKey();
-    local ll=#str;
-    local w=size*ll/2+2*CC.MenuBorderPixel;
-    local h=size+2*CC.MenuBorderPixel;
+    size = size or CC.DefaultFont;
+    -- 与 DrawStrBox 同源：框宽必须按真实像素宽算，
+    -- 否则下面 ShowMenu 的 x 定位（依赖 w）也会偏。
+    local box = TextBoxLayout.measure(str, {size=size});
+    local w = box.width;
+    local h = box.height;
     if x==-1 then
-        x=(CC.ScreenW-size/2*ll-2*CC.MenuBorderPixel)/2;
+        x=(CC.ScreenW-w)/2;
     end
     if y==-1 then
-        y=(CC.ScreenH-size-2*CC.MenuBorderPixel)/2;
+        y=(CC.ScreenH-h)/2;
     end
 
     DrawStrBox(x,y,str,color,size);
