@@ -154,6 +154,199 @@ function TextBoxLayout.measure(str, opts)
     }
 end
 
+--- 把文本左对齐补到指定显示宽度（用于「名称 价格」这类多列排版）
+--
+-- 为什么需要它：`string.format("%-12s", name)` 的 12 是**字节数**，
+-- 汉字 UTF-8 占 3 字节，所以「补到 12 字节」= 补到 4 个汉字。
+-- 3/4/5 字的名字会各占一档，右侧的数字列呈台阶状，完全对不齐。
+--
+-- 实测（真实存档数据，5 家小宝商店 × 5 项商品）：
+--   用 %-12s 时价格列起点在 108/120/132 之间跳动，抖动 24px = 恰好 1 个汉字。
+--   医疗/解毒菜单用 %-10s 时姓名列抖动 12px = 0.5 个汉字。
+--
+-- 本函数按**显示宽度**补空格，粒度是半角空格（0.5em）。汉字名宽必为
+-- 1.0em 的整数倍，因此只要目标宽度是 0.5em 的整数倍，就能精确对齐。
+--
+-- 注意：只补不截。若文本本身已超过 targetWidth，原样返回 ——
+-- 截断会丢字，而「超出」说明调用方给的列宽不够，应当由调用方放大列宽。
+--
+-- @param str string 文本（可含多字节字符）
+-- @param targetWidth number 目标显示宽度（像素）
+-- @param size number 字号
+-- @param fontName string|nil 字体名
+-- @return string 补齐后的文本
+function TextBoxLayout.padToWidth(str, targetWidth, size, fontName)
+    return TextBoxLayout.alignToWidth(str, targetWidth, size, fontName, "left")
+end
+
+--- 按指定对齐方向把文本补到目标显示宽度
+--
+-- align = "left"（默认，在右侧补空格）或 "right"（在左侧补空格）。
+--
+-- 为什么需要右对齐：原版菜单用 string.format("%-10s%4d", 姓名, 数值)，
+-- 其中 %4d 是**右对齐数字**。修掉字节数缺陷时不能顺手把数字也改成左对齐，
+-- 否则「价格列 / 能力值列」的观感就跟原版不一致了。
+-- 右对齐后所有数值的右边缘也对齐，读起来像一张表。
+--
+-- 同样只补不截：文本超过目标宽度时原样返回（截断会丢字）。
+--
+-- @param str string 文本
+-- @param targetWidth number 目标显示宽度（像素）
+-- @param size number 字号
+-- @param fontName string|nil 字体名
+-- @param align string|nil "left" | "right"
+-- @return string 补齐后的文本
+function TextBoxLayout.alignToWidth(str, targetWidth, size, fontName, align)
+    str = str or ""
+    targetWidth = targetWidth or 0
+    size = size or 20
+
+    local w = TextBoxLayout.textWidth(str, size, fontName)
+    if w >= targetWidth then
+        -- 已达或超出目标宽度：不截断，原样返回
+        return str
+    end
+
+    local spaceW = TextBoxLayout.textWidth(" ", size, fontName)
+    if spaceW <= 0 then
+        -- 理论上不会发生（字号 0 或度量异常），避免死循环/除零
+        return str
+    end
+
+    local n = math.floor((targetWidth - w) / spaceW + 0.5)
+    if n <= 0 then
+        return str
+    end
+
+    local pad = string.rep(" ", n)
+    if align == "right" then
+        return pad .. str
+    end
+    return str .. pad
+end
+
+--- 计算一组多列条目中某一列的显示宽度（取该列所有单元格的最大值）
+--
+-- 供「名称 价格」这类表格型菜单统一列宽用。调用方拿到宽度后，
+-- 用 padToWidth 逐格补齐，即可保证同一列起点一致。
+--
+-- @param rows table 二维表，rows[i][colIndex] 为第 i 行第 col 列的文本
+-- @param colIndex number 列序号
+-- @param size number 字号
+-- @param fontName string|nil 字体名
+-- @return number 该列最大显示宽度
+function TextBoxLayout.columnWidth(rows, colIndex, size, fontName)
+    size = size or 20
+    local maxW = 0
+    for i = 1, #rows do
+        local row = rows[i]
+        local cell = row and row[colIndex]
+        if type(cell) == "string" then
+            local w = TextBoxLayout.textWidth(cell, size, fontName)
+            if w > maxW then
+                maxW = w
+            end
+        end
+    end
+    return maxW
+end
+
+--- 判断一列是否应当右对齐（整列都是数字/负数）
+--
+-- 原版菜单里的数值列用 %4d / %5d，本来就是右对齐的。
+-- 这里自动识别数字列，让调用方不必逐个声明。
+local function isNumericColumn(rows, colIndex)
+    local sawAny = false
+    for i = 1, #rows do
+        local row = rows[i]
+        local cell = (type(row) == "table") and row[colIndex] or nil
+        if cell ~= nil then
+            local t = tostring(cell)
+            if t ~= "" then
+                sawAny = true
+                if not t:match("^%-?%d+$") then
+                    return false
+                end
+            end
+        end
+    end
+    return sawAny
+end
+
+--- 把多列表格拼成一行行等宽列文本
+--
+-- 每个单元格按所在列的**最大显示宽度**补齐，列与列之间插入 sep。
+-- 文本列左对齐、数字列右对齐（与原版 %-10s%4d 的语义一致），
+-- 也可用 opts.aligns 逐列显式指定 "left" / "right"。
+--
+-- 末列的处理：
+--   · 左对齐 -> 不补（避免行尾出现无意义空格）
+--   · 右对齐 -> 左侧补齐（使数值右边缘对齐）
+--
+-- @param rows table 二维表
+-- @param size number 字号
+-- @param fontName string|nil 字体名
+-- @param sep string|nil 列分隔符，默认 " "
+-- @param opts table|nil { aligns = {"left","right",...} }
+-- @return table 文本行数组
+function TextBoxLayout.formatColumns(rows, size, fontName, sep, opts)
+    size = size or 20
+    if sep == nil then
+        sep = " "
+    end
+    opts = opts or {}
+
+    local explicitAligns = opts.aligns
+
+    -- 求列数
+    local colCount = 0
+    for i = 1, #rows do
+        local row = rows[i]
+        if type(row) == "table" then
+            for c = 1, #row do
+                if c > colCount then
+                    colCount = c
+                end
+            end
+        end
+    end
+
+    local colW, colAlign = {}, {}
+    for c = 1, colCount do
+        colW[c] = TextBoxLayout.columnWidth(rows, c, size, fontName)
+        if explicitAligns and explicitAligns[c] then
+            colAlign[c] = explicitAligns[c]
+        elseif isNumericColumn(rows, c) then
+            colAlign[c] = "right"
+        else
+            colAlign[c] = "left"
+        end
+    end
+
+    local out = {}
+    for i = 1, #rows do
+        local row = rows[i]
+        local parts = {}
+        for c = 1, colCount do
+            local cell = (type(row) == "table") and row[c] or nil
+            if cell == nil then
+                cell = ""
+            else
+                cell = tostring(cell)
+            end
+            local isLast = (c == colCount)
+            -- 末列左对齐时不补，避免行尾空格
+            if isLast and colAlign[c] == "left" then
+                parts[c] = cell
+            else
+                parts[c] = TextBoxLayout.alignToWidth(cell, colW[c], size, fontName, colAlign[c])
+            end
+        end
+        out[i] = table.concat(parts, sep)
+    end
+    return out
+end
+
 --- 计算让框在屏幕上居中时的左上角坐标
 --
 -- 语义与原版 DrawStrBox 的 x/y == -1 分支一致，但基于真实框尺寸。
