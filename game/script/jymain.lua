@@ -1049,6 +1049,14 @@ function TrainNeedExp(id)         --计算人物修炼物品成功需要的点�
 end
 
 --医疗菜单
+-- 注意：本函数（以及 Menu_DecPoison、MMenu、Game_MMap/Game_SMap）只在
+-- 原版阻塞式 JY_Main 循环里可达；Love2D 版走 JYMainAdapter + MMenuCoroutine，
+-- 这些函数是死代码，保留作为原版行为的参考。
+-- 里面的 string.format("%-10s%4d", ...) 同样有「%-10s 按字节补齐」的缺陷
+-- （汉字 3 字节，补到 10 字节 ≈ 3.33 个汉字，3/4 字姓名各占一档，
+--   实测姓名列抖动 12px）。活路径 framework/jymain_async.lua 已改用
+-- TextBoxLayout.formatColumns 按显示宽度对齐，此处不再改，
+-- 以免在死代码上引入无法用实机验证的改动。
 function Menu_Doctor()       --医疗菜单
     DrawStrBox(CC.MainSubMenuX,CC.MainSubMenuY,"谁要使用医术",C_WHITE,CC.DefaultFont);
     local nexty=CC.MainSubMenuY+CC.SingleLineHeight;
@@ -4370,10 +4378,22 @@ function instruct_64()                 --小宝卖东西
     lib.Debug("instruct_64: TalkEx returned");
 
     local menu={};
+    -- 名称与价格必须按**显示宽度**对齐，不能按字节数。
+    -- 旧写法 string.format("%-12s %5d", name, price) 里的 12 是字节数，
+    -- 汉字 UTF-8 占 3 字节，于是「补到 12 字节」= 补到 4 个汉字：
+    -- 3/4/5 字的名字各占一档，价格列呈三级台阶。
+    -- 实测真实存档 5 家商店 × 5 项，价格列起点在 108/120/132 间跳动，
+    -- 抖动 24px = 恰好 1 个汉字宽。
+    -- 改为先收集各列原文，再用 formatColumns 按列内最大显示宽度补齐。
+    local rows={};
+    for i=1,5 do
+        local thingid=JY.Shop[id]["物品" ..i];
+        rows[i]={JY.Thing[thingid]["名称"], tostring(JY.Shop[id]["物品价格" ..i])};
+    end
+    local lines=TextBoxLayout.formatColumns(rows, CC.DefaultFont);
     for i=1,5 do
         menu[i]={};
-        local thingid=JY.Shop[id]["物品" ..i];
-        menu[i][1]=string.format("%-12s %5d",JY.Thing[thingid]["名称"],JY.Shop[id]["物品价格" ..i]);
+        menu[i][1]=lines[i];
         menu[i][2]=nil;
         if JY.Shop[id]["物品数量" ..i] >0 then
             menu[i][3]=1;
