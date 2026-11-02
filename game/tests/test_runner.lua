@@ -25,6 +25,7 @@ local TestSceneName = require("tests.unit.test_scene_name")
 local TestFontSize = require("tests.unit.test_font_size")
 local TestNewEvent = require("tests.unit.test_new_event")
 local TestDialogLayout = require("tests.unit.test_dialog_layout")
+local TestTextBoxLayout = require("tests.unit.test_text_box_layout")
 
 local TestRunner = {}
 
@@ -300,7 +301,18 @@ function TestRunner.runAll()
     totalStats.passed = totalStats.passed + dlgStats.passed
     totalStats.failed = totalStats.failed + dlgStats.failed
     allPassed = allPassed and dlgResult
-    
+
+    print("\n" .. string.rep("-", 60))
+    print("运行单行文本框尺寸测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local tboxResult = TestTextBoxLayout.runAll()
+    local tboxStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + tboxStats.total
+    totalStats.passed = totalStats.passed + tboxStats.passed
+    totalStats.failed = totalStats.failed + tboxStats.failed
+    allPassed = allPassed and tboxResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -363,6 +375,8 @@ function TestRunner.runModule(moduleName)
         return TestModE2E.runAll()
     elseif moduleName == "mod_boot" then
         return TestModBoot.runAll()
+    elseif moduleName == "text_box_layout" then
+        return TestTextBoxLayout.runAll()
     elseif moduleName == "dialog_layout" then
         return TestDialogLayout.runAll()
     else
