@@ -9,6 +9,7 @@
 - [SRC_FILES.md](SRC_FILES.md) - game/ 目录文件分析（使用状态和作用说明）
 - [SCRIPT_FILES.md](SCRIPT_FILES.md) - game/script/ 脚本文件说明
 - [DATA_FILES.md](DATA_FILES.md) - game/data/ 数据文件格式说明
+- [MOD_20IN1_GUIDE.md](MOD_20IN1_GUIDE.md) - 金庸群侠传 20 合 1 MOD 包适配说明（20 个 MOD 清单/激活/构建链/ini 生效面/已知缺陷）
 
 > **重要**: 以上文档内容以实际运行代码为准，文档可能与代码存在偏差，开发时请优先参考源码。
 
