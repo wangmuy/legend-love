@@ -48,7 +48,7 @@
 #   pig3dos       金庸水浒传 dos 版
 #   BookCalamity  天书劫
 #   books         天书奇侠试玩
-#   dream         （未标注名称）
+#   dream         笑梦游记
 #
 # ↓↓↓ 下面这一行才是实际生效的 slug（改成你要的即可，可整份复制本文件） ↓↓↓
 mingdong
