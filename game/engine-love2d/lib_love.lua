@@ -871,10 +871,19 @@ function BuildingSort(x, y, Mypic)
                             if im3~=0 and im4~=0 then
                                 if im3~=ij3 or im4~=ij4 then
                                     if im3~=buildList[idxk].x or im4~=buildList[idxk].y then
-                                        local idxp = p+1
-                                        tmpBuild = buildList[idxp-1] -- last one
-                                        buildList[idxp-1] = BuildingType:new()
-                                        table.insert(buildList, idxk+1, tmpBuild)
+                                        -- 与原版 mainmap.c:BuildingSort 逐字一致：
+                                        --     tmpBuild = Build[p-1];
+                                        --     memmove(&Build[k+1], &Build[k], (p-k-1)*sizeof(BuildingType));
+                                        --     Build[k] = tmpBuild;
+                                        -- 即把 buildList[idxk..p] 这一段整体右旋一位，数组长度不变。
+                                        -- 早期移植误写成 table.insert(buildList, idxk+1, tmp)，造成
+                                        --   ① 插入点后移一位 → 建筑深度顺序与原版不一致（遮挡错位）
+                                        --   ② buildList 被无限拉长（每次排序增长，长跑内存只增不减）
+                                        tmpBuild = buildList[p] -- C: Build[p-1]，最后一个有效元素
+                                        for t=p, idxk+1, -1 do
+                                            buildList[t] = buildList[t-1]
+                                        end
+                                        buildList[idxk] = tmpBuild
                                     end
                                 end
                             end
