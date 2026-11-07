@@ -26,6 +26,7 @@ local TestFontSize = require("tests.unit.test_font_size")
 local TestNewEvent = require("tests.unit.test_new_event")
 local TestDialogLayout = require("tests.unit.test_dialog_layout")
 local TestTextBoxLayout = require("tests.unit.test_text_box_layout")
+local TestMmapDepth = require("tests.unit.test_mmap_depth")
 
 local TestRunner = {}
 
@@ -313,6 +314,17 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + tboxStats.failed
     allPassed = allPassed and tboxResult
 
+    print("\n" .. string.rep("-", 60))
+    print("运行主地图 2.5D 遮挡关系测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local mmResult = TestMmapDepth.runAll()
+    local mmStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + mmStats.total
+    totalStats.passed = totalStats.passed + mmStats.passed
+    totalStats.failed = totalStats.failed + mmStats.failed
+    allPassed = allPassed and mmResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -379,9 +391,11 @@ function TestRunner.runModule(moduleName)
         return TestTextBoxLayout.runAll()
     elseif moduleName == "dialog_layout" then
         return TestDialogLayout.runAll()
+    elseif moduleName == "mmap_depth" then
+        return TestMmapDepth.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, mmap_depth")
         return false
     end
 end
