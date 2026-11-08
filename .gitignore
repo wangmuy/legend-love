@@ -50,3 +50,4 @@ game/save/
 
 # 临时调试脚本（用完即删，不属于测试套件；正式门禁见 game/tests/gate_*.sh）
 game/tests/scratch_*.lua
+game/tests/probe_*.png

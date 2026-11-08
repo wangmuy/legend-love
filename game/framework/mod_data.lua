@@ -321,6 +321,7 @@ function ModData.RewriteConstants(CC, CONFIG)
         "PaletteFile", "WarFile", "TalkIdxFile", "TalkGrpFile",
         "MMAPPicFile", "SMAPPicFile", "WMAPPicFile", "EffectFile",
         "HeadPicFile", "ThingPicFile", "WarMapFile", "MMapFile",
+        "CloudPicFile",
     }
     for _, name in ipairs(singles) do
         local v = CC[name]

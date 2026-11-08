@@ -122,6 +122,9 @@ function SetGlobalConst()
    CC.HeadPicFile={CONFIG.DataPath .. "hdgrp.idx",CONFIG.DataPath .. "hdgrp.grp"};
    CC.ThingPicFile={CONFIG.DataPath .. "thing.idx",CONFIG.DataPath .. "thing.grp"};
 
+   --主地图飘云图（原版 kys_engine.pas:ReadTiles 的 resource/cloud.idx|grp）
+   CC.CloudPicFile={CONFIG.DataPath .. "cloud.idx",CONFIG.DataPath .. "cloud.grp"};
+
 
     CC.MIDIFile=CONFIG.SoundPath .. "game%02d.ogg";
    CC.ATKFile=CONFIG.SoundPath .. "atk%02d.wav";
@@ -516,6 +519,10 @@ function SetGlobalConst()
 	--如果显示坐标，则会增加cpu占用。机器速度慢的话可能会卡。这个在调试时有用。
 	--注意: 如果设置了CONFIG.FastShowScreen=1，则场景视角范围超出后显示的坐标不正确。
 	CC.ShowXY=0      --0 不显示 1 显示
+
+	--主地图动态效果开关。原版 kysmod.ini [system] MMAPAMI，读不到时默认 1。
+	--0 关闭（云仍然绘制，只是不再飘动） >0 每 40ms 移动一次（kys_main.pas:1846）
+	CC.MMapAmi=1
 
 	--以下为控制显示方式的参数
 

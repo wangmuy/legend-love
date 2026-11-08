@@ -154,6 +154,10 @@ handlers["GAME_MMAP"] = {
 
             lib.Debug("Subscene transition completed")
         end
+
+        -- 云朵漂移：原版 kys_main.cpp 主循环每 40ms 移动一次（MMAPAMI>0 门控
+        -- 在 CloudTick 内部），与主角移动解耦，每帧调用即可。
+        lib.CloudTick()
     end,
     
     -- 每帧渲染

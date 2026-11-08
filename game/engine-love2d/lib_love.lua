@@ -981,6 +981,11 @@ function DrawMMap(x, y, Mypic)
         end
     end
 
+    -- 云朵层：原版 kys_draw.pas:DrawMMap 在建筑循环结束后、解除裁剪前调用
+    -- DrawClouds，云永远画在地面/建筑之上（天空层）。公式里的 Mx,My 就是
+    -- 传入 DrawMMap 的主角坐标，故直接复用 x,y。
+    DrawClouds(x, y)
+
     if oldScissorX then
         love.graphics.setScissor(oldScissorX, oldScissorY, oldScissorW, oldScissorH)
     else
@@ -994,6 +999,212 @@ function UnloadMMap()
     mmap.building=nil
     mmap.buildx=nil
     mmap.buildy=nil
+end
+
+-- ============================================================
+-- 云朵系统（主地图飘云）
+-- 逐字移植自原版 kys（kys_main.cpp / kys_draw.cpp / kys_engine.cpp）：
+--   * 原版在大地图每帧绘制 60 朵云（CLOUD_AMOUNT），每 40ms 右移 Speedx(1..3)px，
+--     越界(>17279 或 <0)后从左侧(CloudCreateOnSide, Positionx=0)重生；
+--   * 每朵云有随机色调 mixColor(RGB) 与 mixAlpha(10..59)，先把调色板像素
+--     朝 mixColor 混合 mixAlpha%（DrawRLE8Pic 的 mix 公式），再整体以
+--     Alpha(10..59)% 透明度合成到背景。
+-- 移植取舍：Love2D 无逐像素 mixColor 通道，故在「生成云」的瞬间把色调
+-- 烘焙进该朵云的贴图（精确复刻 mix 公式），绘制时用 setColor 的 alpha
+-- 复刻整体透明度。云帧 RLE 解码与 LoadPic 同一格式，但云 idx 是「每帧一个
+-- 贴图」（原版 DrawCPic 不做 /2），故直接按 idx[num+1..num+2] 取帧范围。
+-- ============================================================
+local CLOUD_AMOUNT = 60
+local CLOUD_SLOT = 40   -- PicLoadFile 槽位（0=地图 1=头像 2=物品 3=特效 4+i=战斗人物；40 与之无冲突）
+local CLOUD_WORLD_X = 17280  -- 云世界 x 范围（原版硬编码 17280 = 2*MWidth*XScale）
+local CLOUD_WORLD_Y = 8640   -- 云世界 y 范围（原版硬编码 8640 = MHeight*XScale，注意是 XScale 不是 YScale）
+local cloudFrames = {}   -- cloudFrames[picnum] = {w=,h=,pixels={{x,y,r,g,b},...}} 调色板原色 0-255
+local cloudList = {}     -- cloudList[i] = {Picnum,Positionx,Positiony,Speedx,Speedy,Alpha,mixR,mixG,mixB,mixAlpha,img,imgW,imgH}
+local cloudPicAmount = 0
+local cloudNextTick = 0
+
+-- 解码一帧云 RLE 为调色板原色像素列表。
+-- 逐字移植原版 DrawRLE8Pic 的行 RLE 状态机（kys_engine.cpp / kys_engine.pas）：
+--   每行首字节 l = 本行命令字节总数；状态 p: 0=读跳过 1=读像素数 >=2=逐像素绘制，
+--   一 run 结束(p 回到 2)复位 p=0。与 LoadPic 的「成对」解码不同，状态机能
+--   正确处理行尾的 trailing skip（空白收尾），对真实云数据两者结果一致。
+local function CloudDecodeFrame(picnum)
+    local pf = picFileCache[CLOUD_SLOT + 1]
+    if pf == nil then return nil end
+    local start = pf.idx[picnum + 1]
+    local finish = pf.idx[picnum + 2]
+    if start == nil or finish == nil or finish <= start then return nil end
+    local f = FileUtil.open(pf.grpfilename, "rb")
+    if f == nil then return nil end
+    f:seek("set", start)
+    local header = f:read(8)
+    if header == nil then f:close(); return nil end
+    local w = Byte.byte2ushortl(header:sub(1,2):byte(1,2))
+    local h = Byte.byte2ushortl(header:sub(3,4):byte(1,2))
+    local xoff = Byte.byte2sshortl(header:sub(5,6):byte(1,2))
+    local yoff = Byte.byte2sshortl(header:sub(7,8):byte(1,2))
+    if w <= 0 or h <= 0 then f:close(); return nil end
+    local pixels = {}
+    for iy = 1, h do
+        local lbyte = f:read(1)
+        if lbyte == nil then break end
+        local l = lbyte:byte(1)        -- 本行 entry 数量（1 字节）
+        local col = 1                  -- 当前列，1 基（原版 ww）
+        local p = 0                    -- 状态: 0=读跳过 1=读像素数 >=2=逐像素绘制
+        for ix = 1, l do
+            local byte = f:read(1)
+            if byte == nil then break end
+            local l1 = byte:byte(1)
+            if p == 0 then
+                col = col + l1         -- 跳过 l1 个空白像素
+                p = 1
+            elseif p == 1 then
+                p = 2 + l1             -- 接下来 l1 个像素数据
+            elseif p > 2 then
+                p = p - 1
+                local x = col - 1      -- 帧内 0 基 x（原版 x = ww - xs + px，xs 绘制时扣除）
+                if x >= 0 and x < w then
+                    local color = color32Pallette[l1 + 1]  -- lua starts with 1
+                    if color then
+                        local r = math.floor(color / 65536)
+                        local g = math.floor(color / 256) % 256
+                        local b = color % 256
+                        pixels[#pixels + 1] = { x, iy - 1, r, g, b }
+                    end
+                end
+                col = col + 1
+                if p == 2 then p = 0 end
+            end
+        end
+    end
+    f:close()
+    cloudFrames[picnum] = { w = w, h = h, xoff = xoff, yoff = yoff, pixels = pixels }
+    return cloudFrames[picnum]
+end
+
+-- 烘焙单朵云贴图：把调色板像素朝色调(mixR/mixG/mixB)混合 mixAlpha%
+-- （精确复刻原版 DrawRLE8Pic：pix = (mixAlpha*mixColor + (100-mixAlpha)*pix)/100）
+local function CloudBakeImage(picnum, mixR, mixG, mixB, mixAlpha)
+    local frame = cloudFrames[picnum]
+    if frame == nil then return nil, 0, 0, 0, 0 end
+    local imgdata = love.image.newImageData(frame.w, frame.h)
+    for _, p in ipairs(frame.pixels) do
+        local x, y, r, g, b = p[1], p[2], p[3], p[4], p[5]
+        local nr = (mixAlpha * mixR + (100 - mixAlpha) * r) / 100
+        local ng = (mixAlpha * mixG + (100 - mixAlpha) * g) / 100
+        local nb = (mixAlpha * mixB + (100 - mixAlpha) * b) / 100
+        imgdata:setPixel(x, y, nr / 255, ng / 255, nb / 255, 1)
+    end
+    local img = love.graphics.newImage(imgdata, {mipmaps=false, linear=false, dpiscale=1})
+    return img, frame.w, frame.h, frame.xoff or 0, frame.yoff or 0
+end
+
+-- 云重生（原版 CloudCreateOnSide：Positionx=0，从左侧进入）
+local function CloudCreateOnSide(i)
+    if i < 1 or i > CLOUD_AMOUNT then return end
+    local c = cloudList[i] or {}
+    cloudList[i] = c
+    c.Picnum = (cloudPicAmount > 0) and math.random(0, cloudPicAmount - 1) or 0
+    c.Alpha = 10 + math.random(0, 49)
+    c.mixR = math.random(0, 255)
+    c.mixG = math.random(0, 255)
+    c.mixB = math.random(0, 255)
+    c.mixAlpha = 10 + math.random(0, 49)
+    c.Positionx = 0
+    c.Positiony = math.random(0, CLOUD_WORLD_Y - 1)
+    c.Speedx = 1 + math.random(0, 2)
+    c.Speedy = 0
+    local img, w, h, xoff, yoff = CloudBakeImage(c.Picnum, c.mixR, c.mixG, c.mixB, c.mixAlpha)
+    c.img = img
+    c.imgW = w
+    c.imgH = h
+    c.xoff = xoff
+    c.yoff = yoff
+end
+
+-- 云初始生成（原版 CloudCreate：OnSide 之后把 Positionx 随机散布到整幅）
+local function CloudCreate(i)
+    CloudCreateOnSide(i)
+    if cloudList[i] then
+        cloudList[i].Positionx = math.random(0, CLOUD_WORLD_X - 1)
+    end
+end
+
+-- 加载云贴图并初始化 60 朵云（Init_MMap 在 PicLoadFile 后调用）
+function CloudLoadAndInit(idxFile, grpFile)
+    PicLoadFile(idxFile, grpFile, CLOUD_SLOT)
+    cloudList = {}
+    cloudFrames = {}
+    cloudPicAmount = 0
+    cloudNextTick = GetTime()
+    CLOUD_WORLD_X = (CC and CC.MWidth or 480) * (CONFIG and CONFIG.XScale or 18) * 2
+    CLOUD_WORLD_Y = (CC and CC.MHeight or 480) * (CONFIG and CONFIG.XScale or 18)
+    local pf = picFileCache[CLOUD_SLOT + 1]
+    if pf ~= nil then
+        -- 云 idx 为「末偏移累计」布局：帧 num(0 基) 占 [idx[num+1], idx[num+2])
+        local n = 0
+        while pf.idx[n + 1] ~= nil and pf.idx[n + 2] ~= nil
+                and pf.idx[n + 2] > pf.idx[n + 1] do
+            cloudFrames[n] = CloudDecodeFrame(n)
+            cloudPicAmount = cloudPicAmount + 1
+            n = n + 1
+        end
+    end
+    for i = 1, CLOUD_AMOUNT do
+        CloudCreate(i)
+    end
+end
+
+-- 云 40ms 漂移 tick（原版 kys_main.cpp:1897，受 MMAPAMI>0 门控）
+function CloudTick()
+    if cloudPicAmount == 0 then return end
+    if CC == nil or CC.MMapAmi == nil or CC.MMapAmi <= 0 then return end
+    local now = GetTime()
+    if now - cloudNextTick <= 0 then return end
+    cloudNextTick = now + 40
+    for i = 1, CLOUD_AMOUNT do
+        local c = cloudList[i]
+        if c ~= nil then
+            c.Positionx = c.Positionx + c.Speedx
+            c.Positiony = c.Positiony + c.Speedy
+            if c.Positionx > CLOUD_WORLD_X - 1 or c.Positionx < 0
+                or c.Positiony > CLOUD_WORLD_Y - 1 or c.Positiony < 0 then
+                CloudCreateOnSide(i)
+            end
+        end
+    end
+end
+
+-- 绘制云（原版 kys_draw.cpp:DrawClouds，主地图建筑层之上，坐标公式逐字一致）
+-- 绘制锚点 = 原版 DrawCPic 的 (px,py)，再按帧 xoff/yoff 偏移——与 JY_LoadPic
+-- 的 (x - xoff, y - yoff) 约定一致（原版 DrawRLE8Pic: screen = anchor + col - xoff）。
+function DrawClouds(mx, my)
+    if cloudPicAmount == 0 or #cloudList == 0 then return end
+    local centerX = math.floor(CONFIG.Width / 2)
+    local centerY = math.floor(CONFIG.Height / 2)
+    for i = 1, CLOUD_AMOUNT do
+        local c = cloudList[i]
+        if c ~= nil and c.img ~= nil and c.Picnum >= 0 and c.Picnum < cloudPicAmount then
+            local px = c.Positionx - (-mx * CONFIG.XScale + my * CONFIG.XScale + CLOUD_WORLD_Y - centerX)
+            local py = c.Positiony - (mx * CONFIG.YScale + my * CONFIG.YScale + CONFIG.YScale - centerY)
+            local x = px - (c.xoff or 0)
+            local y = py - (c.yoff or 0)
+            -- 原版 DrawRLE8Pic 的 alpha 合成（cloud 无遮挡、alpha<100 分支）：
+            --   out = 背景*(Alpha/100) + 云色*((100-Alpha)/100)
+            -- 即 Alpha 是「背景透出百分比」，云自身不透明度 = (100-Alpha)/100。
+            -- LÖVE 的默认 alpha 混合是 source-over（out = 源*a + 背景*(1-a)），
+            -- 故此处必须传 (100-Alpha)/100，传 Alpha/100 会把不透明度反过来
+            -- （原版近不透明的云会变近透明）。
+            love.graphics.setColor(1, 1, 1, (100 - c.Alpha) / 100)
+            love.graphics.draw(c.img, x, y)
+            love.graphics.setColor(1, 1, 1, 1)
+        end
+    end
+end
+
+-- 测试/调试用：返回内部云表（只读观察，勿改）
+function CloudGetList()
+    return cloudList
 end
 
 local S_XMax = 0
