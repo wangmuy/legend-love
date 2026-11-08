@@ -27,6 +27,7 @@ local TestNewEvent = require("tests.unit.test_new_event")
 local TestDialogLayout = require("tests.unit.test_dialog_layout")
 local TestTextBoxLayout = require("tests.unit.test_text_box_layout")
 local TestMmapDepth = require("tests.unit.test_mmap_depth")
+local TestCloud = require("tests.unit.test_cloud")
 
 local TestRunner = {}
 
@@ -325,6 +326,17 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + mmStats.failed
     allPassed = allPassed and mmResult
 
+    print("\n" .. string.rep("-", 60))
+    print("运行主地图飘云测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local clResult = TestCloud.runAll()
+    local clStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + clStats.total
+    totalStats.passed = totalStats.passed + clStats.passed
+    totalStats.failed = totalStats.failed + clStats.failed
+    allPassed = allPassed and clResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -393,9 +405,11 @@ function TestRunner.runModule(moduleName)
         return TestDialogLayout.runAll()
     elseif moduleName == "mmap_depth" then
         return TestMmapDepth.runAll()
+    elseif moduleName == "cloud" then
+        return TestCloud.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, mmap_depth")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, mmap_depth, cloud")
         return false
     end
 end
