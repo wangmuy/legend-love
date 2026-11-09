@@ -1184,9 +1184,23 @@ function CloudTick()
     end
 end
 
--- 绘制云（原版 kys_draw.cpp:DrawClouds，主地图建筑层之上，坐标公式逐字一致）
+-- 绘制云（移植原版 kys_draw.pas:DrawClouds，画在主地图建筑层之上）
 -- 绘制锚点 = 原版 DrawCPic 的 (px,py)，再按帧 xoff/yoff 偏移——与 JY_LoadPic
 -- 的 (x - xoff, y - yoff) 约定一致（原版 DrawRLE8Pic: screen = anchor + col - xoff）。
+--
+-- 【x 轴符号为什么不能照抄原版】
+-- 原版 kys 的地形投影是
+--   GetPositionOnScreen: sx = -18*(i-Mx) + 18*(j-My) + CENTER_X
+--                       = -18*(i-j) + 18*(Mx-My) + CENTER_X
+-- 而本项目（Mac 血缘 mainmap.c:JY_DrawMMap）的地形投影是它的水平镜像：
+--   sx = 18*((i-mx) - (j-my)) + W/2 = 18*(i-j) - 18*(mx-my) + W/2
+-- 同一个「主角横移」量在两条轴上式子相反：kys 地形玩家项 = +18*(Mx-My)，
+-- 本项目地形玩家项 = -18*(mx-my)。云是「世界锚定」的图层，必须与地形同步
+-- 滚动，因此 x 的玩家项必须取 -18*(mx-my)（即 +18*mx - 18*my 前面加负号），
+-- 也就是把原版的 `-(-Mx*18 + My*18 + ...)` 写成 `-(mx*18 - my*18 + ...)`。
+-- 照抄原版会让云以 +18*(mx-my) 反向滑动：主角按 ←/→ 或 ↑/↓ 时地形向左下/
+-- 右上滚，而云向右上/左下飘——表现就是「云跟着主角左右偏移」（历史 bug）。
+-- y 轴无镜像（两边都是 9*(i+j)），故 y 的玩家项 9*(mx+my) 与原版一致，不改。
 function DrawClouds(mx, my)
     if cloudPicAmount == 0 or #cloudList == 0 then return end
     local centerX = math.floor(CONFIG.Width / 2)
@@ -1194,7 +1208,7 @@ function DrawClouds(mx, my)
     for i = 1, CLOUD_AMOUNT do
         local c = cloudList[i]
         if c ~= nil and c.img ~= nil and c.Picnum >= 0 and c.Picnum < cloudPicAmount then
-            local px = c.Positionx - (-mx * CONFIG.XScale + my * CONFIG.XScale + CLOUD_WORLD_Y - centerX)
+            local px = c.Positionx - (mx * CONFIG.XScale - my * CONFIG.XScale + CLOUD_WORLD_Y - centerX)
             local py = c.Positiony - (mx * CONFIG.YScale + my * CONFIG.YScale + CONFIG.YScale - centerY)
             local x = px - (c.xoff or 0)
             local y = py - (c.yoff or 0)
