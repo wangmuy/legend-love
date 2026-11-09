@@ -349,6 +349,27 @@ function TestCloud.testMissingCloudFilesAreGraceful()
     TestHelper.assertTrue(ok2, "DrawClouds 数据缺失时不应报错: " .. tostring(err2))
 end
 
+-- 8) PicLoadFile 槽位上界：与原版 PIC_FILE_NUM=40 一致，id 合法范围 0..39
+function TestCloud.testPicLoadFileSlotBounds()
+    print("\n=== Test: PicLoadFile 槽位上界与原版 PIC_FILE_NUM 一致 ===")
+    if not bootEngine() then return end
+    local cache = Lib.picFileCache
+
+    -- 云槽位必须在原版合法区间内
+    Lib.CloudLoadAndInit(CC.CloudPicFile[1], CC.CloudPicFile[2])
+    TestHelper.assertNotNil(cache[40], "云槽位 39（1 基下标 40）应成功载入")
+
+    -- 上界：id=40 超界（原版 0..39），必须静默拒绝
+    cache[41] = nil
+    Lib.PicLoadFile(CC.CloudPicFile[1], CC.CloudPicFile[2], 40)
+    TestHelper.assertNil(cache[41], "id=40 超界应被拒绝（原版 piccache.c 上界检查）")
+
+    -- 下界：id=-1 同样拒绝（原有行为，不得回退）
+    cache[0] = nil
+    Lib.PicLoadFile(CC.CloudPicFile[1], CC.CloudPicFile[2], -1)
+    TestHelper.assertNil(cache[0], "id=-1 应继续被拒绝")
+end
+
 function TestCloud.runAll()
     print("\n" .. string.rep("=", 60))
     print("主地图飘云（Cloud*）子系统测试")
@@ -364,6 +385,7 @@ function TestCloud.runAll()
     TestCloud.testTickGatedByMMapAmi()
     TestCloud.testBakePixelParityWithMixFormula()
     TestCloud.testMissingCloudFilesAreGraceful()
+    TestCloud.testPicLoadFileSlotBounds()
 
     setmetatable(_G, savedMt)
 
