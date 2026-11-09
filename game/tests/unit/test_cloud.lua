@@ -12,8 +12,12 @@
 --
 -- 本套件锁定：
 --   1) CloudLoadAndInit 生成 60 朵云，各字段范围与原版一致；
---   2) DrawClouds 画满 60 朵，屏幕坐标公式与原版逐字一致，
---      且每朵云 setColor(1,1,1,Alpha/100)、画完复位；
+--   2) DrawClouds 画满 60 朵，屏幕坐标公式与本项目地形投影一致（含 y 轴逐字
+--      同原版、x 轴镜像改号的推导），且每朵云 setColor(1,1,1,(100-Alpha)/100)、
+--      画完复位；
+--   2b) 云为「世界锚定」图层：主角移动 1 格时云的屏幕位移必须与地形/建筑
+--      的屏幕位移完全相同（历史 bug：照抄原版 x 公式导致云反向滑动，
+--      表现为「云跟着主角左右偏移」）；
 --   3) 40ms tick 节奏：窗口内不重复移动，窗口后恰好移动 Speedx(1..3)px；
 --   4) 云越过右边界后在左侧重生（Positionx=0）；
 --   5) MMAPAMI=0 关闭漂移、=1 恢复；
@@ -132,15 +136,16 @@ function TestCloud.testDrawCloudsCountFormulaAndAlpha()
     Lib.DrawClouds(mx, my)
     TestHelper.assertEquals(60, #draws, "应画满 60 朵云")
 
-    -- 第 1 朵云的屏幕坐标必须与原版公式逐字一致：
-    --   x = Positionx - (-Mx*18 + My*18 + 8640 - CENTER_X)
-    --   y = Positiony - (Mx*9 + My*9 + 9 - CENTER_Y)
+    -- 第 1 朵云的屏幕坐标：y 与原版逐字一致，x 为镜像改号后的本项目形式
+    -- （推导见 lib_love.lua DrawClouds 注释与下方 testCloudScrollMatchesTerrain）：
+    --   x = Positionx - (mx*18 - my*18 + 8640 - CENTER_X)
+    --   y = Positiony - (mx*9 + my*9 + 9 - CENTER_Y)
     local c1 = list[1]
     local centerX = math.floor(CONFIG.Width / 2)
     local centerY = math.floor(CONFIG.Height / 2)
     TestHelper.assertEquals(
-        c1.Positionx - (-mx * 18 + my * 18 + 8640 - centerX) - c1.xoff, draws[1].x,
-        "云 1 屏幕 x 符合原版公式（含 8640、centerX、xoff 项）")
+        c1.Positionx - (mx * 18 - my * 18 + 8640 - centerX) - c1.xoff, draws[1].x,
+        "云 1 屏幕 x 符合本项目镜像轴公式（含 8640、centerX、xoff 项）")
     TestHelper.assertEquals(
         c1.Positiony - (mx * 9 + my * 9 + 9 - centerY) - c1.yoff, draws[1].y,
         "云 1 屏幕 y 符合原版公式（含 9、centerY、yoff 项）")
@@ -165,6 +170,87 @@ function TestCloud.testDrawCloudsCountFormulaAndAlpha()
     TestHelper.assertEquals(60, tintCalls, "60 朵云应对应 60 次非复位 setColor")
     TestHelper.assertEquals(0, badTint, "调色应为 (1,1,1,(100-Alpha)/100)（云不透明度）")
     TestHelper.assertEquals(60, #colorCalls - tintCalls, "每朵云画完都应复位白色")
+end
+
+-- 2b) 世界锚定：主角移动 1 格时，云的屏幕位移必须和地形/建筑完全一致
+--
+-- 历史 bug：DrawClouds 原本逐字照抄原版 kys 的 x 公式
+--   x = Positionx - (-Mx*18 + My*18 + 8640 - CENTER_X)
+-- 但本项目（Mac 血缘 mainmap.c）的等距投影是原版的水平镜像：
+--   地形 sx = 18*((i-mx)-(j-my)) + W/2      → 玩家项 -18*(mx-my)
+--   原版 sx = -18*(i-Mx)+18*(j-My)+CENTER_X → 玩家项 +18*(Mx-My)
+-- 照抄后云的玩家项是 +18*(mx-my)，与地形反号，于是主角一按方向键
+-- 地形向左下滚、云却向右上飘——玩家看到的就是「云跟着主角左右偏移」。
+function TestCloud.testCloudScrollMatchesTerrain()
+    print("\n=== Test: 云为世界锚定图层（移动主角时与地形同步滚动） ===")
+    if not bootEngine() then return end
+    math.randomseed(11)
+    loadRealClouds()
+
+    -- 本项目 DrawMMap / BuildingSort 的等距投影（lib_love.lua DrawMMap）
+    local function terrainScreen(u, v, mx, my)
+        local i1, j1 = u - mx, v - my
+        return CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2),
+               CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+    end
+    -- 取屏幕坐标固定的「世界点」：主角右下 2 格，保证位移可测
+    local U, V = 100, 100
+    local mx, my = U - 2, V - 2
+
+    local function cloudDrawPos(cmx, cmy)
+        draws = {}
+        Lib.DrawClouds(cmx, cmy)
+        return draws[1].x, draws[1].y
+    end
+
+    -- 四方向各走 1 格（game_states 的 VK 语义：← 人X-1、→ 人X+1、↑ 人Y-1、↓ 人Y+1）
+    local moves = {
+        { "按← (X-1)", -1, 0 }, { "按→ (X+1)", 1, 0 },
+        { "按↑ (Y-1)", 0, -1 }, { "按↓ (Y+1)", 0, 1 },
+        { "左上 (X-1,Y-1)", -1, -1 }, { "右下 (X+1,Y+1)", 1, 1 },
+    }
+    local bad = 0
+    for _, m in ipairs(moves) do
+        local name, dx, dy = m[1], m[2], m[3]
+        local ax, ay = cloudDrawPos(mx, my)
+        local bx, by = cloudDrawPos(mx + dx, my + dy)
+        local t0x, t0y = terrainScreen(U, V, mx, my)
+        local t1x, t1y = terrainScreen(U, V, mx + dx, my + dy)
+        local cdx, cdy = bx - ax, by - ay
+        local tdx, tdy = t1x - t0x, t1y - t0y
+        if cdx ~= tdx or cdy ~= tdy then
+            bad = bad + 1
+            print(string.format("  MISMATCH %-16s 云 d=(%+d,%+d) 地形 d=(%+d,%+d)",
+                name, cdx, cdy, tdx, tdy))
+        end
+        -- 云与地形必须是「同一个刚体位移」，不能出现反向滑动
+        TestHelper.assertEquals(tdx, cdx, name .. "：云的屏幕 x 位移应与地形一致")
+        TestHelper.assertEquals(tdy, cdy, name .. "：云的屏幕 y 位移应与地形一致")
+    end
+    TestHelper.assertEquals(0, bad, "六个方向的云滚动均不得与地形反向")
+
+    -- 锚点自洽性：主角任意移动，云与地形（同一个屏幕世界点）的相对偏移恒定。
+    -- 这等价于「云的屏幕位置 = 世界锚点投影」，即云不参与任何自身视差。
+    local c1 = Lib.CloudGetList()[1]
+    local cx0 = math.floor(CONFIG.Width / 2)
+    local cy0 = math.floor(CONFIG.Height / 2)
+    local function screenOfCloud(cmx, cmy)
+        return c1.Positionx - (cmx * CONFIG.XScale - cmy * CONFIG.XScale
+                   + 8640 - cx0) - (c1.xoff or 0),
+               c1.Positiony - (cmx * CONFIG.YScale + cmy * CONFIG.YScale
+                   + CONFIG.YScale - cy0) - (c1.yoff or 0)
+    end
+    local sx0, sy0 = screenOfCloud(100, 100)
+    local tx0, ty0 = terrainScreen(U, V, 100, 100)
+    local refDx, refDy = sx0 - tx0, sy0 - ty0
+    for _, p in ipairs({ { 100, 100 }, { 101, 100 }, { 99, 103 }, { 104, 97 } }) do
+        local sx, sy = screenOfCloud(p[1], p[2])
+        local tx, ty = terrainScreen(U, V, p[1], p[2])
+        TestHelper.assertEquals(refDx, sx - tx,
+            string.format("主角(%d,%d) 时云与地形的 x 相对偏移应恒定", p[1], p[2]))
+        TestHelper.assertEquals(refDy, sy - ty,
+            string.format("主角(%d,%d) 时云与地形的 y 相对偏移应恒定", p[1], p[2]))
+    end
 end
 
 -- 3) 40ms 节奏：next_time3=now+40 语义（窗口内不动、窗口后动恰好 Speedx）
@@ -380,6 +466,7 @@ function TestCloud.runAll()
 
     TestCloud.testInitSpawns60CloudsWithValidFields()
     TestCloud.testDrawCloudsCountFormulaAndAlpha()
+    TestCloud.testCloudScrollMatchesTerrain()
     TestCloud.testTickCadenceIs40ms()
     TestCloud.testRespawnOnRightEdge()
     TestCloud.testTickGatedByMMapAmi()
