@@ -159,6 +159,19 @@ function TestModData.testRewriteConstantsRedirectsOnHit()
     TestHelper.assertEquals("mods/mingdong/data/mmap.grp", CC.MMAPPicFile[2], "hit: redirected")
 end
 
+function TestModData.testRewriteConstantsCloudPicFile()
+    print("\n=== Test: RewriteConstants redirects CloudPicFile per-entry ===")
+    local ModData = freshModData()
+    ModData.SetActive("mingdong")
+    -- 只有 grp 存在于 MOD 中，idx 走回退（逐项判断，与 MMAPPicFile 语义一致）
+    ModData.exists = function(path) return path == "mods/mingdong/data/cloud.grp" end
+    local CC = { CloudPicFile = { "data/cloud.idx", "data/cloud.grp" } }
+    ModData.RewriteConstants(CC, { DataPath = "data/", ScriptPath = "script/" })
+    TestHelper.assertEquals("data/cloud.idx", CC.CloudPicFile[1], "cloud idx miss: unchanged")
+    TestHelper.assertEquals("mods/mingdong/data/cloud.grp", CC.CloudPicFile[2],
+        "cloud grp hit: redirected")
+end
+
 function TestModData.testRewriteConstantsFightPicFormat()
     print("\n=== Test: RewriteConstants redirects FightPicFile format string ===")
     local ModData = freshModData()
@@ -696,6 +709,7 @@ function TestModData.runAll()
     TestModData.testFightFilesNoActiveUsesData()
     TestModData.testRewriteConstantsNoActiveIsNoop()
     TestModData.testRewriteConstantsRedirectsOnHit()
+    TestModData.testRewriteConstantsCloudPicFile()
     TestModData.testRewriteConstantsFightPicFormat()
     TestModData.testRewriteConstantsScriptPath()
     TestModData.testRewriteAudioNoActiveIsNoop()

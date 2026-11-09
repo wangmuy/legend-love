@@ -444,8 +444,13 @@ end
 // filename 文件名 
 // id  0 - PIC_FILE_NUM-1
 --]]
+-- 原版 jymain.h:117 `#define PIC_FILE_NUM 40`，piccache.c:92
+-- `if(id<0 || id>=PIC_FILE_NUM) return 1;`；此处同步该上界检查。
+local PIC_FILE_NUM = 40
+
 function PicLoadFile(idxfilename, grpfilename, fileid)
-    if fileid < 0 then return end
+    -- 与原版一致：id 合法范围 0..PIC_FILE_NUM-1，越界直接拒绝
+    if fileid == nil or fileid < 0 or fileid >= PIC_FILE_NUM then return end
     fileid = fileid+1 -- lua starts with 1
 
     --Debug("PicLoadFile: %s %d", idxfilename, fileid)
@@ -1015,7 +1020,11 @@ end
 -- 贴图」（原版 DrawCPic 不做 /2），故直接按 idx[num+1..num+2] 取帧范围。
 -- ============================================================
 local CLOUD_AMOUNT = 60
-local CLOUD_SLOT = 40   -- PicLoadFile 槽位（0=地图 1=头像 2=物品 3=特效 4+i=战斗人物；40 与之无冲突）
+-- PicLoadFile 槽位。原版 jymain.h:117 `#define PIC_FILE_NUM 40`，合法 id 为
+-- 0..39；已占用：0=地图/场景/战场图 1=头像 2=物品 3=特效 4+i=战斗人物
+-- （WAR.Person 共 26 项，i=0..25 → 4..29）。故 30..39 空闲，取上界 39，
+-- 既不与原版 PIC_FILE_NUM 容量冲突，也不与任何现有槽位冲突。
+local CLOUD_SLOT = 39
 local CLOUD_WORLD_X = 17280  -- 云世界 x 范围（原版硬编码 17280 = 2*MWidth*XScale）
 local CLOUD_WORLD_Y = 8640   -- 云世界 y 范围（原版硬编码 8640 = MHeight*XScale，注意是 XScale 不是 YScale）
 local cloudFrames = {}   -- cloudFrames[picnum] = {w=,h=,pixels={{x,y,r,g,b},...}} 调色板原色 0-255

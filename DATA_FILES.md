@@ -70,6 +70,7 @@ alldef.grp      ───新游戏──→  d1/d2/d3.grp      ──读档─�
 | `hdgrp.idx` + `hdgrp.grp` | 人物头像贴图 | `CC.HeadPicFile` |
 | `thing.idx` + `thing.grp` | 物品贴图 | `CC.ThingPicFile` |
 | `warfld.idx` + `warfld.grp` | 战斗场景贴图 | `CC.WarMapFile` |
+| `cloud.idx` + `cloud.grp` | 主地图飘云贴图（9 帧 RLE，`MMAPAMI>0` 时绘制） | `CC.CloudPicFile` |
 
 ### R 存档文件
 
