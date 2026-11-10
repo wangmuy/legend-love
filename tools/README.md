@@ -105,6 +105,19 @@ TRACE.log("startNewGame:348")  -- 调用点
 模拟开场卧姿调查的写点时序并打印 `tools/trace_out.txt` 输出，
 用于快速验证 trace_global 工作方式；真实用法仍见上方启用配方。
 
+## verify-cloud/ — 主地图飘云运行时取证
+
+`probe` / `e2e` / `scroll` 三个独立 LÖVE 驱动 + 像素分析，证明云“真被画出来、
+画在建筑与人物之上、与地形同步滚动、`MMAPAMI` 门控生效”。一键运行：
+
+```bash
+bash tools/verify-cloud/run.sh all
+```
+
+工作目录由脚本 `mktemp -d` 现场创建（**不在仓库里放 `data -> ../../data` 之类
+的软链**：`7z a ./game/*` 会跟随软链，实测会把 `.love` 从 31M 顶到 809M）。
+详见 [`verify-cloud/README.md`](verify-cloud/README.md)。
+
 ## 输出物
 
 - `tools/trace_out.txt`（trace_global）— 已 gitignore

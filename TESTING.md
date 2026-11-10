@@ -101,16 +101,37 @@ cd game && lua tests/unit/test_input_manager.lua
 
 ### 可用模块
 
-| 模块名 | 测试文件 |
-|--------|----------|
-| `state_machine` | 状态机测试 |
-| `input_manager` | 输入管理器测试 |
-| `event_bridge` | 事件桥接测试 |
-| `coroutine_scheduler` | 协程调度器测试 |
-| `byte_io` | Byte I/O 测试 |
-| `script_loader` | 脚本加载器测试 |
-| `item_async` | 物品系统测试 |
-| `war_async` | 战斗系统测试 |
+`test_runner.lua <模块名>` 可单独运行下列模块（断言数合计 2464 条）：
+
+| 模块名 | 覆盖内容 | 断言数 |
+|--------|----------|--------|
+| `state_machine` | 状态机 | 6 |
+| `input_manager` | 输入管理器 | 4 |
+| `event_bridge` | 事件桥接 | 2 |
+| `coroutine_scheduler` | 协程调度器 | 4 |
+| `byte_io` | Byte I/O | 5 |
+| `script_loader` | 脚本加载器 | 3 |
+| `item_async` | 物品系统 | 6 |
+| `war_async` | 战斗系统 | 2 |
+| `engine_api` | EngineAPI 接口定义 | 4 |
+| `engine_test` | 测试引擎（MUD） | 3 |
+| `mod_ini` | MOD ini 解析 | 81 |
+| `mod_data` | MOD 数据回退 | 133 |
+| `mod_encoding` | MOD 编码/布局逆向 | 55 |
+| `mod_build` | MOD 构建期行为 | 52 |
+| `mod_resources` | MOD 资源分类 | 959 |
+| `mod_audit` | MOD 资源穷举审计 | 280 |
+| `format_spec` | 数据格式字段级覆盖 | 297 |
+| `mod_e2e` | MOD 无头端到端 | 37 |
+| `mod_boot` | MOD 全启动链路无头验证 | 87 |
+| `dialog_layout` | 对话自动换行/框宽 | 59 |
+| `text_box_layout` | 单行文本框尺寸 | 102 |
+| `mmap_depth` | 主地图 2.5D 遮挡关系 | 52 |
+| `cloud` | 主地图飘云子系统 | 61 |
+
+另有三个模块只在全量运行中执行（有顺序约束或依赖前面模块留下的全局状态，
+未注册 `runModule` 分支）：`scene_name`（81，会 `LoadRecord` 并改 `JY` 全局）、
+`font_size`（16）、`new_event`（73）。
 
 ## 测试覆盖范围
 
@@ -125,6 +146,8 @@ cd game && lua tests/unit/test_input_manager.lua
 | `coroutine_scheduler` | 协程创建、yield/resume、waitForKey 绕过 disableInput |
 | `item_async` | Grid物品选择、数组转换、药品/暗器过滤、必填字段验证 |
 | `war_async` | 战斗状态初始化、移动范围计算、武功类型匹配、动画帧数、战斗地图操作、菜单返回值逻辑、用毒/解毒/医疗功能、物品菜单Grid显示、状态菜单协程版本、战败处理逻辑 |
+| `mmap_depth` | 单趟按 `BuildingSort` 排序绘制（禁止改回先地形后建筑的两趟） |
+| `cloud` | 60 朵云生成与字段范围、绘制坐标公式、40ms 漂移节奏、越界重生、`CC.MMapAmi` 门控、RLE + mix 公式逐位一致、云与地形滚动同步、槽位 39 上界 |
 
 ### 关键测试场景
 
@@ -410,3 +433,57 @@ spy.restore()
 3. **清理资源**：测试完成后调用 `teardown()` 清理
 4. **清晰断言**：提供描述性的断言消息
 5. **单一职责**：每个测试函数只测试一个功能点
+
+## 手动验证：主地图飘云
+
+云子系统（`engine-love2d/lib_love.lua` 的 `Cloud*` / `DrawClouds`）除了单测，
+还需要在真机上肉眼确认。下面是把「怎么才能看到云」整理出的操作手册——
+云的可见性比直觉差很多，不看这节很容易以为「云没渲染」。
+
+### 为什么出门经常看不到云
+
+云世界是 17280×8640，屏幕只有 1024×768，60 朵云随机分布。实测：
+
+* 单朵云落在视口内的概率 ≈ 6.7%(x) × 9.7%(y) ≈ **0.65%**，60 朵 ≈ **0.39 朵/屏**；
+* 新游戏出门位置 (356,236) 原地不动：60 朵初始 **0 朵可见**，首次出现中位
+  98.9s；
+* 随机走动（每 0.32s 一格）：首次看到云中位 **10s**，75% 分位 28s，最慢 217s；
+* 600s 长跑采样的 529 个网格点里**没有一个点完全看不到云**，但热点集中在
+  `人X`、`人Y` 都较大且 `人X-人Y` 远离 0 的区域（y 方向只有约 9% 宽的世界带
+  能落进视口，x 方向约 6.7%）。
+
+**结论：云只在 `GAME_MMAP` / `GAME_FIRSTMMAP`（大地图）绘制，子场景 SMAP 没有云。**
+等到云出现 ≠ 云没坏；要用下面的手段主动造场景。
+
+### 推荐操作顺序
+
+1. **显示坐标**：`game/script/jyconst.lua` 把 `CC.ShowXY` 改成 `1`
+   （默认 0）。屏幕上会打印 `人X`/`人Y`，方便对照热点区域。
+2. **进大地图**：新游戏 → 走出场景门（`GAME_SMAP → GAME_MMAP`）。
+3. **持续按住 `↓` + `→`（右下对角线）**：实测最快，中位 5.7s 就看到云。
+   其他方向：→ 13.7s、← 9.6s、↓ 8.1s、↑ 18.6s、左上对角线 11.9s。
+4. **盯屏幕上半部分天空**：云从左侧向右飘（25～75 px/s，由 `Speedx=1..3`
+   决定，40ms 一拍），半透明；过了 100 多秒会飘出左侧并在左侧重生。
+5. **想确认「云只是慢」而不是「云没画」**：
+   `game/script/jyconst.lua` 把 `CC.MMapAmi` 改成 `0`。云会**冻结但不会消失**，
+   一直停在原位，肉眼更好确认。
+6. **想验证渲染最快的方式**：临时把 `lib_love.lua` 的 `CLOUD_AMOUNT` 从 60
+   改大。实测 200 → 59% 帧有云/3 朵可见；**600 → 100% 帧有云/5 朵可见**
+   （加载 0.92s，`DrawClouds` 每帧 0.533ms，无性能问题）。测完**必须改回 60**——
+   单测按 60 写死。
+
+### 坑：没有调试热键
+
+`game/main.lua:10` 只把 `keypressed` 转发给 `InputManager`，不在 keymap
+（`framework/input_manager.lua`）里注册的键会被直接丢弃。想加 F1 之类必须先
+改 keymap，别指望挂个回调就能用。
+
+### 云相关的运行时取证脚本
+
+肉眼之外的可复现取证见 [`tools/verify-cloud/`](tools/verify-cloud/README.md)：
+`probe`（云在建筑之上）、`e2e`（真实启动链 + 漂移 + `MMAPAMI` 门控 + 云在主角
+之上）、`scroll`（云与地形滚动一致性，含像素分析）。
+
+> 这三个驱动早期放在 `game/tests/scratch_cloud_*` 并用相对软链引用
+> `../../data` 等资源。**不要恢复那种做法**：`tools/build-love.sh` 与 CI 都用
+> `7z a ./game/*` 打包，7z 会跟随软链，实测 `.love` 会从 31M 膨胀到 809M。
