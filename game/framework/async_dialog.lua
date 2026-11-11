@@ -2,6 +2,8 @@
 -- 异步对话框管理器
 -- 支持非阻塞的对话框显示和交互
 
+local TextBoxLayout = require("framework.text_box_layout")
+
 local AsyncDialog = {}
 AsyncDialog.__index = AsyncDialog
 
@@ -44,22 +46,22 @@ function AsyncDialog:showYesNo(message, callback, options)
     
     -- 计算默认尺寸（使用菜单样式）
     local size = options.size or CC.DefaultFont
-    local ll = #message
-    -- 宽度：根据消息长度或选项宽度（取较大值）
-    local msgWidth = size * ll / 2
-    local optionWidth = size * 2  -- "是"/"否" 的宽度
-    local width = math.max(msgWidth, optionWidth) + 2 * CC.MenuBorderPixel
-    -- 高度：消息行 + 两个选项行 + 边距和间距
-    local height = CC.MenuBorderPixel * 2 + size + (size + CC.RowPixel) * 2 + CC.RowPixel
-    
-    -- 计算默认位置（居中）
+    -- 宽度：按消息的真实像素宽（不再用 #message 字节数）或选项宽度取较大值
+    local box = TextBoxLayout.measure(message, { size = size })
+    local optionWidth = TextBoxLayout.textWidth("是", size) * 2
+    local width = math.max(box.width, optionWidth)
+    -- 高度：消息行 + 两个选项行 + 边距和间距（多行布局，保持原有垂直排布）
+    local lineH = box.lineHeight
+    local height = CC.MenuBorderPixel * 2 + lineH + (lineH + CC.RowPixel) * 2 + CC.RowPixel
+
+    -- 计算默认位置（居中），基于真实框尺寸
     local x = options.x
     local y = options.y
     if x == -1 or x == nil then
-        x = (CC.ScreenW - size / 2 * ll - 2 * CC.MenuBorderPixel) / 2
+        x = (CC.ScreenW - width) / 2
     end
     if y == -1 or y == nil then
-        y = (CC.ScreenH - size - 2 * CC.MenuBorderPixel) / 2
+        y = (CC.ScreenH - height) / 2
     end
     
     -- 创建对话框数据
@@ -71,6 +73,8 @@ function AsyncDialog:showYesNo(message, callback, options)
         y = y,
         width = width,
         height = height,
+        pad = box.pad,
+        lineHeight = lineH,
         color = options.color or C_WHITE,
         size = size,
         result = nil,
@@ -333,26 +337,41 @@ function AsyncDialog:drawYesNo(dialog, x, y, w, h)
     DrawBox(x, y, x + w, y + h, C_WHITE)
     
     -- 绘制提示文本
-    local msgY = y + CC.MenuBorderPixel
-    DrawString(x + CC.MenuBorderPixel, msgY, dialog.message, C_WHITE, CC.DefaultFont)
+    local pad = dialog.pad or CC.MenuBorderPixel
+    local lineH = dialog.lineHeight or CC.DefaultFont
+    local msgY = y + pad
+    DrawString(x + pad, msgY, dialog.message, C_WHITE, CC.DefaultFont)
     
     -- 绘制选项（上下排列，配合上下方向键选择）
-    -- 使用 C_GOLD（黄色）作为选中颜色，与游戏其他界面保持一致
-    local yesColor = dialog.selected == 1 and C_GOLD or C_WHITE
-    local noColor = dialog.selected == 2 and C_GOLD or C_WHITE
+    -- 使用 C_RED（红色）作为选中颜色，与主菜单/属性页"是否"菜单（C_RED 底 C_WHITE 选中）
+    -- 风格一致；黄色（C_GOLD）与未选项白色对比不明显，用户反馈易混淆
+    local yesColor = dialog.selected == 1 and C_RED or C_WHITE
+    local noColor = dialog.selected == 2 and C_RED or C_WHITE
     
     -- 计算选项起始Y位置（在消息下方）
-    local optionStartY = msgY + CC.DefaultFont + CC.RowPixel
+    local optionStartY = msgY + lineH + CC.RowPixel
     
     -- "是"在上，"否"在下，使用菜单样式居中显示
     local optionX = x + w/2 - CC.DefaultFont
     DrawString(optionX, optionStartY, "是", yesColor, CC.DefaultFont)
-    DrawString(optionX, optionStartY + CC.DefaultFont + CC.RowPixel, "否", noColor, CC.DefaultFont)
+    DrawString(optionX, optionStartY + lineH + CC.RowPixel, "否", noColor, CC.DefaultFont)
 end
 
 -- 绘制消息对话框
+--
+-- 偏移用 pad（= CC.MenuBorderPixel），不是写死的 10。
+--
+-- 这才是「获取物品提示文字靠下」的直接根因：
+--   框高是 size + 2*pad = 24 + 10 = 34px，文字却画在 y + 10，
+--   于是上间隙 12px、下间隙只剩 2px —— 文字视觉上明显贴底。
+-- 改用 y + pad 后，文字行框占据 [5, 29]，上下各留 5px，对称。
+--
+-- 实测（画到画布后逐像素扫描墨迹包围盒）：
+--   y + 10 -> 上 12 / 下  2   （偏下，用户报告的症状）
+--   y +  5 -> 上  7 / 下  7   （居中）
 function AsyncDialog:drawMessage(dialog, x, y, w, h)
-    DrawString(x + 10, y + 10, dialog.message, dialog.color, dialog.size)
+    local pad = dialog.pad or CC.MenuBorderPixel
+    DrawString(x + pad, y + pad, dialog.message, dialog.color, dialog.size)
 end
 
 -- 绘制输入对话框
@@ -444,17 +463,18 @@ function AsyncDialog:showMessage(message, callback, options)
     options = options or {}
     
     local size = options.size or CC.DefaultFont
-    local ll = #message
-    local width = size * ll / 2 + 2 * CC.MenuBorderPixel
-    local height = size + 2 * CC.MenuBorderPixel
-    
+    -- 按真实像素宽算框（#message 是 UTF-8 字节数，不能直接当字符数用）
+    local box = TextBoxLayout.measure(message, { size = size })
+    local width = box.width
+    local height = box.height
+
     local x = options.x
     local y = options.y
     if x == -1 or x == nil then
-        x = (CC.ScreenW - size / 2 * ll - 2 * CC.MenuBorderPixel) / 2
+        x = (CC.ScreenW - width) / 2
     end
     if y == -1 or y == nil then
-        y = (CC.ScreenH - size - 2 * CC.MenuBorderPixel) / 2
+        y = (CC.ScreenH - height) / 2
     end
     
     local dialog = {
@@ -465,6 +485,8 @@ function AsyncDialog:showMessage(message, callback, options)
         y = y,
         width = width,
         height = height,
+        pad = box.pad,
+        lineHeight = box.lineHeight,
         color = options.color or C_WHITE,
         size = size,
         result = nil,

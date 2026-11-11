@@ -1,140 +1,90 @@
 -- talk_async.lua
 -- 对话系统异步模块
--- 提供对话显示的协程版本函数
+--
+-- 本模块只负责「对话的节奏与状态」：
+--   ① 调 EngineAPI.dialog.measure 得到排版结果（进入新页时算一次，缓存）；
+--   ② 维护 currentTalk 供 EventBridge:draw() 读取；
+--   ③ 分页等待按键（InputAsync.WaitKeyCoroutine）。
+--
+-- 排版算法（换行 / 框宽 / 行高 / 锚点）不在本模块，而在：
+--   引擎的 EngineAPI.dialog.measure（排版）+ framework/dialog_layout.lua（算法）。
+--
+-- 为什么下沉：对话框排版属于「渲染介质相关」决策。Love2D 有真实字体度量
+-- （font:getWidth / getHeight）可以精确排版；mud 无图形输出；web 的字体由
+-- 浏览器决定。Lua 层若自己算坐标就得读 CC.DefaultFont 这类常量，在 mud/web
+-- 上纯属浪费且不反映真实排版。这与 EngineAPI 中已有的语义级调用一致：
+--   M.map.drawScene(sceneId, x, y, offX, offY, playerPic)
+-- Lua 只说「画这个场景」，引擎自己决定怎么画。
 
 local TalkAsync = {}
 
 local CoroutineScheduler = require("framework.coroutine_scheduler")
 local InputAsync = require("framework.input_async")
 
--- 对话框配置
+-- 对话节奏配置（只保留与「分页/等待」相关的项，排版参数已下沉到引擎）
 local talkConfig = {
-    picw = 100,       -- 最大头像图片宽
-    pich = 100,       -- 最大头像图片高
-    talkxnum = 12,    -- 对话框宽度（中文字符数）
-    charsPerLine = 13, -- 每行实际可容纳的中文字符数
-    talkynum = 3,     -- 对话行数
-    dx = 2,
-    dy = 2,
+    talkynum = 3,     -- 每页对话行数
 }
+
+-- 当前对话状态（供 draw 读取）
+-- 结构：{ spec = { text, headId, flag }, layout = <EngineAPI.dialog.measure 返回值> }
+local currentTalk = nil
 
 -- 获取调度器实例
 local function getScheduler()
     return CoroutineScheduler.getInstance()
 end
 
--- 计算对话框位置配置
-local function getTalkPosition(flag)
-    local picw = talkConfig.picw
-    local pich = talkConfig.pich
-    local dx = talkConfig.dx
-    local dy = talkConfig.dy
-    local boxpicw = picw + 10
-    local boxpich = pich + 10
-    local boxtalkw = 12 * CC.DefaultFont + 10
-    local boxtalkh = boxpich
-    
-    local xy = {
-        [0] = {
-            headx = dx, heady = dy,
-            talkx = dx + boxpicw + 2, talky = dy,
-            showhead = 1
-        },
-        {
-            headx = CC.ScreenW - 1 - dx - boxpicw, heady = CC.ScreenH - dy - boxpich,
-            talkx = CC.ScreenW - 1 - dx - boxpicw - boxtalkw - 2, talky = CC.ScreenH - dy - boxpich,
-            showhead = 1
-        },
-        {
-            headx = dx, heady = dy,
-            talkx = dx + boxpicw + 2, talky = dy,
-            showhead = 0
-        },
-        {
-            headx = CC.ScreenW - 1 - dx - boxpicw, heady = CC.ScreenH - dy - boxpich,
-            talkx = CC.ScreenW - 1 - dx - boxpicw - boxtalkw - 2, talky = CC.ScreenH - dy - boxpich,
-            showhead = 1
-        },
-        {
-            headx = CC.ScreenW - 1 - dx - boxpicw, heady = dy,
-            talkx = CC.ScreenW - 1 - dx - boxpicw - boxtalkw - 2, talky = dy,
-            showhead = 1
-        },
-        {
-            headx = dx, heady = CC.ScreenH - dy - boxpich,
-            talkx = dx + boxpicw + 2, talky = CC.ScreenH - dy - boxpich,
-            showhead = 1
-        },
-    }
-    
-    if flag < 0 or flag > 5 then
-        flag = 0
-    end
-    
-    return xy[flag], boxtalkw, boxtalkh
-end
-
--- 生成分行字符串（按像素宽度分行）
-local function GenTalkString(s, lineWidth)
-    local newstr = ""
-    local start = 1
-    local len = #s
-    local maxPixelWidth = lineWidth * CC.DefaultFont
-    
-    while start <= len do
-        local endPos = start
-        local currentWidth = 0
-        local lastValidEnd = start
-        
-        while endPos <= len do
-            local byte = string.byte(s, endPos)
-            local charPixelWidth
-            local charLen
-            
-            if byte >= 240 then
-                charPixelWidth = CC.DefaultFont
-                charLen = 4
-            elseif byte >= 224 then
-                charPixelWidth = CC.DefaultFont
-                charLen = 3
-            elseif byte >= 128 then
-                charPixelWidth = CC.DefaultFont
-                charLen = 2
-            else
-                charPixelWidth = CC.DefaultFont / 2
-                charLen = 1
-            end
-            
-            if endPos + charLen - 1 > len then
-                break
-            end
-            
-            if currentWidth + charPixelWidth <= maxPixelWidth then
-                currentWidth = currentWidth + charPixelWidth
-                lastValidEnd = endPos + charLen - 1
-                endPos = endPos + charLen
-            else
-                break
-            end
-        end
-        
-        if lastValidEnd >= start then
-            newstr = newstr .. string.sub(s, start, lastValidEnd) .. "*"
-            start = lastValidEnd + 1
-        else
-            break
-        end
-    end
-    
-    return newstr
-end
-
--- 当前对话状态（用于在draw中绘制）
-local currentTalk = nil
-
 -- 获取当前对话状态
 function TalkAsync.getCurrentTalk()
     return currentTalk
+end
+
+--- 取引擎的 dialog 能力
+--
+-- mud / web 的 dialog.measure 是空实现（返回 nil），此时对话退化为
+-- 「按 * 切段分页、不排版」：这些引擎本就没有图形对话框。
+local function getDialog()
+    if EngineAPI and EngineAPI.dialog then
+        return EngineAPI.dialog
+    end
+    return nil
+end
+
+--- 把 layout.lines 按每页行数切成页
+local function paginate(lines, perPage)
+    local pages = {}
+    local i = 1
+    while i <= #lines do
+        local page = {}
+        for k = 0, perPage - 1 do
+            if lines[i + k] == nil then
+                break
+            end
+            page[k + 1] = lines[i + k]
+        end
+        pages[#pages + 1] = page
+        i = i + perPage
+    end
+    if #pages == 0 then
+        pages[1] = { "" }
+    end
+    return pages
+end
+
+--- 清除当前对话状态（含绘制状态）
+--
+-- 用于「协程已被打断、但 currentTalk 还挂着」的场合：最典型是事件里
+-- 先 TalkEx 再开战（韦大宝「佣兵行会」），对话协程被战斗夺走焦点后
+-- 再也没机会走到清空语句。不清掉的话 EventBridge:draw() 会一直把
+-- 韦大宝的对话框画在战斗画面之上。
+function TalkAsync.clear()
+    currentTalk = nil
+    local dialog = getDialog()
+    if dialog and dialog.clear then
+        dialog.clear()
+    end
+    lib.Debug("TalkAsync.clear: currentTalk cleared")
 end
 
 -- 对话显示（协程版本）
@@ -143,95 +93,74 @@ end
 -- @param flag: 对话框位置
 function TalkAsync.TalkExCoroutine(s, headid, flag)
     lib.Debug(string.format("TalkExCoroutine: headid=%d, flag=%d", headid, flag))
-    
-    local picw = talkConfig.picw
-    local pich = talkConfig.pich
+
     local talkynum = talkConfig.talkynum
-    local talkBorder = (pich - talkynum * CC.DefaultFont) / (talkynum + 1)
-    
-    local xy, boxtalkw, boxtalkh = getTalkPosition(flag)
-    
-    if xy.showhead == 0 then
-        headid = -1
+    local dialog = getDialog()
+
+    if flag < 0 or flag > 5 then
+        flag = 0
     end
-    
-    -- 自动分行（仅对没有 * 分隔符的对话）
-    if string.find(s, "*") == nil then
-        s = GenTalkString(s, talkConfig.charsPerLine)
+
+    -- 排版：进入对话时算一次，整段对话复用（每页只是从这个 layout 里取行）
+    local spec = { text = s, headId = headid, flag = flag }
+    local layout = nil
+    if dialog and dialog.measure then
+        layout = dialog.measure(spec)
     end
-    
+
+    -- 兜底：引擎未实现 measure（mud / web）时，退化为按 * 切段
+    if not layout then
+        local lines = {}
+        local start = 1
+        while true do
+            local p = s:find("*", start, true)
+            if not p then
+                lines[#lines + 1] = s:sub(start)
+                break
+            end
+            lines[#lines + 1] = s:sub(start, p - 1)
+            start = p + 1
+        end
+        layout = { lines = lines, pages = 1, linesPerPage = talkynum }
+    end
+
+    local pages = paginate(layout.lines, layout.linesPerPage or talkynum)
+
     lib.GetKey()
-    
-    local startp = 1
-    local endp
-    local dy = 0
-    local lines = {}  -- 存储当前页要显示的行
-    
-    while true do
-        if dy == 0 then
-            lines = {}  -- 清空行列表
-            lib.Debug("TalkExCoroutine: starting new page")
-        end
-        
-        endp = string.find(s, "*", startp)
-        
-        if endp == nil then
-            -- 最后一行
-            table.insert(lines, string.sub(s, startp))
-            lib.Debug("TalkExCoroutine: last line, lines count=" .. #lines)
-            
-            -- 设置当前对话状态，让draw函数绘制
-            currentTalk = {
-                headid = headid,
-                flag = flag,
-                lines = lines,
-                xy = xy,
-                boxtalkw = boxtalkw,
-                boxtalkh = boxtalkh,
-                picw = picw,
-                pich = pich,
-                talkBorder = talkBorder,
-            }
-            lib.Debug("TalkExCoroutine: waiting for key (last page)")
-            -- 清除当前按键，防止同一按键立即触发下一页/下一个对话
-            local InputManager = require("framework.input_manager")
-            InputManager.getInstance():clearCurrentKey()
-            local key = InputAsync.WaitKeyCoroutine()
-            lib.Debug("TalkExCoroutine: key pressed=" .. tostring(key) .. ", clearing currentTalk")
-            currentTalk = nil  -- 清除对话状态
-            break
-        else
-            table.insert(lines, string.sub(s, startp, endp - 1))
-        end
-        
-        dy = dy + 1
-        startp = endp + 1
-        
-        if dy >= talkynum then
-            lib.Debug("TalkExCoroutine: page full, lines count=" .. #lines)
-            -- 设置当前对话状态，让draw函数绘制
-            currentTalk = {
-                headid = headid,
-                flag = flag,
-                lines = lines,
-                xy = xy,
-                boxtalkw = boxtalkw,
-                boxtalkh = boxtalkh,
-                picw = picw,
-                pich = pich,
-                talkBorder = talkBorder,
-            }
-            lib.Debug("TalkExCoroutine: waiting for key (page full)")
-            -- 清除当前按键，防止同一按键立即触发下一页/下一个对话
-            local InputManager = require("framework.input_manager")
-            InputManager.getInstance():clearCurrentKey()
-            local key = InputAsync.WaitKeyCoroutine()
-            lib.Debug("TalkExCoroutine: key pressed=" .. tostring(key) .. ", resetting dy")
-            dy = 0
-            currentTalk = nil  -- 清除当前页，准备下一页
-        end
+
+    local InputManager = require("framework.input_manager")
+
+    for pageIndex = 1, #pages do
+        currentTalk = {
+            spec = spec,
+            layout = {
+                -- 单页视图：换成本页的行，其余排版信息（框宽/锚点/行高）沿用整段
+                width = layout.width,
+                height = layout.height,
+                lineHeight = layout.lineHeight,
+                lines = pages[pageIndex],
+                pages = #pages,
+                pageIndex = pageIndex,
+                linesPerPage = layout.linesPerPage,
+                headId = layout.headId,
+                flag = layout.flag,
+                headBox = layout.headBox,
+                textBox = layout.textBox,
+                border = layout.border,
+                lineY = layout.lineY,
+                fontSize = layout.fontSize,
+                showHead = layout.showHead,
+            },
+        }
+        lib.Debug(string.format("TalkExCoroutine: page %d/%d, lines=%d",
+            pageIndex, #pages, #pages[pageIndex]))
+
+        -- 清除当前按键，防止同一按键立即触发下一页/下一个对话
+        InputManager.getInstance():clearCurrentKey()
+        local key = InputAsync.WaitKeyCoroutine()
+        lib.Debug("TalkExCoroutine: key pressed=" .. tostring(key))
     end
-    
+
     currentTalk = nil
     lib.Debug("TalkExCoroutine: finished")
 end
@@ -241,36 +170,25 @@ function TalkAsync.draw()
     if not currentTalk then
         return
     end
-    
-    lib.Debug("TalkAsync.draw: drawing talk with headid=" .. tostring(currentTalk.headid))
-    
-    local talk = currentTalk
-    local xy = talk.xy
-    local picw = talk.picw
-    local pich = talk.pich
-    local talkBorder = talk.talkBorder
-    local headid = talk.headid
-    
-    -- 显示头像
-    if headid >= 0 then
-        local boxpicw = picw + 10
-        local boxpich = pich + 10
-        DrawBox(xy.headx, xy.heady, xy.headx + boxpicw, xy.heady + boxpich, C_WHITE)
-        
-        local w, h = lib.PicGetXY(1, headid * 2)
-        local x = (picw - w) / 2
-        local y = (pich - h) / 2
-        lib.PicLoadCache(1, headid * 2, xy.headx + 5 + x, xy.heady + 5 + y, 1)
+
+    -- 战斗/死亡/开始画面不画对话气泡。
+    --
+    -- currentTalk 是模块级状态，只在 TalkExCoroutine 的等键点被清空。
+    -- 若战斗在对话挂起期间开始（韦大宝「佣兵行会」：TalkEx("祝你好运！")
+    -- → WarMain 开战），currentTalk 会一直留着，而 EventBridge:draw()
+    -- 每帧无条件调用本函数，于是对话框被反复画在战斗画面之上，
+    -- 表现为「进入战斗后韦大宝的对话框没有消失」。
+    if JY and JY.Status and (JY.Status == GAME_WMAP or JY.Status == GAME_DEAD
+                             or JY.Status == GAME_START) then
+        return
     end
-    
-    -- 绘制对话框
-    DrawBox(xy.talkx, xy.talky, xy.talkx + talk.boxtalkw, xy.talky + talk.boxtalkh, C_WHITE)
-    
-    -- 绘制文字
-    for i, line in ipairs(talk.lines) do
-        DrawString(xy.talkx + 5, xy.talky + 5 + talkBorder + (i-1) * (CC.DefaultFont + talkBorder),
-                   line, C_WHITE, CC.DefaultFont)
+
+    local dialog = getDialog()
+    if not dialog or not dialog.draw then
+        return
     end
+
+    dialog.draw(currentTalk.spec, currentTalk.layout)
 end
 
 -- 简单版本对话（协程版本）

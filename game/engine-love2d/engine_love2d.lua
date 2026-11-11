@@ -26,8 +26,11 @@ local lib = require("engine-love2d.lib_love")
 
 -- 将 lib_love 中的函数映射到 EngineAPI 各模块
 -- render 模块
-EngineAPI.render.text = function(x, y, str, color, size)
-    lib.DrawStr(x, y, str, color, size)
+-- fontname 必须透传：原版 luafun.c:25 是
+--   JY_DrawStr(x, y, str, color, size, fontname)
+-- 六个参数全传。丢掉 fontname 会让中文回落到 LÖVE 内置字体（无中文字形）。
+EngineAPI.render.text = function(x, y, str, color, size, fontname)
+    lib.DrawStr(x, y, str, color, size, fontname)
 end
 
 EngineAPI.render.fillRect = function(x1, y1, x2, y2, color)
@@ -276,6 +279,233 @@ EngineAPI.font.get = function(fontName, size)
     return love.graphics.newFont(20)
 end
 
+-- dialog 模块
+--
+-- 对话框排版与绘制。排版算法本身在 framework/dialog_layout.lua（纯函数），
+-- 本模块只负责：
+--   ① 提供真实字体度量（font:getWidth / getHeight），这是 Love2D 独有的能力；
+--   ② 决定 6 个 flag 的锚点坐标（屏幕尺寸相关，mud/web 不需要）；
+--   ③ 实际绘制（头像框 + 对话框 + 文本行）。
+--
+-- 为什么 measure 必须是纯函数：它会被单测直接调用，且每帧不应重算。
+-- 调用方（framework/talk_async.lua）在进入新页时 measure 一次并缓存 layout。
+local DialogLayout = require("framework.dialog_layout")
+
+-- 对话框布局常量（与原版 TalkEx 对齐）
+local DLG_PICW, DLG_PICH = 100, 100          -- 最大头像宽高
+local DLG_BOXPICW, DLG_BOXPICH = 110, 110    -- 头像框 = pic + 10
+local DLG_DX, DLG_DY = 2, 2                  -- 屏幕边距
+local DLG_PAD = 5                            -- 框内边距
+local DLG_MINLINES = 3                       -- 框高按 3 行算（不足留空）
+local DLG_MAXW = nil                         -- 延迟计算（依赖 CC.ScreenW）
+
+local function dlgMaxWidth()
+    if DLG_MAXW == nil then
+        local screenW = (CC and CC.ScreenW) or 1024
+        DLG_MAXW = screenW - 2 * DLG_DX - DLG_BOXPICW - 2
+    end
+    return DLG_MAXW
+end
+
+-- 绘制带背景的方框（引擎内自绘，不依赖 script/jymain.lua 的 DrawBox）
+--
+-- 复刻 script/jymain.lua:2079 DrawBox 的视觉：先填半透明黑底再描两道凹角白边。
+-- 引擎不能 require script 层（依赖方向：engine → framework/script 单向），
+-- 所以这里用 lib.Background / lib.DrawRect 原语重写同一效果。
+local function dlgDrawBox(x1, y1, x2, y2, color)
+    local s = 4
+    lib.Background(x1, y1 + s, x1 + s, y2 - s, 128)
+    lib.Background(x1 + s, y1, x2 - s, y2, 128)
+    lib.Background(x2 - s, y1 + s, x2, y2 - s, 128)
+
+    local r, g, b = EngineAPI.color.unpack(color % 0x1000000)
+    -- 内层深色描边
+    local dark = EngineAPI.color.pack(
+        math.floor(r * 255 / 2),
+        math.floor(g * 255 / 2),
+        math.floor(b * 255 / 2))
+
+    local function box1(bx1, by1, bx2, by2, col)
+        local ss = 4
+        local segs = {
+            { bx1 + ss, by1, bx2 - ss, by1 },
+            { bx2 - ss, by1, bx2 - ss, by1 + ss },
+            { bx2 - ss, by1 + ss, bx2, by1 + ss },
+            { bx2, by1 + ss, bx2, by2 - ss },
+            { bx2, by2 - ss, bx2 - ss, by2 - ss },
+            { bx2 - ss, by2 - ss, bx2 - ss, by2 },
+            { bx2 - ss, by2, bx1 + ss, by2 },
+            { bx1 + ss, by2, bx1 + ss, by2 - ss },
+            { bx1 + ss, by2 - ss, bx1, by2 - ss },
+            { bx1, by2 - ss, bx1, by1 + ss },
+            { bx1, by1 + ss, bx1 + ss, by1 + ss },
+            { bx1 + ss, by1 + ss, bx1 + ss, by1 },
+        }
+        for _, sg in ipairs(segs) do
+            lib.DrawRect(sg[1], sg[2], sg[3], sg[4], col)
+        end
+    end
+
+    box1(x1 + 1, y1 + 1, x2, y2, dark)
+    box1(x1, y1, x2 - 1, y2 - 1, color)
+end
+
+-- 取字体：优先真实字体名，回退 LÖVE 内置
+local function dlgFont(size)
+    local fontname = (CC and CC.FontName) or nil
+    local ok, font = pcall(function()
+        return lib.getFont(fontname, size)
+    end)
+    if ok and font then
+        return font
+    end
+    return love.graphics.newFont(size)
+end
+
+-- 由框宽和 flag 计算锚点坐标
+local function dlgBoxes(flag, boxW, boxH)
+    local screenW = (CC and CC.ScreenW) or 1024
+    local screenH = (CC and CC.ScreenH) or 768
+    local rightHeadX = screenW - 1 - DLG_DX - DLG_BOXPICW
+    local bottomY = screenH - DLG_DY - DLG_BOXPICH
+    local leftTalkX = DLG_DX + DLG_BOXPICW + 2
+    -- 右锚定：talkx 随实际框宽重算，保证右边界贴住头像框
+    local rightTalkX = screenW - 1 - DLG_DX - DLG_BOXPICW - boxW - 2
+
+    -- flag 语义（与原版 xy 表一致）：
+    --   0 左上+头像   1 右下+头像   2 左上无头像
+    --   3 右下+头像   4 右上+头像   5 左下+头像
+    local anchors = {
+        [0] = { headX = DLG_DX, headY = DLG_DY,               talkX = leftTalkX,  talkY = DLG_DY,      showHead = true },
+        [1] = { headX = rightHeadX, headY = bottomY,          talkX = rightTalkX, talkY = bottomY,     showHead = true },
+        [2] = { headX = DLG_DX, headY = DLG_DY,               talkX = leftTalkX,  talkY = DLG_DY,      showHead = false },
+        [3] = { headX = rightHeadX, headY = bottomY,          talkX = rightTalkX, talkY = bottomY,     showHead = true },
+        [4] = { headX = rightHeadX, headY = DLG_DY,           talkX = rightTalkX, talkY = DLG_DY,      showHead = true },
+        [5] = { headX = DLG_DX, headY = bottomY,              talkX = leftTalkX,  talkY = bottomY,     showHead = true },
+    }
+    local a = anchors[flag] or anchors[0]
+
+    local result = {
+        textBox = { x = a.talkX, y = a.talkY, w = boxW, h = boxH },
+        showHead = a.showHead,
+    }
+    if a.showHead then
+        result.headBox = { x = a.headX, y = a.headY, w = DLG_BOXPICW, h = DLG_BOXPICH }
+    end
+    return result
+end
+
+--- 排版计算（纯函数：不绘制、不阻塞、不写全局状态）
+EngineAPI.dialog.measure = function(spec)
+    spec = spec or {}
+    local text = spec.text or ""
+    local headId = spec.headId or -1
+    local flag = spec.flag or 0
+    if flag < 0 or flag > 5 then
+        flag = 0
+    end
+
+    local size = (CC and CC.DefaultFont) or 24
+    local font = dlgFont(size)
+
+    -- 真实像素测量：自适应字体 / 字号 / 分辨率的关键
+    local widthFn
+    if font and font.getWidth then
+        widthFn = function(s)
+            return font:getWidth(s)
+        end
+    else
+        widthFn = DialogLayout.emWidthFn(size)
+    end
+
+    -- 行高取真实 getHeight（实测 27，≠ 字号 24）。
+    -- 若直接拿 CC.DefaultFont 当行高，每行差 3px，3 行累计 9px，下行会被上行挤压。
+    local lineHeight = size
+    if font and font.getHeight then
+        local ok, h = pcall(function() return font:getHeight() end)
+        if ok and h and h > 0 then
+            lineHeight = h
+        end
+    end
+    if lineHeight < size then
+        lineHeight = size * 1.125   -- 回退估算：24 * 1.125 = 27
+    end
+
+    local lay = DialogLayout.layoutText(text, {
+        size = size,
+        pad = DLG_PAD,
+        minWidth = 12 * size + 10,
+        maxWidth = dlgMaxWidth(),
+        linesPerPage = DLG_MINLINES,
+        widthFn = widthFn,
+    })
+
+    local boxes = dlgBoxes(flag, lay.width, DLG_BOXPICH)
+    if not boxes.showHead then
+        headId = -1
+    end
+
+    -- 行 y 坐标：按 3 行固定算边距，不足 3 行则顶部对齐、下方留空。
+    -- talkBorder = (110 - 3*27) / 4 = 7.25
+    local border = (DLG_BOXPICH - DLG_MINLINES * lineHeight) / (DLG_MINLINES + 1)
+    local lineY = {}
+    for i = 1, #lay.lines do
+        lineY[i] = boxes.textBox.y + DLG_PAD + border + (i - 1) * lineHeight
+    end
+
+    return {
+        width = lay.width,
+        height = DLG_BOXPICH,
+        lineHeight = lineHeight,
+        lines = lay.lines,
+        pages = lay.pages,
+        linesPerPage = lay.linesPerPage,
+        headId = headId,
+        flag = flag,
+        headBox = boxes.headBox,
+        textBox = boxes.textBox,
+        border = border,
+        lineY = lineY,
+        fontSize = size,
+    }
+end
+
+--- 绘制对话（只能在 love.draw() 内调用）
+EngineAPI.dialog.draw = function(spec, layout)
+    if not layout then
+        return
+    end
+    local size = layout.fontSize or ((CC and CC.DefaultFont) or 24)
+    local color = (_G and _G.C_WHITE) or 0xFFFFFF
+
+    -- 头像框 + 头像
+    if layout.showHead ~= false and layout.headId and layout.headId >= 0 and layout.headBox then
+        local hb = layout.headBox
+        dlgDrawBox(hb.x, hb.y, hb.x + hb.w, hb.y + hb.h, color)
+        local w, h = lib.PicGetXY(1, layout.headId * 2)
+        local offX = (DLG_PICW - (w or 0)) / 2
+        local offY = (DLG_PICH - (h or 0)) / 2
+        lib.PicLoadCache(1, layout.headId * 2, hb.x + 5 + offX, hb.y + 5 + offY, 1)
+    end
+
+    -- 对话框（框宽由 measure 决定，随内容自适应）
+    local tb = layout.textBox
+    dlgDrawBox(tb.x, tb.y, tb.x + tb.w, tb.y + tb.h, color)
+
+    -- 文本行：行距用真实行高 lineHeight（27），不是 CC.DefaultFont（24）
+    local fontname = (CC and CC.FontName) or nil
+    for i, line in ipairs(layout.lines) do
+        if line and line ~= "" then
+            lib.DrawStr(tb.x + DLG_PAD, layout.lineY[i], line, color, size, fontname)
+        end
+    end
+end
+
+--- 清除对话状态（幂等）
+EngineAPI.dialog.clear = function()
+    -- 无引擎侧缓存状态；layout 由调用方持有
+end
+
 -- color 模块
 EngineAPI.color.pack = function(r, g, b)
     return r * 65536 + g * 256 + b
@@ -296,8 +526,14 @@ EngineAPI.debug.log = function(...)
 end
 
 -- coroutine 模块
+-- 注意：LuaJIT/Lua5.1 的 coroutine.running() 在主线程也返回非 nil
+-- （返回主线程对象 + ismain=true），所以不能只用 ~= nil 判断。
+-- 必须用第二个返回值 ismain 排除主线程；Lua5.2+ 主线程返回 nil。
 EngineAPI.coroutine.isRunning = function()
-    return coroutine.running() ~= nil
+    local co, ismain = coroutine.running()
+    if co == nil then return false end
+    if ismain == true then return false end
+    return true
 end
 
 EngineAPI.coroutine.yieldPoint = function()

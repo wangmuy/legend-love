@@ -10,6 +10,7 @@ local EventExecutor = require("framework.event_executor")
 local JyMainAsync = require("framework.jymain_async")
 local CoroutineScheduler = require("framework.coroutine_scheduler")
 local MenuAsync = require("framework.menu_async")
+local TalkAsync = require("framework.talk_async")
 local PerfLog = require("framework.perf_log")
 
 -- 游戏状态处理器表
@@ -136,18 +137,27 @@ handlers["GAME_MMAP"] = {
             PerfLog.mark("GAME_MMAP entering subscene", tostring(JY.SubScene))
             lib.Debug("Entering subscene: " .. tostring(JY.SubScene))
             
-            -- 先切换状态，让exit处理资源清理
             local newState = getStateId("GAME_SMAP")
-            lib.Debug("Setting JY.Status to GAME_SMAP: " .. tostring(newState))
-            JY.Status = newState
+            lib.Debug("Entering GAME_SMAP: " .. tostring(newState))
             JY.MmapMusic = -1
-            
+
             JY.MyPic = GetMyPic()
             JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
             JY.Base["人Y1"] = JY.Scene[JY.SubScene]["入口Y"]
-            
+
+            -- 对齐原版 Game_MMap：进子场景后调用 Init_SMap(1) 提示场景名
+            -- （原版 jymain.lua:430）。这里通过 switchTo 的 data 把
+            -- showname 传给 GAME_SMAP.enter，避免在 update 里直接调
+            -- Init_SMap 造成「先画一帧无名、再画一帧有名」的闪烁。
+            PerfLog.mark("GAME_MMAP.switchState(GAME_SMAP, showname=1)")
+            EventBridge.getInstance():switchState(newState, { showname = 1 })
+
             lib.Debug("Subscene transition completed")
         end
+
+        -- 云朵漂移：原版 kys_main.cpp 主循环每 40ms 移动一次（MMAPAMI>0 门控
+        -- 在 CloudTick 内部），与主角移动解耦，每帧调用即可。
+        lib.CloudTick()
     end,
     
     -- 每帧渲染
@@ -177,11 +187,25 @@ handlers["GAME_MMAP"] = {
 
 -- GAME_SMAP 状态处理器
 handlers["GAME_SMAP"] = {
-    enter = function()
+    enter = function(prevState, data)
         lib.Debug("Enter GAME_SMAP state")
-        -- 在enter中调用Init_SMap，确保状态已经切换
-        local t = PerfLog.begin("GAME_SMAP.enter.Init_SMap(0)")
-        Init_SMap(0)
+        -- showname=1 表示要提示场景名。原版两处调用带 1：
+        --   Game_MMap 进子场景（jymain.lua:430）、场景内跳转（jymain.lua:1331）
+        -- LÖVE 版把「主地图进子场景」改成 switchTo 传参，必须在这里接住，
+        -- 否则进客栈等小场景时永远只走 Init_SMap(0)，场景名不显示。
+        local showname = (data and data.showname) or 0
+
+        -- Init_SMap(1) 内部会调 jymain 的 ShowSceneName()，后者转发到全局
+        -- ShowSceneNameAsyncImpl。该全局正常由 AsyncGlobals.install() 注入，
+        -- 但那条路径只在事件脚本执行时才会走；从主地图进场景时可能尚未安装，
+        -- 因此这里兜底注入一次（幂等）。
+        if showname == 1 then
+            local SceneNameAsync = require("framework.scene_name_async")
+            rawset(_G, "ShowSceneNameAsyncImpl", SceneNameAsync.Show)
+        end
+
+        local t = PerfLog.begin("GAME_SMAP.enter.Init_SMap(" .. tostring(showname) .. ")")
+        Init_SMap(showname)
         PerfLog.finish(t)
     end,
     
@@ -190,6 +214,10 @@ handlers["GAME_SMAP"] = {
     end,
     
     update = function(dt)
+        -- 场景名提示期间，StateMachine 会优先更新子状态并跳过本函数
+        -- （见 state_machine.lua 的 update：有子状态时直接 return），
+        -- 因此这里不需要再判断提示状态。
+        
         -- 如果有活动菜单，不处理游戏输入
         if MenuAsync.hasActiveMenu() then
             return
@@ -302,8 +330,12 @@ handlers["GAME_SMAP"] = {
         if InputManager.disableInput then
             keypress = -1  -- 忽略按键
         end
-        
-        if keypress ~= -1 then
+
+        -- 事件执行期间（JY.CurrentD >= 0，含开场强制对话）冻结玩家输入：
+        -- 原版 Game_SMap 是阻塞式，事件执行时主循环不轮询按键。事件驱动下若不冻结，
+        -- 玩家连按的方向键会让主角在对话期间移动（甚至走进路过事件实体），
+        -- 空格键会触发面向 tile 的事件，破坏强制流程并污染 JY.CurrentD/MyPic。
+        if keypress ~= -1 and not (JY and JY.CurrentD >= 0) then
             JY.MyTick = 0
             if keypress == VK_ESCAPE then
                 startMenuCoroutine()
@@ -354,8 +386,21 @@ handlers["GAME_SMAP"] = {
         end
         
         -- 更新主角贴图（根据方向和走路帧）
-        -- 只有在动画播放期间才跳过更新
-        if not JY.AnimationState.active then
+        -- 跳过条件：
+        --   1. 动画播放期间（instruct_27 等）：动画帧贴图由 update 驱动，不能被覆盖
+        --   2. 事件执行期间（JY.CurrentD >= 0）：原版 Game_SMap 是阻塞式，事件执行
+        --      时主循环暂停，贴图保持不变。事件驱动下事件协程挂起（instruct_1 对话
+        --      yield 等按键）期间 update 仍在跑，若照常重算 GetMyPic()，开场新游戏
+        --      （卧姿 3445）的卧姿贴图会在对话期间被覆盖成站立（GetMyPic 只能算出
+        --      站立/行走帧 2494~2522，永远算不出卧姿），直到 instruct_27 动画
+        --      开始才恢复卧姿（用户报告的开场 bug 根因）。
+        --   3. 对话框显示中（TalkAsync.currentTalk ~= nil）：兜底守卫。CurrentD 是
+        --      共享全局，若开场事件被内联执行（startNewGame 内联路径）而玩家连按
+        --      空格触发面向 tile 的嵌套事件协程，其结束时会把 CurrentD 复位 -1，
+        --      条件 2 失效、卧姿仍会被覆盖；对话显示中贴图必须保持不变，故以
+        --      currentTalk 为第二道闸。
+        local _talkActive = TalkAsync.getCurrentTalk() ~= nil
+        if not JY.AnimationState.active and not _talkActive and not (JY and JY.CurrentD >= 0) then
             JY.MyPic = GetMyPic()
         end
         DtoSMap()
@@ -373,6 +418,10 @@ handlers["GAME_SMAP"] = {
         -- 在 Love2D 中，每一帧都需要重新绘制
         -- 禁用 FastShowScreen 优化以避免黑屏
         DrawSMap(0)
+        
+        -- 场景名提示由 EventBridge:draw() 里的 SceneNameAsync.draw() 负责：
+        -- 它排在 StateMachine:draw()（含本函数的 DrawSMap）之后，
+        -- 因此不会被全屏重绘覆盖。
         
         if CC.ShowXY == 1 then
             DrawString(10, CC.ScreenH - 20, string.format("%s %d %d", JY.Scene[JY.SubScene]["名称"], JY.Base["人X1"], JY.Base["人Y1"]), C_GOLD, 16)

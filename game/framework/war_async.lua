@@ -98,6 +98,16 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     -- 设置状态为战斗（在初始化完成后）
     local prevState = JY.Status
     JY.Status = GAME_WMAP
+
+    -- 清掉可能残留的对话气泡。
+    --
+    -- 事件脚本里常见「先 TalkEx 再开战」的写法（韦大宝「佣兵行会」就是
+    -- TalkEx("祝你好运！") 之后立刻 WarMain）。TalkExCoroutine 停在等键点时
+    -- currentTalk 仍被设置，战斗一旦接管屏幕，那个协程再没机会执行清空语句，
+    -- 而 EventBridge:draw() 每帧无条件调用 TalkAsync.draw()，对话框就会被
+    -- 反复画在战斗画面之上——即「进入战斗后韦大宝的对话框没有消失」。
+    local TalkAsync = require("framework.talk_async")
+    if TalkAsync.clear then TalkAsync.clear() end
     
     -- 战斗主循环
     local first = 0
@@ -183,6 +193,32 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     War_SettlementCoroutine(warStatus)
     
     War_EndPersonData(warState.isExp, warStatus)
+
+    -- 本场战斗经验清零。
+    --
+    -- 原版 WAR 数据每场重建（WarLoad 里重新读表），而事件驱动架构下 WAR
+    -- 表跨场复用，不清零会让 WAR.Person[i]["经验"] 逐场累加，下一场
+    -- War_EndPersonData 发放的经验就是「本场 + 上一场」的叠加值。
+    -- 对齐原版 WarMain 收尾的同名循环。
+    for i = 0, WAR.PersonNum - 1 do
+        WAR.Person[i]["经验"] = 0
+    end
+    
+    -- 恢复场景贴图与音乐（对齐原版 WarMain 收尾：ShowSlow/进门音乐/贴图重载。
+    -- 战斗期间 PicInit 清空了 SMAP 贴图（槽0=WMAP），不重载则回场景后渲染缺图）
+    lib.ShowSlow(50, 1)
+    if JY.Scene and JY.Scene[JY.SubScene] and JY.Scene[JY.SubScene]["进门音乐"] >= 0 then
+        PlayMIDI(JY.Scene[JY.SubScene]["进门音乐"])
+    else
+        PlayMIDI(0)
+    end
+    CleanMemory()
+    lib.PicInit()
+    lib.PicLoadFile(CC.SMAPPicFile[1], CC.SMAPPicFile[2], 0)
+    lib.PicLoadFile(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
+    if CC.LoadThingPic == 1 then
+        lib.PicLoadFile(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
+    end
     
     -- 恢复状态
     JY.Status = prevState
@@ -359,6 +395,25 @@ War_AutoMoveCoroutine = function(wugongnum)
         
         if x == nil then
             local enemyid = War_AutoSelectEnemy()
+
+            -- War_AutoSelectEnemy_near() 在「找不到任何存活敌人」时返回 -1，
+            -- 此时 WAR.Person[-1] 为 nil，下面 WAR.Person[enemyid]["坐标X"]
+            -- 会抛 attempt to index a nil value。
+            --
+            -- 这个分支在战斗结局已定后必然被走到：WarMainCoroutine 的主循环
+            -- 在内层 `while p < WAR.PersonNum` 中先执行人物行动、再调
+            -- War_isEnd()；结局返回 1/2 后内层循环仍要把剩余 p 跑完，
+            -- 那些单位照样执行 War_AutoCoroutine，而此时敌方（或我方）已全灭，
+            -- 寻路自然找不到目标。
+            --
+            -- 原版是阻塞式实现，崩了会直接抛到玩家面前；本项目的战斗协程
+            -- 抛错会被调度器静默记录（error.txt），收尾段的 JY.Status 恢复、
+            -- 贴图重载、warState.result 全部不执行，玩家就永久卡在战斗画面。
+            -- 因此这里直接跳过寻路（本回合无法靠近，等价于原地不动）。
+            if not enemyid or enemyid < 0 or not WAR.Person[enemyid] then
+                return 0
+            end
+
             War_CalMoveStep(WAR.CurID, 100, 0)
             
             local minDest = math.huge
@@ -448,33 +503,19 @@ War_AutoCoroutine = function()
 end
 
 -- 战斗结算（协程版本）
+-- 对齐原版 WarMain：结算只显示"战斗胜利/失败"，经验分配、升级、修炼
+-- 统一由随后的 War_EndPersonData 处理（原版即如此）。
+-- 注意：旧实现在这里调用 AddPersonAttrib(pid, "经验值", ...)，但人物字段
+-- 只有"经验"（jyconst.lua Person_S），没有"经验值"，加法必然报错 →
+-- 战斗协程死亡 → JY.Status 永不恢复 → 胜利后卡在战斗场景（P 根因）。
 War_SettlementCoroutine = function(warStatus)
     local scheduler = CoroutineScheduler.getInstance()
+    
+    WAR.ShowHead = 0
     
     if warStatus == 1 then
         -- 胜利
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗胜利", C_WHITE, CC.DefaultFont)
-        
-        -- 分配经验
-        for i = 0, WAR.PersonNum - 1 do
-            if WAR.Person[i]["我方"] == true and WAR.Person[i]["死亡"] == false then
-                local pid = WAR.Person[i]["人物编号"]
-                local exp = WAR.Person[i]["经验"] or 0
-                
-                AddPersonAttrib(pid, "经验值", exp)
-                
-                -- 检查升级
-                local newExp = JY.Person[pid]["经验值"]
-                local levelUpExp = JY.Person[pid]["等级"] * 100
-                
-                if newExp >= levelUpExp then
-                    JY.Person[pid]["等级"] = JY.Person[pid]["等级"] + 1
-                    JY.Person[pid]["经验值"] = newExp - levelUpExp
-                    AsyncMessageBox.ShowMessageCoroutine(-1, -1, 
-                        JY.Person[pid]["姓名"] .. " 升级了！", C_WHITE, CC.DefaultFont)
-                end
-            end
-        end
     elseif warStatus == 2 then
         -- 失败
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "战斗失败", C_WHITE, CC.DefaultFont)
