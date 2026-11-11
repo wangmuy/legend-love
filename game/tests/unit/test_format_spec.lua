@@ -11,6 +11,19 @@ local T = {}
 
 local REF = "../reference/allmods"
 
+-- 枚举 reference/allmods/kys-* 目录（跨平台，不依赖 ls）
+local function listModDirs()
+    local Fs = require("framework.fs_compat")
+    local out = {}
+    for _, name in ipairs(Fs.listDirectory(REF)) do
+        if name:match("^kys%-.+") and Fs.directoryExists(REF .. "/" .. name) then
+            out[#out + 1] = REF .. "/" .. name
+        end
+    end
+    table.sort(out)
+    return out
+end
+
 -- 缓存全量结果（6773 项，避免重复遍历）
 local _all = nil
 local function all()
@@ -43,8 +56,7 @@ end
 function T.testAllModsHdgrpCoverage()
     print("\n=== Test: 20 MOD 的 hdgrp 均覆盖完整 ===")
     local n, bad = 0, 0
-    local p = io.popen("ls -d " .. REF .. "/kys-*")
-    for m in p:lines() do
+    for _, m in ipairs(listModDirs()) do
         n = n + 1
         local r = FS.verifyPair(m .. "/resource/hdgrp.idx", m .. "/resource/hdgrp.grp")
         if not r.ok then
@@ -52,7 +64,6 @@ function T.testAllModsHdgrpCoverage()
             print("  FAIL " .. m:match("([^/]+)$"))
         end
     end
-    p:close()
     TestHelper.assertEquals(20, n, "20 个 MOD")
     TestHelper.assertEquals(0, bad, "20/20 覆盖完整")
 end
@@ -324,8 +335,7 @@ end
 function T.testWarStaRecordCountsVary()
     print("\n=== Test: war.sta 记录数随 MOD 变化 ===")
     local counts = {}
-    local p = io.popen("ls -d " .. REF .. "/kys-*")
-    for m in p:lines() do
+    for _, m in ipairs(listModDirs()) do
         local path = m .. "/resource/war.sta"
         if FS.fileSize(path) then
             local r = FS.verifyFixedRecords(path, 186)
@@ -333,7 +343,6 @@ function T.testWarStaRecordCountsVary()
             counts[r.records] = true
         end
     end
-    p:close()
     local n = 0
     for _ in pairs(counts) do n = n + 1 end
     TestHelper.assertTrue(n > 1, "记录数非固定（" .. n .. " 种）")

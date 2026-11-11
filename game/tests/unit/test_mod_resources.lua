@@ -10,6 +10,7 @@
 --   music/*.mid   → PENDING（待决策，见 epic TODO）
 
 local TestHelper = require("tests.test_helper")
+local Fs = require("framework.fs_compat")
 local TestModResources = {}
 
 local REF = "../reference/allmods"
@@ -17,36 +18,24 @@ local GAME = "."
 
 -- 列出目录下的条目（无则空表）
 local function ls(dir)
-    local out = {}
-    local p = io.popen("ls -1 '" .. dir .. "' 2>/dev/null")
-    if p then
-        for line in p:lines() do out[#out + 1] = line end
-        p:close()
-    end
-    return out
+    return Fs.listDirectory(dir)
 end
 
 local function readText(path)
-    local f = io.open(path, "rb")
-    if not f then return nil end
-    local d = f:read("*a")
-    f:close()
-    return d
+    return Fs.readFile(path)
 end
 
 local function dirExists(path)
-    local p = io.popen("test -d '" .. path .. "' && echo yes 2>/dev/null")
-    if not p then return false end
-    local r = p:read("*l")
-    p:close()
-    return r == "yes"
+    return Fs.directoryExists(path)
 end
 
 -- 全部 MOD 源目录
 local function allModDirs()
     local out = {}
     for _, name in ipairs(ls(REF)) do
-        if name:match("^kys%-") then out[#out + 1] = name end
+        if name:match("^kys%-") and dirExists(REF .. "/" .. name) then
+            out[#out + 1] = name
+        end
     end
     return out
 end
@@ -64,16 +53,15 @@ local function modHasFile(modDir, filename)
     return false
 end
 
--- 收集 game/ 下所有 .lua 源码（递归），返回 path→content
+-- 收集 game/ 下所有 .lua 源码（递归，跳过 mods/ 产物），返回 path→content
 local function allGameSources()
     local out = {}
-    local p = io.popen("find '" .. GAME .. "' -name '*.lua' -not -path '*/mods/*' 2>/dev/null")
-    if p then
-        for line in p:lines() do
-            local c = readText(line)
-            if c then out[line] = c end
+    for _, rel in ipairs(Fs.walkFiles(GAME)) do
+        if rel:match("%.lua$") and not rel:match("^%.?/?mods/") then
+            local key = rel:gsub("^%./", "")
+            local c = readText(key)
+            if c then out[key] = c end
         end
-        p:close()
     end
     return out
 end
@@ -84,8 +72,10 @@ end
 local function runtimeSources()
     local out = {}
     for path, content in pairs(allGameSources()) do
-        if path:find("/script/", 1, true) or path:find("/engine-love2d/", 1, true)
-            or path:find("/engine-mud/", 1, true) then
+        -- allGameSources 的 key 是相对 game/ 的正斜杠路径（如 "script/jymain.lua"），
+        -- 用锚定前缀匹配，避免依赖前导 "./"
+        if path:match("^script/") or path:match("^engine%-love2d/")
+            or path:match("^engine%-mud/") then
             out[path] = content
         end
     end
@@ -155,13 +145,12 @@ function TestModResources.testAllsinbkOnlyInDefinitionAndCall()
     -- （构建器的 SAVE_TEMPLATE 列 allsinbk.grp 是存档模板路由，与引擎读取无关）
     local sources = {}
     for _, dir in ipairs({ "script", "engine-love2d" }) do
-        local p = io.popen("find '" .. dir .. "' -name '*.lua' 2>/dev/null")
-        if p then
-            for line in p:lines() do
-                local c = readText(line)
-                if c then sources[line] = c end
+        for _, rel in ipairs(Fs.walkFiles(dir)) do
+            if rel:match("%.lua$") then
+                local key = dir .. "/" .. rel
+                local c = readText(key)
+                if c then sources[key] = c end
             end
-            p:close()
         end
     end
     local hits = {}
@@ -401,42 +390,39 @@ end
 -- 且不再依赖测试执行顺序。
 function TestModResources.restoreAllProductSaves()
     local restored, removed = 0, 0
-    local p = io.popen("ls -d mods/*/save/ 2>/dev/null")
-    if not p then return restored, removed end
+    -- 只同步用户存档槽（rN/dN/sN.grp|idx），与 mod_build 的路由一致：
+    -- save/ 下其它文件（ranger.*/allsdef.* 模板、作者手工备份）由构建器
+    -- 送到 data/，产物 save/ 里本就不该有，无差别拷贝会造出假文件。
+    local function isSaveSlot(name)
+        local base, ext = name:lower():match("^([rds]%d+)%.([a-z]+)$")
+        if not base then return false end
+        return ext == "grp" or ext == "idx"
+    end
+    TestModResources.isSaveSlot = isSaveSlot
     local dirs = {}
-    for d in p:lines() do dirs[#dirs + 1] = d end
-    p:close()
-    for _, d in ipairs(dirs) do
-        local slug = d:match("mods/([^/]+)/save/")
-        if slug then
-            local src = "../reference/allmods/kys-" .. slug .. "/save/"
-            -- 1) 删除产物中源包不存在的文件（测试残留）
-            local lp = io.popen("ls " .. d .. " 2>/dev/null")
-            if lp then
-                local names = {}
-                for name in lp:lines() do names[#names + 1] = name end
-                lp:close()
-                for _, name in ipairs(names) do
-                    local fs = io.open(src .. name, "rb")
-                    if fs then fs:close() else
-                        os.remove(d .. name)
-                        removed = removed + 1
-                    end
-                end
+    for _, slug in ipairs(Fs.listDirectory("mods")) do
+        if slug:sub(1, 1) ~= "_" and Fs.directoryExists("mods/" .. slug .. "/save") then
+            dirs[#dirs + 1] = slug
+        end
+    end
+    table.sort(dirs)
+    for _, slug in ipairs(dirs) do
+        local d = "mods/" .. slug .. "/save/"
+        local src = "../reference/allmods/kys-" .. slug .. "/save/"
+        -- 1) 删除产物中源包不存在的槽文件（测试残留）
+        for _, name in ipairs(Fs.listDirectory(d)) do
+            if isSaveSlot(name) and not Fs.fileExists(src .. name) then
+                os.remove(d .. name)
+                removed = removed + 1
             end
-            -- 2) 源包有的文件逐字节拷回
-            local sp = io.popen("ls " .. src .. " 2>/dev/null")
-            if sp then
-                local names = {}
-                for name in sp:lines() do names[#names + 1] = name end
-                sp:close()
-                for _, name in ipairs(names) do
-                    local f = io.open(src .. name, "rb")
-                    if f then
-                        local data = f:read("*a"); f:close()
-                        local out = io.open(d .. name, "wb")
-                        if out then out:write(data); out:close(); restored = restored + 1 end
-                    end
+        end
+        -- 2) 源包有的槽文件逐字节拷回
+        for _, name in ipairs(Fs.listDirectory(src)) do
+            if isSaveSlot(name) then
+                local data = Fs.readFile(src .. name)
+                if data then
+                    local out = io.open(d .. name, "wb")
+                    if out then out:write(data); out:close(); restored = restored + 1 end
                 end
             end
         end
@@ -450,36 +436,25 @@ function TestModResources.testProductSaveSlotMatchesSource()
     print(string.format("[INFO] 自愈重建产物 save 槽：恢复 %d 个文件，删除 %d 个残留",
         restored, removed))
     local checked = 0
-    local p = io.popen("ls -d mods/*/ 2>/dev/null")
-    if not p then return end
-    for d in p:lines() do
-        local slug = d:match("mods/([^/]+)/")
-        if slug and slug:sub(1, 1) ~= "_" then
+    for _, slug in ipairs(Fs.listDirectory("mods")) do
+        if slug:sub(1, 1) ~= "_" and Fs.directoryExists("mods/" .. slug) then
             -- 逐一比对源 save/ 中的每个文件在产物中的对应项（若产物中存在）
             -- 覆盖 r1.grp / r1.idx / d1.grp / s1.grp / d11.grp / r11.grp / s11.grp 等
-            local lp = io.popen("ls ../reference/allmods/kys-" .. slug .. "/save/ 2>/dev/null")
-            if lp then
-                for name in lp:lines() do
-                    local prod = d .. "save/" .. name
-                    local srcp = "../reference/allmods/kys-" .. slug .. "/save/" .. name
-                    local fp = io.open(prod, "rb")
-                    local fs = io.open(srcp, "rb")
-                    if fp and fs then
-                        local a, b = fp:read("*a"), fs:read("*a")
-                        fp:close(); fs:close()
+            local srcDir = "../reference/allmods/kys-" .. slug .. "/save/"
+            for _, name in ipairs(Fs.listDirectory(srcDir)) do
+                if TestModResources.isSaveSlot(name) then
+                    local prod = "mods/" .. slug .. "/save/" .. name
+                    local a = Fs.readFile(prod)
+                    local b = Fs.readFile(srcDir .. name)
+                    if a and b then
                         TestHelper.assertEquals(#a, #b, slug .. " " .. name .. " 大小一致")
                         TestHelper.assertTrue(a == b, slug .. " " .. name .. " 内容一致")
                         checked = checked + 1
-                    else
-                        if fp then fp:close() end
-                        if fs then fs:close() end
                     end
                 end
-                lp:close()
             end
         end
     end
-    p:close()
     TestHelper.assertTrue(checked >= 40, "检查了 >= 40 个存档文件（" .. checked .. "）")
 end
 

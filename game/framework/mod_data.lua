@@ -35,9 +35,49 @@ ModData.SAVE_DIR = "save/"          -- 原版（未激活 MOD）的可写存档�
 -- ============================================================
 -- IO 适配（可在测试中替换）
 -- ============================================================
+--
+-- 重要：这里的目录探测**不能**用 io.popen 调 POSIX shell。
+--   * Android 上没有 /bin/sh、没有 ls/test；
+--   * .love 打包后资源只在 love.filesystem 的虚拟文件系统里可见；
+--   * Windows 上 io.popen 走 cmd.exe，`test -d` / `ls -1` / `2>/dev/null`
+--     全部失效，会让音效/MIDI 回退在 Windows 原生运行时静默失效。
+--
+-- 因此统一走 EngineAPI.file.directoryExists / listDirectory：
+--   Love2D 引擎 → love.filesystem.getInfo / getDirectoryItems
+--   MUD 引擎    → framework.fs_compat（宿主文件系统，跨平台）
+--   纯 Lua 测试 → fs_compat（未装载 EngineAPI 时的兜底）
 
--- 判断相对 game/ 的路径是否存在（普通文件）。默认用 io.open。
+-- 取文件系统原语：优先 EngineAPI.file，其次 fs_compat，最后本地退化实现。
+local fsCompat  -- 惰性缓存
+
+local function getFs()
+    if EngineAPI and EngineAPI.file then
+        local ef = EngineAPI.file
+        if type(ef.directoryExists) == "function"
+            and type(ef.listDirectory) == "function" then
+            return ef
+        end
+    end
+    if fsCompat == nil then
+        local ok, mod = pcall(require, "framework.fs_compat")
+        fsCompat = ok and mod or false
+    end
+    if fsCompat then return fsCompat end
+    return nil
+end
+
+-- 判断相对 game/ 的路径是否存在（普通文件）。
+-- 运行时必须走 EngineAPI.file.exists（love.filesystem）：
+--   * .love 打包 / Android 下资源只在虚拟文件系统里，io.open 看不到；
+--   * 纯 Lua 测试环境没有 love.filesystem 时才回退 io.open。
 function ModData.exists(path)
+    if path == nil or path == "" then return false end
+    if EngineAPI and EngineAPI.file and EngineAPI.file.exists then
+        local ok, r = pcall(EngineAPI.file.exists, path)
+        if ok and r == true then return true end
+        -- 引擎明确说没有时才算不存在（避免引擎实现缺陷导致误判）
+        if ok and r == false then return false end
+    end
     local f = io.open(path, "rb")
     if f then
         f:close()
@@ -48,24 +88,30 @@ end
 
 -- 判断目录是否存在（用于音效回退：mods/<slug>/sound/ 是否存在）。
 function ModData.dirExists(path)
-    local p = io.popen("test -d '" .. tostring(path) .. "' && echo yes 2>/dev/null")
-    if not p then return false end
-    local r = p:read("*l")
-    p:close()
-    return r == "yes"
+    if path == nil or path == "" then return false end
+    local fs = getFs()
+    if fs then
+        local ok, r = pcall(fs.directoryExists, path)
+        if ok then return r == true end
+    end
+    return false
 end
 
--- 列出目录下匹配 pattern 的文件名（仅文件名，不含目录）。默认用 io.popen 的 ls。
+-- 列出目录下匹配 pattern 的文件名（仅文件名，不含目录）。
 function ModData.listDir(dir, pattern)
     local names = {}
-    local p = io.popen("ls -1 " .. dir .. " 2>/dev/null")
-    if p then
-        for line in p:lines() do
-            if not pattern or line:match(pattern) then
-                names[#names + 1] = line
+    if dir == nil or dir == "" then return names end
+    local fs = getFs()
+    if not fs then return names end
+    local ok, items = pcall(fs.listDirectory, dir)
+    if not ok or type(items) ~= "table" then return names end
+    for _, name in ipairs(items) do
+        if type(name) == "string" and name ~= "" then
+            -- 过滤掉子目录（只保留文件名），并应用调用方给的模式
+            if not pattern or name:match(pattern) then
+                names[#names + 1] = name
             end
         end
-        p:close()
     end
     return names
 end
@@ -163,13 +209,38 @@ end
 function ModData.EnsureSaveDir()
     local dir = ModData.SaveDir()
     -- 去掉结尾斜杠作为目录名
-    local d = dir:gsub("/$", "")
+    local d = dir:gsub("[/\\]+$", "")
     if d == "" then return end
-    os.execute("mkdir -p '" .. d .. "' 2>/dev/null")
+    ModData.makeDir(d)
+end
+
+-- 创建目录（含中间层级）。走 EngineAPI.file.createDirectory（love.filesystem
+-- 在 Android/.love 下会自动补齐层级），纯 Lua 环境回退 fs_compat。
+function ModData.makeDir(d)
+    if d == nil or d == "" then return false end
+    if EngineAPI and EngineAPI.file and EngineAPI.file.createDirectory then
+        local ok, r = pcall(EngineAPI.file.createDirectory, d)
+        -- love.filesystem 的 createDirectory 返回 true；纯 io 实现可能返回 nil
+        if ok and r ~= false then
+            -- 再确认一次，避免引擎实现为空操作
+            if ModData.dirExists(d) then return true end
+        end
+    end
+    local fs = getFs()
+    if fs and fs.makeDirectory then
+        local ok, r = pcall(fs.makeDirectory, d)
+        if ok then return r == true end
+    end
+    return ModData.dirExists(d)
 end
 
 -- 读取整个文件为二进制字符串；失败返回 nil
 function ModData.readFileRaw(path)
+    if path == nil or path == "" then return nil end
+    if EngineAPI and EngineAPI.file and EngineAPI.file.read then
+        local ok, data = pcall(EngineAPI.file.read, path)
+        if ok and data ~= nil then return data end
+    end
     local f = io.open(path, "rb")
     if not f then return nil end
     local data = f:read("*a")
@@ -179,9 +250,21 @@ end
 
 -- 写二进制字符串到文件（自动建父目录）；成功返回 true
 function ModData.writeFileRaw(path, data)
-    local dir = path:match("^(.*)/[^/]*$")
+    local dir = path:match("^(.*)[/\\][^/\\]*$")
     if dir and dir ~= "" then
-        os.execute("mkdir -p '" .. dir .. "' 2>/dev/null")
+        ModData.makeDir(dir)
+    end
+    -- 运行时走 EngineAPI.file.write：Android/.love 下只有 love.filesystem 可写。
+    --
+    -- 必须**回读校验**而不是只看返回值：某些实现（测试桩、只读挂载上的
+    -- 静默失败）会返回 true 却什么也没写。只查「文件存在」也不行 —— 上次
+    -- 运行留下的同名文件会让校验假通过，随后读档拿到旧内容。
+    if EngineAPI and EngineAPI.file and EngineAPI.file.write then
+        local ok, r = pcall(EngineAPI.file.write, path, data, "wb")
+        if ok and r == true and EngineAPI.file.read then
+            local okR, back = pcall(EngineAPI.file.read, path)
+            if okR and back == data then return true end
+        end
     end
     local f = io.open(path, "wb")
     if not f then return false end

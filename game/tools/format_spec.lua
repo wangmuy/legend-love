@@ -17,6 +17,9 @@
 
 local M = {}
 
+-- 跨平台文件系统原语（Windows 上 io.popen 走 cmd.exe，POSIX 命令不可用）
+local Fs = require("framework.fs_compat")
+
 M.REPO_ROOT = ".."
 M.MODS_SRC  = M.REPO_ROOT .. "/reference/allmods"
 
@@ -24,20 +27,25 @@ M.MODS_SRC  = M.REPO_ROOT .. "/reference/allmods"
 -- 基础 IO
 -- ============================================================
 local function readFile(p)
-    local f = io.open(p, "rb")
-    if not f then return nil end
-    local d = f:read("*a")
-    f:close()
-    return d
+    -- 走 fs_compat：MOD 源里有中文文件名（如 "不使用.png"），
+    -- Windows 的 io.open 打不开这类 UTF-8 路径。
+    return Fs.readFile(p)
 end
 M.readFile = readFile
 
 local function fileSize(p)
     local f = io.open(p, "rb")
-    if not f then return nil end
-    local s = f:seek("end")
-    f:close()
-    return s
+    if f then
+        local s = f:seek("end")
+        f:close()
+        return s
+    end
+    -- 非 ASCII 路径：io.open 失败时用 fs_compat 桥接读取
+    if p:find("[\128-\255]") then
+        local d = Fs.readFile(p)
+        if d then return #d end
+    end
+    return nil
 end
 M.fileSize = fileSize
 
@@ -652,11 +660,14 @@ M.SIMPLE_FORMATS = {
 -- ============================================================
 local function listModDirs()
     local out = {}
-    local p = io.popen("ls -d " .. M.MODS_SRC .. "/kys-* 2>/dev/null")
-    if p then
-        for line in p:lines() do out[#out + 1] = line end
-        p:close()
+    -- 枚举 <MODS_SRC>/kys-* 目录（跨平台，不依赖 ls）
+    if not Fs.directoryExists(M.MODS_SRC) then return out end
+    for _, name in ipairs(Fs.listDirectory(M.MODS_SRC)) do
+        if name:match("^kys%-.+") and Fs.directoryExists(M.MODS_SRC .. "/" .. name) then
+            out[#out + 1] = M.MODS_SRC .. "/" .. name
+        end
     end
+    table.sort(out)
     return out
 end
 
@@ -818,16 +829,8 @@ end
 -- 多文件族：fight/*、sound/*、head/*
 -- ============================================================
 local function listFiles(dir, pattern)
-    local out = {}
-    local p = io.popen("ls '" .. dir .. "' 2>/dev/null")
-    if p then
-        for line in p:lines() do
-            if not pattern or line:match(pattern) then out[#out + 1] = line end
-        end
-        p:close()
-    end
-    table.sort(out)
-    return out
+    -- 只列文件名（不含子目录），跨平台
+    return Fs.listFiles(dir, pattern)
 end
 M.listFiles = listFiles
 

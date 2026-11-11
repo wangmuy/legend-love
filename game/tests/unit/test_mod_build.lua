@@ -6,6 +6,7 @@
 -- 用临时目录伪造 MOD 树做隔离测试；另加对真实 20 MOD 源数据的轻量断言。
 
 local TestHelper = require("tests.test_helper")
+local Fs = require("framework.fs_compat")
 local TestModBuild = {}
 
 -- 载入 mod_build.lua（dofile 不触发 CLI，因为 ... 在 dofile 下为 nil）
@@ -30,20 +31,17 @@ local function writeBytes(path, data)
 end
 
 local function dirExists(path)
-    local p = io.popen("test -d '" .. path .. "' && echo yes 2>/dev/null")
-    if not p then return false end
-    local r = p:read("*l")
-    p:close()
-    return r == "yes"
+    return Fs.directoryExists(path)
 end
 
 -- 在临时目录下搭一个伪 MOD 树，返回 modDir 路径。
 -- spec = { resource = { {name, content}, ... }, sound = {...}, fight = {...} }
 local function makeFakeMod(spec)
     local root = "tests/tmp_mod_" .. tostring(math.random(100000, 999999))
-    os.execute("rm -rf '" .. root .. "' && mkdir -p '" .. root .. "'")
+    Fs.removeTree(root)
+    Fs.makeDirectory(root)
     for dir, files in pairs(spec) do
-        os.execute("mkdir -p '" .. root .. "/" .. dir .. "'")
+        Fs.makeDirectory(root .. "/" .. dir)
         for _, item in ipairs(files) do
             writeBytes(root .. "/" .. dir .. "/" .. item[1], item[2])
         end
@@ -56,7 +54,7 @@ local function makeFakeMod(spec)
 end
 
 local function cleanup(root)
-    if root then os.execute("rm -rf '" .. root .. "'") end
+    if root then Fs.removeTree(root) end
 end
 
 -- 直接调用内部 collectDataFiles/flattenResources 不可行（它们是 local），
@@ -259,36 +257,33 @@ end
 
 function TestModBuild.testMusicArtifactsIfBuilt()
     print("\n=== Test: 真实产物含 .mid 与 .mp3，排除 .sf2 ===")
+    -- 统计 mods/*/music/ 下匹配的文件总数（跨平台，不依赖 ls/wc）
     local function count(pattern)
-        local p = io.popen("ls mods/*/music/" .. pattern .. " 2>/dev/null | wc -l")
-        if not p then return 0 end
-        local n = tonumber(p:read("*l") or "0") or 0
-        p:close()
+        local n = 0
+        for _, slug in ipairs(Fs.listDirectory("mods")) do
+            local d = "mods/" .. slug .. "/music"
+            if slug:sub(1, 1) ~= "_" and Fs.directoryExists(d) then
+                n = n + #Fs.listFiles(d, pattern)
+            end
+        end
         return n
     end
-    local mid = count("*.mid")
+    local mid = count("^game%d+%.mid$")
     if mid == 0 then
         print("  [SKIP] mods/ 未构建，跳过产物断言")
         return
     end
     TestHelper.assertEquals(578, mid, "产物 .mid = 源 578（零丢失）")
-    TestHelper.assertEquals(2, count("*.mp3"), "产物 .mp3 = 源 2")
-    TestHelper.assertEquals(0, count("*.sf2"), "negative: .sf2 不搬运（BUILD_INPUT）")
+    TestHelper.assertEquals(2, count("^game%d+%.mp3$"), "产物 .mp3 = 源 2")
+    TestHelper.assertEquals(0, count("%.sf2$"), "negative: .sf2 不搬运（BUILD_INPUT）")
 
-    -- 字节级：产物必须与源逐字节相同
-    local function md5(path)
-        local p = io.popen("md5sum \"" .. path .. "\" 2>/dev/null | cut -d' ' -f1")
-        if not p then return nil end
-        local h = p:read("*l")
-        p:close()
-        return h
-    end
+    -- 字节级：产物必须与源逐字节相同（直接比对内容，不依赖 md5sum）
     local pairsToCheck = {
         { "../reference/allmods/kys-dream/music/24.mp3", "mods/dream/music/game25.mp3" },
         { "../reference/allmods/kys-pineapple/music/37.mp3", "mods/pineapple/music/game38.mp3" },
     }
     for _, pr in ipairs(pairsToCheck) do
-        local a, b = md5(pr[1]), md5(pr[2])
+        local a, b = Fs.readFile(pr[1]), Fs.readFile(pr[2])
         TestHelper.assertTrue(a ~= nil and a == b,
             string.format("%s 与 %s 字节一致", pr[1], pr[2]))
     end

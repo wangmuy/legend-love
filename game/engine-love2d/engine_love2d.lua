@@ -246,6 +246,44 @@ EngineAPI.file.createDirectory = function(dirpath)
     end
 end
 
+-- 目录存在性 / 目录列举
+--
+-- 必须走 love.filesystem，不能用 io.popen 调 shell：
+--   * Android 上没有 /bin/sh，也没有 ls/test；
+--   * .love 打包后资源只在 love.filesystem 的虚拟文件系统里可见，
+--     磁盘路径根本不存在；
+--   * Windows 上 io.popen 走 cmd.exe，POSIX 命令全部失效。
+-- love.filesystem.getInfo 的 type 字段是 "file" / "directory" / "symlink"，
+-- 因此 getDirectoryItems 天然只列真实子项（不含 "." 与 ".."）。
+EngineAPI.file.directoryExists = function(dirpath)
+    if not dirpath or dirpath == "" then return false end
+    if love and love.filesystem and love.filesystem.getInfo then
+        local ok, info = pcall(love.filesystem.getInfo, dirpath)
+        if ok and info and info.type == "directory" then
+            return true
+        end
+        return false
+    end
+    -- 无 love.filesystem（纯 Lua 测试环境）：退回 fs_compat
+    local ok, Fs = pcall(require, "framework.fs_compat")
+    if ok and Fs then return Fs.directoryExists(dirpath) end
+    return false
+end
+
+EngineAPI.file.listDirectory = function(dirpath)
+    if not dirpath or dirpath == "" then return {} end
+    if love and love.filesystem and love.filesystem.getDirectoryItems then
+        local ok, items = pcall(love.filesystem.getDirectoryItems, dirpath)
+        if ok and type(items) == "table" then
+            return items
+        end
+        return {}
+    end
+    local ok, Fs = pcall(require, "framework.fs_compat")
+    if ok and Fs then return Fs.listDirectory(dirpath) end
+    return {}
+end
+
 -- script 模块
 EngineAPI.script.load = function(path)
     -- 优先使用 love.filesystem.load（支持 .love 打包）

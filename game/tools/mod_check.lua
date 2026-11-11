@@ -15,12 +15,29 @@
 -- 说明：本脚本为每个 MOD 派生一个独立子进程（状态隔离），因此较慢（每个约 1-2 秒）。
 --       单 MOD 详细检查逻辑在 tools/mod_check_one.lua。
 
+local Fs = require("framework.fs_compat")
+
+-- 执行子进程并捕获输出。跨平台：
+--   * POSIX  → sh -c
+--   * Windows→ 若有 bash 则用 bash，否则用 cmd /c（命令本身是 `lua tools/...`，
+--              两种 shell 都懂）
 local function sh(cmd)
-    local p = io.popen(cmd .. " 2>&1")
+    local ok, out = Fs.runShell(cmd .. " 2>&1")
+    if ok then return out end
+    -- 无 POSIX shell（Windows 且未装 msys2/Git bash）：退回 cmd /c
+    local p = io.popen('cmd /c "' .. cmd .. ' 2>&1"')
     if not p then return nil end
-    local out = p:read("*a")
+    local s = p:read("*a")
     p:close()
-    return out
+    return s
+end
+
+-- 子进程里调用的 Lua 解释器：优先用当前解释器（Windows 上 `lua` 常不在 PATH）
+local LUA_EXE = Fs.luaInterpreter()
+    or (Fs.isWindows and "lua" or "lua")
+local function luaQuote()
+    if Fs.isWindows then return Fs.quoteWin(LUA_EXE) end
+    return Fs.quotePosix(LUA_EXE)
 end
 
 local JSON = false
@@ -32,8 +49,8 @@ end
 
 -- 收集已构建的 MOD（跳过审计输出目录 _audit）
 local mods = {}
-for m in io.popen("ls mods 2>/dev/null"):lines() do
-    if m:sub(1, 1) ~= "_" then
+for _, m in ipairs(Fs.listDirectory("mods")) do
+    if m:sub(1, 1) ~= "_" and Fs.directoryExists("mods/" .. m) then
         if not only or m == only then mods[#mods + 1] = m end
     end
 end
@@ -54,7 +71,7 @@ if not JSON then
 end
 
 for _, slug in ipairs(mods) do
-    local out = sh(string.format("MOD_SLUG=%s lua tools/mod_check_one.lua", slug))
+    local out = sh(string.format("MOD_SLUG=%s %s tools/mod_check_one.lua", slug, luaQuote()))
     -- 解析 `KEY=value` 行
     local kv = {}
     for line in (out or ""):gmatch("[^\n]+") do

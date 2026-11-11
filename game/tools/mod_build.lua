@@ -13,6 +13,9 @@
 
 local BUILD = {}
 
+-- 跨平台文件系统原语（Windows 上 io.popen 走 cmd.exe，POSIX 命令不可用）
+local Fs = require("framework.fs_compat")
+
 -- ---------------------------------------------------------------------------
 -- paths / io helpers
 -- ---------------------------------------------------------------------------
@@ -34,11 +37,9 @@ local function join(...)
 end
 
 local function readFile(path)
-    local f = io.open(path, "rb")
-    if not f then return nil end
-    local data = f:read("*a")
-    f:close()
-    return data
+    -- 走 fs_compat：MOD 源里有中文文件名（如 "ranger - 副本.idx"），
+    -- Windows 上 io.open 打不开这类 UTF-8 路径，会导致文件被静默跳过。
+    return Fs.readFile(path)
 end
 
 -- ---------------------------------------------------------------------------
@@ -84,9 +85,11 @@ end
 function BUILD.ParseGamesIni() return parseGamesIni() end
 
 local function writeFile(path, data)
-    local f = assert(io.open(path, "wb"))
-    f:write(data)
-    f:close()
+    -- 走 fs_compat：产物里可能出现含中文的名字（MOD 源的
+    -- "ranger - 副本.idx" 会被拍平到 data/），Windows 的 io.open 写不了。
+    if not Fs.writeFile(path, data) then
+        error("writeFile failed: " .. tostring(path))
+    end
 end
 
 -- 4 字节小端 uint32（用于 oldtalk.idx 偏移表）
@@ -105,33 +108,27 @@ local function exists(path)
     return false
 end
 
+-- 目录判定 / 列举 / 建删目录：统一走 fs_compat（Windows / Linux / macOS）。
+-- 旧实现用 io.popen("ls ...") + os.execute("mkdir -p ...")，在 Windows 上
+-- （cmd.exe）全部失效，导致构建链在 Windows 上直接不可用。
 local function isDir(path)
-    local f = io.open(path .. "/.", "r")
-    if f then f:close(); return true end
-    -- fallback: try opening as directory via io.popen is not portable; use love? no.
-    return false
+    return Fs.directoryExists(path)
 end
 
--- Portable directory listing: use `ls` via popen (Linux/macOS). Falls back to nil.
 local function listDir(path)
-    local p = io.popen("ls -1 '" .. path .. "' 2>/dev/null")
-    if not p then return nil end
-    local out = {}
-    for line in p:lines() do out[#out + 1] = line end
-    p:close()
-    if #out == 0 and not exists(path) then return nil end
-    return out
+    if not Fs.directoryExists(path) then return nil end
+    return Fs.listDirectory(path)
 end
 
 local function mkdirp(path)
-    os.execute("mkdir -p '" .. path .. "'")
+    Fs.makeDirectory(path)
 end
 
 -- Remove a build output directory so a rebuild never leaves stale files behind
 -- (e.g. pre-alias sdx/smp or a removed sound/). Only paths under game/mods/ are
 -- ever passed in.
 local function rmdirp(path)
-    os.execute("rm -rf '" .. path .. "'")
+    Fs.removeTree(path)
 end
 
 local function fileSize(path)
@@ -601,13 +598,7 @@ local LIST_COPY_WHITELIST = { ["effect.bin"] = true, ["match.bin"] = true }
 local function flattenMusic(modDir, outMusic)
     if not outMusic then return 0 end
     local srcDir = modDir .. "/music"
-    local names = {}
-    local p = io.popen(string.format('ls -1 "%s" 2>/dev/null', srcDir))
-    if not p then return 0 end
-    for line in p:lines() do
-        if line ~= "" then names[#names + 1] = line end
-    end
-    p:close()
+    local names = listDir(srcDir) or {}
     local n = 0
     for _, name in ipairs(names) do
         -- Lua patterns have no alternation operator ("|" is a literal), so
@@ -705,13 +696,7 @@ local function collectDataFiles(modDir)
                 local relPath = rel == "" and name or (rel .. "/" .. name)
                 local lower = name:lower()
                 -- directory?
-                local isdir = false
-                local probe = io.popen("test -d '" .. full .. "' && echo yes")
-                if probe then
-                    local r = probe:read("*l")
-                    probe:close()
-                    isdir = (r == "yes")
-                end
+                local isdir = isDir(full)
                 if isdir then
                     local top = relPath:match("^([^/]+)")
                     if not IGNORE_DIRS[top:lower()] then
@@ -1215,7 +1200,9 @@ end
 function BUILD.Build(mod, opts)
     opts = opts or {}
     local modDir = REF_DIR .. "/" .. mod
-    if not exists(modDir) then
+    -- 注意：不能用 exists()（io.open 探测）判目录 —— Windows 上 io.open 打开
+    -- 目录会失败，而 Linux 上会成功，导致同一份代码在两个平台行为相反。
+    if not isDir(modDir) then
         return nil, "MOD 目录不存在: " .. modDir
     end
     -- output slug = MOD name without the "kys-" prefix (e.g. kys-mingdong -> mingdong)

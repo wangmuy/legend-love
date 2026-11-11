@@ -1,18 +1,32 @@
 -- tests/unit/boot_one_mod.lua
 -- 单 MOD 全启动链路验证（在独立进程中运行，保证全局状态干净）。
--- 用法: lua tests/unit/boot_one_mod.lua <slug> <Person> <Thing> <Scene> <Wugong> <hero>
+-- 用法: lua tests/unit/boot_one_mod.lua <slug> <Person> <Thing> <Scene> <Wugong> <heroIndex>
 --
--- 由 test_mod_boot.lua 通过 io.popen 为 5 个「有问题」MOD 各调一次。
--- 独立进程是关键：真实启动是"一次进程一个 MOD"，同进程内反复重载
+-- 由 test_mod_boot.lua 通过 shell 为 5 个「有问题」MOD 各调一次。
+-- 独立进程是关键：真实启动是"一次进程一个 MOD"，同进程内多次重载
 -- jymain/lib 会留下 JY 全局残留，反而不能证明真实启动路径。
+--
+-- 注意：主角姓名**不通过命令行传递**。Windows 上子进程参数要经过
+-- cmd.exe 的代码页转换（GBK ↔ UTF-8），中文会变成 "小蝦�?2" 这类乱码，
+-- 导致断言凭空失败。改为传一个序号，在本文件内查表。
 package.path = "./?.lua;" .. package.path
+
+-- 期望数据表：与 test_mod_boot.lua 的 PROBLEMATIC_MODS 一一对应（按 slug 查）
+local EXPECT = {
+    BookCalamity = { person = 800, thing = 550, scene = 139, wugong = 398, hero = "主角" },
+    zheng        = { person = 320, thing = 200, scene =  84, wugong =  93, hero = "小蝦米" },
+    loving       = { person = 320, thing = 200, scene =  84, wugong =  93, hero = "莫言" },
+    awaken       = { person = 720, thing = 237, scene = 153, wugong = 163, hero = "北辰月" },
+    pig3dos      = { person = 607, thing = 242, scene = 133, wugong = 202, hero = "主角" },
+}
 
 local slug      = arg[1]
 local expPerson = tonumber(arg[2])
 local expThing  = tonumber(arg[3])
 local expScene  = tonumber(arg[4])
 local expWugong = tonumber(arg[5])
-local expHero   = arg[6]
+-- arg[6] 保留兼容（旧调用方会传 hero），但不再使用命令行里的中文
+local expHero   = (EXPECT[slug] and EXPECT[slug].hero) or arg[6]
 
 local fails = {}
 local function check(cond, msg)

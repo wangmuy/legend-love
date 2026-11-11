@@ -1,9 +1,16 @@
--- test_byte_io.lua
+﻿-- test_byte_io.lua
 -- Byte I/O 模块单元测试
 
 local TestHelper = require("tests.test_helper")
+local Fs = require("framework.fs_compat")
 
 local TestByteIO = {}
+
+-- 临时文件路径：跨平台（POSIX 用 /tmp，Windows 用 %TEMP%）
+local TMP_SAVE    = Fs.tempPath("test_save.bin")
+local TMP_SAVE_LE = Fs.tempPath("test_save_le.bin")
+local TMP_SAVE_BE = Fs.tempPath("test_save_be.bin")
+local TMP_U32LE   = Fs.tempPath("test_u32le.bin")
 
 local function setup()
     TestHelper.setup()
@@ -13,9 +20,9 @@ end
 
 local function cleanup()
     -- 清理临时文件
-    os.remove("/tmp/test_save.bin")
-    os.remove("/tmp/test_save_le.bin")
-    os.remove("/tmp/test_save_be.bin")
+    os.remove(TMP_SAVE)
+    os.remove(TMP_SAVE_LE)
+    os.remove(TMP_SAVE_BE)
 end
 
 -- 测试8: little-endian 32位编码（用于对话索引写入）
@@ -34,7 +41,7 @@ function TestByteIO.testUint32LittleEndianEncoding()
         return string.char(b1, b2, b3, b4)
     end
 
-    local path = "/tmp/test_u32le.bin"
+    local path = TMP_U32LE
     local f = io.open(path, "wb")
     TestHelper.assertNotNil(f, "File handle should be created")
     if f then
@@ -101,10 +108,10 @@ function TestByteIO.testSaveFromTable16LittleEndian()
     local t = {1000, 2000, 30000, 65535, 0}
     
     -- 保存
-    Byte.SaveFromTable16(t, "/tmp/test_save_le.bin", 5, 1, nil, true)
+    Byte.SaveFromTable16(t, TMP_SAVE_LE, 5, 1, nil, true)
     
     -- 验证文件存在
-    local f = io.open("/tmp/test_save_le.bin", "rb")
+    local f = io.open(TMP_SAVE_LE, "rb")
     TestHelper.assertNotNil(f, "File should be created")
     if f then
         -- 读取并验证字节序（小端）
@@ -133,10 +140,10 @@ function TestByteIO.testSaveFromTable16BigEndian()
     local t = {1000, 2000}
     
     -- 保存
-    Byte.SaveFromTable16(t, "/tmp/test_save_be.bin", 2, 1, nil, false)
+    Byte.SaveFromTable16(t, TMP_SAVE_BE, 2, 1, nil, false)
     
     -- 验证文件存在
-    local f = io.open("/tmp/test_save_be.bin", "rb")
+    local f = io.open(TMP_SAVE_BE, "rb")
     TestHelper.assertNotNil(f, "File should be created")
     if f then
         local bytes = f:read("*a")
@@ -164,10 +171,10 @@ function TestByteIO.testSaveAndLoadConsistency()
     end
     
     -- 保存
-    Byte.SaveFromTable16(original, "/tmp/test_save.bin", 100, 1, nil, true)
+    Byte.SaveFromTable16(original, TMP_SAVE, 100, 1, nil, true)
     
     -- 加载
-    local loaded = Byte.LoadToTable16("/tmp/test_save.bin", 100, 0, true)
+    local loaded = Byte.LoadToTable16(TMP_SAVE, 100, 0, true)
     
     -- 验证数据一致性
     TestHelper.assertNotNil(loaded, "Loaded data should not be nil")
@@ -198,10 +205,10 @@ function TestByteIO.testSignedNumbers()
     local t = {65535, 65436, 32768}
     
     -- 保存
-    Byte.SaveFromTable16(t, "/tmp/test_save.bin", 3, 1, nil, true)
+    Byte.SaveFromTable16(t, TMP_SAVE, 3, 1, nil, true)
     
     -- 加载（小端返回有符号数）
-    local loaded = Byte.LoadToTable16("/tmp/test_save.bin", 3, 0, true)
+    local loaded = Byte.LoadToTable16(TMP_SAVE, 3, 0, true)
     
     -- 验证（小端加载返回有符号数：65535 -> -1, 65436 -> -100, 32768 -> -32768）
     TestHelper.assertEquals(-1, loaded[1], "65535 should become -1 as signed")
@@ -219,10 +226,10 @@ function TestByteIO.testEmptyData()
     local Byte = require("framework.lib_Byte")
     
     -- 空表
-    Byte.SaveFromTable16({}, "/tmp/test_save.bin", 0, 1, nil, true)
+    Byte.SaveFromTable16({}, TMP_SAVE, 0, 1, nil, true)
     
     -- nil 表
-    Byte.SaveFromTable16(nil, "/tmp/test_save.bin", 0, 1, nil, true)
+    Byte.SaveFromTable16(nil, TMP_SAVE, 0, 1, nil, true)
     
     -- 应该不会崩溃
     TestHelper.assertTrue(true, "Should handle empty/nil data without crash")
@@ -244,12 +251,12 @@ function TestByteIO.testLargeDataPerformance()
     end
     
     local startTime = os.clock()
-    Byte.SaveFromTable16(t, "/tmp/test_save.bin", 100000, 1, nil, true)
+    Byte.SaveFromTable16(t, TMP_SAVE, 100000, 1, nil, true)
     local saveTime = os.clock() - startTime
     
     -- 加载
     startTime = os.clock()
-    local loaded = Byte.LoadToTable16("/tmp/test_save.bin", 100000, 0, true)
+    local loaded = Byte.LoadToTable16(TMP_SAVE, 100000, 0, true)
     local loadTime = os.clock() - startTime
     
     print(string.format("  Save time: %.3fs", saveTime))
@@ -273,14 +280,14 @@ function TestByteIO.testSeekPos()
     
     -- 创建并保存数据
     local t1 = {100, 200}
-    Byte.SaveFromTable16(t1, "/tmp/test_save.bin", 2, 1, nil, true)
+    Byte.SaveFromTable16(t1, TMP_SAVE, 2, 1, nil, true)
     
     -- 在偏移 4 字节处追加数据
     local t2 = {300, 400}
-    Byte.SaveFromTable16(t2, "/tmp/test_save.bin", 2, 1, 4, true)
+    Byte.SaveFromTable16(t2, TMP_SAVE, 2, 1, 4, true)
     
     -- 读取验证
-    local loaded = Byte.LoadToTable16("/tmp/test_save.bin", 4, 0, true)
+    local loaded = Byte.LoadToTable16(TMP_SAVE, 4, 0, true)
     
     TestHelper.assertEquals(100, loaded[1], "First element should be 100")
     TestHelper.assertEquals(200, loaded[2], "Second element should be 200")

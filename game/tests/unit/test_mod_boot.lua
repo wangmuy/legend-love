@@ -297,8 +297,9 @@ function TestModBoot.testSaveLoadRoundTripWithMingdong()
         end
     end
     -- 先清理上一轮可能遗留的存档槽（保证测试可重复运行）
-    os.execute("rm -f mods/mingdong/save/r1.idx mods/mingdong/save/r1.grp "
-        .. "mods/mingdong/save/r1.ovr mods/mingdong/save/s1.grp mods/mingdong/save/d1.grp")
+    for _, slot in ipairs({ "r1.idx", "r1.grp", "r1.ovr", "s1.grp", "d1.grp" }) do
+        os.remove("mods/mingdong/save/" .. slot)
+    end
     local ok, err = pcall(function()
         -- 先确保载入了基础数据（id=0）
         LoadRecord(0)
@@ -457,14 +458,28 @@ local PROBLEMATIC_MODS = {
 function TestModBoot.testFullBootChainForProblematicMods()
     print("\n=== Test: full boot chain for 5 problematic MODs (subprocess) ===")
 
+    local Fs = require("framework.fs_compat")
+    local luaExe = Fs.luaInterpreter() or "lua"
+
     for _, spec in ipairs(PROBLEMATIC_MODS) do
         local slug = spec[1]
+        -- 不传中文（见 boot_one_mod.lua 的说明）：只传 slug + 4 个数字，
+        -- 期望的姓名在子进程内按 slug 查表。
         local cmd = string.format(
-            "lua tests/unit/boot_one_mod.lua %s %d %d %d %d %s 2>&1",
-            slug, spec[2], spec[3], spec[4], spec[5], spec[6])
-        local pipe = io.popen(cmd)
-        local out = pipe:read("*a")
-        local ok = pipe:close()
+            "%s tests/unit/boot_one_mod.lua %s %d %d %d %d",
+            (Fs.isWindows and Fs.quoteWin(luaExe) or luaExe),
+            slug, spec[2], spec[3], spec[4], spec[5])
+        -- 需要子进程退出码：io.popen 的 close 能拿到，但要走 shell 包装；
+        -- 这里改为「跑命令 + 检查输出里的 RESULT OK」，跨平台一致。
+        local out, ok = "", false
+        local ran, captured = Fs.runShell(cmd .. " 2>&1")
+        if ran then
+            out = captured
+        else
+            local p = io.popen(cmd .. " 2>&1")
+            if p then out = p:read("*a") or ""; p:close() end
+        end
+        ok = out:find("RESULT " .. slug .. ": OK", 1, true) ~= nil
 
         TestHelper.assertTrue(ok, slug .. ": 独立进程启动链路全绿（RESULT OK）")
         if not ok then
@@ -509,20 +524,16 @@ function TestModBoot.testProductSavesNotDestroyedByTests()
     print("\n=== Test: 本测试模块未销毁任何 MOD 产物 save/ ===")
     -- 回归：save/load 测试会写 mods/<mod>/save/，必须备份+恢复。
     -- 本断言在全部测试跑完后执行（runAll 末位），确保无残留。
+    local Fs = require("framework.fs_compat")
     local checked, bad = 0, 0
-    local p = io.popen("ls -d mods/*/ 2>/dev/null")
-    if not p then return end
-    for d in p:lines() do
-        local slug = d:match("mods/([^/]+)/")
-        if slug and slug:sub(1, 1) ~= "_" then
-            local prod = d .. "save/r1.grp"
+    for _, slug in ipairs(Fs.listDirectory("mods")) do
+        if slug:sub(1, 1) ~= "_" and Fs.directoryExists("mods/" .. slug) then
+            local prod = "mods/" .. slug .. "/save/r1.grp"
             local srcp = "../reference/allmods/kys-" .. slug .. "/save/r1.grp"
-            local fs = io.open(srcp, "rb")
-            if fs then
-                local want = fs:read("*a"); fs:close()
-                local fp = io.open(prod, "rb")
-                if fp then
-                    local got = fp:read("*a"); fp:close()
+            local want = Fs.readFile(srcp)
+            if want then
+                local got = Fs.readFile(prod)
+                if got then
                     checked = checked + 1
                     if got ~= want then
                         bad = bad + 1
@@ -535,7 +546,6 @@ function TestModBoot.testProductSavesNotDestroyedByTests()
             end
         end
     end
-    p:close()
     TestHelper.assertTrue(checked >= 10, "检查了 >= 10 个 MOD（" .. checked .. "）")
     TestHelper.assertEquals(0, bad, "无 MOD 产物 save/ 被销毁")
 end
