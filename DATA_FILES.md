@@ -70,6 +70,7 @@ alldef.grp      ───新游戏──→  d1/d2/d3.grp      ──读档─�
 | `hdgrp.idx` + `hdgrp.grp` | 人物头像贴图 | `CC.HeadPicFile` |
 | `thing.idx` + `thing.grp` | 物品贴图 | `CC.ThingPicFile` |
 | `warfld.idx` + `warfld.grp` | 战斗场景贴图 | `CC.WarMapFile` |
+| `cloud.idx` + `cloud.grp` | 主地图飘云贴图（9 帧 RLE，`MMAPAMI>0` 时绘制） | `CC.CloudPicFile` |
 
 ### R 存档文件
 
@@ -291,6 +292,147 @@ alldef.grp      ───新游戏──→  d1/d2/d3.grp      ──读档─�
 | 物品1~5 | 0–8 | 各2 | s16 | 5 个货架物品 ID |
 | 物品数量1~5 | 10–18 | 各2 | s16 | 对应库存数量 |
 | 物品价格1~5 | 20–28 | 各2 | s16 | 对应价格
+
+### MOD 数据格式（allmods / kys-*）
+
+> 适用于 `game/mods/<slug>/data/ranger.grp` 与 `game/mods/<slug>/save/rN.grp`。
+> 由 `game/tools/mod_build.lua` 在构建期生成；引擎侧由 `game/framework/mod_data.lua` 适配。
+
+#### 1. 记录布局（与原版完全不同！）
+
+MOD（allmods，UPedit 编辑器格式）的记录布局**比原版小**，权威来源为
+`reference/allmods/UPedit/UPedit.ini` 的 `[R_Modify]` 段。
+
+| 数据段 | 原版记录大小 | **MOD 记录大小** | MOD 字符串字段（偏移+字节数） |
+|--------|------------|----------------|---------------------------|
+| 基础数据 | 836 | 1636 | — |
+| 人物 | 202 | **182** | 姓名 @8+10、外号 @18+10 |
+| 物品 | 260 | **190** | 名 @2+20、名2 @22+20、说明 @42+30 |
+| 场景 | 62 | **52** | 名称 @2+10 |
+| 武功 | 146 | **136** | 名称 @2+10 |
+| 商店 | 30 | **50** | —（无字符串） |
+
+`ranger.idx` 仍为 6 个 uint32 LE 段偏移，语义不变。
+全 20 个 MOD 布局一致（段长均可被 182/190/52/136 整除）。
+
+> ⚠ 原版常量 `CC.PersonSize=202` 等**不能**用于读 MOD 数据。
+> 实测用原版常量读 mingdong：PersonNum 得 569（应为 632）、ThingNum 得 268（应为 367），
+> 且姓名完全错位。MOD 激活时须覆盖记录大小与字段表。
+
+#### 2. 字符串编码：Big5 → UTF-8（旁路表）
+
+MOD 原始数据的字符串字段为 **Big5**，引擎按 UTF-8 渲染，故构建期转换。
+
+**问题**：Big5 每字 2 字节，UTF-8 每字 3 字节。定长字段容量缩为 2/3：
+
+| 字段 | 字节 | Big5 容量 | UTF-8 容量 |
+|------|-----|----------|-----------|
+| 人物 姓名/外号 | 10 | 5 字 | **3 字** |
+| 物品 名/名2 | 20 | 10 字 | **6 字** |
+| 物品 说明 | 30 | 15 字 | **10 字** |
+| 场景/武功 名称 | 10 | 5 字 | **3 字** |
+
+**原地转换会截断**：实测 20 个 MOD 共 34174 字段中 **13335 个超长**（41%），
+如 `雪山飛狐`(12字节) 放不进 10 字节字段。违反「不截断」要求。
+
+**方案：hint 占位 + 旁路字符串表**
+
+```
+构建期：
+  ranger.grp (Big5)  →  ranger.grp  字符串区 = hint；数值区一字不改
+                     →  ranger.str  旁路表（UTF-8，去重，按段分组）
+                     →  ranger.idx  原样复制
+```
+
+- **`ranger.grp` 大小不变**（223688 → 223688），数值偏移零风险
+- **字符串零截断**（满足「不截断」要求）
+
+##### hint 格式（写入 grp 字符串区）
+
+hint = **类别前缀 + 段内 `%04d` 序号**。前缀便于 UPedit 中辨识类别。
+
+| 字段 | 前缀 | 格式 | 段内 index 上界 | 示例 |
+|------|-----|------|---------------|------|
+| 人物 姓名 | `P` | `P%04d` | 1600 | `P0002` |
+| 人物 外号 | `N` | `N%04d` | 1600 | `N0003` |
+| 物品 名 | `T` | `T%04d` | 1650 | `T0005` |
+| 物品 名2 | `T2` | `T2%04d` | 1650 | `T20006` |
+| 物品 说明 | `TD` | `TD%04d` | 1650 | `TD0007` |
+| 场景 名称 | `S` | `S%04d` | 153 | `S0008` |
+| 武功 名称 | `W` | `W%04d` | 398 | `W0009` |
+
+> index 为**段内**自增（每段从 0000 开始）。因 hint 已带前缀，前缀本身
+> 已区分段，故段内 index 与全局 index 在唯一性上等价，但余量更宽裕
+> （段内上界 1650 vs 全局 3787；`%04d` 上限 9999）。
+
+**UPedit 中可见效果：**
+
+```
+人物 1:  姓名 = P0002    外号 = N0003
+物品 0:  名 = T0005      名2 = T20006   说明 = TD0007
+场景 0:  名称 = S0008
+武功 0:  名称 = W0009
+```
+
+##### 旁路表格式（`ranger.str`）
+
+纯文本，按段分组，`#` 为分节注释，每行 `index,类别,记录下标,字段,值`：
+
+```
+# Person
+0000,Person,0,Name,小蝦米
+0001,Person,0,Nick,天下奇男子
+0002,Person,1,Name,胡斐
+0003,Person,1,Nick,雪山飛狐
+# Thing
+0000,Thing,0,Name,大可樂
+0001,Thing,0,Name2,大可樂
+0002,Thing,0,Desc,活性飲料，迅速補充你的體力
+# Scene
+0000,Scene,0,Name,胡斐居
+# Wugong
+0000,Wugong,0,Name,普通攻擊
+```
+
+- 值保留**繁体**（不做繁→简），UTF-8 编码
+- 相同值在**段内**复用同一 index（去重）
+- mingdong 实测：2724 字段 → 去重后 1397 条，约 13KB
+
+##### 存档覆盖表（`save/rN.ovr`）
+
+引擎中字符串写入点仅 2 处（主角姓名、其居所名），记录数从不变化。
+故存档只需记录**变化过的**字符串：
+
+```
+# mods/<slug>/save/r1.ovr
+P0000=郭靖
+S0008=郭靖居
+```
+
+读取优先级：
+
+```
+字符串 = rN.ovr[index] 有?  → 用它          (玩家改名)
+        : ranger.str[index] 有? → 用它      (99.9%)
+        : 回退读 rN.grp 缓冲区              (原版 / 无 MOD，零回归)
+```
+
+> 存档**不能**直接写真值到 `rN.grp`：41% 的 UTF-8 字符串放不回定长字段
+> （会截断）。故必须保留 hint + `rN.ovr`。
+
+#### 3. 引擎侧适配要点
+
+| 项 | 原版 | MOD 激活时 |
+|----|------|-----------|
+| `CC.PersonSize` | 202 | 182 |
+| `CC.ThingSize` | 260 | 190 |
+| `CC.SceneSize` | 62 | 52 |
+| `CC.WugongSize` | 146 | 136 |
+| `CC.ShopSize` | 30 | 50 |
+| `CC.Person_S`/`Thing_S`/... | 原版偏移 | MOD 专用偏移表 |
+| 字符串读取 | 直接读缓冲区 | 先查 `rN.ovr` → `ranger.str` → 回退缓冲区 |
+
+未激活 MOD（原版）时，无 `ranger.str`/`rN.ovr`，全部回退到缓冲区读取，行为完全不变。
 
 ### S 场景文件
 
@@ -546,7 +688,70 @@ SaveRecord(id)
 
 ---
 
-## 八、相关源码文件
+## 八、MOD 资源分类（`allmods-slice0b-resource-classify`）
+
+> **穷举清单**：本节的分类表是**按格式族的摘要**。逐文件穷举（11220 个源文件，
+> 每个都有类别 + 证据 + 机器锚点）见仓库根目录的
+> [`MOD_RESOURCE_AUDIT.md`](MOD_RESOURCE_AUDIT.md)（自动生成）。
+> 字节级/字段级覆盖验证见 `game/tools/format_spec.lua`。
+> 两者的关系：本节回答「这类文件是否需要」，`MOD_RESOURCE_AUDIT.md` 回答
+> 「**每个**文件是否需要」，`format_spec.lua` 回答「**每个字节**属于哪个字段」。
+
+MOD 源数据（`reference/allmods/kys-*/`）与 Lua 引擎的资源需求并不一一对应。
+以下分类表是**权威判定**，并已固化为可回归测试
+（`game/tests/unit/test_mod_resources.lua`）。
+
+**核心原则**：
+
+- **「缺文件」≠「bug」** — 源 MOD 不提供某资源，可能是设计性回退（如 `thing.*`）。
+- **「多余文件」≠「需移植」** — 死文件与编辑器副产物保留忠实拷贝，不影响运行。
+
+### 分类表
+
+| 分类 | 含义 | 资源 | 涉及 MOD | 判据（证据） |
+|------|------|------|---------|-------------|
+| `REQUIRED` | 引擎必需，源 MOD 提供 | `sdx`/`smp` → `smap.idx`/`smap.grp`；`wdx`/`wmp` → `wmap.idx`/`wmap.grp` | 20/20 | `UPedit.ini` `[File]` 段 `File2`/`File3`/`SMAPIDX`/`SMAPGRP` |
+| `REQUIRED` | 引擎必需，源 MOD 提供 | `sound/atk*.wav`、`sound/e*.wav` | 20/20 | 命名与 `CC.ATKFile`/`CC.EFile` 吻合；pascal 78 个同名文件逐字节相同 |
+| `DESIGNED_FALLBACK` | 源 MOD 不提供是预期，回退原版 | `thing.idx`、`thing.grp` | 0/20 提供 | 引擎 `CC.ThingPicFile` → `data/thing.*`（原版 200 项） |
+| `DEAD_PARAM` | 形参从未被引用 | `allsinbk.grp` | 0/20 提供 | `lib.LoadSMap(Sfilename, tmpfilename, ...)` 函数体内 0 次引用 `tmpfilename` |
+| `LEGACY` | C 引擎/编辑器遗留，Lua 引擎不读 | `name.idx`、`name.grp` | 4（BookCalamity/Dragon/pineapple/RiverLake） | `kys.exe` strings 不引用；人名实来自 `ranger.grp` 的 `JY.Person[i]["姓名"]` |
+| `DEAD_FILE` | 引擎命名规则无法生成 | `fightNNN..grp`、`fightNNN_02.grp` | awaken | `string.format("fight%03d.grp", n)` 永不含 `..`/`_02` |
+| `DEAD_FILE` | 同上 | `new.idx`、`fight23.idx` | dream | `new.idx` = `kdef.idx` + 9 字节垃圾（无 `new.grp`）；`fight23` 非 3 位 |
+| `DEAD_FILE` | 同上 | `war1.sta` | Dragon | 引擎只读 `CC.WarFile = data/war.sta` |
+| `EDITOR_DUMP` | UPedit 导出副产物，不复制 | `head/`、`item/`、`eft/`、`cc/` | 4/2/1/1 | `mod_build.lua` 的 `IGNORE_DIRS = { head, item, eft }` |
+| `PENDING` | 待决策（需 spike） | `music/*.mid` | 20/20 | `.mid` ≠ 引擎 `sound/game%02d.ogg`；66 首 vs 25 槽；需外部音源工具 |
+
+### 别名映射（`REQUIRED` 的构建期处理）
+
+`game/tools/mod_build.lua` 的 `ALIAS_MAP`：
+
+```lua
+local ALIAS_MAP = {
+    ["sdx"] = "smap.idx",   -- 场景地图贴图索引
+    ["smp"] = "smap.grp",   -- 场景地图贴图数据
+    ["wdx"] = "wmap.idx",   -- 战斗地图贴图索引
+    ["wmp"] = "wmap.grp",   -- 战斗地图贴图数据
+}
+```
+
+- **仅对 `resource/` 来源（`kind == "data"`）生效**；`fight/`、`save/` 不参与。
+- **只改名，不改内容**（逐字节保留）。
+- 别名目标名冲突时**硬失败**（非静默覆盖）。
+- `diff.md` 含「资源别名转换」小节，且改名对不在「基准独有」/「MOD 独有」中误报。
+
+### 音效回退链
+
+- 构建期：`mods/<mod>/sound/`（与 `data/`、`script/` 平级）。
+- 运行期：`ModData.RewriteConstants` 按**文件名模式**逐常量检查（非仅目录存在）：
+  - `CC.ATKFile`：MOD 有 `atk%d+.wav` → `mods/<slug>/sound/atk%02d.wav`
+  - `CC.EFile`：MOD 有 `e%d+.wav` → `mods/<slug>/sound/e%02d.wav`
+  - `CC.MIDIFile`：MOD 有 `game%d+.ogg` → 改写；20/20 MOD 均无，故保持原版
+- 未激活 MOD 或 MOD 无 `sound/` → 常量保持原版路径（零回归）。
+- `%02d` 对 3 位编号（`e100.wav`）原样输出，无需改格式串。
+
+---
+
+## 九、相关源码文件
 
 | 文件 | 说明 |
 |------|------|
@@ -554,4 +759,4 @@ SaveRecord(id)
 | `game/script/jymain.lua` | 加载/保存函数实现 |
 | `game/engine-love2d/lib_love.lua` | 图片加载和 RLE 解码 |
 | `game/framework/lib_Byte.lua` | 二进制数据读写工具 |
-| `game/framework/config.lua` | 路径配置（CONFIG.DataPath, CONFIG.ScriptPath 等） |
+|  `game/framework/config.lua` | 路径配置（CONFIG.DataPath, CONFIG.ScriptPath 等） |

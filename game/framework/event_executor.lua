@@ -53,12 +53,14 @@ function EventExecutor.oldEventExecuteCoroutine(flag)
         eventnum = GetD(JY.SubScene, JY.CurrentD, 4)
     end
     
-    if eventnum == nil or eventnum <= 0 then
-        eventnum = JY.CurrentD  -- fallback: 直接用事件 ID
-    end
+    lib.Debug(string.format("oldEventExecuteCoroutine: flag=%d, CurrentD=%d, eventnum=%s",
+        flag, JY.CurrentD, tostring(eventnum)))
     
-    lib.Debug(string.format("oldEventExecuteCoroutine: eventnum=%d", eventnum or -1))
-    
+    -- 与原版 oldEventExecute 一致：eventnum<=0 表示该触发方式为"无事件"，
+    -- 不执行。切勿在 eventnum 为空时回退为 JY.CurrentD（D* tile 索引）：
+    -- 那会把"路过/空格无事件"的 tile 当 oldevent 编号执行，触发无关事件
+    -- （典型：河洛客栈外出口 tile 无路过事件，回退后误执行 oldevent_17
+    -- "这箱子似乎被锁住了"）。
     if eventnum and eventnum > 0 then
         EventExecutor.oldCallEventCoroutine(eventnum)
     end
@@ -68,7 +70,6 @@ end
 function EventExecutor.oldCallEventCoroutine(eventnum)
     local eventfilename = string.format("oldevent_%d.lua", eventnum)
     lib.Debug(string.format("oldCallEventCoroutine: %s START", eventfilename))
-    
     -- 保存进入时的 JY.CurrentD（调用方可能已设置为触发事件的 tile 索引，
     -- 事件结束后恢复它，避免本事件内部嵌套执行其他事件时被覆盖污染）
     local savedCurrentD = JY and JY.CurrentD
@@ -115,8 +116,55 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     -- （典型：611 战斗胜利后 612 写 D71[611]、tile3 仍 611 需再选一次才得鹿鼎记；
     --   616 战后 tile5 仍 616，蓝凤凰已加入仍重复"是否加入"询问——P6 Step12/13 根因）。
     if JY then JY.CurrentD = savedCurrentD or -1 end
-    
+
     lib.Debug(string.format("oldCallEventCoroutine: %s FINISHED", eventfilename))
+end
+
+-- 协程版本的新场景事件（newevent/scene_X_event_Y.lua）执行器。
+--
+-- 背景：newevent/ 脚本用的是 TalkEx / Talk / ShowMenu / DrawStrBoxWaitKey /
+-- DrawStrBoxYesNo / lib.Delay / WarMain 这些「阻塞式」原版接口。在原版里整个
+-- 事件循环本来就是阻塞的，所以直接 dofile 没问题；但在本项目的事件驱动架构下，
+-- 主线程一旦进到阻塞版 WaitKey 里死等按键，love.update 再也不返回，
+-- 整个游戏表现就是「对话没反应、画面像挂住」——韦大宝（河洛客栈 D*19）就是
+-- 这个症状：newCallEvent 走 dofile，newevent 脚本里的 TalkEx 用的是未替换的
+-- 阻塞版。
+--
+-- 修法与 oldevent 完全一致（见 oldCallEventCoroutine）：
+--   1. AsyncGlobals.install() 把阻塞全局换成协程版
+--   2. 在调用方已提供的协程上下文里执行脚本（EventExecuteSync 已经把
+--      newSceneEvent_1 跑在协程内）
+--   3. AsyncGlobals.uninstall() 还原
+-- 区别仅在于脚本来源是 CONFIG.NewEventPath 而不是 OldEventPath。
+--
+-- @param eventfilename: 已拼好的脚本路径（含 newevent/ 前缀）
+function EventExecutor.newCallEventCoroutine(eventfilename)
+    lib.Debug(string.format("newCallEventCoroutine: %s START", tostring(eventfilename)))
+
+    -- 与 oldCallEventCoroutine 同样保存/恢复 JY.CurrentD：
+    -- 脚本内部可能嵌套触发别的事件，内层结束会把 CurrentD 重置为 -1，
+    -- 外层后续指令（instruct_3 用 id=-2 写回本 tile）就会写到孤儿槽。
+    local savedCurrentD = JY and JY.CurrentD
+
+    AsyncGlobals.install()
+
+    local chunk, err = ScriptLoader.load(eventfilename)
+    if chunk then
+        chunk()
+    else
+        lib.Debug("newCallEventCoroutine: failed to load " .. tostring(eventfilename)
+            .. ": " .. tostring(err))
+        if JY_Error then
+            JY_Error("newCallEventCoroutine load failed: %s (%s)",
+                tostring(eventfilename), tostring(err))
+        end
+    end
+
+    AsyncGlobals.uninstall()
+
+    if JY then JY.CurrentD = savedCurrentD or -1 end
+
+    lib.Debug(string.format("newCallEventCoroutine: %s FINISHED", tostring(eventfilename)))
 end
 
 -- 启动事件协程

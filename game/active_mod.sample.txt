@@ -1,0 +1,54 @@
+# active_mod.sample.txt
+#
+# MOD 激活示例文件。
+#
+# 用法：
+#   1) 把本文件复制为 game/active_mod.txt（说明文字可以整份保留，无需删注释）
+#   2) 把末尾的示例行改成你要的 slug，例如：
+#          mingdong
+#   3) 启动游戏：
+#          cd game && love .
+#      或直接用启动脚本（推荐，会自动处理以上步骤）：
+#          ./tools/run-mod.sh mingdong
+#          ./tools/run-mod.sh            # 交互式选择 MOD
+#
+# 关闭 MOD（回到原版）：
+#          rm game/active_mod.txt
+#
+# 格式说明：
+#   * active_mod.txt 只取**第一个有效行**；空行与 # 注释行一律跳过
+#   * 空文件 / 只有注释 = 未激活（原版路径，零回归）
+#   * 前后空白、\r\n 会被自动忽略
+#   * 可写 "mingdong" 或 "kys-mingdong"（前缀 kys- 会被自动去掉，二者等价）
+#   * 内容为 MOD 目录名去掉 "kys-" 前缀后的部分（见下方可用列表）
+#
+# 注意：
+#   * 本文件（active_mod.txt）是每用户运行时状态，不提交仓库（见 .gitignore）
+#   * 激活前需先构建 MOD 数据包：cd game && lua tools/mod_build.lua kys-<mod>
+#     （run-mod.sh 会自动检测并在缺失时构建）
+#   * 必须在 game/ 下运行（ModData 使用相对 game/ 的路径）
+#
+# 可用 MOD slug（对应 reference/allmods/kys-<slug>）：
+#   mingdong      名动天下
+#   pascal        原版（一般不用显式激活；删掉 active_mod.txt 即为原版）
+#   Dragon        苍龙逐日
+#   RiverLake     再战江湖
+#   ptt           PTT
+#   pineapple     再破菠萝
+#   HeavenSword   倚天剑
+#   SweeOan       瑞安群侠传
+#   stronger      威力加强版
+#   lostbook      失传天书-越女剑
+#   GodsDevils    天龙八部
+#   zheng         魏征传奇
+#   loving        问情篇
+#   pig           小猪闯江湖
+#   lyff          刘亦纷飞版
+#   awaken        真龙苏醒
+#   pig3dos       金庸水浒传 dos 版
+#   BookCalamity  天书劫
+#   books         天书奇侠试玩
+#   dream         笑梦游记
+#
+# ↓↓↓ 下面这一行才是实际生效的 slug（改成你要的即可，可整份复制本文件） ↓↓↓
+mingdong

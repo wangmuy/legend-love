@@ -77,32 +77,56 @@ function GetTime()
     return love.timer.getTime() * 1000  -- LOVE 11.x returns seconds, convert to ms
 end
 
+-- 字体缓存。
+-- 键必须是「字体名 + 字号」：原版 charset.c:68 的 GetFont 正是按
+-- (Font[i].size == size && strcmp(filename, Font[i].name)==0) 查表的，
+-- 只按文件名缓存会让后请求的字号复用先前的字号（游戏内 16/24 全被画成 20）。
 local fontTbl = {}
 local defaultFont = nil
-local function getFont(fontname)
-    if fontname==nil then 
+
+-- 原版 DefaultFont 的兜底字号
+local DEFAULT_FONT_SIZE = 20
+
+local function getFont(fontname, size)
+    size = size or DEFAULT_FONT_SIZE
+
+    -- 无字体名：使用 LÖVE 内置字体，按字号分别缓存
+    if fontname==nil then
         if defaultFont == nil then
-            defaultFont = love.graphics.newFont(20)
+            defaultFont = {}
         end
-        return defaultFont
+        local f = defaultFont[size]
+        if f == nil then
+            f = love.graphics.newFont(size)
+            defaultFont[size] = f
+        end
+        return f
     end
-    if fontTbl[fontname] == nil then
-        local success, font = pcall(function() return love.graphics.newFont(fontname, 20) end)
+
+    local key = fontname .. ":" .. tostring(size)
+    if fontTbl[key] == nil then
+        local success, font = pcall(function() return love.graphics.newFont(fontname, size) end)
         if success then
-            fontTbl[fontname] = font
+            fontTbl[key] = font
         else
+            -- 字体文件打不开：退回 LÖVE 内置字体（同样按字号缓存）
             if defaultFont == nil then
-                defaultFont = love.graphics.newFont(20)
+                defaultFont = {}
             end
-            fontTbl[fontname] = defaultFont
+            local f = defaultFont[size]
+            if f == nil then
+                f = love.graphics.newFont(size)
+                defaultFont[size] = f
+            end
+            fontTbl[key] = f
         end
     end
-    return fontTbl[fontname]
+    return fontTbl[key]
 end
   
 function DrawStr(x, y, str, color, size, fontname)
     local oldR, oldG, oldB, oldA = love.graphics.getColor()
-    love.graphics.setFont(getFont(fontname))
+    love.graphics.setFont(getFont(fontname, size))
     local r, g, b = GetRGB(color)
     love.graphics.setColor(r, g, b, 1)
     love.graphics.print(str, x, y)
@@ -420,8 +444,13 @@ end
 // filename 文件名 
 // id  0 - PIC_FILE_NUM-1
 --]]
+-- 原版 jymain.h:117 `#define PIC_FILE_NUM 40`，piccache.c:92
+-- `if(id<0 || id>=PIC_FILE_NUM) return 1;`；此处同步该上界检查。
+local PIC_FILE_NUM = 40
+
 function PicLoadFile(idxfilename, grpfilename, fileid)
-    if fileid < 0 then return end
+    -- 与原版一致：id 合法范围 0..PIC_FILE_NUM-1，越界直接拒绝
+    if fileid == nil or fileid < 0 or fileid >= PIC_FILE_NUM then return end
     fileid = fileid+1 -- lua starts with 1
 
     --Debug("PicLoadFile: %s %d", idxfilename, fileid)
@@ -564,6 +593,93 @@ end
 
 local currentMusic = nil
 
+-- ---------------------------------------------------------------------------
+-- Audio path resolution (REQ-MIDI-1 / REQ-MIDI-2)
+--
+-- 1) MOD/原版 prefix must NOT be re-prefixed with CONFIG.SoundPath.
+--    Previously a MOD-overridden path such as "mods/<slug>/sound/game27.ogg"
+--    did not start with "sound/", so it was rewritten into the nonexistent
+--    "sound/mods/<slug>/sound/game27.ogg" and playback silently failed.
+--    Any path already carrying a directory prefix that exists is left alone.
+--
+-- 2) LÖVE picks its decoder by *file extension* (verified: a MIDI file renamed
+--    to .ogg fails with "Could not read Ogg bitstream"). LÖVE 11.5 does decode
+--    .mid/.mp3 natively (libmodplug), so when the caller supplies an extension-
+--    less path we probe the candidates in order.
+--
+--    Probe order is .ogg -> .mp3 -> .mid. The bundled 25 themes ship only as
+--    .ogg so they stay bit-identical regardless of order. For MOD music an
+--    optional pre-rendered .ogg (rendered with a real SoundFont) must win over
+--    the source .mid, because LÖVE's bundled libmodplug ignores SoundFonts and
+--    renders MIDI with a thin built-in wavetable (measured: ~2.1x the high-
+--    frequency energy of a SoundFont render). .mid is last so it acts purely
+--    as the fallback when no rendered version has been produced yet.
+-- ---------------------------------------------------------------------------
+
+-- Extensions probed for an extension-less music path, in priority order.
+local MUSIC_EXTS = { ".ogg", ".mp3", ".mid" }
+
+-- Cheap existence probe that works for both bare names (LÖVE source dir) and
+-- relative paths (Chromium-style fuse mount), without touching love.filesystem.
+local function audioFileExists(path)
+    local f = io.open(path, "rb")
+    if f then f:close() return true end
+    -- Packed .love / mobile builds expose assets only through love.filesystem.
+    if love and love.filesystem and love.filesystem.getInfo then
+        local rel = path:gsub("^%./", "")
+        local ok, info = pcall(love.filesystem.getInfo, rel)
+        if ok and info then return true end
+    end
+    return false
+end
+
+local function hasExtension(path)
+    -- Only a trailing ".<letters/digits>" counts; "1.2" style names are not exts.
+    return path:match("%.%w+$") ~= nil
+end
+
+-- First existing candidate for an extension-less path, or nil.
+local function firstExisting(stem)
+    for _, ext in ipairs(MUSIC_EXTS) do
+        if audioFileExists(stem .. ext) then
+            return stem .. ext
+        end
+    end
+    return nil
+end
+
+-- REQ-MIDI-3: built-in fallback.
+--
+-- A MOD may reference more music ids than it actually ships (measured:
+-- BookCalamity references up to id 51 but only ships music/0..23). Without a
+-- fallback those scenes would be *worse* than before this feature, because the
+-- MOD path shadows the bundled sound/gameNN.ogg that used to play.
+--
+-- So when a MOD music path cannot be resolved, retry the same basename under
+-- the bundled sound directory. Scenes with no bundled track either stay silent
+-- (the previous, non-crashing behaviour).
+local function bundledFallback(filepath, basePath)
+    local base = filepath:match("([^/]+)$")
+    if not base then return nil end
+    local soundPath = (CONFIG and CONFIG.SoundPath) or "sound/"
+    -- Do not fall back when we are already looking at the bundled directory.
+    if filepath:sub(1, #soundPath) == soundPath then return nil end
+    return firstExisting(soundPath .. base)
+end
+
+-- Returns the concrete file to decode for a music path, or nil when nothing
+-- exists. Extension-carrying paths are returned untouched (so the original
+-- sound/gameNN.ogg behaviour is byte-for-byte unchanged).
+local function resolveMusicFile(filepath)
+    if hasExtension(filepath) then
+        if audioFileExists(filepath) then return filepath end
+        return bundledFallback(filepath) or filepath
+    end
+    local found = firstExisting(filepath)
+    if found then return found end
+    return bundledFallback(filepath, nil) or filepath
+end
+
 function PlayMIDI(filename)
     if not love.audio then return end
     
@@ -578,11 +694,16 @@ function PlayMIDI(filename)
     local filepath = filename
     Debug("PlayMIDI: filename=" .. tostring(filename))
     
+    -- REQ-MIDI-1: only apply CONFIG.SoundPath when the caller passed a bare
+    -- file name. Paths that already name a directory (sound/, mods/... /,
+    -- absolute) are used as-is.
     if not filepath:match("^/") and not filepath:match("^%a:") then
-        if not filepath:match("^sound/") then
+        local bareName = not filepath:match("/")
+        if bareName and not filepath:match("^sound/") then
             filepath = CONFIG.SoundPath .. filepath
         end
     end
+    filepath = resolveMusicFile(filepath)
     Debug("PlayMIDI: filepath=" .. filepath)
     
     local success, source_or_err = pcall(love.audio.newSource, filepath, "stream")
@@ -607,8 +728,11 @@ function PlayWAV(filename)
     end
     
     local filepath = filename
+    -- REQ-MIDI-1 (same prefix defect as PlayMIDI): keep directory-carrying
+    -- paths intact so MOD sound effects resolve under mods/<slug>/sound/.
     if not filepath:match("^/") and not filepath:match("^%a:") then
-        if not filepath:match("^sound/") then
+        local bareName = not filepath:match("/")
+        if bareName and not filepath:match("^sound/") then
             filepath = CONFIG.SoundPath .. filepath
         end
     end
@@ -752,10 +876,19 @@ function BuildingSort(x, y, Mypic)
                             if im3~=0 and im4~=0 then
                                 if im3~=ij3 or im4~=ij4 then
                                     if im3~=buildList[idxk].x or im4~=buildList[idxk].y then
-                                        local idxp = p+1
-                                        tmpBuild = buildList[idxp-1] -- last one
-                                        buildList[idxp-1] = BuildingType:new()
-                                        table.insert(buildList, idxk+1, tmpBuild)
+                                        -- 与原版 mainmap.c:BuildingSort 逐字一致：
+                                        --     tmpBuild = Build[p-1];
+                                        --     memmove(&Build[k+1], &Build[k], (p-k-1)*sizeof(BuildingType));
+                                        --     Build[k] = tmpBuild;
+                                        -- 即把 buildList[idxk..p] 这一段整体右旋一位，数组长度不变。
+                                        -- 早期移植误写成 table.insert(buildList, idxk+1, tmp)，造成
+                                        --   ① 插入点后移一位 → 建筑深度顺序与原版不一致（遮挡错位）
+                                        --   ② buildList 被无限拉长（每次排序增长，长跑内存只增不减）
+                                        tmpBuild = buildList[p] -- C: Build[p-1]，最后一个有效元素
+                                        for t=p, idxk+1, -1 do
+                                            buildList[t] = buildList[t-1]
+                                        end
+                                        buildList[idxk] = tmpBuild
                                     end
                                 end
                             end
@@ -830,7 +963,17 @@ function DrawMMap(x, y, Mypic)
         end
     end
 
-    -- 先绘制普通建筑（非主角）
+    -- 建筑层：单次按 BuildingSort 的排序顺序绘制。
+    -- 主角/船由 BuildingSort 临时写入主地图 building/buildx/buildy，
+    -- 和其它建筑条目一起参与同一份排序，所以它们的绘制次序就是深度次序
+    -- （对应原版 mainmap.c:JY_DrawMMap 唯一的一层循环）。
+    --
+    -- 禁止把主角/船拆出来「最后单独绘制」：那样任何建筑（大山、房屋、
+    -- 树木）都再也遮不住主角，走到大山背后会整块露出来（commit 2c8a644
+    -- 「修复主地图主角显示问题」引入的回归）。
+    -- 也禁止给主角/船加额外 y 偏移：屏幕位置完全由贴图头部的 xoff/yoff 决定
+    -- （原版 piccache.c:JY_LoadPic 只有 x-xoff / y-yoff），贴图头里已经带有
+    -- 正确的 yoff（主角帧 15x39，xoff=5 yoff=44），再叠加偏移就是错位。
     for i=0,buildNumber-1 do
         local idxi = i+1
         local i1=buildList[idxi].x -x
@@ -838,31 +981,16 @@ function DrawMMap(x, y, Mypic)
         local x1=CONFIG.XScale*(i1-j1)+math.floor(CONFIG.Width/2)
         local y1=CONFIG.YScale*(i1+j1)+math.floor(CONFIG.Height/2)
         local picnum=buildList[idxi].num
-        -- 跳过主角和船贴图，最后单独绘制
-        if picnum>0 and not ((picnum >= 5002 and picnum <= 5096) or (picnum >= 7430 and picnum <= 7500)) then
+        if picnum>0 then
             JY_LoadPic(0,picnum,x1,y1,0,0)
         end
     end
-    
-    -- 最后绘制主角和船，确保显示在最前面
-    for i=0,buildNumber-1 do
-        local idxi = i+1
-        local i1=buildList[idxi].x -x
-        local j1=buildList[idxi].y -y
-        local x1=CONFIG.XScale*(i1-j1)+math.floor(CONFIG.Width/2)
-        local y1=CONFIG.YScale*(i1+j1)+math.floor(CONFIG.Height/2)
-        local picnum=buildList[idxi].num
-        -- 只绘制主角和船贴图
-        if picnum>0 and ((picnum >= 5002 and picnum <= 5096) or (picnum >= 7430 and picnum <= 7500)) then
-            -- 主角和船贴图需要额外的Y轴偏移，因为它们的yoff值较大
-            -- 注意: picnum是Mypic*2，所以范围需要乘以2
-            -- 主角贴图范围: 5002-5096 (2501*2 - 2548*2)
-            -- 船贴图范围: 7430-7500 (3715*2 - 3750*2)
-            local y_adjust = -10  -- 调整值，使主角显示在正确的位置
-            JY_LoadPic(0,picnum,x1,y1+y_adjust,0,0)
-        end
-    end
-    
+
+    -- 云朵层：原版 kys_draw.pas:DrawMMap 在建筑循环结束后、解除裁剪前调用
+    -- DrawClouds，云永远画在地面/建筑之上（天空层）。公式里的 Mx,My 就是
+    -- 传入 DrawMMap 的主角坐标，故直接复用 x,y。
+    DrawClouds(x, y)
+
     if oldScissorX then
         love.graphics.setScissor(oldScissorX, oldScissorY, oldScissorW, oldScissorH)
     else
@@ -876,6 +1004,230 @@ function UnloadMMap()
     mmap.building=nil
     mmap.buildx=nil
     mmap.buildy=nil
+end
+
+-- ============================================================
+-- 云朵系统（主地图飘云）
+-- 逐字移植自原版 kys（kys_main.cpp / kys_draw.cpp / kys_engine.cpp）：
+--   * 原版在大地图每帧绘制 60 朵云（CLOUD_AMOUNT），每 40ms 右移 Speedx(1..3)px，
+--     越界(>17279 或 <0)后从左侧(CloudCreateOnSide, Positionx=0)重生；
+--   * 每朵云有随机色调 mixColor(RGB) 与 mixAlpha(10..59)，先把调色板像素
+--     朝 mixColor 混合 mixAlpha%（DrawRLE8Pic 的 mix 公式），再整体以
+--     Alpha(10..59)% 透明度合成到背景。
+-- 移植取舍：Love2D 无逐像素 mixColor 通道，故在「生成云」的瞬间把色调
+-- 烘焙进该朵云的贴图（精确复刻 mix 公式），绘制时用 setColor 的 alpha
+-- 复刻整体透明度。云帧 RLE 解码与 LoadPic 同一格式，但云 idx 是「每帧一个
+-- 贴图」（原版 DrawCPic 不做 /2），故直接按 idx[num+1..num+2] 取帧范围。
+-- ============================================================
+local CLOUD_AMOUNT = 60
+-- PicLoadFile 槽位。原版 jymain.h:117 `#define PIC_FILE_NUM 40`，合法 id 为
+-- 0..39；已占用：0=地图/场景/战场图 1=头像 2=物品 3=特效 4+i=战斗人物
+-- （WAR.Person 共 26 项，i=0..25 → 4..29）。故 30..39 空闲，取上界 39，
+-- 既不与原版 PIC_FILE_NUM 容量冲突，也不与任何现有槽位冲突。
+local CLOUD_SLOT = 39
+local CLOUD_WORLD_X = 17280  -- 云世界 x 范围（原版硬编码 17280 = 2*MWidth*XScale）
+local CLOUD_WORLD_Y = 8640   -- 云世界 y 范围（原版硬编码 8640 = MHeight*XScale，注意是 XScale 不是 YScale）
+local cloudFrames = {}   -- cloudFrames[picnum] = {w=,h=,pixels={{x,y,r,g,b},...}} 调色板原色 0-255
+local cloudList = {}     -- cloudList[i] = {Picnum,Positionx,Positiony,Speedx,Speedy,Alpha,mixR,mixG,mixB,mixAlpha,img,imgW,imgH}
+local cloudPicAmount = 0
+local cloudNextTick = 0
+
+-- 解码一帧云 RLE 为调色板原色像素列表。
+-- 逐字移植原版 DrawRLE8Pic 的行 RLE 状态机（kys_engine.cpp / kys_engine.pas）：
+--   每行首字节 l = 本行命令字节总数；状态 p: 0=读跳过 1=读像素数 >=2=逐像素绘制，
+--   一 run 结束(p 回到 2)复位 p=0。与 LoadPic 的「成对」解码不同，状态机能
+--   正确处理行尾的 trailing skip（空白收尾），对真实云数据两者结果一致。
+local function CloudDecodeFrame(picnum)
+    local pf = picFileCache[CLOUD_SLOT + 1]
+    if pf == nil then return nil end
+    local start = pf.idx[picnum + 1]
+    local finish = pf.idx[picnum + 2]
+    if start == nil or finish == nil or finish <= start then return nil end
+    local f = FileUtil.open(pf.grpfilename, "rb")
+    if f == nil then return nil end
+    f:seek("set", start)
+    local header = f:read(8)
+    if header == nil then f:close(); return nil end
+    local w = Byte.byte2ushortl(header:sub(1,2):byte(1,2))
+    local h = Byte.byte2ushortl(header:sub(3,4):byte(1,2))
+    local xoff = Byte.byte2sshortl(header:sub(5,6):byte(1,2))
+    local yoff = Byte.byte2sshortl(header:sub(7,8):byte(1,2))
+    if w <= 0 or h <= 0 then f:close(); return nil end
+    local pixels = {}
+    for iy = 1, h do
+        local lbyte = f:read(1)
+        if lbyte == nil then break end
+        local l = lbyte:byte(1)        -- 本行 entry 数量（1 字节）
+        local col = 1                  -- 当前列，1 基（原版 ww）
+        local p = 0                    -- 状态: 0=读跳过 1=读像素数 >=2=逐像素绘制
+        for ix = 1, l do
+            local byte = f:read(1)
+            if byte == nil then break end
+            local l1 = byte:byte(1)
+            if p == 0 then
+                col = col + l1         -- 跳过 l1 个空白像素
+                p = 1
+            elseif p == 1 then
+                p = 2 + l1             -- 接下来 l1 个像素数据
+            elseif p > 2 then
+                p = p - 1
+                local x = col - 1      -- 帧内 0 基 x（原版 x = ww - xs + px，xs 绘制时扣除）
+                if x >= 0 and x < w then
+                    local color = color32Pallette[l1 + 1]  -- lua starts with 1
+                    if color then
+                        local r = math.floor(color / 65536)
+                        local g = math.floor(color / 256) % 256
+                        local b = color % 256
+                        pixels[#pixels + 1] = { x, iy - 1, r, g, b }
+                    end
+                end
+                col = col + 1
+                if p == 2 then p = 0 end
+            end
+        end
+    end
+    f:close()
+    cloudFrames[picnum] = { w = w, h = h, xoff = xoff, yoff = yoff, pixels = pixels }
+    return cloudFrames[picnum]
+end
+
+-- 烘焙单朵云贴图：把调色板像素朝色调(mixR/mixG/mixB)混合 mixAlpha%
+-- （精确复刻原版 DrawRLE8Pic：pix = (mixAlpha*mixColor + (100-mixAlpha)*pix)/100）
+local function CloudBakeImage(picnum, mixR, mixG, mixB, mixAlpha)
+    local frame = cloudFrames[picnum]
+    if frame == nil then return nil, 0, 0, 0, 0 end
+    local imgdata = love.image.newImageData(frame.w, frame.h)
+    for _, p in ipairs(frame.pixels) do
+        local x, y, r, g, b = p[1], p[2], p[3], p[4], p[5]
+        local nr = (mixAlpha * mixR + (100 - mixAlpha) * r) / 100
+        local ng = (mixAlpha * mixG + (100 - mixAlpha) * g) / 100
+        local nb = (mixAlpha * mixB + (100 - mixAlpha) * b) / 100
+        imgdata:setPixel(x, y, nr / 255, ng / 255, nb / 255, 1)
+    end
+    local img = love.graphics.newImage(imgdata, {mipmaps=false, linear=false, dpiscale=1})
+    return img, frame.w, frame.h, frame.xoff or 0, frame.yoff or 0
+end
+
+-- 云重生（原版 CloudCreateOnSide：Positionx=0，从左侧进入）
+local function CloudCreateOnSide(i)
+    if i < 1 or i > CLOUD_AMOUNT then return end
+    local c = cloudList[i] or {}
+    cloudList[i] = c
+    c.Picnum = (cloudPicAmount > 0) and math.random(0, cloudPicAmount - 1) or 0
+    c.Alpha = 10 + math.random(0, 49)
+    c.mixR = math.random(0, 255)
+    c.mixG = math.random(0, 255)
+    c.mixB = math.random(0, 255)
+    c.mixAlpha = 10 + math.random(0, 49)
+    c.Positionx = 0
+    c.Positiony = math.random(0, CLOUD_WORLD_Y - 1)
+    c.Speedx = 1 + math.random(0, 2)
+    c.Speedy = 0
+    local img, w, h, xoff, yoff = CloudBakeImage(c.Picnum, c.mixR, c.mixG, c.mixB, c.mixAlpha)
+    c.img = img
+    c.imgW = w
+    c.imgH = h
+    c.xoff = xoff
+    c.yoff = yoff
+end
+
+-- 云初始生成（原版 CloudCreate：OnSide 之后把 Positionx 随机散布到整幅）
+local function CloudCreate(i)
+    CloudCreateOnSide(i)
+    if cloudList[i] then
+        cloudList[i].Positionx = math.random(0, CLOUD_WORLD_X - 1)
+    end
+end
+
+-- 加载云贴图并初始化 60 朵云（Init_MMap 在 PicLoadFile 后调用）
+function CloudLoadAndInit(idxFile, grpFile)
+    PicLoadFile(idxFile, grpFile, CLOUD_SLOT)
+    cloudList = {}
+    cloudFrames = {}
+    cloudPicAmount = 0
+    cloudNextTick = GetTime()
+    CLOUD_WORLD_X = (CC and CC.MWidth or 480) * (CONFIG and CONFIG.XScale or 18) * 2
+    CLOUD_WORLD_Y = (CC and CC.MHeight or 480) * (CONFIG and CONFIG.XScale or 18)
+    local pf = picFileCache[CLOUD_SLOT + 1]
+    if pf ~= nil then
+        -- 云 idx 为「末偏移累计」布局：帧 num(0 基) 占 [idx[num+1], idx[num+2])
+        local n = 0
+        while pf.idx[n + 1] ~= nil and pf.idx[n + 2] ~= nil
+                and pf.idx[n + 2] > pf.idx[n + 1] do
+            cloudFrames[n] = CloudDecodeFrame(n)
+            cloudPicAmount = cloudPicAmount + 1
+            n = n + 1
+        end
+    end
+    for i = 1, CLOUD_AMOUNT do
+        CloudCreate(i)
+    end
+end
+
+-- 云 40ms 漂移 tick（原版 kys_main.cpp:1897，受 MMAPAMI>0 门控）
+function CloudTick()
+    if cloudPicAmount == 0 then return end
+    if CC == nil or CC.MMapAmi == nil or CC.MMapAmi <= 0 then return end
+    local now = GetTime()
+    if now - cloudNextTick <= 0 then return end
+    cloudNextTick = now + 40
+    for i = 1, CLOUD_AMOUNT do
+        local c = cloudList[i]
+        if c ~= nil then
+            c.Positionx = c.Positionx + c.Speedx
+            c.Positiony = c.Positiony + c.Speedy
+            if c.Positionx > CLOUD_WORLD_X - 1 or c.Positionx < 0
+                or c.Positiony > CLOUD_WORLD_Y - 1 or c.Positiony < 0 then
+                CloudCreateOnSide(i)
+            end
+        end
+    end
+end
+
+-- 绘制云（移植原版 kys_draw.pas:DrawClouds，画在主地图建筑层之上）
+-- 绘制锚点 = 原版 DrawCPic 的 (px,py)，再按帧 xoff/yoff 偏移——与 JY_LoadPic
+-- 的 (x - xoff, y - yoff) 约定一致（原版 DrawRLE8Pic: screen = anchor + col - xoff）。
+--
+-- 【x 轴符号为什么不能照抄原版】
+-- 原版 kys 的地形投影是
+--   GetPositionOnScreen: sx = -18*(i-Mx) + 18*(j-My) + CENTER_X
+--                       = -18*(i-j) + 18*(Mx-My) + CENTER_X
+-- 而本项目（Mac 血缘 mainmap.c:JY_DrawMMap）的地形投影是它的水平镜像：
+--   sx = 18*((i-mx) - (j-my)) + W/2 = 18*(i-j) - 18*(mx-my) + W/2
+-- 同一个「主角横移」量在两条轴上式子相反：kys 地形玩家项 = +18*(Mx-My)，
+-- 本项目地形玩家项 = -18*(mx-my)。云是「世界锚定」的图层，必须与地形同步
+-- 滚动，因此 x 的玩家项必须取 -18*(mx-my)（即 +18*mx - 18*my 前面加负号），
+-- 也就是把原版的 `-(-Mx*18 + My*18 + ...)` 写成 `-(mx*18 - my*18 + ...)`。
+-- 照抄原版会让云以 +18*(mx-my) 反向滑动：主角按 ←/→ 或 ↑/↓ 时地形向左下/
+-- 右上滚，而云向右上/左下飘——表现就是「云跟着主角左右偏移」（历史 bug）。
+-- y 轴无镜像（两边都是 9*(i+j)），故 y 的玩家项 9*(mx+my) 与原版一致，不改。
+function DrawClouds(mx, my)
+    if cloudPicAmount == 0 or #cloudList == 0 then return end
+    local centerX = math.floor(CONFIG.Width / 2)
+    local centerY = math.floor(CONFIG.Height / 2)
+    for i = 1, CLOUD_AMOUNT do
+        local c = cloudList[i]
+        if c ~= nil and c.img ~= nil and c.Picnum >= 0 and c.Picnum < cloudPicAmount then
+            local px = c.Positionx - (mx * CONFIG.XScale - my * CONFIG.XScale + CLOUD_WORLD_Y - centerX)
+            local py = c.Positiony - (mx * CONFIG.YScale + my * CONFIG.YScale + CONFIG.YScale - centerY)
+            local x = px - (c.xoff or 0)
+            local y = py - (c.yoff or 0)
+            -- 原版 DrawRLE8Pic 的 alpha 合成（cloud 无遮挡、alpha<100 分支）：
+            --   out = 背景*(Alpha/100) + 云色*((100-Alpha)/100)
+            -- 即 Alpha 是「背景透出百分比」，云自身不透明度 = (100-Alpha)/100。
+            -- LÖVE 的默认 alpha 混合是 source-over（out = 源*a + 背景*(1-a)），
+            -- 故此处必须传 (100-Alpha)/100，传 Alpha/100 会把不透明度反过来
+            -- （原版近不透明的云会变近透明）。
+            love.graphics.setColor(1, 1, 1, (100 - c.Alpha) / 100)
+            love.graphics.draw(c.img, x, y)
+            love.graphics.setColor(1, 1, 1, 1)
+        end
+    end
+end
+
+-- 测试/调试用：返回内部云表（只读观察，勿改）
+function CloudGetList()
+    return cloudList
 end
 
 local S_XMax = 0
@@ -1271,5 +1623,11 @@ function DrawWarMap(flag, x, y, v1, v2, v3)
         end
     end
 end
+
+-- 导出字体获取，供 engine_love2d 的 M.dialog 做真实字体度量。
+-- 实测 simsun.ttf@24: 汉字 24.00px (1.0em)、ASCII 12.00px (0.5em)、
+-- font:getHeight() = 27.00px。用真实度量而非 CC.DefaultFont 常量，
+-- 才能自适应未来换字体 / 换字号 / 换分辨率。
+M.getFont = getFont
 
 return M

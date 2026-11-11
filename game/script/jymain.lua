@@ -9,6 +9,9 @@
 
 local FileUtil = require "lib_file"
 local ScriptLoader = require "script_loader"
+-- 单行文本的框尺寸计算（引擎无关纯模块）。
+-- DrawStrBox 需要按真实像素宽定框，手边又拿不到字体对象，统一走这里。
+local TextBoxLayout = require("framework.text_box_layout")
 
 --本模块是lua主模块，由C主程序JYLua.exe调用。C程序主要提供游戏需要的视频、音乐、键盘等API函数，供lua调用。
 --游戏的所有逻辑都在lua代码中，以方便大家对代码的修改。
@@ -95,7 +98,7 @@ function SetGlobal()   --设置游戏内部使用的全程变量
    JY.oldSMapPic=-1;        --上次显示场景地图主角贴图
 
    JY.D_Valid=nil           --记录当前场景有效的D的编号，提高速度，不用每次显示都计算了。若为nil则重新计算
-   JY_D_Valld_Num=0;        --当前场景有效的D个数
+   JY.D_Valid_Num=0;        --当前场景有效的D个数（原名误写为裸全局 JY_D_Valld_Num）
 
    JY.D_PicChange={}        --记录事件动画改变，以计算Clip
    JY.NumD_PicChange=0;     --事件动画改变的个数
@@ -310,7 +313,7 @@ function NewGame()     --选择新游戏，设置主角初始属性
         local menu={{"是 ",nil,1},
                     {"否 ",nil,2},
                    };
-        local ok=ShowMenu2(menu,2,0,x1+11*fontsize,CC.NewGameY-CC.MenuBorderPixel,0,0,0,0,fontsize,C_RED, C_WHITE)
+        local ok=ShowMenu2(menu,2,0,x1+11*fontsize,CC.NewGameY-CC.MenuBorderPixel,0,0,0,0,fontsize,C_WHITE, C_RED)
         if ok==1 then
             break;
         end
@@ -373,6 +376,10 @@ function Init_MMap()   --初始化主地图数据
     if CC.LoadThingPic==1 then
         lib.PicLoadFile(CC.ThingPicFile[1],CC.ThingPicFile[2],2);
     end
+
+    -- 主地图飘云（原版 kys_engine.pas:ReadTiles 加载 cloud.idx/grp，
+    -- kys_main.pas 初始化 60 朵云）。文件缺失时 PicLoadFile 静默跳过，无云不报错。
+    lib.CloudLoadAndInit(CC.CloudPicFile[1],CC.CloudPicFile[2]);
 
     JY.EnterSceneXY=nil;         --设为空，强制重新生成场景入口数据。防止有事件更改了场景入口。
     JY.oldMMapX=-1;
@@ -504,14 +511,63 @@ function Init_SMap(showname)   --初始化场景数据
     lib.ShowSlow(50,0)
     lib.GetKey();
 
+    --showname=1 时提示场景名。
+    --
+    --原版此处是阻塞流程：
+    --    DrawStrBox(-1,10,名称); ShowScreen(); WaitKey(); Cls(); ShowScreen()
+    --事件驱动下不能在这里画也不能在这里等键：
+    --   1. ShowScreen() 已被 async_globals 替换为空操作（draw 每帧自动 present）
+    --   2. GAME_SMAP.draw 每帧无条件 DrawSMap(0) 全屏重绘，
+    --      任何不在 draw 回调里画的东西都会在下一帧被覆盖
+    --故改为：异步模块起一条等键协程并置 currentName，
+    --绘制由 EventBridge:draw() 里的 SceneNameAsync.draw() 每帧完成。
     if showname==1 then
-        DrawStrBox(-1,10,JY.Scene[JY.SubScene]["名称"],C_WHITE,CC.DefaultFont);
-        ShowScreen();
-        WaitKey();
-        Cls();
-        ShowScreen();
+        ShowSceneName();
     end
 
+end
+
+-- 场景名提示：取当前场景名称。
+--
+-- jymain 这里只提供数据（GetSceneName）和绘制原语（DrawSceneName），
+-- 不持有提示状态、也不等键。显示/等键由
+-- framework/scene_name_async.lua 负责（对齐 person_status_async.lua 样板：
+-- 协程挂起等键 + draw() 每帧渲染 + InputManager.disableInput 屏蔽行走）。
+-- @return: 场景名称字符串；无名称（nil/空串/纯空白）时返回 nil
+function GetSceneName()
+    local scene = JY.Scene and JY.Scene[JY.SubScene];
+    if scene == nil then return nil end
+    local name = scene["名称"];
+    -- 空串或纯空白视为无名称：否则会画出一个空框
+    if name == nil or name:match("^%s*$") then return nil end
+    return name;
+end
+
+-- 请求显示场景名提示。
+--
+-- 只转发到全局 ShowSceneNameAsyncImpl（由 framework/scene_name_async.lua 经
+-- AsyncGlobals.install() 注入）。script/ 不直接依赖 framework/——
+-- 严格 _G 下确实读不到 GameStates 这类模块 local。
+--
+-- 必须用 rawget：严格 _G 元表（jymain_adapter.lua 的 __index）对不存在的键
+-- 会直接抛「attempt read read to undeclared variable」。该全局可能尚未注入
+-- （例如从主地图进场景、AsyncGlobals.install() 还没跑过），此时必须能安全
+-- 读到 nil 并降级为 no-op，而不是把整个 Init_SMap 炸掉。
+function ShowSceneName()
+    local name = GetSceneName();
+    if name == nil then return end
+    local impl = rawget(_G, "ShowSceneNameAsyncImpl");
+    if impl == nil then return end   -- 未接入框架：静默跳过
+    impl(name);
+end
+
+-- 绘制场景名提示框（由 framework/scene_name_async.lua 的 draw() 调用）。
+-- 位置与原版一致：x 居中（-1），y=10，白色边框 + 白字。
+-- @param name: 场景名称，省略时取当前场景
+function DrawSceneName(name)
+    name = name or GetSceneName();
+    if name == nil then return end
+    DrawStrBox(-1,10,name,C_WHITE,CC.DefaultFont);
 end
 
 --计算贴图改变形成的Clip裁剪
@@ -997,6 +1053,14 @@ function TrainNeedExp(id)         --计算人物修炼物品成功需要的点�
 end
 
 --医疗菜单
+-- 注意：本函数（以及 Menu_DecPoison、MMenu、Game_MMap/Game_SMap）只在
+-- 原版阻塞式 JY_Main 循环里可达；Love2D 版走 JYMainAdapter + MMenuCoroutine，
+-- 这些函数是死代码，保留作为原版行为的参考。
+-- 里面的 string.format("%-10s%4d", ...) 同样有「%-10s 按字节补齐」的缺陷
+-- （汉字 3 字节，补到 10 字节 ≈ 3.33 个汉字，3/4 字姓名各占一档，
+--   实测姓名列抖动 12px）。活路径 framework/jymain_async.lua 已改用
+-- TextBoxLayout.formatColumns 按显示宽度对齐，此处不再改，
+-- 以免在死代码上引入无法用实机验证的改动。
 function Menu_Doctor()       --医疗菜单
     DrawStrBox(CC.MainSubMenuX,CC.MainSubMenuY,"谁要使用医术",C_WHITE,CC.DefaultFont);
     local nexty=CC.MainSubMenuY+CC.SingleLineHeight;
@@ -1616,6 +1680,70 @@ end
 -- 读取游戏进度
 -- id=0 新进度，=1/2/3 进度
 --
+-- MOD 旁路字符串表接入（allmods 编码转换）
+-- MOD 的字符串字段在 ranger.grp 中被替换为固定宽度 hint（如 "P0002"），
+-- 真实 UTF-8 值在 data/ranger.str。未激活 MOD 时 ModData 为空操作，
+-- 行为与原版逐字节一致（零回归）。
+-- 注意：这三个 helper 必须在 LoadRecord/SaveRecord 之前定义（局部函数
+-- 需先声明后使用），故放在文件此处。
+local _modDataHooked = false
+local _modDataCache = nil
+local function modDataForStrings()
+    if _modDataHooked then return _modDataCache end
+    _modDataHooked = true
+    local ok, m = pcall(require, "framework.mod_data")
+    _modDataCache = (ok and m) or false
+    return _modDataCache
+end
+
+-- 解析从缓冲区读到的字符串：若是 hint 且能查到旁路表，返回真实值。
+-- 当前存档覆盖表（若有）优先。
+-- 对「未转换」字段（缓冲区里是纯 ASCII 原文），则用合成键查覆盖表。
+local function resolveModString(v, t, offset)
+    local m = modDataForStrings()
+    if not m or not m.Active() then return v end
+    local ovr = m._currentOverrides
+    -- 1) 真实 hint 键
+    if ovr and ovr[v] ~= nil then return ovr[v] end
+    -- 2) 合成键（未转换字段的改写）
+    if ovr and t and m.IdentifyStringField and m.SyntheticKey then
+        local seg, field = m.IdentifyStringField(t[1])
+        if seg then
+            local k = m.SyntheticKey(seg, field, offset)
+            if k and ovr[k] ~= nil then return ovr[k] end
+        end
+    end
+    return m.ResolveString(v)
+end
+
+-- 写入字符串字段：MOD 激活时记录到存档覆盖表（而非写缓冲区），
+-- 以便存档回写时能保留玩家修改的字符串（UTF-8 放不回定长字段）。
+-- 键的选择：
+--   * 缓冲区是真实 hint（构建期已转换）→ 用 hint 作键
+--   * 缓冲区是纯 ASCII 原文（构建期未转换）→ 用合成键（段+字段+记录偏移）
+local function writeModString(data, t, offset, v)
+    local m = modDataForStrings()
+    if m and m.Active() and m._currentOverrides then
+        local hint = Byte.getstr(data, t[1]+offset, t[3])
+        if hint and hint ~= "" and m.ParseHint and m.ParseHint(hint) then
+            m._currentOverrides[hint] = v
+            return true
+        end
+        -- 无 hint：用合成键，避免 UTF-8 被截断进定长字段
+        if m.IdentifyStringField and m.SyntheticKey then
+            local seg, field = m.IdentifyStringField(t[1])
+            if seg then
+                local k = m.SyntheticKey(seg, field, offset)
+                if k then
+                    m._currentOverrides[k] = v
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 --这里是先把数据读入Byte数组中。然后定义访问相应表的方法，在访问表时直接从数组访问。
 --与以前的实现相比，从文件中读取和保存到文件的时间显著加快。而且内存占用少了
 function LoadRecord(id)       -- 读取游戏进度
@@ -1646,6 +1774,16 @@ function LoadRecord(id)       -- 读取游戏进度
     --读取R*.idx文件
     local data=Byte.create(6*4);
     Byte.loadfile(data,idxFile,0,6*4);
+
+    -- MOD 存档覆盖表：读档时先加载 rN.ovr（未激活 MOD / 无文件时为空表）
+    do
+        local m = modDataForStrings()
+        if m and m.Active() and m.SaveOverrides then
+            m._currentOverrides = m.SaveOverrides(id)
+        else
+            if m then m._currentOverrides = nil end
+        end
+    end
 
     local idx={};
     idx[0]=0;
@@ -1772,6 +1910,20 @@ function SaveRecord(id)         -- 写游戏进度
     --读取R*.idx文件
     local t1=lib.GetTime();
 
+    -- 首次保存该槽时，存档目录里还没有 rN.idx（分段偏移表），
+    -- 先从 MOD/原版的基础数据模板（ranger.idx）播种一份，否则会读到全 0 idx，
+    -- 导致写出的存档各段长度为 0（损坏）。
+    if id > 0 then
+        local ok, ModData = pcall(require, "framework.mod_data")
+        if ok and ModData and ModData.SeedSaveSlot then
+            ModData.EnsureSaveDir()
+            local seeded = ModData.SeedSaveSlot(id)
+            if seeded then
+                lib.Debug(string.format("SaveRecord: seeded idx from template -> %s", seeded))
+            end
+        end
+    end
+
     lib.Debug("SaveRecord: reading idx file")
     local data=Byte.create(6*4);
     Byte.loadfile(data,CC.R_IDXFilename[id],0,6*4);
@@ -1798,6 +1950,15 @@ function SaveRecord(id)         -- 写游戏进度
 
     lib.Debug("SaveRecord: calling SaveSMap")
     lib.SaveSMap(CC.S_Filename[id],CC.D_Filename[id]);
+
+    -- MOD 存档覆盖表：把本次会话中修改过的字符串写入 rN.ovr
+    do
+        local m = modDataForStrings()
+        if m and m.Active() and m._currentOverrides and m.WriteSaveOverrides then
+            m.WriteSaveOverrides(id, m._currentOverrides)
+        end
+    end
+
     lib.Debug(string.format("SaveRecord time=%d",lib.GetTime()-t1));
     lib.Debug("SaveRecord: done")
 
@@ -1857,6 +2018,7 @@ function GetDataFromStruct(data,offset,t_struct,key)  --从数据的结构中翻
         r=Byte.getu16(data,t[1]+offset);
     elseif t[2]==2 then
         r=Byte.getstr(data,t[1]+offset,t[3]);
+        r=resolveModString(r, t, offset);
     end
     return r;
 end
@@ -1870,6 +2032,8 @@ function getTableKeys(t)
     return keys
 end
 
+-- 写入字符串字段：MOD 激活时记录到存档覆盖表（而非写缓冲区 hint），
+-- 以便存档回写时能保留玩家修改的字符串。
 function SetDataFromStruct(data,offset,t_struct,key,v)  --从数据的结构中翻译数据，保存数据
     local t=t_struct[key];
     if t[2]==0 then
@@ -1877,9 +2041,11 @@ function SetDataFromStruct(data,offset,t_struct,key,v)  --从数据的结构中�
     elseif t[2]==1 then
         Byte.setu16(data,t[1]+offset,v);
     elseif t[2]==2 then
-        local s;
-        s=v;
-        Byte.setstr(data,t[1]+offset,t[3],s);
+        if not writeModString(data, t, offset, v) then
+            local s;
+            s=v;
+            Byte.setstr(data,t[1]+offset,t[3],s);
+        end
     end
 end
 
@@ -1959,19 +2125,40 @@ end
 
 --显示带框的字符串
 --(x,y) 坐标，如果都为-1,则在屏幕中间显示
+--
+-- 框宽按文本的**真实像素宽**算，不再用 `size*#str/2`。
+--
+-- 原版 C 层 JY_DrawStr 用 TTF_SizeUTF8 量真实宽（charset.c:150），
+-- 上式在原版是准的。但 Lua 的 #str 是 **UTF-8 字节数**：一个汉字 3 字节，
+-- 于是中文字符串的框宽被算成约 4.5 倍字号，比实际宽一大截；
+-- 而 ASCII 恰好只占 1 字节，算出来是对的。这就是「中文提示框右边空一大块、
+-- 英文框却正常」的原因。
+--
+-- 实测（simsun@24）：
+--   梅庄               真实 48px   旧公式  82px   多 29px
+--   牛家村             真实 72px   旧公式 118px   多 41px
+--   得到物品:倚天剑 1  真实 204px  旧公式 298px   多 89px
+--
+-- 框高仍用字号（size + 2*pad）：单行文本要的是光学居中，
+-- 而 getHeight（27）比字形墨迹高（23）大 4px，多出的空间是给下伸部
+-- 预留的，中文单行用不上，反而让文字偏上（实测 上7/下10）。
+--
+-- 注意：ShowMenu 的自动定宽（jymain.lua:2333）里还有同一处 `string.len`
+-- 字节数公式，影响全游戏所有菜单框宽，改动面远大于本函数，暂未动。
 function DrawStrBox(x,y,str,color,size)         --显示带框的字符串
-    local ll=#str;
-    local w=size*ll/2+2*CC.MenuBorderPixel;
-    local h=size+2*CC.MenuBorderPixel;
+    size = size or CC.DefaultFont;
+    local box = TextBoxLayout.measure(str, {size=size});
+    local w = box.width;
+    local h = box.height;
     if x==-1 then
-        x=(CC.ScreenW-size/2*ll-2*CC.MenuBorderPixel)/2;
+        x=(CC.ScreenW-w)/2;
     end
     if y==-1 then
-        y=(CC.ScreenH-size-2*CC.MenuBorderPixel)/2;
+        y=(CC.ScreenH-h)/2;
     end
 
     DrawBox(x,y,x+w-1,y+h-1,C_WHITE);
-    DrawString(x+CC.MenuBorderPixel,y+CC.MenuBorderPixel,str,color,size);
+    DrawString(x+box.pad,y+box.pad,str,color,size);
 end
 
 --显示并询问Y/N，如果点击Y，则返回true, N则返回false
@@ -1979,14 +2166,17 @@ end
 --改为用菜单询问是否
 function DrawStrBoxYesNo(x,y,str,color,size)        --显示字符串并询问Y/N
     lib.GetKey();
-    local ll=#str;
-    local w=size*ll/2+2*CC.MenuBorderPixel;
-    local h=size+2*CC.MenuBorderPixel;
+    size = size or CC.DefaultFont;
+    -- 与 DrawStrBox 同源：框宽必须按真实像素宽算，
+    -- 否则下面 ShowMenu 的 x 定位（依赖 w）也会偏。
+    local box = TextBoxLayout.measure(str, {size=size});
+    local w = box.width;
+    local h = box.height;
     if x==-1 then
-        x=(CC.ScreenW-size/2*ll-2*CC.MenuBorderPixel)/2;
+        x=(CC.ScreenW-w)/2;
     end
     if y==-1 then
-        y=(CC.ScreenH-size-2*CC.MenuBorderPixel)/2;
+        y=(CC.ScreenH-h)/2;
     end
 
     DrawStrBox(x,y,str,color,size);
@@ -2883,88 +3073,69 @@ end
 --s 字符串，必须加上*作为分行，如果里面没有*,则会自动加上
 function TalkEx(s,headid,flag)          --复杂版本对话
     lib.Debug(string.format("TalkEx called: headid=%d, flag=%d, s=%s", headid, flag, string.sub(s, 1, 30)));
-    
-    local picw=100;       --最大头像图片宽高
-    local pich=100;
-    local talkxnum=12;         --对话一行字数
-    local talkynum=3;          --对话行数
-    local dx=2;
-    local dy=2;
-    local boxpicw=picw+10;
-    local boxpich=pich+10;
-    local boxtalkw=12*CC.DefaultFont+10;
-    local boxtalkh=boxpich;
-
-    local talkBorder=(pich-talkynum*CC.DefaultFont)/(talkynum+1);
-
-    --显示头像和对话的坐标
-    local xy={ [0]={headx=dx,heady=dy,
-                    talkx=dx+boxpicw+2,talky=dy,
-                    showhead=1},
-                   {headx=CC.ScreenW-1-dx-boxpicw,heady=CC.ScreenH-dy-boxpich,
-                    talkx=CC.ScreenW-1-dx-boxpicw-boxtalkw-2,talky= CC.ScreenH-dy-boxpich,
-                    showhead=1},
-                   {headx=dx,heady=dy,
-                   talkx=dx+boxpicw+2,talky=dy,
-                   showhead=0},
-                   {headx=CC.ScreenW-1-dx-boxpicw,heady=CC.ScreenH-dy-boxpich,
-                   talkx=CC.ScreenW-1-dx-boxpicw-boxtalkw-2,talky= CC.ScreenH-dy-boxpich,
-                    showhead=1},
-                   {headx=CC.ScreenW-1-dx-boxpicw,heady=dy,
-                    talkx=CC.ScreenW-1-dx-boxpicw-boxtalkw-2,talky=dy,showhead=1},
-                   {headx=dx,heady=CC.ScreenH-dy-boxpich,talkx=dx+boxpicw+2,talky=CC.ScreenH-dy-boxpich,showhead=1}, }
 
     if flag<0 or flag>5 then
         flag=0;
     end
 
-    if xy[flag].showhead==0 then
-        headid=-1;
-    end
-
-    if string.find(s,"*") ==nil then
-        s=GenTalkString(s,12);
-    end
+    -- 排版交由引擎：对话框属于渲染介质相关决策。
+    -- EngineAPI.dialog.measure 是纯函数（Love2D 用真实 font:getWidth/getHeight，
+    -- 汉字 1.0em、ASCII 0.5em、行高 27px），因此本函数不再自算坐标。
+    local spec = { text = s, headId = headid, flag = flag };
+    local layout = EngineAPI.dialog.measure(spec);
+    local dialog = EngineAPI.dialog;
 
     if CONFIG.KeyRepeat==0 then
          lib.EnableKeyRepeat(0,CONFIG.KeyRepeatInterval);
     end
     lib.GetKey();
 
-    local startp=1
-    local endp;
-    local dy=0;
-    while true do
-        if dy==0 then
-            Cls();
-            if headid>=0 then
-                DrawBox(xy[flag].headx, xy[flag].heady, xy[flag].headx + boxpicw, xy[flag].heady + boxpich,C_WHITE);
-                lib.Debug(string.format("TalkEx: loading headid=%d, picid=%d", headid, headid*2));
-                local w,h=lib.PicGetXY(1,headid*2);
-                lib.Debug(string.format("TalkEx: PicGetXY returned w=%s, h=%s", tostring(w), tostring(h)));
-                local x=(picw-w)/2;
-                local y=(pich-h)/2;
-                lib.PicLoadCache(1,headid*2,xy[flag].headx+5+x,xy[flag].heady+5+y,1);
-                lib.Debug("TalkEx: PicLoadCache called");
-            end
-            DrawBox(xy[flag].talkx, xy[flag].talky, xy[flag].talkx +boxtalkw, xy[flag].talky + boxtalkh,C_WHITE);
+    if not layout or not layout.lines or #layout.lines == 0 then
+        -- 引擎未实现排版（非图形引擎）：直接结束
+        if CONFIG.KeyRepeat==0 then
+             lib.EnableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);
         end
-        endp=string.find(s,"*",startp);
-        if endp==nil then
-            DrawString(xy[flag].talkx + 5, xy[flag].talky + 5+talkBorder + dy * (CC.DefaultFont+talkBorder),string.sub(s,startp),C_WHITE,CC.DefaultFont);
-            ShowScreen();
-            WaitKey();
-            break;
-        else
-            DrawString(xy[flag].talkx + 5, xy[flag].talky + 5+talkBorder + dy * (CC.DefaultFont+talkBorder),string.sub(s,startp,endp-1),C_WHITE,CC.DefaultFont);
+        Cls();
+        return;
+    end
+
+    -- 按每页行数分页
+    local perPage = layout.linesPerPage or 3;
+    local total = #layout.lines;
+    local pageStart = 1;
+
+    while pageStart <= total do
+        -- 取当前页的行
+        local pageLines = {};
+        for i = pageStart, math.min(pageStart + perPage - 1, total) do
+            pageLines[#pageLines + 1] = layout.lines[i];
         end
-        dy=dy+1;
-        startp=endp+1;
-        if dy>=talkynum then
-            ShowScreen();
-            WaitKey();
-            dy=0;
-        end
+
+        Cls();
+
+        -- 构造单页视图（框宽/锚点/行高沿用整段排版，只有 lines 换成本页）
+        local pageLayout = {
+            width = layout.width,
+            height = layout.height,
+            lineHeight = layout.lineHeight,
+            lines = pageLines,
+            pages = layout.pages,
+            linesPerPage = perPage,
+            headId = layout.headId,
+            flag = layout.flag,
+            headBox = layout.headBox,
+            textBox = layout.textBox,
+            border = layout.border,
+            lineY = layout.lineY,
+            fontSize = layout.fontSize,
+            showHead = layout.showHead,
+        };
+
+        dialog.draw(spec, pageLayout);
+        ShowScreen();
+        WaitKey();
+
+        pageStart = pageStart + perPage;
     end
 
     if CONFIG.KeyRepeat==0 then
@@ -2973,6 +3144,7 @@ function TalkEx(s,headid,flag)          --复杂版本对话
 
     Cls();
 end
+
 
 --测试指令，占位置用
 function instruct_test(s)
@@ -3206,8 +3378,11 @@ function instruct_6(warid,tmp,tmp2,flag)      --战斗
     local isexp = (flag == 0) and 0 or (flag or 1)
     if co then
         lib.Debug("instruct_6: running in coroutine, warid=" .. warid .. ", flag=" .. tostring(flag) .. ", isexp=" .. tostring(isexp))
-        local scheduler = require("coroutine_scheduler")
-        local WarAsync = require("war_async")
+        -- 注意：必须写全 framework.* 前缀。裸名 "coroutine_scheduler"/"war_async"
+        -- 在 package.path 下找不到（实测 require 直接失败），会让 instruct_6
+        -- 在协程分支抛错、整场战斗无法开始。
+        local scheduler = require("framework.coroutine_scheduler").getInstance()
+        local WarAsync = require("framework.war_async")
         
         lib.Debug("instruct_6: creating battle sub-coroutine")
         local warCo = scheduler:create(function()
@@ -3535,7 +3710,7 @@ function instruct_27(id,startpic,endpic)           --显示动画
     -- 获取协程调度器
     local scheduler = nil
     if coroutine.running() then
-        scheduler = require("coroutine_scheduler").getInstance()
+        scheduler = require("framework.coroutine_scheduler").getInstance()
     end
     
     if scheduler then
@@ -3550,7 +3725,6 @@ function instruct_27(id,startpic,endpic)           --显示动画
             frameDuration = CC.AnimationFrame,
         }
         lib.Debug(string.format("instruct_27: set AnimationState id=%d, startFrame=%d, endFrame=%d", id, startpic, endpic))
-        
         -- 等待动画完成
         -- 使用 yield 让出协程，让 GAME_SMAP.update 播放动画
         while JY.AnimationState.active do
@@ -4208,10 +4382,22 @@ function instruct_64()                 --小宝卖东西
     lib.Debug("instruct_64: TalkEx returned");
 
     local menu={};
+    -- 名称与价格必须按**显示宽度**对齐，不能按字节数。
+    -- 旧写法 string.format("%-12s %5d", name, price) 里的 12 是字节数，
+    -- 汉字 UTF-8 占 3 字节，于是「补到 12 字节」= 补到 4 个汉字：
+    -- 3/4/5 字的名字各占一档，价格列呈三级台阶。
+    -- 实测真实存档 5 家商店 × 5 项，价格列起点在 108/120/132 间跳动，
+    -- 抖动 24px = 恰好 1 个汉字宽。
+    -- 改为先收集各列原文，再用 formatColumns 按列内最大显示宽度补齐。
+    local rows={};
+    for i=1,5 do
+        local thingid=JY.Shop[id]["物品" ..i];
+        rows[i]={JY.Thing[thingid]["名称"], tostring(JY.Shop[id]["物品价格" ..i])};
+    end
+    local lines=TextBoxLayout.formatColumns(rows, CC.DefaultFont);
     for i=1,5 do
         menu[i]={};
-        local thingid=JY.Shop[id]["物品" ..i];
-        menu[i][1]=string.format("%-12s %5d",JY.Thing[thingid]["名称"],JY.Shop[id]["物品价格" ..i]);
+        menu[i][1]=lines[i];
         menu[i][2]=nil;
         if JY.Shop[id]["物品数量" ..i] >0 then
             menu[i][3]=1;
@@ -4341,6 +4527,17 @@ end
 --加载战斗数据
 function WarLoad(warid)              --加载战斗数据
     WarSetGlobal();         --初始化战斗变量
+    -- 边界校验（MOD 的 war.sta 大小不同）：warid 越界时报错而非静默加载失败
+    do
+        local ok, ModData = pcall(require, "framework.mod_data")
+        if ok and ModData and ModData.WarRecordCount then
+            local n = ModData.WarRecordCount(CC.WarFile, CC.WarDataSize)
+            if n and (warid < 0 or warid >= n) then
+                JY_Error("WarLoad: warid=%d out of range (war.sta has %d records)", warid, n)
+                return
+            end
+        end
+    end
     local data=Byte.create(CC.WarDataSize);      --读取战斗数据
     Byte.loadfile(data,CC.WarFile,warid*CC.WarDataSize,CC.WarDataSize);
     LoadData(WAR.Data,CC.WarData_S,data);
@@ -4474,6 +4671,12 @@ function WarMain(warid,isexp)           --战斗主函数
     end
 
     War_EndPersonData(isexp,warStatus);    --战斗后设置人物参数
+
+    --本场战斗经验清零，避免下场所持 WAR.Person["经验"] 残留（原版 WAR 数据每场重建，
+    --事件驱动架构下 WAR 表跨场复用，不清零会叠加）
+    for i=0,WAR.PersonNum-1 do
+        WAR.Person[i]["经验"]=0;
+    end
 
     lib.ShowSlow(50,1);
 

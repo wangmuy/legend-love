@@ -25,7 +25,7 @@
 
 ## EngineAPI 架构
 
-EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 11 个模块约 37 个函数。所有引擎操作通过 `EngineAPI.*` 或 `lib.*` 调用，`game/script/` 中的脚本不直接依赖任何引擎。
+EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 12 个模块（render/sprite/map/input/audio/time/file/script/font/dialog/color/debug/coroutine）。所有引擎操作通过 `EngineAPI.*` 或 `lib.*` 调用，`game/script/` 中的脚本不直接依赖任何引擎。
 
 ```
 game/script/ (游戏逻辑)
@@ -111,7 +111,8 @@ game/
 │   ├── coroutine_scheduler.lua # 协程调度器
 │   ├── menu_async.lua          # 异步菜单
 │   ├── menu_state_machine.lua  # 菜单状态机
-│   ├── talk_async.lua          # 异步对话
+│   ├── talk_async.lua          # 异步对话（节奏与分页；排版在 EngineAPI.dialog）
+│   ├── dialog_layout.lua       # 对话框排版纯算法（换行/框宽/裁剪，引擎无关）
 │   ├── war_async.lua           # 战斗系统
 │   ├── jymain_async.lua        # 主菜单异步
 │   ├── jymain_adapter.lua      # 游戏适配器

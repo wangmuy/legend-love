@@ -95,7 +95,7 @@ end
 -- 进入子状态
 function EventBridge:pushSubState(subStateId, data)
     local sm = StateMachine.getInstance()
-    sm:pushSubState(subStateId, data)
+    return sm:pushSubState(subStateId, data)
 end
 
 -- 退出子状态
@@ -152,6 +152,10 @@ function EventBridge:draw()
     -- 渲染当前状态
     StateMachine.getInstance():draw()
     
+    -- 渲染场景名提示（在场景之上；场景名必须压在每帧 DrawSMap 全屏重绘之后）
+    local SceneNameAsync = require("framework.scene_name_async")
+    SceneNameAsync.draw()
+
     -- 渲染人物状态（在场景之上）
     local PersonStatusAsync = require("framework.person_status_async")
     PersonStatusAsync.draw()

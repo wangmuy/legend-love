@@ -344,6 +344,17 @@ function EngineAPI.font.get(fontName, size)
 end
 
 --------------------------------------------------------------------------------
+-- dialog - stub (web 的对话框由浏览器/DOM 决定，Lua 层不做排版)
+--------------------------------------------------------------------------------
+EngineAPI.dialog = {}
+
+function EngineAPI.dialog.measure(spec) end
+
+function EngineAPI.dialog.draw(spec, layout) end
+
+function EngineAPI.dialog.clear() end
+
+--------------------------------------------------------------------------------
 -- color - pack/unpack tools
 --------------------------------------------------------------------------------
 EngineAPI.color = {}

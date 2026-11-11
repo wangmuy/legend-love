@@ -105,6 +105,18 @@ function TestEngineTest.testCoroutineModule()
         TestHelper.assertEquals(true, running, "isRunning should be true inside coroutine")
     end)
     coroutine.resume(co)
+    
+    -- 主线程必须为 false。
+    -- LuaJIT/Lua5.1 的 coroutine.running() 在主线程返回非 nil（主线程对象 + ismain=true），
+    -- 若实现只判断 `~= nil`，主线程会被误判为"正在协程中"，导致 async_globals 里
+    -- 7 处 isRunning 分支在主线程全部走异步路径。此断言专门锁死该缺陷。
+    TestHelper.assertEquals(false, EngineAPI.coroutine.isRunning(),
+        "isRunning should be false on main thread (LuaJIT coroutine.running() returns main thread + ismain=true)")
+    
+    -- 显式证明判据：主线程 ismain==true，子协程 ismain==false
+    local co2, ismain2 = coroutine.running()
+    TestHelper.assertEquals(true, ismain2 ~= nil and ismain2 == true,
+        "coroutine.running() on main thread must report ismain=true in LuaJIT")
 end
 
 function TestEngineTest.runAll()

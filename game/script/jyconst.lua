@@ -60,6 +60,7 @@ function SetGlobalConst()
 
 
    -- 游戏状态定义
+    GAME_INIT = -1      --游戏刚初始化，尚未进入任何画面（SetGlobal 的初始值）
     GAME_START =0       --开始画面
     GAME_FIRSTMMAP = 1  --第一次显示主地图
     GAME_MMAP =2;       --主地图
@@ -120,6 +121,9 @@ function SetGlobalConst()
 
    CC.HeadPicFile={CONFIG.DataPath .. "hdgrp.idx",CONFIG.DataPath .. "hdgrp.grp"};
    CC.ThingPicFile={CONFIG.DataPath .. "thing.idx",CONFIG.DataPath .. "thing.grp"};
+
+   --主地图飘云图（原版 kys_engine.pas:ReadTiles 的 resource/cloud.idx|grp）
+   CC.CloudPicFile={CONFIG.DataPath .. "cloud.idx",CONFIG.DataPath .. "cloud.grp"};
 
 
     CC.MIDIFile=CONFIG.SoundPath .. "game%02d.ogg";
@@ -516,6 +520,10 @@ function SetGlobalConst()
 	--注意: 如果设置了CONFIG.FastShowScreen=1，则场景视角范围超出后显示的坐标不正确。
 	CC.ShowXY=0      --0 不显示 1 显示
 
+	--主地图动态效果开关。原版 kysmod.ini [system] MMAPAMI，读不到时默认 1。
+	--0 关闭（云仍然绘制，只是不再飘动） >0 每 40ms 移动一次（kys_main.pas:1846）
+	CC.MMapAmi=1
+
 	--以下为控制显示方式的参数
 
 	CC.RowPixel=4         -- 每行字的间距像素数
@@ -624,5 +632,15 @@ function SetGlobalConst()
     CC.LoadThingPic=1           --读取物品贴图方式 0 从mmap/smap/wmap中读取  1 读取独立的thing.idx/grp
 	CC.StartThingPic=0          --物品贴图在mmap/smap/wmap中的起始编号。CC.LoadThingPic=0有效
 
-
+    -- MOD 数据回退：若激活 MOD，则把 CC.* 路径常量重定向到 mods/<mod>/data|script/（存在则用）
+    -- 未激活 MOD 时为空操作，路径与现状逐字节一致（REQ-DATA-4）
+    local ok, ModData = pcall(require, "framework.mod_data")
+    if ok and ModData and ModData.RewriteConstants then
+        ModData.RewriteConstants(CC, CONFIG)
+        -- MOD 记录布局与原版不同（Person 202->182 等），必须覆盖，
+        -- 否则 LoadRecord 会算出错误记录数并读到错位数据。
+        if ModData.ApplyLayout then
+            ModData.ApplyLayout(CC)
+        end
+    end
 end

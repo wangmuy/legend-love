@@ -13,6 +13,7 @@ local InputAsync = require("framework.input_async")
 local TalkAsync = require("framework.talk_async")
 local ItemAsync = require("framework.item_async")
 local PersonStatusAsync = require("framework.person_status_async")
+local TextBoxLayout = require("framework.text_box_layout")
 
 -- ============================================
 -- 主菜单系统
@@ -153,8 +154,13 @@ function JyMainAsync.Menu_ReadRecord()
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
         -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
         -- ShowScreen()
-        LoadRecord(r)
-        JY.Status = GAME_FIRSTMMAP
+        local ok = LoadRecord(r)
+        if ok then
+            JY.Status = GAME_FIRSTMMAP
+        else
+            Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+            AsyncMessageBox.ShowMessageCoroutine(-1, -1, "该存档不存在或已损坏", C_WHITE, CC.DefaultFont)
+        end
     end
 end
 
@@ -281,14 +287,40 @@ function JyMainAsync.SelectTeamMemberWithAbilityAsync(title, abilityKey, minAbil
             
             if shouldShow then
                 if abilityKey then
-                    -- 显示姓名和能力值
-                    menu[i][1] = string.format("%-10s%4d", JY.Person[id]["姓名"], JY.Person[id][abilityKey])
+                    -- 姓名与能力值两列，稍后按显示宽度统一补齐
+                    menu[i].__cells = { JY.Person[id]["姓名"], tostring(JY.Person[id][abilityKey]) }
                 else
                     -- 只显示姓名
                     menu[i][1] = JY.Person[id]["姓名"]
                 end
                 menu[i][3] = 1
             end
+        end
+    end
+
+    -- 名称与数值按**显示宽度**对齐，不能按字节数。
+    -- 旧写法 string.format("%-10s%4d", ...) 的 10 是字节数，汉字占 3 字节，
+    -- 于是「补到 10 字节」≈ 3.33 个汉字，3/4 字姓名各占一档。
+    -- 实测真实人物姓名，姓名列终点在 84/96 间跳动，抖动 12px = 半个汉字。
+    if abilityKey then
+        local rows = {}
+        for i = 1, #menu do
+            if menu[i].__cells then
+                rows[#rows + 1] = menu[i].__cells
+            end
+        end
+        if #rows > 0 then
+            local lines = TextBoxLayout.formatColumns(rows, CC.DefaultFont)
+            local k = 0
+            for i = 1, #menu do
+                if menu[i].__cells then
+                    k = k + 1
+                    menu[i][1] = lines[k]
+                end
+            end
+        end
+        for i = 1, #menu do
+            menu[i].__cells = nil
         end
     end
     
@@ -382,14 +414,34 @@ function JyMainAsync.SelectTeamMemberWithLifeAsync(title)
     local startY = CC.MainSubMenuY + CC.SingleLineHeight
     
     -- 构建菜单（显示姓名和生命值）
+    -- 三列（姓名 / 当前生命 / 最大生命）按显示宽度对齐，不用 %-10s 的字节语义。
+    local rows = {}
     local menu = {}
     for i = 1, CC.TeamNum do
         menu[i] = {"", nil, 0}
         local id = JY.Base["队伍" .. i]
         if id >= 0 then
-            -- 显示姓名和生命/生命最大值
-            menu[i][1] = string.format("%-10s%4d/%4d", JY.Person[id]["姓名"], JY.Person[id]["生命"], JY.Person[id]["生命最大值"])
+            rows[#rows + 1] = {
+                JY.Person[id]["姓名"],
+                tostring(JY.Person[id]["生命"]),
+                tostring(JY.Person[id]["生命最大值"]),
+            }
+            menu[i].__row = #rows
             menu[i][3] = 1
+        end
+    end
+    if #rows > 0 then
+        -- 第 2、3 列之间用 "/" 连接，避免出现多余空格
+        local colW1 = TextBoxLayout.columnWidth(rows, 1, CC.DefaultFont)
+        local colW2 = TextBoxLayout.columnWidth(rows, 2, CC.DefaultFont)
+        for i = 1, #menu do
+            if menu[i].__row then
+                local r = rows[menu[i].__row]
+                menu[i][1] = TextBoxLayout.padToWidth(r[1], colW1, CC.DefaultFont)
+                    .. TextBoxLayout.padToWidth(r[2], colW2, CC.DefaultFont)
+                    .. "/" .. r[3]
+                menu[i].__row = nil
+            end
         end
     end
     
@@ -517,14 +569,25 @@ function JyMainAsync.SelectTeamMemberWithPoisonAsync(title)
     local startY = CC.MainSubMenuY + CC.SingleLineHeight * 2
     
     -- 构建菜单（显示姓名和中毒程度）
+    -- 两列按显示宽度对齐，不用 %-10s 的字节语义。
+    local rows = {}
     local menu = {}
     for i = 1, CC.TeamNum do
         menu[i] = {"", nil, 0}
         local id = JY.Base["队伍" .. i]
         if id >= 0 then
-            -- 显示姓名和中毒程度
-            menu[i][1] = string.format("%-10s%5d", JY.Person[id]["姓名"], JY.Person[id]["中毒程度"])
+            rows[#rows + 1] = { JY.Person[id]["姓名"], tostring(JY.Person[id]["中毒程度"]) }
+            menu[i].__row = #rows
             menu[i][3] = 1
+        end
+    end
+    if #rows > 0 then
+        local lines = TextBoxLayout.formatColumns(rows, CC.DefaultFont)
+        for i = 1, #menu do
+            if menu[i].__row then
+                menu[i][1] = lines[menu[i].__row]
+                menu[i].__row = nil
+            end
         end
     end
     

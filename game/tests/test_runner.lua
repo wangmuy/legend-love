@@ -12,6 +12,22 @@ local TestItemAsync = require("tests.unit.test_item_async")
 local TestWarAsync = require("tests.unit.test_war_async")
 local TestEngineAPI = require("tests.unit.test_engine_api")
 local TestEngineTest = require("tests.unit.test_engine_test")
+local TestModIni = require("tests.unit.test_mod_ini")
+local TestModData = require("tests.unit.test_mod_data")
+local TestModEncoding = require("tests.unit.test_mod_encoding")
+local TestModBuild = require("tests.unit.test_mod_build")
+local TestModResources = require("tests.unit.test_mod_resources")
+local TestModAudit = require("tests.unit.test_mod_audit")
+local TestFormatSpec = require("tests.unit.test_format_spec")
+local TestModE2E = require("tests.unit.test_mod_e2e")
+local TestModBoot = require("tests.unit.test_mod_boot")
+local TestSceneName = require("tests.unit.test_scene_name")
+local TestFontSize = require("tests.unit.test_font_size")
+local TestNewEvent = require("tests.unit.test_new_event")
+local TestDialogLayout = require("tests.unit.test_dialog_layout")
+local TestTextBoxLayout = require("tests.unit.test_text_box_layout")
+local TestMmapDepth = require("tests.unit.test_mmap_depth")
+local TestCloud = require("tests.unit.test_cloud")
 
 local TestRunner = {}
 
@@ -20,6 +36,10 @@ function TestRunner.runAll()
     print("\n" .. string.rep("=", 60))
     print("金庸群侠传 Love2D 重构 - 单元测试套件")
     print(string.rep("=", 60))
+
+    -- 套件入口自愈：各 MOD 产物 save/ 与源 save/ 逐字节对齐
+    -- （清理上次运行中断残留，见 TestHelper.healAllModSaves 注释）
+    TestHelper.healAllModSaves()
     
     local allPassed = true
     local totalStats = { total = 0, passed = 0, failed = 0 }
@@ -138,7 +158,185 @@ function TestRunner.runAll()
     totalStats.passed = totalStats.passed + etStats.passed
     totalStats.failed = totalStats.failed + etStats.failed
     allPassed = allPassed and etResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行 ModIni 解析器测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local miResult = TestModIni.runAll()
+    local miStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + miStats.total
+    totalStats.passed = totalStats.passed + miStats.passed
+    totalStats.failed = totalStats.failed + miStats.failed
+    allPassed = allPassed and miResult
     
+    print("\n" .. string.rep("-", 60))
+    print("运行 ModData 数据回退测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local mdResult = TestModData.runAll()
+    local mdStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + mdStats.total
+    totalStats.passed = totalStats.passed + mdStats.passed
+    totalStats.failed = totalStats.failed + mdStats.failed
+    allPassed = allPassed and mdResult
+    
+    print("\n" .. string.rep("-", 60))
+    print("运行 MOD 编码/布局逆向测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local meResult = TestModEncoding.runAll()
+    local meStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + meStats.total
+    totalStats.passed = totalStats.passed + meStats.passed
+    totalStats.failed = totalStats.failed + meStats.failed
+    allPassed = allPassed and meResult
+    
+    print("\n" .. string.rep("-", 60))
+    print("运行 mod_build 构建期测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local buildResult = TestModBuild.runAll()
+    local buildStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + buildStats.total
+    totalStats.passed = totalStats.passed + buildStats.passed
+    totalStats.failed = totalStats.failed + buildStats.failed
+    allPassed = allPassed and buildResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行 MOD 资源分类测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local resResult = TestModResources.runAll()
+    local resStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + resStats.total
+    totalStats.passed = totalStats.passed + resStats.passed
+    totalStats.failed = totalStats.failed + resStats.failed
+    allPassed = allPassed and resResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行 MOD 资源穷举审计测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local auditResult = TestModAudit.runAll()
+    local auditStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + auditStats.total
+    totalStats.passed = totalStats.passed + auditStats.passed
+    totalStats.failed = totalStats.failed + auditStats.failed
+    allPassed = allPassed and auditResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行格式字段级覆盖测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local fmtResult = TestFormatSpec.runAll()
+    local fmtStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + fmtStats.total
+    totalStats.passed = totalStats.passed + fmtStats.passed
+    totalStats.failed = totalStats.failed + fmtStats.failed
+    allPassed = allPassed and fmtResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行名动天下无头端到端验证...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local e2eResult = TestModE2E.runAll()
+    local e2eStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + e2eStats.total
+    totalStats.passed = totalStats.passed + e2eStats.passed
+    totalStats.failed = totalStats.failed + e2eStats.failed
+    allPassed = allPassed and e2eResult
+    
+    print("\n" .. string.rep("-", 60))
+    print("运行全启动链路无头验证...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local bootResult = TestModBoot.runAll()
+    local bootStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + bootStats.total
+    totalStats.passed = totalStats.passed + bootStats.passed
+    totalStats.failed = totalStats.failed + bootStats.failed
+    allPassed = allPassed and bootResult
+
+    -- 场景名测试放在最后：它会 LoadRecord 并设置全局 JY 状态，
+    -- 而 test_mod_boot 要求"必须在最后运行"且不能被前面用例污染。
+    print("\n" .. string.rep("-", 60))
+    print("运行场景名提示测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local snResult = TestSceneName.runAll()
+    local snStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + snStats.total
+    totalStats.passed = totalStats.passed + snStats.passed
+    totalStats.failed = totalStats.failed + snStats.failed
+    allPassed = allPassed and snResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行字体大小测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local fsResult = TestFontSize.runAll()
+    local fsStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + fsStats.total
+    totalStats.passed = totalStats.passed + fsStats.passed
+    totalStats.failed = totalStats.failed + fsStats.failed
+    allPassed = allPassed and fsResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行 newevent 事件分派测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local neResult = TestNewEvent.runAll()
+    local neStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + neStats.total
+    totalStats.passed = totalStats.passed + neStats.passed
+    totalStats.failed = totalStats.failed + neStats.failed
+    allPassed = allPassed and neResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行对话框排版测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local dlgResult = TestDialogLayout.runAll()
+    local dlgStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + dlgStats.total
+    totalStats.passed = totalStats.passed + dlgStats.passed
+    totalStats.failed = totalStats.failed + dlgStats.failed
+    allPassed = allPassed and dlgResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行单行文本框尺寸测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local tboxResult = TestTextBoxLayout.runAll()
+    local tboxStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + tboxStats.total
+    totalStats.passed = totalStats.passed + tboxStats.passed
+    totalStats.failed = totalStats.failed + tboxStats.failed
+    allPassed = allPassed and tboxResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行主地图 2.5D 遮挡关系测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local mmResult = TestMmapDepth.runAll()
+    local mmStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + mmStats.total
+    totalStats.passed = totalStats.passed + mmStats.passed
+    totalStats.failed = totalStats.failed + mmStats.failed
+    allPassed = allPassed and mmResult
+
+    print("\n" .. string.rep("-", 60))
+    print("运行主地图飘云测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local clResult = TestCloud.runAll()
+    local clStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + clStats.total
+    totalStats.passed = totalStats.passed + clStats.passed
+    totalStats.failed = totalStats.failed + clStats.failed
+    allPassed = allPassed and clResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -160,6 +358,8 @@ end
 -- 运行单个测试模块
 function TestRunner.runModule(moduleName)
     TestHelper.resetCounts()
+    -- 与全量运行相同的入口自愈（单模块入口同样适用）
+    TestHelper.healAllModSaves()
     
     if moduleName == "state_machine" then
         return TestStateMachine.runAll()
@@ -181,9 +381,35 @@ function TestRunner.runModule(moduleName)
         return TestEngineAPI.runAll()
     elseif moduleName == "engine_test" then
         return TestEngineTest.runAll()
+    elseif moduleName == "mod_ini" then
+        return TestModIni.runAll()
+    elseif moduleName == "mod_data" then
+        return TestModData.runAll()
+    elseif moduleName == "mod_encoding" then
+        return TestModEncoding.runAll()
+    elseif moduleName == "mod_build" then
+        return TestModBuild.runAll()
+    elseif moduleName == "mod_resources" then
+        return TestModResources.runAll()
+    elseif moduleName == "mod_audit" then
+        return TestModAudit.runAll()
+    elseif moduleName == "format_spec" then
+        return TestFormatSpec.runAll()
+    elseif moduleName == "mod_e2e" then
+        return TestModE2E.runAll()
+    elseif moduleName == "mod_boot" then
+        return TestModBoot.runAll()
+    elseif moduleName == "text_box_layout" then
+        return TestTextBoxLayout.runAll()
+    elseif moduleName == "dialog_layout" then
+        return TestDialogLayout.runAll()
+    elseif moduleName == "mmap_depth" then
+        return TestMmapDepth.runAll()
+    elseif moduleName == "cloud" then
+        return TestCloud.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, mmap_depth, cloud")
         return false
     end
 end

@@ -2,7 +2,30 @@
 
 ## 背景
 
-EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 render/sprite/map/input/audio/time/file/script/font/color/debug/coroutine 共 11 个模块。当前 OpenSpec 变更（`engine-api-abstraction-layer`）已完成接口定义、Love2D 实现、测试引擎和事件驱动适配层的实现。
+EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 render/sprite/map/input/audio/time/file/script/font/dialog/color/debug/coroutine 共 12 个模块。当前 OpenSpec 变更（`engine-api-abstraction-layer`）已完成接口定义、Love2D 实现、测试引擎和事件驱动适配层的实现。
+
+### dialog 模块（2026-11 新增，第 6 次锁内改动）
+
+对话框排版从 `framework/talk_async.lua` 下沉到引擎层，因为框宽/换行/行高全部是
+「渲染介质相关」决策：Love2D 有真实字体度量（`font:getWidth`/`font:getHeight`），
+mud 无图形输出，web 的字体由浏览器决定。
+
+| 函数 | 语义 |
+|------|------|
+| `EngineAPI.dialog.measure(spec)` | 纯函数。`spec = { text, headId, flag }` → `{ width, height, lineHeight, lines, pages, headBox, textBox, border }` |
+| `EngineAPI.dialog.draw(spec, layout)` | 绘制。必须在 `love.draw()` 阶段调用（`ShowSurface` 只在 `inDrawLoop` 时 present） |
+| `EngineAPI.dialog.clear()` | 清除绘制状态 |
+
+排版算法本身是与引擎无关的纯函数，位于 `framework/dialog_layout.lua`
+（`charWidth` / `textWidth` / `greedyWrap` / `balancedWrap` / `splitByStar` /
+`trimTrailingBlank` / `layoutText` / `paginate`）。引擎只提供字体度量函数。
+
+两条关键不变量：
+
+1. **先换行，后按实际最宽行定框宽**。若先假定框宽再换行，短对话会得到
+   908px 的框却只有 466px 的文字，右侧留大片空白。
+2. **框高恒为 110px**（= 头像框高），与对话行数无关；行高用
+   `font:getHeight()`（simsun@24 → 27px，不是 24px）。
 
 本文档记录该变更完成后，后续需要推进的工作。
 
@@ -25,7 +48,7 @@ EngineAPI.audio.playMusic   →  AudioStreamPlayer
 
 ### 1.2 其他引擎
 
-EngineAPI 接口定义后，任何引擎只要实现这 37 个函数即可运行游戏脚本。
+EngineAPI 接口定义后，任何引擎只要实现全部接口函数即可运行游戏脚本（三引擎当前分别 55 / 50 / 62 个，因平台能力差异略有多寡）。
 
 ---
 
