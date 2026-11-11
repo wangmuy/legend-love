@@ -223,6 +223,18 @@ function M.file.lines(filename) end
 --- 创建目录
 function M.file.createDirectory(dirpath) end
 
+--- 检查目录是否存在
+-- 必须与「文件是否存在」区分：MOD 音效回退、fight 文件枚举都依赖它。
+-- @param dirpath string 目录路径
+-- @return boolean
+function M.file.directoryExists(dirpath) end
+
+--- 列出目录下的条目名（仅名字，不含路径；不含 "." 与 ".."）
+-- 目录不存在或无法列举时返回空表（不返回 nil，便于直接 ipairs）。
+-- @param dirpath string 目录路径
+-- @return table 名字数组
+function M.file.listDirectory(dirpath) end
+
 --------------------------------------------------------------------
 -- script - 脚本加载
 --------------------------------------------------------------------

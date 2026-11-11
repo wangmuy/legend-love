@@ -7,6 +7,7 @@ local TestHelper = require("tests.test_helper")
 -- 从 game/ 目录加载审计工具
 package.path = "./?.lua;" .. package.path
 local Audit = require("tools.mod_audit")
+local Fs = require("framework.fs_compat")
 
 local T = {}
 
@@ -27,24 +28,28 @@ end
 function T.testWalksAllModFiles()
     print("\n=== Test: 遍历 20 MOD 全部源文件 ===")
     local a = audit()
-    -- find 的结果必须与 walkMods 一致
-    local p = io.popen(
-        "find ../reference/allmods -mindepth 2 -type f " ..
-        "-path '*/kys-*/*' 2>/dev/null | wc -l")
-    local n = tonumber(p:read("*a"):match("%d+"))
-    p:close()
-    TestHelper.assertEquals(n, a.tot, "walkMods 覆盖 find 的全部文件")
+    -- 独立统计：用 fs_compat 递归遍历（不依赖 find/ls，Windows 也可用）
+    local n = 0
+    local modsSrc = "../reference/allmods"
+    for _, name in ipairs(Fs.listDirectory(modsSrc)) do
+        if name:match("^kys%-.+") and Fs.directoryExists(modsSrc .. "/" .. name) then
+            n = n + #Fs.walkFiles(modsSrc .. "/" .. name)
+        end
+    end
+    TestHelper.assertEquals(n, a.tot, "walkMods 覆盖文件系统全部文件")
 end
 
 function T.testTotalEqualsFilesystem()
     print("\n=== Test: 记录数 == 文件系统实际值 ===")
     local a = audit()
-    local p = io.popen(
-        "find ../reference/allmods -mindepth 2 -type f " ..
-        "-path '*/kys-*/*' 2>/dev/null | wc -l")
-    local n = tonumber(p:read("*a"):match("%d+"))
-    p:close()
-    TestHelper.assertEquals(n, a.tot, "遍历总数 == find 结果")
+    local n = 0
+    local modsSrc = "../reference/allmods"
+    for _, name in ipairs(Fs.listDirectory(modsSrc)) do
+        if name:match("^kys%-.+") and Fs.directoryExists(modsSrc .. "/" .. name) then
+            n = n + #Fs.walkFiles(modsSrc .. "/" .. name)
+        end
+    end
+    TestHelper.assertEquals(n, a.tot, "遍历总数 == 文件系统实际值")
     TestHelper.assertEquals(n, #a.recs, "无未归类时 记录数 == 遍历总数")
     TestHelper.assertTrue(n > 11000, "总数 > 11000（实际 " .. n .. "）")
 end
@@ -81,11 +86,14 @@ end
 function T.testSplitPathHandlesRootFiles()
     print("\n=== Test: 根级文件 topdir 为空 ===")
     -- 根级文件（kysmod.ini 等）topdir 应为 ""
-    local p = io.popen(
-        "find ../reference/allmods -mindepth 2 -maxdepth 2 -type f 2>/dev/null | head -3")
+    -- 用 fs_compat 枚举各 MOD 目录的直接子项，统计其中的**文件**（跨平台）
     local n = 0
-    for line in p:lines() do n = n + 1 end
-    p:close()
+    local modsSrc = "../reference/allmods"
+    for _, name in ipairs(Fs.listDirectory(modsSrc)) do
+        if name:match("^kys%-.+") and Fs.directoryExists(modsSrc .. "/" .. name) then
+            n = n + #Fs.listFiles(modsSrc .. "/" .. name)
+        end
+    end
     TestHelper.assertTrue(n > 0, "存在根级文件（" .. n .. "）")
     local r = Audit.classify({ mod = "x", path = "kysmod.ini", size = 0 })
     TestHelper.assertNotNil(r, "根级 kysmod.ini 可归类")
@@ -217,9 +225,9 @@ end
 -- ============================================================
 
 local function fileExists(p)
-    local f = io.open(p, "rb")
-    if f then f:close(); return true end
-    return false
+    -- 走 fs_compat：产物里有中文名文件（如 "ranger - 副本.idx"），
+    -- Windows 的 io.open 打不开这类 UTF-8 路径。
+    return Fs.fileExists(p)
 end
 
 function T.testInProductMatchesFilesystem()

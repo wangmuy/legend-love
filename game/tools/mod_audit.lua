@@ -15,6 +15,9 @@
 
 local M = {}
 
+-- 跨平台文件系统原语（Windows 上 io.popen 走 cmd.exe，POSIX 命令不可用）
+local Fs = require("framework.fs_compat")
+
 M.REPO_ROOT = ".."                      -- 相对 game/
 M.MODS_SRC  = M.REPO_ROOT .. "/reference/allmods"
 M.MODS_OUT  = "mods"                    -- 构建产物根
@@ -401,29 +404,27 @@ end
 
 function M.walkMods(modFilter)
     local out = {}
-    local p = io.popen("find '" .. M.MODS_SRC .. "' -maxdepth 1 -type d -name 'kys-*' 2>/dev/null | sort")
     local mods = {}
-    for line in p:lines() do
-        local name = line:match("([^/]+)$")
-        if name then
+    -- 枚举 reference/allmods/kys-* 目录（跨平台，不依赖 find/ls）
+    for _, name in ipairs(Fs.listDirectory(M.MODS_SRC)) do
+        if name:match("^kys%-.+") and Fs.directoryExists(M.MODS_SRC .. "/" .. name) then
             local slug = name:gsub("^kys%-", "")
             if not modFilter or slug == modFilter then
-                mods[#mods + 1] = { slug = slug, dir = line }
+                mods[#mods + 1] = { slug = slug, dir = M.MODS_SRC .. "/" .. name }
             end
         end
     end
-    p:close()
+    table.sort(mods, function(a, b) return a.slug < b.slug end)
 
     for _, m in ipairs(mods) do
-        local q = io.popen("find '" .. m.dir .. "' -type f 2>/dev/null | sort")
-        for line in q:lines() do
-            local rel = line:sub(#m.dir + 2)
+        -- 递归列举该 MOD 的全部文件（相对路径已排序，保证输出稳定）
+        for _, rel in ipairs(Fs.walkFiles(m.dir)) do
+            local full = m.dir .. "/" .. rel
             local size = 0
-            local fh = io.open(line, "rb")
+            local fh = io.open(full, "rb")
             if fh then size = fh:seek("end") or 0; fh:close() end
-            out[#out + 1] = { mod = m.slug, path = rel, size = size, src = line }
+            out[#out + 1] = { mod = m.slug, path = rel, size = size, src = full }
         end
-        q:close()
     end
     return out
 end
@@ -450,9 +451,9 @@ end
 -- in_product 判定（含别名转换，REQ-INV-5）
 -- ============================================================
 local function fileExists(p)
-    local f = io.open(p, "rb")
-    if f then f:close(); return true end
-    return false
+    -- 走 fs_compat：MOD 源里有中文文件名（如 "ranger - 副本.idx"），
+    -- Windows 上 io.open 打不开这类 UTF-8 路径。
+    return Fs.fileExists(p)
 end
 
 -- save/ 下的模板（ranger.*/alldef.*/allsin.*/allsinbk.*）→ data/；
@@ -684,6 +685,12 @@ end
 
 -- ============================================================
 -- 证据执行（REQ-EVID-2）：跑 cmd，断言输出含 expect
+--
+-- 证据里的 cmd 刻意保留 POSIX 形式（grep/head/ls/md5sum），因为它们是写进
+-- 审计文档给人复现的。执行层负责跨平台：
+--   * POSIX  → /bin/sh
+--   * Windows→ 找一个 bash（msys2 / Git for Windows / WSL）来跑同一条命令
+-- 找不到 bash 时返回「环境不支持」，调用方应跳过而不是判失败。
 -- ============================================================
 function M.runEvidence(e, timeoutSec)
     if type(e) ~= "table" or not e.cmd then
@@ -692,13 +699,19 @@ function M.runEvidence(e, timeoutSec)
     local ok, quality = M.checkEvidenceQuality(e)
     if not ok then return false, "bad evidence: " .. tostring(quality) end
 
-    local t = timeoutSec or 20
-    local cmd = string.format("timeout %d sh -c %s 2>&1",
-        t, "'" .. e.cmd:gsub("'", "'\\''") .. "'")
-    local p = io.popen(cmd)
-    if not p then return false, "popen failed" end
-    local out = p:read("*a") or ""
-    p:close()
+    -- `lua -e ...` 在 Windows 上通常不在 PATH 里，替换成当前解释器
+    local cmd = e.cmd
+    local interp = Fs.luaInterpreter()
+    if interp then
+        cmd = cmd:gsub("%f[%w]lua%s+%-e", Fs.isWindows
+            and (Fs.quoteWin(interp) .. " -e")
+            or (Fs.quotePosix(interp) .. " -e"))
+    end
+
+    local ran, out, reason = Fs.runShell(cmd, { timeout = timeoutSec or 20 })
+    if not ran then
+        return false, "shell-unavailable: " .. tostring(reason)
+    end
 
     if e.expect and #e.expect > 0 then
         if not out:find(e.expect, 1, true) then
@@ -849,8 +862,8 @@ end
 -- CLI
 -- ============================================================
 local function writeFile(path, content)
-    os.execute("mkdir -p '" .. (path:match("^(.*)/[^/]+$") or ".") .. "'")
-    local f = assert(io.open(path, "w"))
+    Fs.makeDirectory(path:match("^(.*)[/\\][^/\\]+$") or ".")
+    local f = assert(io.open(path, "wb"))
     f:write(content)
     f:close()
 end
@@ -894,7 +907,7 @@ local function main(args)
         end
     end
 
-    os.execute("mkdir -p '" .. M.AUDIT_DIR .. "'")
+    Fs.makeDirectory(M.AUDIT_DIR)
     local jsonPayload = jsonVal({
         total = sum.total,
         in_product = sum.in_product,

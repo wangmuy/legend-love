@@ -216,6 +216,21 @@ EngineAPI.file.getInfo = function(filename)
     return { size = size, modtime = nil, type = "file" }
 end
 
+-- 目录存在性 / 列举：MUD 引擎跑在终端，直接用宿主文件系统的跨平台原语
+EngineAPI.file.directoryExists = function(dirpath)
+    logCall("file.directoryExists", dirpath)
+    local ok, Fs = pcall(require, "framework.fs_compat")
+    if ok and Fs then return Fs.directoryExists(dirpath) end
+    return false
+end
+
+EngineAPI.file.listDirectory = function(dirpath)
+    logCall("file.listDirectory", dirpath)
+    local ok, Fs = pcall(require, "framework.fs_compat")
+    if ok and Fs then return Fs.listDirectory(dirpath) end
+    return {}
+end
+
 --------------------------------------------------------------------
 -- script 模块 - 正常 loadfile
 --------------------------------------------------------------------

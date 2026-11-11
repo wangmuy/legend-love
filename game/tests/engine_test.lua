@@ -259,6 +259,25 @@ end
 
 EngineAPI.file.createDirectory = function(dirpath)
     logCall("file.createDirectory", dirpath)
+    local ok, Fs = pcall(require, "framework.fs_compat")
+    if ok and Fs then return Fs.makeDirectory(dirpath) end
+end
+
+-- 目录原语：无头引擎跑在宿主文件系统上，用 fs_compat 的跨平台实现。
+-- （engine_api.lua 里的同名声明是空函数，不覆盖就会让 ModData.dirExists
+--   恒为 false —— 那正是 Windows 上 MOD 路径回退整组失败的根因之一。）
+EngineAPI.file.directoryExists = function(dirpath)
+    logCall("file.directoryExists", dirpath)
+    local ok, Fs = pcall(require, "framework.fs_compat")
+    if ok and Fs then return Fs.directoryExists(dirpath) end
+    return false
+end
+
+EngineAPI.file.listDirectory = function(dirpath)
+    logCall("file.listDirectory", dirpath)
+    local ok, Fs = pcall(require, "framework.fs_compat")
+    if ok and Fs then return Fs.listDirectory(dirpath) end
+    return {}
 end
 
 --------------------------------------------------------------------

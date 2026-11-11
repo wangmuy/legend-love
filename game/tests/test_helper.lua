@@ -4,6 +4,10 @@
 
 local TestHelper = {}
 
+-- 跨平台文件系统原语（测试在纯 Lua 下跑，不走 love.filesystem）
+local Fs = require("framework.fs_compat")
+TestHelper.Fs = Fs
+
 -- ============================================
 -- 断言函数
 -- ============================================
@@ -267,12 +271,22 @@ function TestHelper.mockGlobals()
 end
 
 function TestHelper.mockEngineAPI()
-    -- love 风格的 open mode（"r"/"w"/"a"/"c"）转成 io.open 能接受的形式。
-    -- lib_file.toLoveOpenMode 把含 "+" 的模式（如 "r+b"）映射为 "c"，
-    -- 但 io.open 不认 "c"，必须先转回 "r+b"/"w+b"。
+    -- love 风格 open mode → io.open 可接受的形式。
+    --
+    -- lib_file.toLoveOpenMode 把含 "+" 的模式映射为 "c"，把 "wb" 归一化为
+    -- "w"；而 love.filesystem 的文件句柄是**二进制安全**的，io.open 的 "w"
+    -- 却是文本模式 —— Windows 上会把 "\n" 改写成 "\r\n"，写 200 字节落盘
+    -- 201 字节，读回时后半段全错位。
+    -- 因此这里必须全部映射到二进制模式（"b"），不能用裸 "w"/"r"/"a"。
     local function toIOOpenMode(mode)
         mode = mode or "r"
         if mode == "c" then return "r+b" end
+        if mode == "w" or mode == "wb" then return "w+b" end
+        if mode == "a" or mode == "ab" then return "a+b" end
+        if mode == "r+c" or mode == "r+" then return "r+b" end
+        if mode == "w+c" or mode == "w+" then return "w+b" end
+        if mode == "a+c" or mode == "a+" then return "a+b" end
+        if mode == "r" or mode == "rb" then return "rb" end
         return mode
     end
 
@@ -320,8 +334,13 @@ function TestHelper.mockEngineAPI()
                     return l
                 end
             end,
-            createDirectory = function() end,
+            createDirectory = function(p)
+                return Fs.makeDirectory(p)
+            end,
             remove = function(p) return os.remove(p) end,
+            -- 目录原语：镜像 engine_love2d 的实现（无 love.filesystem 时退回 fs_compat）
+            directoryExists = function(p) return Fs.directoryExists(p) end,
+            listDirectory = function(p) return Fs.listDirectory(p) end,
         },
         debug = { log = function() end },
         coroutine = {
@@ -836,19 +855,11 @@ function TestHelper.healModSave(slug)
     -- 临时出现的非规范目录（如并行实验的 kys-s-* 暂存）被误自愈成幻影
     -- mods/<slug>/ 或误报缺失。
     local function dirExists(d)
-        local p = io.popen('test -d "' .. d .. '" && echo y', "r")
-        if not p then return false end
-        local ok = p:read() == "y\n"
-        p:close()
-        return ok
+        return Fs.directoryExists(d)
     end
     if not dirExists("mods/" .. slug) then return 0 end
     local function listDir1(d)
-        local out, p = {}, io.popen('ls -1 "' .. d .. '" 2>/dev/null', "r")
-        if not p then return out end
-        for line in p:lines() do out[#out + 1] = line end
-        p:close()
-        return out
+        return Fs.listDirectory(d)
     end
     local function readAll(p)
         local f = io.open(p, "rb")
@@ -858,9 +869,22 @@ function TestHelper.healModSave(slug)
     end
     local srcDir = "../reference/allmods/kys-" .. slug .. "/save/"
     local dstDir = "mods/" .. slug .. "/save/"
-    local srcFiles = listDir1(srcDir)
+    -- 只同步「用户存档槽」（rN/dN/sN.grp|idx）—— 这与 mod_build 的路由一致：
+    -- save/ 下的其它文件（ranger.* / allsdef.* 等模板，以及作者的手工备份
+    -- 如 "ranger - 副本.idx"）会被构建器送到 data/，产物 save/ 里**不应**出现。
+    -- 早期版本无差别拷贝，会在产物里造出构建器从不生成的文件，
+    -- 进而让 mod_audit 的「必需文件未进产物」检查报出假矛盾。
+    local function isSaveSlot(name)
+        local base, ext = name:lower():match("^([rds]%d+)%.([a-z]+)$")
+        if not base then return false end
+        return ext == "grp" or ext == "idx"
+    end
+    local srcFiles = {}
+    for _, n in ipairs(listDir1(srcDir)) do
+        if isSaveSlot(n) then srcFiles[#srcFiles + 1] = n end
+    end
     if #srcFiles == 0 then return 0 end
-    os.execute('mkdir -p "' .. dstDir .. '"')
+    Fs.makeDirectory(dstDir)
     local healed = 0
     local srcSet = {}
     for _, n in ipairs(srcFiles) do
@@ -874,8 +898,10 @@ function TestHelper.healModSave(slug)
         end
         ::cont::
     end
+    -- 删除产物 save/ 里源包没有的槽文件（上次中断残留）；非槽文件不动，
+    -- 因为它们是构建产物/外部渲染结果，不归本函数管。
     for _, n in ipairs(listDir1(dstDir)) do
-        if not srcSet[n] then
+        if isSaveSlot(n) and not srcSet[n] then
             os.remove(dstDir .. n)
             healed = healed + 1
         end
@@ -885,13 +911,14 @@ end
 
 -- 全部 20 个 MOD 产物 save/ 自愈（套件入口调用）
 function TestHelper.healAllModSaves()
-    local total, p = 0, io.popen("ls -1d ../reference/allmods/kys-* 2>/dev/null", "r")
-    if p then
-        for d in p:lines() do
-            local slug = d:match("kys-(.+)")
+    local total = 0
+    -- 枚举 reference/allmods/kys-* 目录（跨平台）
+    for _, name in ipairs(Fs.listDirectory("../reference/allmods")) do
+        if name:match("^kys%-.+")
+            and Fs.directoryExists("../reference/allmods/" .. name) then
+            local slug = name:match("kys%-(.+)")
             if slug then total = total + TestHelper.healModSave(slug) end
         end
-        p:close()
     end
     if total > 0 then
         print("[heal] 修复 " .. total .. " 个存档槽文件（上次运行中断残留）")
