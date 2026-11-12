@@ -39,6 +39,13 @@ local function bootHeadless()
     _G.lib = require("engine-love2d.engine_love2d")
     lib.init()
 
+    -- 必须自己加载 jymain：全局 WarMain 由 jymain.lua 定义，本套件的
+    -- 「install 期间 WarMain 被替换」用例依赖它存在。
+    -- 早前靠 test_scene_name（在全量顺序里排在本套件之前）顺手 require 过，
+    -- 于是本套件单跑 / 在全量顺序变更后会报「jymain 应已定义全局 WarMain」失败
+    -- ——隐藏的套件间顺序依赖，必须自己补齐。
+    pcall(require, CONFIG.ScriptPath .. "jymain")
+
     EventExecutor = require("framework.event_executor")
     AsyncGlobals = require("framework.async_globals")
 end
@@ -263,6 +270,54 @@ function TestNewEvent.testWarMainRestoredAfterUninstall()
     TestHelper.assertEquals(after, original, "uninstall() 后 WarMain 应还原为原版")
 end
 
+-- 回归：AsyncGlobals.install() 必须可重入。
+--
+-- 事件脚本里嵌套触发另一个事件时，内层 EventExecutor 会再次 install()。
+-- 旧实现每次都无条件把「当前全局」当原版保存，于是：
+--   * 内层保存到的是外层已替换的异步版；
+--   * 内层 uninstall 把异步版当原版写回 → 异步版永久驻留；
+--   * WarMain 包装器闭包引用同一个 _WarMain upvalue，二次安装后
+--     「原版」指向自己的包装器 → 非协程分支无限自我递归。
+function TestNewEvent.testInstallIsReentrant()
+    print("\n=== Test: install()/uninstall() 可重入（嵌套事件）===")
+    bootHeadless()
+
+    local origWaitKey = function() return "ORIG" end
+    local origWarMain = function() return "ORIG_WAR" end
+    local savedWK, savedWM = rawget(_G, "WaitKey"), rawget(_G, "WarMain")
+
+    local duringInner, innerAfterUninstall, depthAfterAll, finalWK, finalWM
+    local ok, err = withPlainG(function()
+        rawset(_G, "WaitKey", origWaitKey)
+        rawset(_G, "WarMain", origWarMain)
+
+        AsyncGlobals.install()            -- 外层事件
+        AsyncGlobals.install()            -- 内层事件（嵌套触发）
+        duringInner = rawget(_G, "WaitKey")
+        AsyncGlobals.uninstall()          -- 内层结束
+        innerAfterUninstall = rawget(_G, "WaitKey")
+        AsyncGlobals.uninstall()          -- 外层结束
+        depthAfterAll = AsyncGlobals.installDepth and AsyncGlobals.installDepth() or -1
+        finalWK = rawget(_G, "WaitKey")
+        finalWM = rawget(_G, "WarMain")
+    end)
+
+    rawset(_G, "WaitKey", savedWK)
+    rawset(_G, "WarMain", savedWM)
+    -- 用 pcall：旧实现没有这个调试钩子，不该因此把断言失败变成崩溃
+    pcall(AsyncGlobals.resetInstallState)
+
+    TestHelper.assertTrue(ok, "嵌套 install/uninstall 不应抛错: " .. tostring(err))
+    TestHelper.assertTrue(duringInner ~= origWaitKey,
+        "嵌套期间 WaitKey 应处于异步版")
+    TestHelper.assertTrue(innerAfterUninstall ~= origWaitKey,
+        "退掉内层后 WaitKey 仍应是异步版（外层事件还在执行）")
+    TestHelper.assertEquals(0, depthAfterAll, "全部退出后安装深度归零")
+    TestHelper.assertTrue(finalWK == origWaitKey,
+        "全部退出后 WaitKey 必须还原为真原版（不得残留异步版）")
+    TestHelper.assertTrue(finalWM == origWarMain,
+        "全部退出后 WarMain 必须还原为真原版（否则包装器会自我递归）")
+end
 function TestNewEvent.testWarMainFallsBackOutsideCoroutine()
     print("\n=== Test: 非协程上下文时 WarMain 保持原版行为（不误用协程调度）===")
     bootHeadless()
@@ -699,6 +754,7 @@ function TestNewEvent.runAll()
     TestNewEvent.testWeiDabaoScriptHasBlockingApis()
     TestNewEvent.testWarMainGetsAsyncWrapper()
     TestNewEvent.testWarMainRestoredAfterUninstall()
+    TestNewEvent.testInstallIsReentrant()
     TestNewEvent.testWarMainFallsBackOutsideCoroutine()
     TestNewEvent.testWeiDabaoUsesWarMain()
     TestNewEvent.testNoBareFrameworkRequire()
