@@ -16,9 +16,15 @@ bash tools/verify-cloud/run.sh scroll   # 云与地形滚动一致性（含像�
 bash tools/verify-cloud/run.sh all
 ```
 
-依赖：LÖVE 11.x（默认 `/home/woodfish/bin/love.AppImage`，可用环境变量
-`LOVE=/path/to/love` 覆盖）、`DISPLAY` 可用、`scroll` 的像素分析需
-`python3` + `Pillow`。
+依赖：LÖVE 11.x、`DISPLAY` 可用、`scroll` 的像素分析需 `python3` + `Pillow`。
+
+`run.sh` 按 `$LOVE` → `PATH` 里的 `love`/`love2d` → 常见安装位置
+（`$HOME/bin/love.AppImage`、`/usr/bin/love`、`/snap/bin/love` 等）依次探测
+LÖVE 可执行文件，也可显式指定：
+
+```bash
+LOVE=/path/to/love bash tools/verify-cloud/run.sh probe
+```
 
 ## 为什么不在目录里放软链
 

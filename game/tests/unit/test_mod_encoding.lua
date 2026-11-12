@@ -329,6 +329,7 @@ function TestModEncoding.testConvertRangerConvertsMixedAsciiBig5Fields()
 
     -- Thing[112].物品说明 原始 = "53\xa1A219"（ASCII 前缀 + Big5 对）
     -- 必须被转换，否则引擎读到原始 Big5 字节 -> 非法 UTF-8
+    -- （注：上面是注释里的示例写法；Lua 5.1 不支持 \xNN 转义，实参见代码）
     local found = false
     for _, v in pairs(side.Thing or {}) do
         if type(v) == "string" and v == "53，219" then found = true break end
@@ -442,7 +443,9 @@ function TestModEncoding.testIsStringFieldDiscriminator()
     local E = freshEncoding()
     TestHelper.assertNotNil(E.IsStringField, "mod_encoding 导出 IsStringField")
 
-    -- 正例：必须判定为字符串字段（输入为 **Big5 原始字节**，非 UTF-8）
+    -- 注意：字节字面量一律用**十进制**转义（\161 = 0xA1）。
+    -- Lua 5.1/LuaJIT 不支持 `\xNN` 十六进制转义，会把 "\xa1" 解析成字面量
+    -- "xa1"（丢掉反斜杠且不报错），导致反例被误判为字符串。
     local positives = {
         { raw = "AAA",              why = "纯 ASCII 3 字节（lyff 主角名）" },
         { raw = "killer-G",         why = "ASCII 含连字符（HeavenSword）" },
@@ -450,10 +453,10 @@ function TestModEncoding.testIsStringFieldDiscriminator()
         { raw = "PTT",              why = "全大写 ASCII（ptt 场景名）" },
         { raw = "------",           why = "重复标点 ASCII 6 字节（dream Thing）" },
         { raw = "AB",               why = "长度恰为下限 2" },
-        { raw = "53\xa1A219",       why = "ASCII 前缀 + Big5 对（mingdong Thing 112）" },
-        { raw = "\xa4\xa4\xa4\xe5", why = "纯 Big5 四字节（中文名）" },
-        { raw = "a\xa1A",           why = "ASCII + 高位字节混合" },
-        { raw = "\xa4\xa4\xa4\xe5\xa1\xa3", why = "Big5 六字节（三字中文名）" },
+        { raw = "53\161A219",       why = "ASCII 前缀 + Big5 对（mingdong Thing 112）" },
+        { raw = "\164\164\164\229", why = "纯 Big5 四字节（中文名）" },
+        { raw = "a\161A",           why = "ASCII + 高位字节混合" },
+        { raw = "\164\164\164\229\161\163", why = "Big5 六字节（三字中文名）" },
     }
     local bad = {}
     for _, c in ipairs(positives) do
@@ -473,9 +476,9 @@ function TestModEncoding.testIsStringFieldDiscriminator()
         { raw = "$",       why = "单字节符号（zheng 残留）" },
         { raw = "\0\0\0\0", why = "NUL 填充的 int32 数值槽" },
         { raw = "\1\2\3\4", why = "C0 控制字节的数值槽" },
-        { raw = "\xff\xff\xff\xff", why = "int32 -1 数值槽" },
-        { raw = "\xff\xfe\xfd\xfc", why = "非法 Big5 高位对（非 int32 槽）" },
-        { raw = "\xa4",       why = "孤立 Big5 首字节（缺尾字节）" },
+        { raw = "\255\255\255\255", why = "int32 -1 数值槽" },
+        { raw = "\255\254\253\252", why = "非法 Big5 高位对（非 int32 槽）" },
+        { raw = "\164",       why = "孤立 Big5 首字节（缺尾字节）" },
         { raw = "12\0\0\0", why = "小整数 + NUL 填充" },
         { raw = "\t\n",    why = "纯控制符（trim 后为空）" },
     }

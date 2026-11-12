@@ -17,7 +17,7 @@
 
 | 文件 | 使用状态 | 作用 |
 |------|----------|------|
-| `engine_api.lua` | ✅ 使用中 | EngineAPI 接口定义（11 模块，37 个函数签名），引擎无关 |
+| `engine_api.lua` | ✅ 使用中 | EngineAPI 接口定义（14 模块，51 个函数签名），引擎无关 |
 | `engine_love2d.lua` | ✅ 使用中 | EngineAPI Love2D 实现，委托 lib_love.lua，设置 `lib` 全局变量 |
 | `lib_love.lua` | ✅ 使用中 | 原始 Love2D 图形/音频封装。封装贴图加载/显示（RLE/PNG）、地图绘制、音频播放、字体渲染、按键映射等 |
 

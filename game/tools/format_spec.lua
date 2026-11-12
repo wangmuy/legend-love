@@ -259,13 +259,18 @@ function M.verifyPair(idxPath, grpPath, opts)
     opts = opts or {}
     local idxData = readFile(idxPath)
     if not idxData then
-        return { ok = false, error = "missing idx: " .. idxPath }
+        -- 早退分支也要带 gaps/overlaps 空表：调用方普遍直接 #r.gaps，
+        -- 缺字段会在「文件不存在」时抛 nil 索引，把一句清晰的「缺失」
+        -- 变成难读的崩溃（新克隆缺 reference/ 时的实际表现）。
+        return { ok = false, error = "missing idx: " .. idxPath,
+                 gaps = {}, overlaps = {}, idx_count = 0, idx_tail = 0 }
     end
     local grpData = readFile(grpPath)
     if not grpData then
         -- fight/ 下有 .idx 无 .grp 的情况（如 dream）：显式归类为 DEAD_FILE
         return { ok = false, error = "missing grp: " .. grpPath,
-                 orphan_idx = true }
+                 orphan_idx = true,
+                 gaps = {}, overlaps = {}, idx_count = 0, idx_tail = 0 }
     end
 
     -- 1) idx 自身：必须能被 4 整除（否则有残余字节）

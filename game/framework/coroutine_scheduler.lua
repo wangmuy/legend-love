@@ -187,17 +187,16 @@ function CoroutineScheduler:killStaleEvents()
         -- 若不跳过，instruct_6 里调用本函数会把"正在调它的那条事件协程"误杀——
         -- 该协程随后 yield("war") 时已被移出 coroutines 表，成为孤儿永不恢复，
         -- 战斗胜利后事件后程（instruct_3 升级/给书）不执行（P6 五毒教 616 不置 611 根因）。
-        if id == currentCoroutine then
-            goto continue_kill
+        -- 注意：不用 goto（Lua 5.2+ 语法），保持 5.1/LuaJIT 可解析。
+        if id ~= currentCoroutine then
+            local nm = info.name or ""
+            local isEventCo = string.find(nm, "event_", 1, true) ~= nil
+                or string.find(nm, "npc_talk_", 1, true) ~= nil
+            if info.status == "suspended" and isEventCo then
+                coroutines[id] = nil
+                killed = killed + 1
+            end
         end
-        local nm = info.name or ""
-        local isEventCo = string.find(nm, "event_", 1, true) ~= nil
-            or string.find(nm, "npc_talk_", 1, true) ~= nil
-        if info.status == "suspended" and isEventCo then
-            coroutines[id] = nil
-            killed = killed + 1
-        end
-        ::continue_kill::
     end
     if killed > 0 then
         self:_debug("CoroutineScheduler.killStaleEvents: killed " .. killed .. " stale event coroutines")

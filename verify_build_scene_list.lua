@@ -1,8 +1,13 @@
 -- verify_build_scene_list.lua 一次性核验脚本
 -- 用真实 mmap_smap_handlers.lua 的 buildSceneList() + data_loader.lua parseJSON
 -- 复现 MmapHandlers.list() 的用户可见编号，与 check_mmap_list.js 输出对比
-package.path = "/home/woodfish/project/legend-love/game/engine-web/?.lua;" .. package.path
-local ENGINE = "/home/woodfish/project/legend-love/game/engine-web"
+--
+-- 用法（在仓库根目录）:
+--   lua verify_build_scene_list.lua
+-- 路径相对本脚本定位，可在任意克隆路径/任意平台下运行。
+local scriptDir = (debug.getinfo(1, "S").source:sub(2):match("^(.*)[/\\][^/\\]*$")) or "."
+package.path = scriptDir .. "/game/engine-web/?.lua;" .. package.path
+local ENGINE = scriptDir .. "/game/engine-web"
 dofile(ENGINE .. "/data_loader.lua")
 
 local function loadJson(path)

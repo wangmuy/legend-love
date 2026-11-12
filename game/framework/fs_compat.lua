@@ -327,7 +327,14 @@ local function winRunScript(script, marker)
     f:write("\n")
     f:close()
 
-    local p = io.popen('powershell -NoProfile -ExecutionPolicy Bypass -File "' ..
+    -- 把 PowerShell 的 $LOCALAPPDATA 指到临时目录：
+    -- PowerShell 启动时会写 ModuleAnalysisCache（$LOCALAPPDATA\Microsoft\...）。
+    -- 该变量缺失/为空时它会退化到**当前工作目录**，在仓库里留下一个
+    -- Microsoft/ 目录（实测 mod_audit 跑完就会多出这个目录）。
+    -- 同时不能改 CWD —— 调用方传进来的相对路径要靠 CWD 解析。
+    local tmpWork = Fs.tempDir()
+    local p = io.popen('set "LOCALAPPDATA=' .. tmpWork:gsub("/", "\\") ..
+        '" && powershell -NoProfile -ExecutionPolicy Bypass -File "' ..
         ps1 .. '" 2>&1')
     local out = ""
     if p then out = p:read("*a") or ""; p:close() end

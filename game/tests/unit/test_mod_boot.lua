@@ -100,7 +100,10 @@ local function installLoveStub()
                 end
                 return nil
             end,
-            getSaveDirectory = function() return "/tmp" end,
+            -- love.filesystem.getSaveDirectory 的桩。运行时代码不调用它
+            -- （存档走 ModData.SaveDir 的相对路径），这里返回跨平台临时目录，
+            -- 避免留下 Linux 专有的 /tmp 字面量误导后来者。
+            getSaveDirectory = function() return require("framework.fs_compat").tempDir() end,
             createDirectory = function() return true end, write = function() return true end, remove = os.remove,
             newFile = function(p) return newFileObj(p) end,
             newFileData = function() return newObj() end,
@@ -128,21 +131,25 @@ local function installLoveStub()
     }
 end
 
--- Lua 5.4: %d with float 容错（LuaJIT 容忍）
+-- Lua 5.4: %d with float 容错（LuaJIT 容忍）。
+-- 兼容 5.1：该版本没有 table.unpack（只有全局 unpack），也没有 math.tointeger。
 local function installFormatTolerance()
+    local unpackFn = table.unpack or unpack
     local orig = string.format
     string.format = function(fmt, ...)
         local n = select("#", ...)
         local a = {}
         for i = 1, n do
             local v = select(i, ...)
-            if type(v) == "number" then v = math.tointeger(v) or v end
+            if type(v) == "number" and math.tointeger then
+                v = math.tointeger(v) or v
+            end
             a[i] = v
         end
-        local ok, r = pcall(orig, fmt, table.unpack(a, 1, n))
+        local ok, r = pcall(orig, fmt, unpackFn(a, 1, n))
         if ok then return r end
         for i = 1, n do if type(a[i]) == "number" then a[i] = math.floor(a[i]) end end
-        return orig(fmt, table.unpack(a, 1, n))
+        return orig(fmt, unpackFn(a, 1, n))
     end
 end
 
@@ -469,8 +476,9 @@ function TestModBoot.testFullBootChainForProblematicMods()
             "%s tests/unit/boot_one_mod.lua %s %d %d %d %d",
             (Fs.isWindows and Fs.quoteWin(luaExe) or luaExe),
             slug, spec[2], spec[3], spec[4], spec[5])
-        -- 需要子进程退出码：io.popen 的 close 能拿到，但要走 shell 包装；
-        -- 这里改为「跑命令 + 检查输出里的 RESULT OK」，跨平台一致。
+        -- 跑子进程并检查输出里的 RESULT <slug>: OK（跨平台一致）。
+        -- Fs.runShell 在 Windows 上会走 bash（找不到则返回 ran=false），
+        -- 此时退回裸 io.popen（cmd 也能跑 `<lua> <script> args`）。
         local out, ok = "", false
         local ran, captured = Fs.runShell(cmd .. " 2>&1")
         if ran then
