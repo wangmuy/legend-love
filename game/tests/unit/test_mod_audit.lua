@@ -639,6 +639,10 @@ function T.testJsonRoundTrip()
     print("\n=== Test: audit.json 可解析且数字一致 ===")
     local f = io.open("mods/_audit/audit.json", "rb")
     TestHelper.assertNotNil(f, "audit.json 存在")
+    -- 缺产物的环境下（新克隆 / 未跑 mod_audit.lua --all）该文件不存在。
+    -- 断言已记录失败，这里直接返回，避免再去索引 nil 把「缺文件」
+    -- 变成一条难读的 stack traceback。
+    if not f then return end
     local txt = f:read("*a")
     f:close()
     -- 简单结构断言（不引入 JSON 解析依赖）

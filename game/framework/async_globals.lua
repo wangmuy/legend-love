@@ -89,7 +89,21 @@ function AsyncGlobals.ShowScreen_Async(flag)
 end
 
 -- 安装替换
+--
+-- 必须是**可重入**的：事件脚本里嵌套触发另一个事件时，内层 EventExecutor
+-- 会再次 install()。若每次都无条件保存/覆盖「原始函数」，内层保存到的是
+-- 外层装好的异步版本，uninstall 时就把异步版当成原版永久留下；
+-- 更糟的是 WarMain 包装器闭包引用同一个 _WarMain upvalue，二次安装会变成
+-- 自我递归。因此用深度计数：只在最外层真正替换与还原。
+local _installDepth = 0
+
 function AsyncGlobals.install()
+    _installDepth = _installDepth + 1
+    if _installDepth > 1 then
+        -- 已安装（嵌套调用）：什么都不做，等最外层 uninstall 统一还原
+        return
+    end
+
     _DrawStrBoxWaitKey = _G.DrawStrBoxWaitKey
     _DrawStrBoxYesNo = _G.DrawStrBoxYesNo
     _WaitKey = _G.WaitKey
@@ -197,8 +211,16 @@ function AsyncGlobals.install()
     end
 end
 
--- 卸载替换
+-- 卸载替换（与 install 配对，深度计数归零时才真正还原）
 function AsyncGlobals.uninstall()
+    if _installDepth > 0 then
+        _installDepth = _installDepth - 1
+    end
+    if _installDepth > 0 then
+        -- 还有外层事件在执行：保持替换状态
+        return
+    end
+
     _G.DrawStrBoxWaitKey = _DrawStrBoxWaitKey
     _G.DrawStrBoxYesNo = _DrawStrBoxYesNo
     _G.WaitKey = _WaitKey
@@ -206,11 +228,25 @@ function AsyncGlobals.uninstall()
     _G.ShowMenu2 = _ShowMenu2
     _G.TalkEx = _TalkEx
     _G.ShowScreen = _ShowScreen
-    if _WarMain then _G.WarMain = _WarMain end
+    -- 必须无条件还原（含 nil 的情形）：若进入 install() 时 WarMain 尚未定义
+    -- （jymain 还没加载），旧写法 `if _WarMain then` 会把异步包装器永久留在
+    -- 全局上，后续 install() 保存到的「原版」就是上一个包装器，层层自包裹。
+    rawset(_G, "WarMain", _WarMain)
 
     if lib and _libDelay then
         lib.Delay = _libDelay
     end
+end
+
+--- 当前安装深度（调试/测试用）。
+-- @return number
+function AsyncGlobals.installDepth()
+    return _installDepth
+end
+
+--- 强制复位（仅测试用：某个用例中途抛错后留下的残留状态）。
+function AsyncGlobals.resetInstallState()
+    _installDepth = 0
 end
 
 return AsyncGlobals
