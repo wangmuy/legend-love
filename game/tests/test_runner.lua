@@ -32,9 +32,19 @@ local TestCloud = require("tests.unit.test_cloud")
 local TestRunner = {}
 
 -- 运行前检查：MOD 相关测试依赖两个「不随 git 分发」的目录。
--- 缺任何一个都只影响 MOD 组（其余模块照常跑），但必须**尽早明确告知**，
+-- 缺任何一个就**跳过** MOD 组（其余模块照常跑），并尽早明确告知 ——
 -- 否则表现为几十条「参考数据缺失」式失败 + 一处 nil 索引崩溃，很难定位。
+local MOD_MODULES = {
+    "mod_ini", "mod_data", "mod_encoding", "mod_build", "mod_resources",
+    "mod_audit", "format_spec", "mod_e2e", "mod_boot",
+}
+
+local modDataReady = nil   -- nil = 未检查
+
+-- 检查（并缓存）MOD 测试数据是否就绪。
+-- @return boolean
 local function checkPrerequisites()
+    if modDataReady ~= nil then return modDataReady end
     local Fs = require("framework.fs_compat")
     local missing = {}
     if not Fs.directoryExists("../reference/allmods") then
@@ -49,7 +59,10 @@ local function checkPrerequisites()
             hint = "MOD 构建产物，先运行: lua tools/mod_build.lua --all",
         }
     end
-    if #missing == 0 then return true end
+    if #missing == 0 then
+        modDataReady = true
+        return true
+    end
 
     print("\n" .. string.rep("!", 60))
     print("缺少 MOD 测试所需目录（git 不分发，需本地准备）：")
@@ -57,11 +70,36 @@ local function checkPrerequisites()
         print(string.format("  ✗ %-24s  %s", m.path, m.hint))
     end
     print("")
-    print("受影响的模块：mod_ini mod_data mod_encoding mod_build mod_resources")
-    print("              mod_audit format_spec mod_e2e mod_boot")
-    print("其余模块不受影响，会照常运行。")
+    print("以下模块将被跳过：" .. table.concat(MOD_MODULES, " "))
+    print("其余模块照常运行。")
     print(string.rep("!", 60) .. "\n")
+    modDataReady = false
     return false
+end
+TestRunner.hasModData = function() return checkPrerequisites() end
+
+-- 该模块名是否属于 MOD 组
+local function isModModule(name)
+    for _, m in ipairs(MOD_MODULES) do
+        if m == name then return true end
+    end
+    return false
+end
+
+-- MOD 数据缺失时跳过某模块，返回「算作通过」的 true
+local function skipModModule(name)
+    print(string.format("  [SKIP] %s（缺少 reference/allmods 或 mods/）", name))
+    return true
+end
+
+-- 运行一个 MOD 组模块；数据缺失时跳过。
+-- @param name string 模块名（用于提示）
+-- @param fn function 该模块的 runAll
+local function runModModule(name, fn)
+    if not checkPrerequisites() then
+        return skipModModule(name)
+    end
+    return fn()
 end
 
 -- 运行所有测试
@@ -198,7 +236,7 @@ function TestRunner.runAll()
     print("运行 ModIni 解析器测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local miResult = TestModIni.runAll()
+    local miResult = runModModule("mod_ini", TestModIni.runAll)
     local miStats = TestHelper.getStats()
     totalStats.total = totalStats.total + miStats.total
     totalStats.passed = totalStats.passed + miStats.passed
@@ -209,7 +247,7 @@ function TestRunner.runAll()
     print("运行 ModData 数据回退测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local mdResult = TestModData.runAll()
+    local mdResult = runModModule("mod_data", TestModData.runAll)
     local mdStats = TestHelper.getStats()
     totalStats.total = totalStats.total + mdStats.total
     totalStats.passed = totalStats.passed + mdStats.passed
@@ -220,7 +258,7 @@ function TestRunner.runAll()
     print("运行 MOD 编码/布局逆向测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local meResult = TestModEncoding.runAll()
+    local meResult = runModModule("mod_encoding", TestModEncoding.runAll)
     local meStats = TestHelper.getStats()
     totalStats.total = totalStats.total + meStats.total
     totalStats.passed = totalStats.passed + meStats.passed
@@ -231,7 +269,7 @@ function TestRunner.runAll()
     print("运行 mod_build 构建期测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local buildResult = TestModBuild.runAll()
+    local buildResult = runModModule("mod_build", TestModBuild.runAll)
     local buildStats = TestHelper.getStats()
     totalStats.total = totalStats.total + buildStats.total
     totalStats.passed = totalStats.passed + buildStats.passed
@@ -242,7 +280,7 @@ function TestRunner.runAll()
     print("运行 MOD 资源分类测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local resResult = TestModResources.runAll()
+    local resResult = runModModule("mod_resources", TestModResources.runAll)
     local resStats = TestHelper.getStats()
     totalStats.total = totalStats.total + resStats.total
     totalStats.passed = totalStats.passed + resStats.passed
@@ -253,7 +291,7 @@ function TestRunner.runAll()
     print("运行 MOD 资源穷举审计测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local auditResult = TestModAudit.runAll()
+    local auditResult = runModModule("mod_audit", TestModAudit.runAll)
     local auditStats = TestHelper.getStats()
     totalStats.total = totalStats.total + auditStats.total
     totalStats.passed = totalStats.passed + auditStats.passed
@@ -264,7 +302,7 @@ function TestRunner.runAll()
     print("运行格式字段级覆盖测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local fmtResult = TestFormatSpec.runAll()
+    local fmtResult = runModModule("format_spec", TestFormatSpec.runAll)
     local fmtStats = TestHelper.getStats()
     totalStats.total = totalStats.total + fmtStats.total
     totalStats.passed = totalStats.passed + fmtStats.passed
@@ -275,7 +313,7 @@ function TestRunner.runAll()
     print("运行名动天下无头端到端验证...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local e2eResult = TestModE2E.runAll()
+    local e2eResult = runModModule("mod_e2e", TestModE2E.runAll)
     local e2eStats = TestHelper.getStats()
     totalStats.total = totalStats.total + e2eStats.total
     totalStats.passed = totalStats.passed + e2eStats.passed
@@ -286,7 +324,7 @@ function TestRunner.runAll()
     print("运行全启动链路无头验证...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local bootResult = TestModBoot.runAll()
+    local bootResult = runModModule("mod_boot", TestModBoot.runAll)
     local bootStats = TestHelper.getStats()
     totalStats.total = totalStats.total + bootStats.total
     totalStats.passed = totalStats.passed + bootStats.passed
@@ -417,23 +455,23 @@ function TestRunner.runModule(moduleName)
     elseif moduleName == "engine_test" then
         return TestEngineTest.runAll()
     elseif moduleName == "mod_ini" then
-        return TestModIni.runAll()
+        return runModModule("mod_ini", TestModIni.runAll)
     elseif moduleName == "mod_data" then
-        return TestModData.runAll()
+        return runModModule("mod_data", TestModData.runAll)
     elseif moduleName == "mod_encoding" then
-        return TestModEncoding.runAll()
+        return runModModule("mod_encoding", TestModEncoding.runAll)
     elseif moduleName == "mod_build" then
-        return TestModBuild.runAll()
+        return runModModule("mod_build", TestModBuild.runAll)
     elseif moduleName == "mod_resources" then
-        return TestModResources.runAll()
+        return runModModule("mod_resources", TestModResources.runAll)
     elseif moduleName == "mod_audit" then
-        return TestModAudit.runAll()
+        return runModModule("mod_audit", TestModAudit.runAll)
     elseif moduleName == "format_spec" then
-        return TestFormatSpec.runAll()
+        return runModModule("format_spec", TestFormatSpec.runAll)
     elseif moduleName == "mod_e2e" then
-        return TestModE2E.runAll()
+        return runModModule("mod_e2e", TestModE2E.runAll)
     elseif moduleName == "mod_boot" then
-        return TestModBoot.runAll()
+        return runModModule("mod_boot", TestModBoot.runAll)
     elseif moduleName == "text_box_layout" then
         return TestTextBoxLayout.runAll()
     elseif moduleName == "dialog_layout" then

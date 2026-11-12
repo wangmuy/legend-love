@@ -178,11 +178,37 @@ function M.verifyIntervals(intervals, filesize)
     }
 end
 
+-- 统一的「文件缺失」返回值。
+--
+-- 必须带齐 gaps/overlaps/covered/count 等字段：调用方（测试与 CLI）普遍直接
+-- 读 r.gaps、#r.overlaps，若早退分支只返回 {ok,error}，缺文件会从一句清晰的
+-- 「缺失 xxx」退化成 nil 索引崩溃（新克隆没有 reference/ 时的实际表现）。
+-- @param msg string 错误说明
+-- @param extra table|nil 额外字段（如 orphan_idx）
+local function missingResult(msg, extra)
+    local res = {
+        ok = false,
+        error = msg,
+        gaps = {},
+        overlaps = {},
+        covered = 0,
+        filesize = 0,
+        count = 0,
+        idx_count = 0,
+        idx_tail = 0,
+    }
+    if extra then
+        for k, v in pairs(extra) do res[k] = v end
+    end
+    return res
+end
+M.missingResult = missingResult
+
 -- 对单个文件按 spec 验证
 function M.verifyCoverage(path, spec, ctxOverride)
     local data = readFile(path)
     if not data then
-        return { ok = false, error = "cannot read " .. path }
+        return missingResult("cannot read " .. path)
     end
     local ctx = { filesize = #data }
     if ctxOverride then
@@ -259,18 +285,12 @@ function M.verifyPair(idxPath, grpPath, opts)
     opts = opts or {}
     local idxData = readFile(idxPath)
     if not idxData then
-        -- 早退分支也要带 gaps/overlaps 空表：调用方普遍直接 #r.gaps，
-        -- 缺字段会在「文件不存在」时抛 nil 索引，把一句清晰的「缺失」
-        -- 变成难读的崩溃（新克隆缺 reference/ 时的实际表现）。
-        return { ok = false, error = "missing idx: " .. idxPath,
-                 gaps = {}, overlaps = {}, idx_count = 0, idx_tail = 0 }
+        return missingResult("missing idx: " .. idxPath)
     end
     local grpData = readFile(grpPath)
     if not grpData then
         -- fight/ 下有 .idx 无 .grp 的情况（如 dream）：显式归类为 DEAD_FILE
-        return { ok = false, error = "missing grp: " .. grpPath,
-                 orphan_idx = true,
-                 gaps = {}, overlaps = {}, idx_count = 0, idx_tail = 0 }
+        return missingResult("missing grp: " .. grpPath, { orphan_idx = true })
     end
 
     -- 1) idx 自身：必须能被 4 整除（否则有残余字节）
@@ -308,7 +328,7 @@ end
 -- ============================================================
 function M.verifyGrid(path, cellSize, expectedCells)
     local data = readFile(path)
-    if not data then return { ok = false, error = "missing " .. path } end
+    if not data then return missingResult("missing " .. path) end
     local cells = math.floor(#data / cellSize)
     local iv = {}
     for i = 0, cells - 1 do
@@ -333,7 +353,7 @@ end
 -- ============================================================
 function M.verifyFixedRecords(path, recSize)
     local data = readFile(path)
-    if not data then return { ok = false, error = "missing " .. path } end
+    if not data then return missingResult("missing " .. path) end
     local count = math.floor(#data / recSize)
     local iv = {}
     for i = 0, count - 1 do
@@ -371,7 +391,7 @@ end
 --      故这是一个**强判别**（非“数量相等代替集合相等”）。
 function M.verifySaveGrid(path, grid)
     local data = readFile(path)
-    if not data then return { ok = false, error = "missing " .. path } end
+    if not data then return missingResult("missing " .. path) end
     local bytes = #data
     local unit                            -- 单个“场景单元”的字节数
     local cellsPerScene                   -- 每场景 uint16 单元数
@@ -420,7 +440,7 @@ end
 -- ============================================================
 function M.verifyPalette(path)
     local data = readFile(path)
-    if not data then return { ok = false, error = "missing " .. path } end
+    if not data then return missingResult("missing " .. path) end
     local iv = {}
     for i = 0, 255 do
         iv[#iv + 1] = { start = i * 3, stop = i * 3 + 3, name = "rgb[" .. i .. "]" }
@@ -436,7 +456,7 @@ end
 -- ============================================================
 function M.verifyText(path)
     local data = readFile(path)
-    if not data then return { ok = false, error = "missing " .. path } end
+    if not data then return missingResult("missing " .. path) end
     local iv = {}
     local o = 0
     local i = 0
@@ -457,7 +477,7 @@ end
 -- ============================================================
 function M.verifyWav(path)
     local d = readFile(path)
-    if not d then return { ok = false, error = "missing " .. path } end
+    if not d then return missingResult("missing " .. path) end
     if #d == 0 then
         -- 空文件：显式归类（RiverLake 有 28 个声明但空白的 wav）
         return { ok = true, empty = true, chunks = 0, covered = 0, filesize = 0 }
@@ -495,7 +515,7 @@ M.PNG_SIG = PNG_SIG
 
 function M.verifyPng(path)
     local d = readFile(path)
-    if not d then return { ok = false, error = "missing " .. path } end
+    if not d then return missingResult("missing " .. path) end
     if d:sub(1, 8) ~= PNG_SIG then
         return { ok = false, error = "bad signature" }
     end
@@ -529,7 +549,7 @@ function M.verifyRanger(idxPath, grpPath)
     local idxData = readFile(idxPath)
     local grpData = readFile(grpPath)
     if not idxData or not grpData then
-        return { ok = false, error = "missing file" }
+        return missingResult("missing file")
     end
     if #idxData ~= 24 then
         return { ok = false, error = "ranger.idx size != 24 (got " .. #idxData .. ")" }
@@ -809,7 +829,7 @@ end
 -- 对一个「uint16 数组」而言这是错的口径。
 function M.verifyBinTable(path)
     local d = readFile(path)
-    if not d then return { ok = false, error = "missing " .. path } end
+    if not d then return missingResult("missing " .. path) end
     local unit = 2
     local n = math.floor(#d / unit)
     local iv = {}
