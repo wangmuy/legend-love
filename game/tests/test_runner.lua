@@ -31,11 +31,46 @@ local TestCloud = require("tests.unit.test_cloud")
 
 local TestRunner = {}
 
+-- 运行前检查：MOD 相关测试依赖两个「不随 git 分发」的目录。
+-- 缺任何一个都只影响 MOD 组（其余模块照常跑），但必须**尽早明确告知**，
+-- 否则表现为几十条「参考数据缺失」式失败 + 一处 nil 索引崩溃，很难定位。
+local function checkPrerequisites()
+    local Fs = require("framework.fs_compat")
+    local missing = {}
+    if not Fs.directoryExists("../reference/allmods") then
+        missing[#missing + 1] = {
+            path = "../reference/allmods",
+            hint = "MOD 源数据（20 个 kys-* 目录），见 MOD_20IN1_GUIDE.md",
+        }
+    end
+    if not Fs.directoryExists("mods") then
+        missing[#missing + 1] = {
+            path = "mods",
+            hint = "MOD 构建产物，先运行: lua tools/mod_build.lua --all",
+        }
+    end
+    if #missing == 0 then return true end
+
+    print("\n" .. string.rep("!", 60))
+    print("缺少 MOD 测试所需目录（git 不分发，需本地准备）：")
+    for _, m in ipairs(missing) do
+        print(string.format("  ✗ %-24s  %s", m.path, m.hint))
+    end
+    print("")
+    print("受影响的模块：mod_ini mod_data mod_encoding mod_build mod_resources")
+    print("              mod_audit format_spec mod_e2e mod_boot")
+    print("其余模块不受影响，会照常运行。")
+    print(string.rep("!", 60) .. "\n")
+    return false
+end
+
 -- 运行所有测试
 function TestRunner.runAll()
     print("\n" .. string.rep("=", 60))
     print("金庸群侠传 Love2D 重构 - 单元测试套件")
     print(string.rep("=", 60))
+
+    checkPrerequisites()
 
     -- 套件入口自愈：各 MOD 产物 save/ 与源 save/ 逐字节对齐
     -- （清理上次运行中断残留，见 TestHelper.healAllModSaves 注释）

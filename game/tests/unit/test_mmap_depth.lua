@@ -59,7 +59,8 @@ local function readFrameTable()
     local idxData = io.open("data/mmap.idx", "rb"):read("*a")
     local grpData = io.open("data/mmap.grp", "rb"):read("*a")
     local offs = {}
-    for i = 1, #idxData // 4 do
+    -- 用 math.floor 而不是 // （整除运算符是 Lua 5.3+ 语法，5.1/LuaJIT 报错）
+    for i = 1, math.floor(#idxData / 4) do
         local b1, b2, b3, b4 = idxData:byte((i - 1) * 4 + 1, (i - 1) * 4 + 4)
         offs[i] = b1 + b2 * 256 + b3 * 65536 + b4 * 16777216
     end
@@ -74,7 +75,7 @@ local function buildStubPicFile()
     local frames = {}
     local function frameOf(picnum)
         if frames[picnum] ~= nil then return frames[picnum] or nil end
-        local slot = picnum // 2
+        local slot = math.floor(picnum / 2)
         local a = 0
         if slot >= 1 then a = offs[slot] end
         local b = offs[slot + 1] or #grpData

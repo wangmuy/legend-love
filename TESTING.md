@@ -12,6 +12,7 @@
 |------|------|------|
 | 测试运行器 | `game/tests/test_runner.lua` | 运行所有或指定模块的测试 |
 | 测试工具集 | `game/tests/test_helper.lua` | 提供断言、Mock、Spy、Stub 等工具 |
+| 跨平台文件系统 | `game/framework/fs_compat.lua` | 目录/文件原语，屏蔽 Windows/Linux 差异（见「跨平台约定」） |
 
 ### 测试技术
 
@@ -83,6 +84,25 @@ return TestTargetModule
 
 ## 测试命令
 
+### 前置条件
+
+测试分两组，**非 MOD 组无需任何准备**即可跑：
+
+| 组 | 依赖 | 说明 |
+|----|------|------|
+| 非 MOD 组 | 无 | 只依赖 `game/` 自身的代码与 `game/data/`（已在仓库中）|
+| MOD 组 | `../reference/allmods/` + `game/mods/` | 两者都被 `.gitignore` 排除，**新克隆默认没有** |
+
+`reference/allmods/` 是 20 个 MOD 的源数据（约 1.3 GB），获取与用法见
+[MOD_20IN1_GUIDE.md](MOD_20IN1_GUIDE.md)。`game/mods/` 是构建产物，由源数据生成：
+
+```bash
+cd game && lua tools/mod_build.lua --all      # 约 2 分钟，产出 game/mods/<slug>/
+```
+
+缺这两个目录时，`test_runner.lua` 会在开头打印一段醒目的提示，列出缺失路径与
+受影响的模块，其余模块照常运行（不会因为缺数据而崩在中途）。
+
 ### 运行所有测试
 
 ```bash
@@ -99,27 +119,37 @@ cd game && lua tests/test_runner.lua input_manager
 cd game && lua tests/unit/test_input_manager.lua
 ```
 
+### 支持的 Lua 版本
+
+三个版本下全量 2506 条断言全部通过，CI/本地任选其一：
+
+```bash
+cd game && lua5.1 tests/test_runner.lua   # 与运行时 LuaJIT 最接近
+cd game && lua5.3 tests/test_runner.lua
+cd game && lua5.4 tests/test_runner.lua
+```
+
 ### 可用模块
 
-`test_runner.lua <模块名>` 可单独运行下列模块（断言数合计 2464 条）：
+`test_runner.lua <模块名>` 可单独运行下列模块（断言数合计 2506 条）：
 
 | 模块名 | 覆盖内容 | 断言数 |
 |--------|----------|--------|
-| `state_machine` | 状态机 | 6 |
-| `input_manager` | 输入管理器 | 4 |
-| `event_bridge` | 事件桥接 | 2 |
-| `coroutine_scheduler` | 协程调度器 | 4 |
-| `byte_io` | Byte I/O | 5 |
-| `script_loader` | 脚本加载器 | 3 |
-| `item_async` | 物品系统 | 6 |
-| `war_async` | 战斗系统 | 2 |
-| `engine_api` | EngineAPI 接口定义 | 4 |
-| `engine_test` | 测试引擎（MUD） | 3 |
+| `state_machine` | 状态机 | 18 |
+| `input_manager` | 输入管理器 | 38 |
+| `event_bridge` | 事件桥接 | 18 |
+| `coroutine_scheduler` | 协程调度器 | 12 |
+| `byte_io` | Byte I/O | 38 |
+| `script_loader` | 脚本加载器 | 6 |
+| `item_async` | 物品系统 | 21 |
+| `war_async` | 战斗系统 | 80 |
+| `engine_api` | EngineAPI 接口定义 | 52 |
+| `engine_test` | 测试引擎（MUD） | 18 |
 | `mod_ini` | MOD ini 解析 | 81 |
 | `mod_data` | MOD 数据回退 | 133 |
 | `mod_encoding` | MOD 编码/布局逆向 | 55 |
 | `mod_build` | MOD 构建期行为 | 52 |
-| `mod_resources` | MOD 资源分类 | 959 |
+| `mod_resources` | MOD 资源分类 | 739 |
 | `mod_audit` | MOD 资源穷举审计 | 280 |
 | `format_spec` | 数据格式字段级覆盖 | 297 |
 | `mod_e2e` | MOD 无头端到端 | 37 |
@@ -132,6 +162,97 @@ cd game && lua tests/unit/test_input_manager.lua
 另有三个模块只在全量运行中执行（有顺序约束或依赖前面模块留下的全局状态，
 未注册 `runModule` 分支）：`scene_name`（81，会 `LoadRecord` 并改 `JY` 全局）、
 `font_size`（16）、`new_event`（73）。
+
+## 跨平台约定（Windows / Linux / macOS）
+
+测试与工具链必须在三个平台表现一致。以下约束是**强制**的，违反会让整套
+MOD 相关测试在 Windows 上静默失败（历史上曾有 116 项断言因此在 Windows 上
+恒失败，且报错信息全是「参考数据缺失」这类误导性文案）。
+
+### 1. 文件系统操作一律走 `framework/fs_compat.lua`
+
+**不要**在测试或 `tools/` 里写 `io.popen("ls ...")`、`os.execute("mkdir -p ...")`、
+`io.popen("test -d ...")` 或 `find`/`md5sum`/`wc`。Windows 的 `io.popen`
+走 `cmd.exe`，这些命令**全部不存在**，失败方式是安静地返回 `0`/`false`。
+
+用 `fs_compat` 提供的原语：
+
+| 需求 | 用法 |
+|------|------|
+| 目录是否存在 | `Fs.directoryExists(path)` |
+| 列出条目名 | `Fs.listDirectory(path)` / `Fs.listEntries(path)`（带目录标记） |
+| 列出匹配文件 | `Fs.listFiles(path, pattern)` |
+| 递归列文件 | `Fs.walkFiles(path)` |
+| 建/删目录 | `Fs.makeDirectory(path)` / `Fs.removeTree(path)` |
+| 读/写文件 | `Fs.readFile(path)` / `Fs.writeFile(path, data)` |
+| 临时目录 | `Fs.tempDir()` / `Fs.tempPath(name)` |
+| 执行 POSIX 命令 | `Fs.runShell(cmd, {timeout=n})` |
+
+### 2. 运行时（`game/framework`、`game/script`）不得直接碰文件系统
+
+游戏必须通过 `EngineAPI.file.*`（→ `love.filesystem`），否则 `.love` 打包和
+Android 下资源不可见。`fs_compat` **只**给「没有 love.filesystem」的环境用，
+即单元测试与 `tools/`。
+
+### 3. 临时文件不要写死 `/tmp`
+
+用 `Fs.tempPath("xxx.bin")`（POSIX → `/tmp`，Windows → `%TEMP%`）。
+`os.tmpname()` 在 Windows 上返回的是**当前盘符根目录**下的相对路径
+（如 `\s9bk.`），会在仓库/盘符根留下垃圾文件，且清理时机不可控。
+
+### 4. `io.open` 一律用二进制模式
+
+`"wb"` / `"rb"`，**不要**用 `"w"` / `"r"`。Windows 文本模式会把 `\n` 改写成
+`\r\n`：写 200 字节落盘 201 字节，读回时后半段整体错位。`TestHelper.mockEngineAPI`
+已把 love 的 `"w"` 归一化为 `"w+b"`，但测试里直接调 `io.open` 的地方仍需自己注意。
+
+### 5. Lua 版本
+
+- **运行时** 是 LuaJIT（Lua 5.1 语法 + `goto` 扩展），必须保持 5.1 可解析。
+- **测试** 在 Lua 5.1 / 5.3 / 5.4 下都应全绿（CI 无 lua5.3 时本地至少要过 5.3）。
+
+因此禁止在**全仓**（含测试）使用这些 5.2+ 语法/库：
+
+| 禁写 | 改用 |
+|------|------|
+| `a // b` | `math.floor(a / b)` |
+| `goto continue` / `::label::` | `if ... then` 包一层，或抽成 `local function shouldSkip()` |
+| `table.unpack` | `table.unpack or unpack` |
+| `math.tointeger` | `if math.tointeger then ... end` 保护 |
+| `"\xNN"` 十六进制转义 | 十进制 `"\NNN"`（5.1 会把 `"\xa1"` 静默解析成字面量 `"xa1"`）|
+| 字符类 `[\0-\127]` | 逐字节 `for i=1,#s do s:byte(i) > 127` |
+
+一条快捷自查（全仓 5.1 语法）：
+
+```bash
+cd game && find . -name '*.lua' -not -path './mods/*' -exec luac5.1 -p {} \;
+```
+
+### 6. 子进程传参不要带非 ASCII
+
+Windows 的子进程参数要经过 `cmd.exe` 代码页转换（GBK ↔ UTF-8），
+`"小蝦米"` 会变成 `"小蝦\uFFFD?2"`，断言凭空失败。需要传中文数据时，
+改为传 slug/序号，由子进程**内部查表**（见 `tests/unit/boot_one_mod.lua`）。
+
+### 7. 文件读写遇到非 ASCII 路径
+
+Windows 版 PUC-Lua 的 `io.open` 按系统 ACP 解释路径，打不开 UTF-8 字面量
+（MOD 源里有 `match - 复制.bin`、`不使用.png`）。`Fs.readFile` / `Fs.writeFile`
+/ `Fs.fileExists` 已内置 PowerShell Unicode 桥接，只对**含非 ASCII** 的路径启用
+（纯 ASCII 零开销）。所以**不要**绕开 `fs_compat` 直接 `io.open` 处理来自
+`reference/allmods` 的文件名。
+
+> 该桥接在 Windows 上会把握把子进程的 `LOCALAPPDATA` 指到临时目录，
+> 避免 PowerShell 在仓库里生成 `Microsoft/ModuleAnalysisCache` 垃圾目录。
+
+### 8. 目录列举的缓存语义
+
+`fs_compat` 会缓存目录列举结果（11220 个文件全量遍历从分钟级降到秒级）。
+任何**改动目录内容**的操作之后必须失效缓存：
+
+- `Fs.writeFile` / `Fs.makeDirectory` / `Fs.removeTree` / `Fs.removeFile` 内部已自动失效；
+- 若你用裸 `io.open`/`os.remove` 改了文件，需手动调 `Fs.invalidate(path)`；
+- 跨测试切换工作目录时调 `Fs.clearCache()`。
 
 ## 测试覆盖范围
 

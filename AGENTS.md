@@ -59,7 +59,7 @@ game/
 
 ### 换引擎方式
 
-1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 37 个函数
+1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 51 个函数
 2. 实现对应的 `main.lua` 入口（Love2D 用 `love.*` 回调，MUD 用 `main()`）
 3. `framework/` 和 `script/` 完全不变
 
@@ -157,7 +157,7 @@ love game/
 
 # 或使用本地构建的 .love 文件
 ./tools/build-love.sh
-/home/woodfish/bin/love.AppImage builds/1/jylegend.love
+love builds/1/jylegend.love        # love 不在 PATH 时写完整路径
 ```
 
 ### 调试输出

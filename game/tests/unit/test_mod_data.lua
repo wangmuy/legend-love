@@ -500,7 +500,13 @@ function TestModData.testSyntheticKeyFormat()
     -- 键必须全为 ASCII（旧实现用中文字段名，导致覆盖表解析正则失配）
     local k = ModData.SyntheticKey("Person", "姓名", 0)
     TestHelper.assertTrue(k:match("^[\128-\255]") == nil, "key has no non-ASCII leading byte")
-    TestHelper.assertTrue(#k:gsub("[\0-\127]", "") == 0, "key is pure ASCII")
+    -- 逐字节判定纯 ASCII：不能用 [\0-\127] 这样的字符类 —— Lua 5.1 的
+    -- pattern 按 C 字符串处理，模式里的 NUL 会截断，直接报 "missing ']'"。
+    local pureAscii = true
+    for i = 1, #k do
+        if k:byte(i) > 127 then pureAscii = false break end
+    end
+    TestHelper.assertTrue(pureAscii, "key is pure ASCII")
     -- 未知字段返回 nil
     TestHelper.assertNil(ModData.SyntheticKey("Person", "不存在", 0), "unknown field -> nil")
     TestHelper.assertNil(ModData.SyntheticKey(nil, "姓名", 0), "nil seg -> nil")

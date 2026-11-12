@@ -890,13 +890,13 @@ function TestHelper.healModSave(slug)
     for _, n in ipairs(srcFiles) do
         srcSet[n] = true
         local sd = readAll(srcDir .. n)
-        if sd == nil then goto cont end
-        local dd = readAll(dstDir .. n)
-        if dd ~= sd then
-            local out = io.open(dstDir .. n, "wb")
-            if out then out:write(sd); out:close(); healed = healed + 1 end
+        if sd ~= nil then
+            local dd = readAll(dstDir .. n)
+            if dd ~= sd then
+                local out = io.open(dstDir .. n, "wb")
+                if out then out:write(sd); out:close(); healed = healed + 1 end
+            end
         end
-        ::cont::
     end
     -- 删除产物 save/ 里源包没有的槽文件（上次中断残留）；非槽文件不动，
     -- 因为它们是构建产物/外部渲染结果，不归本函数管。

@@ -369,8 +369,14 @@ function TestCloud.testBakePixelParityWithMixFormula()
 
     local tmpIdx = os.tmpname()
     local tmpGrp = os.tmpname()
-    io.open(tmpIdx, "wb"):write(idx):close()
-    io.open(tmpGrp, "wb"):write(frame):close()
+    -- 不写成 io.open(...):write(...):close() 的链式调用：
+    -- Lua 5.1 的 file:write 返回值不可再索引（5.2+ 才稳定返回句柄），
+    -- 链式写法在 5.1/LuaJIT 上会报 "attempt to index a boolean value"。
+    for path, payload in pairs({ [tmpIdx] = idx, [tmpGrp] = frame }) do
+        local f = assert(io.open(path, "wb"))
+        f:write(payload)
+        f:close()
+    end
 
     math.randomseed(99)
     clockTime = 0

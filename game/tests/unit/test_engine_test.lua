@@ -113,10 +113,17 @@ function TestEngineTest.testCoroutineModule()
     TestHelper.assertEquals(false, EngineAPI.coroutine.isRunning(),
         "isRunning should be false on main thread (LuaJIT coroutine.running() returns main thread + ismain=true)")
     
-    -- 显式证明判据：主线程 ismain==true，子协程 ismain==false
+    -- 显式证明判据：主线程下 isRunning 必须为 false。
+    -- 注意 `coroutine.running()` 的返回值跨版本不同：
+    --   Lua 5.1 (PUC)         → nil            （主线程没有协程对象）
+    --   LuaJIT                → 主线程对象 + ismain=true
+    --   Lua 5.2+/5.3/5.4      → 主线程对象 + ismain=true
+    -- 所以判据必须同时覆盖「返回 nil」与「ismain==true」两种形态，
+    -- 不能只断言 ismain==true（那会让纯 Lua 5.1 无谓失败）。
     local co2, ismain2 = coroutine.running()
-    TestHelper.assertEquals(true, ismain2 ~= nil and ismain2 == true,
-        "coroutine.running() on main thread must report ismain=true in LuaJIT")
+    local mainDetected = (co2 == nil) or (ismain2 == true)
+    TestHelper.assertEquals(true, mainDetected,
+        "coroutine.running() 在主线程可被识别（nil 或 ismain=true）")
 end
 
 function TestEngineTest.runAll()

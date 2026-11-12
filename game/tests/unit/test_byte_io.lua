@@ -1,4 +1,4 @@
-﻿-- test_byte_io.lua
+-- test_byte_io.lua
 -- Byte I/O 模块单元测试
 
 local TestHelper = require("tests.test_helper")

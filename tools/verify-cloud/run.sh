@@ -12,7 +12,7 @@
 #   bash tools/verify-cloud/run.sh scroll   # 云与地形滚动一致性（含像素分析）
 #   bash tools/verify-cloud/run.sh all
 #
-# 依赖: LÖVE 11.x（默认 /home/woodfish/bin/love.AppImage，可用 LOVE=... 覆盖）、
+# 依赖: LÖVE 11.x（优先 $LOVE，其次 PATH 里的 love / love2d，最后常见 AppImage 路径）、
 #       scroll 的像素分析需要 python3 + Pillow、%DISPLAY% 可用（无头会失败）。
 #
 # 截图落盘: ~/.local/share/love/<identity>/（identity 见各 conf.lua）
@@ -20,9 +20,30 @@ set -u
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 SRC="$ROOT/tools/verify-cloud"
-LOVE=${LOVE:-/home/woodfish/bin/love.AppImage}
 GAME="$ROOT/game"
 MODE=${1:-all}
+
+# 探测 love：不用硬编码的绝对路径，按 $LOVE → PATH → 常见位置 依次找。
+find_love() {
+    if [ -n "${LOVE:-}" ]; then
+        [ -x "$LOVE" ] && { echo "$LOVE"; return 0; }
+        echo "LOVE 环境变量不可执行: $LOVE" >&2
+        return 1
+    fi
+    for c in love love2d; do
+        command -v "$c" >/dev/null 2>&1 && { command -v "$c"; return 0; }
+    done
+    for c in "$ROOT/love.AppImage" "$HOME/bin/love.AppImage" \
+             "$HOME/.local/bin/love.AppImage" /usr/local/bin/love /usr/bin/love /snap/bin/love; do
+        [ -x "$c" ] && { echo "$c"; return 0; }
+    done
+    return 1
+}
+
+LOVE_BIN=$(find_love) || {
+    echo "未找到 LÖVE。请安装 LÖVE，或用 LOVE=/path/to/love 指定。" >&2
+    exit 1
+}
 
 # 与 game/ 运行时同构的资源与源码入口
 LINKS="data pic sound script framework engine-love2d simsun.ttf product.env"
@@ -40,7 +61,7 @@ run_one() {
     cp "$SRC/$name/main.lua" "$SRC/$name/conf.lua" "$work/"
 
     echo "=== verify-cloud: $name (work=$work) ==="
-    ( cd "$work" && DISPLAY=${DISPLAY:-:0.0} timeout 300 "$LOVE" . )
+    ( cd "$work" && DISPLAY=${DISPLAY:-:0.0} timeout 300 "$LOVE_BIN" . )
     local rc=$?
 
     if [ "$name" = "scroll" ]; then

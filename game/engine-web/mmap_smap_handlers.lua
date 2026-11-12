@@ -658,7 +658,10 @@ function SmapHandlers.look(args)
                 end
                 if eventId then
                     local consumed = _G.eventConsumed[sceneId] and _G.eventConsumed[sceneId][evtKey(eventId)]
-                    if not consumed then
+                    -- 跳过判定集中成一个函数，避免用 goto（5.2+ 语法）：
+                    -- 本文件同时被 web 端与 node 测试加载，保持 5.1 可解析。
+                    local function shouldSkip()
+                        if consumed then return true end
                         -- 运行时状态检查：eventExtra 过路触发事件若已在 D* 表中被清除
                         -- （如主角居 691 开局剧情触发后 instruct_3 修改事件定义将其置 -1/0），
                         -- 静态 events.json 仍保留原值，需对照 JY.D 避免残留"搜索"项。
@@ -671,7 +674,7 @@ function SmapHandlers.look(args)
                             local GetD = g(_G, "GetD")
                             local curExtra = GetD and JY2 and GetD(tonumber(sceneId), tileIdx, 4)
                             if curExtra ~= nil and curExtra <= 0 then
-                                goto continue
+                                return true
                             end
                         end
                         -- 圣堂事件：检查 D* 表是否已放置天书（tileCurrent == 4664）
@@ -682,14 +685,17 @@ function SmapHandlers.look(args)
                             if GetD and JY2 then
                                 local tileCurrent = GetD(tonumber(sceneId), tileIdx, 5)
                                 if tileCurrent == 4664 then
-                                    goto continue
+                                    return true
                                 end
                             end
                         end
                         -- 已在静态 NPC / D* 扫描 / 入口事件中列出的事件不再重复显示（消除 DISPLAY_DUP）
                         if listedEventIds[evtKey(eventId)] then
-                            goto continue
+                            return true
                         end
+                        return false
+                    end
+                    if not shouldSkip() then
                         entityIndex = entityIndex + 1
                         smapEntityList[entityIndex] = { type = "event_trigger", eventId = eventId, eventType = eventType, name = "tile_event", npcData = {["事件编号"]=eventId} }
                         if eventId >= 1001 and eventId <= 1014 then
@@ -701,7 +707,6 @@ function SmapHandlers.look(args)
                     end
                 end
             end
-            ::continue::
         end
     end
     
