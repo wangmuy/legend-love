@@ -139,8 +139,12 @@ local activeLoaded = false
 -- 旧实现用 gsub("\n","") 把所有行直接拼接，导致带注释的文件被解析成
 -- 一个 2000+ 字符的乱串，静默失效却不报错。
 local function firstMeaningfulLine(text)
-    for line in text:gmatch("[^\r\n]+") do
-        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+    -- 注意：不能给循环变量赋值。Lua 5.5 起 for 的控制变量是 **const**，
+    -- `line = line:gsub(...)` 会直接报
+    --   attempt to assign to const variable 'line'
+    -- （5.1~5.4 允许，所以这是 5.5 才暴露的写法。）
+    for raw in text:gmatch("[^\r\n]+") do
+        local line = raw:gsub("^%s+", ""):gsub("%s+$", "")
         if line ~= "" and line:sub(1, 1) ~= "#" then
             return line
         end

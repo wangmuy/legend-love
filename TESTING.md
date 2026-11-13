@@ -121,17 +121,21 @@ cd game && lua tests/unit/test_input_manager.lua
 
 ### 支持的 Lua 版本
 
-三个版本下全量 2506 条断言全部通过，CI/本地任选其一：
+四个版本下全量断言全部通过，CI/本地任选其一：
 
 ```bash
 cd game && lua5.1 tests/test_runner.lua   # 与运行时 LuaJIT 最接近
 cd game && lua5.3 tests/test_runner.lua
 cd game && lua5.4 tests/test_runner.lua
+cd game && lua5.5 tests/test_runner.lua
 ```
+
+> 5.4 起 `bit32` 被移除、5.5 起 `for` 变量变 `const` 且 `#t`/浮点 `tostring`
+> 语义变更 —— 详见「跨平台约定 › 5. Lua 版本」。
 
 ### 可用模块
 
-`test_runner.lua <模块名>` 可单独运行下列模块（断言数合计 2506 条）：
+`test_runner.lua <模块名>` 可单独运行下列模块：
 
 | 模块名 | 覆盖内容 | 断言数 |
 |--------|----------|--------|
@@ -158,6 +162,7 @@ cd game && lua5.4 tests/test_runner.lua
 | `text_box_layout` | 单行文本框尺寸 | 102 |
 | `mmap_depth` | 主地图 2.5D 遮挡关系 | 52 |
 | `cloud` | 主地图飘云子系统 | 61 |
+| `version_compat` | Lua 5.1/5.3/5.4/5.5 跨版本兼容（const for / #t 带洞 / 浮点 tostring / bit32） | 24 |
 
 另有三个模块只在全量运行中执行（有顺序约束或依赖前面模块留下的全局状态，
 未注册 `runModule` 分支）：`scene_name`（81，会 `LoadRecord` 并改 `JY` 全局）、
@@ -209,24 +214,43 @@ Android 下资源不可见。`fs_compat` **只**给「没有 love.filesystem」�
 ### 5. Lua 版本
 
 - **运行时** 是 LuaJIT（Lua 5.1 语法 + `goto` 扩展），必须保持 5.1 可解析。
-- **测试** 在 Lua 5.1 / 5.3 / 5.4 下都应全绿（CI 无 lua5.3 时本地至少要过 5.3）。
+- **测试与 tools** 在 **Lua 5.1 / 5.3 / 5.4 / 5.5** 下都应全绿（本机四版各 2540 断言）。
 
-因此禁止在**全仓**（含测试）使用这些 5.2+ 语法/库：
+#### 5.1 为什么还要兼容 5.1 语法
 
-| 禁写 | 改用 |
-|------|------|
-| `a // b` | `math.floor(a / b)` |
-| `goto continue` / `::label::` | `if ... then` 包一层，或抽成 `local function shouldSkip()` |
-| `table.unpack` | `table.unpack or unpack` |
-| `math.tointeger` | `if math.tointeger then ... end` 保护 |
-| `"\xNN"` 十六进制转义 | 十进制 `"\NNN"`（5.1 会把 `"\xa1"` 静默解析成字面量 `"xa1"`）|
-| 字符类 `[\0-\127]` | 逐字节 `for i=1,#s do s:byte(i) > 127` |
+LuaJIT 认 5.1 语法，但它**额外**支持 `goto`。所以「运行时能用」不等于「5.1 能解析」：
+`goto` 在 LuaJIT 下合法，在 PUC-Lua 5.1 下是语法错误。仓库要在 5.1 下跑测试，
+就必须避开。
 
-一条快捷自查（全仓 5.1 语法）：
+#### 5.2 各版本破坏性变更对照（本项目踩过的）
+
+| 变更 | 影响版本 | 本项目处理 |
+|------|----------|-----------|
+| `bit32` 库被移除 | **5.4 起** | `framework/lib_bit.lua` 三后端兜底（原生 bit32 → 5.3+ `&`/`>>` 运算符 → 纯 Lua luabit） |
+| `#t` 对带洞表返回**边界**（首个洞之前） | **5.5 起** | 禁止 `t[#t] = nil` / `while #t` 收缩数组；用 `pairs` 显式计数 |
+| `for` 控制变量是 **const** | **5.5 起** | 禁止 `for k in ... do k = ... end`；改用 `local x = k` 再赋值 |
+| 浮点 `tostring` 改最短往返表示（`0.30000000000000004`） | **5.5 起** | 持久化只走 `string.format("%d")` / Byte 打包，不用浮点 `tostring` |
+| `math.tointeger` / `table.unpack` 不存在 | 5.1 | 用 `if math.tointeger then` 保护；`table.unpack or unpack` |
+| `"\xNN"` 十六进制转义不存在 | 5.1 | 十进制 `"\NNN"`（5.1 会把 `"\xa1"` 静默解析成字面量 `"xa1"`）|
+| `//` 整除、`goto` 不存在 | 5.1 | `math.floor(a / b)`；`if ... then` 或抽函数 |
+| `loadstring` 是唯一字符串编译入口 | 5.1 | `rawget(_G, "loadstring") or load`（且必须 `rawget`，见下） |
+| 字符类里含 `\0` 会截断 pattern | 5.1 | 逐字节 `for i=1,#s do s:byte(i) > 127` |
+
+> **严格 `_G` 陷阱**：`jymain_adapter` 会给 `_G` 装元表，`__index` 对**未声明全局**
+> 直接 `error(...)`。所以在测试里探测「某全局是否存在」**必须用 `rawget`**：
+> `if loadstring then` 在 5.2+ 会抛 `attempt read read to undeclared variable loadstring`
+> 而不是得到 `nil`。
+
+#### 5.3 快捷自查
 
 ```bash
-cd game && find . -name '*.lua' -not -path './mods/*' -exec luac5.1 -p {} \;
+cd game && find . -name '*.lua' -not -path './mods/*' -exec luac5.1 -p {} \;   # 5.1 语法
+cd game && find . -name '*.lua' -not -path './mods/*' -exec luac5.5 -p {} \;   # 5.5 语法（const）
 ```
+
+回归套件 `tests/unit/test_version_compat.lua`（`lua tests/test_runner.lua version_compat`）
+用 `load()` 逐文件编译全部运行时源码 —— 这是「当前解释器能不能读这份代码」的
+直接判据，比正则扫描可靠（正则无法跟踪 `for` 作用域，实测误报 80 处而真实编译 0 失败）。
 
 ### 6. 子进程传参不要带非 ASCII
 
