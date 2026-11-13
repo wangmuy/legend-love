@@ -28,6 +28,7 @@ local TestDialogLayout = require("tests.unit.test_dialog_layout")
 local TestTextBoxLayout = require("tests.unit.test_text_box_layout")
 local TestMmapDepth = require("tests.unit.test_mmap_depth")
 local TestCloud = require("tests.unit.test_cloud")
+local TestVersionCompat = require("tests.unit.test_version_compat")
 
 local TestRunner = {}
 
@@ -410,6 +411,17 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + clStats.failed
     allPassed = allPassed and clResult
 
+    print("\n" .. string.rep("-", 60))
+    print("运行跨版本兼容性测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local vcResult = TestVersionCompat.runAll()
+    local vcStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + vcStats.total
+    totalStats.passed = totalStats.passed + vcStats.passed
+    totalStats.failed = totalStats.failed + vcStats.failed
+    allPassed = allPassed and vcResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -480,9 +492,11 @@ function TestRunner.runModule(moduleName)
         return TestMmapDepth.runAll()
     elseif moduleName == "cloud" then
         return TestCloud.runAll()
+    elseif moduleName == "version_compat" then
+        return TestVersionCompat.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, mmap_depth, cloud")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat")
         return false
     end
 end

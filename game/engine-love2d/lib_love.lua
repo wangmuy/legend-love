@@ -1,3 +1,7 @@
+-- 按位与 / 右移：跨版本后端（bit32 / 5.3+ 运算符 / luabit）。
+-- 必须在 `_ENV = M` **之前** require 并保存引用：换环境后就查不到全局了。
+local Bit = require "framework.lib_bit"
+
 local M = {}
 do
     setmetatable(M, { __index = _G, })
@@ -6,11 +10,14 @@ do
     else
         _ENV = M -- for 5.2
     end
-    if _VERSION < "Lua 5.2" then
-        require "framework.luabit"
-        bit32 = bit
-    end
 
+    -- 历史实现只在 `_VERSION < "Lua 5.2"` 时装 luabit，默认 5.2+ 必有原生
+    -- bit32；但 **Lua 5.4 起 bit32 已被移除**（5.5 亦然），导致本文件里
+    -- bit32.band / bit32.rshift 在 5.4/5.5 下全部 nil 索引崩溃。
+    -- 改为无条件用 lib_bit 兜底（它优先选原生实现，性能无差异）。
+    if not bit32 then
+        bit32 = Bit.api
+    end
     if _G and bit32 and not _G.bit32 then
         _G.bit32 = bit32
     end

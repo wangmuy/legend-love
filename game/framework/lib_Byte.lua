@@ -1,6 +1,11 @@
 require "framework.lib_log"
 local FileUtil = require "framework.lib_file"
 
+-- 按位与 / 右移：跨版本后端（bit32 / 5.3+ 运算符 / luabit）
+-- 必须在这里拿到并注入作用域：下面的 `_ENV = M` 会换掉全局环境，
+-- 之后 M.__index = _G 才能查到它。
+local Bit = require "framework.lib_bit"
+
 local M = {}
 do
     setmetatable(M, { __index = _G, })
@@ -9,13 +14,16 @@ do
     else
         _ENV = M -- for 5.2
     end
-    if _VERSION < "Lua 5.2" then
-        require "framework.luabit"
-        bit32 = bit -- band rshift
-        bit32.rshift = bit.brshift
-    end
 
-    -- 确保脚本层可见 bit32（部分 setfenv 场景下不会自动回写全局）
+    -- 把 bit32 形状的表挂进本模块作用域（M.__index = _G 使它对全局也可见）。
+    --
+    -- 历史实现只在 `_VERSION < "Lua 5.2"` 时 require luabit，默认 5.2+
+    -- 一定有原生 bit32；但 **Lua 5.4 起 bit32 已被移除**，5.5 同样没有，
+    -- 于是 5.4/5.5 下 bit32 恒为 nil，本文件 20+ 处 bit32.band 全部崩。
+    -- 改为无条件用 lib_bit 兜底（它优先用原生实现，性能无差异）。
+    if not bit32 then
+        bit32 = Bit.api
+    end
     if _G and bit32 and not _G.bit32 then
         _G.bit32 = bit32
     end
