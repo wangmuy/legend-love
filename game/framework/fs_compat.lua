@@ -310,6 +310,40 @@ end
 
 local winBridgeSeq = 0
 
+--- 定位 powershell.exe。
+--
+-- 不能只写裸名 `powershell`：它位于
+--   %SystemRoot%\System32\WindowsPowerShell\v1.0\
+-- 而该目录**不在**默认 PATH 里（只有 System32 本身在）。从 cmd/pwsh 启动时
+-- 通常仍能解析到（App Paths 注册表项），但一旦 PATH 被裁剪（CI、嵌入式、
+-- 或用户自定义 PATH），就会静默失败 —— 表现为「中文文件名读不到」这类
+-- 看似数据缺失的错误。
+--
+-- 优先用绝对路径，退化时再用裸名。
+local powershellCache   -- false = 已探测且找不到
+
+local function findPowershell()
+    if powershellCache ~= nil then
+        return powershellCache or nil
+    end
+    local candidates = {
+        (os.getenv("SystemRoot") or "C:\\Windows") ..
+            "\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "C:\\Windows\\SysWOW64\\WindowsPowerShell\\v1.0\\powershell.exe",
+    }
+    for _, p in ipairs(candidates) do
+        if Fs.fileExists(p) then
+            powershellCache = p
+            return p
+        end
+    end
+    -- 兜底：交给 PATH 解析（可能装的是 PowerShell 7 的 pwsh）
+    powershellCache = "powershell"
+    return powershellCache
+end
+Fs.findPowershell = findPowershell
+
 --- 执行一段 PowerShell 脚本（UTF-8 BOM 写入临时 .ps1，避免中文被误解码）。
 -- @param script string PowerShell 脚本正文
 -- @param marker string 脚本成功时要写出的标记文件路径
@@ -332,10 +366,13 @@ local function winRunScript(script, marker)
     -- 该变量缺失/为空时它会退化到**当前工作目录**，在仓库里留下一个
     -- Microsoft/ 目录（实测 mod_audit 跑完就会多出这个目录）。
     -- 同时不能改 CWD —— 调用方传进来的相对路径要靠 CWD 解析。
+    --
+    -- powershell 用绝对路径（见 findPowershell 注释），否则 PATH 被裁剪时
+    -- 会找不到。
     local tmpWork = Fs.tempDir()
     local p = io.popen('set "LOCALAPPDATA=' .. tmpWork:gsub("/", "\\") ..
-        '" && powershell -NoProfile -ExecutionPolicy Bypass -File "' ..
-        ps1 .. '" 2>&1')
+        '" && "' .. findPowershell() .. '" -NoProfile ' ..
+        '-ExecutionPolicy Bypass -File "' .. ps1 .. '" 2>&1')
     local out = ""
     if p then out = p:read("*a") or ""; p:close() end
     os.remove(ps1)
@@ -610,12 +647,32 @@ function Fs.runShell(cmd, opts)
         if not bash then
             return false, "", "no-posix-shell"
         end
-        -- bash 内跑脚本；把 stderr 合进 stdout，便于断言输出内容
-        local script = tostring(cmd) .. " 2>&1"
+        -- 关键：把 bash 自己的 /usr/bin:/bin 前置到 PATH，且必须在**最外层**
+        -- 就设好。
+        --
+        -- 坑 1（PATH）：从 msys2 bash 启动原生 lua 时，msys2 会把 /usr/bin
+        -- 注入 PATH，`grep`/`find`/`ls` 恰好都能找到，看起来一切正常；而
+        -- **真正干净的 Windows**（没装 msys2，或从 cmd/pwsh 启动）里，bash
+        -- 继承了不含 /usr/bin 的 PATH，于是 grep/ls/find 全部 command not
+        -- found —— 命令"执行成功"但输出为空，断言静默失败。
+        --
+        -- 坑 2（顺序）：带超时的时候，实际执行的是
+        --     timeout N bash -c '<cmd>'
+        -- 若 PATH 只在里层 bash 里 export，外层找不到 `timeout` 本身，结果
+        -- 是 "timeout: command not found" —— 比坑 1 更隐蔽，因为普通命令
+        -- （不带超时）反而是好的。所以 export 必须写在 timeout 之前。
+        local inner
         if opts.timeout and opts.timeout > 0 then
-            script = string.format("timeout %d bash -c %s 2>&1",
-                math.floor(opts.timeout), quotePosix(script))
+            inner = string.format("timeout %d bash -c %s 2>&1",
+                math.floor(opts.timeout), quotePosix(tostring(cmd)))
+        else
+            inner = tostring(cmd) .. " 2>&1"
         end
+        -- `unset GREP_OPTIONS`：msys2 的 grep 会对这个遗留变量打
+        -- "GREP_OPTIONS is deprecated" 警告，而我们把 stderr 合进了 stdout，
+        -- 噪声会混进证据输出里。
+        local script = 'export PATH="/usr/bin:/bin:$PATH"; unset GREP_OPTIONS; ' ..
+            inner
         full = '""' .. bash .. '" -c ' .. quoteForCmd(script) .. ' "'
     else
         if opts.timeout and opts.timeout > 0 then
@@ -636,16 +693,53 @@ function Fs.runShell(cmd, opts)
 end
 
 --- 当前 Lua 解释器可执行文件路径（用于证据命令里的 `lua -e ...`）。
--- best-effort：取 arg[-1]；取不到时返回 nil（调用方应回退到裸 "lua"）。
+--
+-- best-effort，三层退化：
+--   1. `arg[-1]`            —— 用脚本文件启动时最可靠
+--   2. 扫描 `arg` 负数下标  —— 部分实现把解释器放在 arg[-2]/arg[-3]
+--   3. 在 PATH 里找 lua*    —— 仅在 `lua -e '...'` 这类拿不到 arg[-1] 的
+--      启动方式下生效；仍找不到就返回 nil，调用方保留原始的 `lua`
+--
+-- 注意：用 `lua -e '...'` 启动时 arg[-1] 是 **nil**（引号里的脚本被当成
+-- arg[0]），这条正是「从 bash 跑测试正常、从 cmd 跑 mod_audit 却失败」的
+-- 隐性差异来源之一。
+--
+-- 说明：第 3 层可能选中与当前进程**不同版本**的 lua（例如跑 5.5 却在 PATH
+-- 里先命中 5.1）。这只影响 mod_audit 的 `lua -e` 证据命令（用途是验证
+-- string.format 行为，各版本一致），不影响被测代码。
 -- @return string|nil
 function Fs.luaInterpreter()
     local a = rawget(_G, "arg")
-    if type(a) == "table" then
-        local ok, v = pcall(function() return a[-1] end)
-        if ok and type(v) == "string" and v ~= "" then
-            return v
+    if type(a) ~= "table" then return nil end
+
+    -- 1) 常规：arg[-1]
+    local ok, v = pcall(function() return a[-1] end)
+    if ok and type(v) == "string" and v ~= "" then return v end
+
+    -- 2) 扫负数下标（-2..-5），跳过看起来像选项的项
+    for i = -2, -5, -1 do
+        local ok2, cand = pcall(function() return a[i] end)
+        if ok2 and type(cand) == "string" and cand ~= ""
+            and not cand:match("^%-%-") and not cand:match("^%-%a$") then
+            return cand
         end
     end
+
+    -- 3) `lua -e '...'` 启动时 arg[-1] 不存在（整个 arg 表里没有解释器路径），
+    --    此时只能在 PATH 里找同名可执行文件。找不到就返回 nil，调用方保留
+    --    原始的 `lua` 命令（能否成功取决于 PATH）。
+    local sep = Fs.isWindows and ";" or ":"
+    local path = os.getenv("PATH") or ""
+    local names = Fs.isWindows
+        and { "lua.exe", "lua55.exe", "lua54.exe", "lua53.exe", "lua51.exe", "luajit.exe" }
+        or { "lua", "lua5.5", "lua5.4", "lua5.3", "lua5.1", "luajit" }
+    for dir in path:gmatch("[^" .. sep .. "]+") do
+        for _, name in ipairs(names) do
+            local cand = dir:gsub("[/\\]+$", "") .. "/" .. name
+            if Fs.fileExists(cand) then return cand end
+        end
+    end
+
     return nil
 end
 
