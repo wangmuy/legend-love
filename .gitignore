@@ -40,6 +40,9 @@ game/engine-web/lib/
 game/engine-web/tests/bridge-*.json
 
 reference/
+# 原版 BGM 的 MIDI 母带不入 git（体积），来源与 md5 见 tools/base-music-manifest.tsv
+# 重渲染时由 tools/render-base-music.sh 按清单从 reference/ 或 git 历史现取
+game/sound/*.mid
 
 # allmods MOD 构建产物（由 tools/mod_build.lua 生成，可重复构建）
 game/mods/

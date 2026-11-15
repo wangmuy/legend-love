@@ -44,6 +44,7 @@ local TestAutoMove = require("tests.unit.test_auto_move")
 local TestInteract = require("tests.unit.test_interact")
 local TestItemStatusMouse = require("tests.unit.test_item_status_mouse")
 local TestBattleMouse = require("tests.unit.test_battle_mouse")
+local TestBaseMusic = require("tests.unit.test_base_music")
 
 local TestRunner = {}
 
@@ -560,6 +561,14 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + btmStats.failed
     allPassed = allPassed and btmResult
 
+    TestHelper.resetCounts()
+    local bgmResult = TestBaseMusic.runAll()
+    local bgmStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + bgmStats.total
+    totalStats.passed = totalStats.passed + bgmStats.passed
+    totalStats.failed = totalStats.failed + bgmStats.failed
+    allPassed = allPassed and bgmResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -662,9 +671,11 @@ function TestRunner.runModule(moduleName)
         return TestItemStatusMouse.runAll()
     elseif moduleName == "battle_mouse" then
         return TestBattleMouse.runAll()
+    elseif moduleName == "base_music" then
+        return TestBaseMusic.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music")
         return false
     end
 end

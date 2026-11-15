@@ -105,6 +105,81 @@ TRACE.log("startNewGame:348")  -- 调用点
 模拟开场卧姿调查的写点时序并打印 `tools/trace_out.txt` 输出，
 用于快速验证 trace_global 工作方式；真实用法仍见上方启用配方。
 
+## 音频工具
+
+### midiinfo.lua — MIDI 探针（纯 Lua，无外部依赖）
+
+按 RFC 解析 `MThd`/`MTrk`、变长 delta-time、running status，
+再用 tempo map 精确积分出时长（`Σ delta_tick × us_per_quarter ÷ division`）。
+
+```bash
+lua tools/midiinfo.lua game/sound/game01.mid                # 表格：fmt/trk/div/ticks/时长/音符数/音色
+lua tools/midiinfo.lua --duration game/sound/game01.mid     # 只打印秒数（49.610）
+lua tools/midiinfo.lua --json game/sound/*.mid              # JSON 数组
+```
+
+刻意不使用 Lua 5.3 位运算符，5.1 可直接跑。
+
+### base-music-manifest.tsv — 母带清单（母带本身不入 git）
+
+原版 25 首 BGM 的 **MIDI 母带不提交进 git**（避免仓库膨胀）。本清单记录每首的
+`md5` / 首选来源路径 / MIDI 时长，`render-base-music.sh` 据此自动恢复母带：
+
+1. `game/sound/gameNN.mid`（手工放的，优先级最高）
+2. 清单里的 `reference/allmods/kys-*/music/*.mid`（该目录已 gitignore）
+3. git 历史（`rev-list --full-history` 回溯，兼容 `bin/sound` 与 `src/sound`、`.mid`/`.MID`）
+
+**实测**：在历史被重写（SHA 全变）的仓库里跑全量渲染，25/25 母带都能自动找回。
+
+### render-base-music.sh — 原版 BGM 重渲染（FluidSynth + SoundFont）
+
+**为什么需要**：`game/sound/game01..25.ogg` 原本是「渲染 → opus → ogg」两次有损
+转码的产物，25 首里 15 首解码后真峰值 > 0 dBFS（最高 +3.20 dBFS），整轨响度跨度
+18.2 dB，`game01` 有 77.6% 能量压在 200 Hz 以下。而原版 Pascal（kys-pascal）是
+FluidSynth + 自带 `mid.sf2` 实时合成——它的 `music/1..23.mid` 与本仓库原版 MIDI
+母带**逐字节相同**。所以要修的是**渲染链**，不是曲子。
+
+```bash
+./tools/render-base-music.sh                # 全量 25 首
+./tools/render-base-music.sh game01 game07  # 指定曲目
+./tools/render-base-music.sh --list         # 报告现状（OGG / 本地母带 / 恢复来源）
+SF2=/path/to/x.sf2 SAMPLE_RATE=48000 ./tools/render-base-music.sh   # 换音色库/采样率
+```
+
+链路：`fluidsynth` → `silenceremove`（去 3~5 s 尾静音）→ 两遍 `loudnorm`
+（-16 LUFS / ≤ -2.0 dBTP，`linear=true` 优先不压缩）→ `libvorbis -q:a 4` @ **32 kHz**。
+
+**为什么是 32 kHz**：解析原版音色库 `mid.sf2` 的 `shdr` 样本头，**492/495 个样本
+是 22050 Hz**，合成上限只有约 11 kHz；母带实测 >11 kHz 的能量在 -26..-68 dB（平均
+-33 dB）。48 kHz 容器里 11~24 kHz 装的基本是重采样镜像与噪声。同一把尺子量：
+
+```
+48 kHz q5   频谱形状偏差 0.26 dB   25 首 26.3 MB
+32 kHz q4   频谱形状偏差 0.57 dB   25 首 20.1 MB   ← 默认
+32 kHz q3   频谱形状偏差 0.67 dB   25 首 17.2 MB   （SNR 掉 2.7 dB，不划算）
+```
+
+产物覆盖 `game/sound/gameNN.ogg`，**母带不保留**（下次从清单再取）。
+运行时不需要 fluidsynth——游戏仍只播预渲染 OGG，`MUSIC_EXTS` 探测顺序不变。
+
+回归门禁：`sh game/tests/gate_base_music.sh`（6 组断言，含负向对照）。
+
+### purge-audio-history.sh — 把音乐资源从 git 历史彻底移除
+
+⚠️ **破坏性操作**：重写所有提交 SHA，协作者必须重新 clone，远程要 force push。
+
+```bash
+./tools/purge-audio-history.sh --dry-run   # 在镜像克隆上试跑，只报告体积
+./tools/purge-audio-history.sh --apply     # 真的重写当前仓库
+```
+
+规则：移除 `*.ogg` / `*.opus` / `*.mp3` 与整个 `bak/`；保留 `bin/sound/*.mid`、
+`src/sound/*.MID`（母带）与 `game/sound/*.wav`（音效）。
+
+**实测**（镜像上跑过）：`.git` **108 MB → 16 MB**，音频 blob **50 → 0**。
+提交数 604 → 603（少的是 `5b8ca8e move unused sound files to bak/`，
+改动 100% 是移动音频，清完变空提交被自动剪掉）。
+
 ## verify-cloud/ — 主地图飘云运行时取证
 
 `probe` / `e2e` / `scroll` 三个独立 LÖVE 驱动 + 像素分析，证明云“真被画出来、

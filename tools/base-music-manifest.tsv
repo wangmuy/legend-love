@@ -1,0 +1,38 @@
+# game/sound 原版 BGM 母带清单（不入 git，仅本文件记录来源）
+#
+# 为什么需要：原版 25 首 BGM 的 MIDI 母带**不提交进 git**（避免仓库膨胀）。
+# 但重渲染必须有母带，所以这里记录每首母带的 md5 与首选来源，
+# tools/render-base-music.sh --restore 会按此表把母带恢复到 game/sound/。
+#
+# 来源优先级：
+#   1) reference/allmods/kys-*/music/*.mid —— 已 gitignore，本地已有（实测 24/25）
+#   2) git 历史 bin/sound/gameNN.mid     —— 只对 reference 里找不到的（game25）
+#
+# 格式： <曲目>	<md5>	<来源路径>	<MIDI时长秒>
+#   来源路径为 "-" 表示走 git 历史：git show 8c3c3c9^:bin/sound/<曲目>.mid
+#   MIDI时长用于门禁/单测校验 OGG 时长是否贴近母带（无需母带在盘上）
+game01	28e78f98d8169c36662043c752d2bc45	reference/allmods/kys-BookCalamity/music/19.mid	49.610
+game02	420425bf0db2ede9673031565a23ff81	reference/allmods/kys-pascal/music/1.mid	55.077
+game03	e218c26ef950cc0829cf687e2151c3f5	reference/allmods/kys-pascal/music/2.mid	38.660
+game04	e881c07d1aca309578a58d3682987f11	reference/allmods/kys-pascal/music/3.mid	71.528
+game05	54111c3a84a95ed617a51c3de817a380	reference/allmods/kys-pascal/music/4.mid	77.648
+game06	79f8abb39a9c2caf22270872d4fce59f	reference/allmods/kys-pascal/music/5.mid	41.965
+game07	8a3683d0f3f8361c11c118621320d739	reference/allmods/kys-pascal/music/6.mid	34.028
+game08	211b60163e7728d5e6116109cb4cf7a1	reference/allmods/kys-pascal/music/7.mid	27.882
+game09	263bb288686fe5cbcf87b8cbdf6a9cda	reference/allmods/kys-pascal/music/8.mid	43.757
+game10	158146b1c9d457cfc80690a219094d0d	reference/allmods/kys-pascal/music/9.mid	63.596
+game11	f07a00118368027d42deb3b11db63f42	reference/allmods/kys-pascal/music/10.mid	62.340
+game12	d6b74bbf5360cca516220177cfcb8425	reference/allmods/kys-pascal/music/11.mid	48.146
+game13	b67eba9ab790a9d53f4d2e0b05ee2aff	reference/allmods/kys-pascal/music/12.mid	44.270
+game14	18d02c01fd0e6cab500c481b094e774a	reference/allmods/kys-pascal/music/13.mid	35.318
+game15	feb59dd77f09e165ca0624002b2c0a4c	reference/allmods/kys-pascal/music/14.mid	52.174
+game16	8b5cbe7cadcf3dbc2eb403d65ecaef31	reference/allmods/kys-pascal/music/15.mid	25.275
+game17	a44eec6745ea0181a51797a2cda97b25	reference/allmods/kys-pascal/music/16.mid	39.432
+game18	aac8eb7e0b62f24451c34cff148e81ce	reference/allmods/kys-pascal/music/17.mid	59.307
+game19	303904afad71bc62146fc855529624d3	reference/allmods/kys-pascal/music/18.mid	59.643
+game20	a26508058f7eb1ce0087af589c2df3af	reference/allmods/kys-pascal/music/19.mid	63.291
+game21	46cf4b9dc4ee043b042c7de37ca12ab1	reference/allmods/kys-pascal/music/20.mid	32.801
+game22	5c9c8dc8023859e4af171ee7ce07ceb4	reference/allmods/kys-pascal/music/21.mid	60.577
+game23	d5e5d03a9c7f0ab5b886577b929ddd3d	reference/allmods/kys-pascal/music/22.mid	54.821
+game24	10ec48ff285de2d625d8a6c861b443ae	reference/allmods/kys-pascal/music/23.mid	43.667
+game25	e2dd08f74abcbee27fa81d0090d28dd0	-	115.625
