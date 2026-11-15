@@ -176,18 +176,29 @@ function AsyncGlobals.install()
         -- 这里只做最小的状态修复：把 JY.Status 从 GAME_WMAP 拉回 SMAP，
         -- 让状态机下一帧切回场景，避免死锁。正常结束时 WarMainCoroutine
         -- 已把 Status 设成 prevState，本分支不会触发。
-        local info = nil
-        if type(scheduler.getInfo) == "function" then
-            info = scheduler:getInfo(warCo)
-        end
-        if info and info.status == "error" then
-            lib.Debug("WarMain: battle coroutine died with error, recovering state")
+        -- **协程出错时 getInfo 返回 nil**（scheduler 会 `coroutines[id] = nil`
+        -- 清理出错的协程，见 coroutine_scheduler.lua 的 start 错误分支）。
+        -- 所以判断「是否异常结束」不能用 `info.status == "error"`，
+        -- 必须用「协程已结束但没拿到结果」：
+        --     isActive == false 且 getResult == nil
+        --
+        -- 用户实测：佣兵任务失败后游戏无响应 —— 战斗协程在收尾段抛错，
+        -- JY.Status 停在 GAME_WMAP，状态机一直按战斗绘制，事件协程等不到
+        -- WarMain 返回，玩家就卡死。
+        local alive = scheduler:isActive(warCo)
+        local result = scheduler:getResult(warCo)
+        -- 结束时才读 state（协程运行期间它会变，提前读会拿到 idle 快照）
+        local warState = WarAsync.getState and WarAsync.getState() or nil
+        if not alive and result == nil and warState and warState.status ~= "ended" then
+            lib.Debug("WarMain: battle coroutine died without result, recovering state")
             if JY and (JY.Status == nil or JY.Status == GAME_WMAP) then
                 JY.Status = GAME_SMAP
             end
+            local InputManager = require("framework.input_manager")
+            InputManager.disableInput = false
         end
 
-        return scheduler:getResult(warCo)
+        return result
     end)
 
     local ItemAsync = require("framework.item_async")

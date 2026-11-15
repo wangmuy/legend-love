@@ -190,6 +190,46 @@ function TestCoroutineScheduler.testPersonStatusScenario()
     InputManager.disableInput = false
 end
 
+-- 模块缓存被清后，scheduler 必须仍能看见注入的键
+--
+-- 背景：事件队列是 input_manager.lua 的模块级 upvalue。
+-- test_mouse_hover 等用例会 `package.loaded["framework.input_manager"] = nil`，
+-- 之后 require 得到的是**全新的模块表 + 全新的空队列**。
+--
+-- 若 coroutine_scheduler 在模块顶部缓存了 InputManager 表，它读到的永远是
+-- 旧队列 → 测试注入的键看不见 → 协程永远不醒。
+-- 症状：单跑 battle_mouse 全过，混进全套件后「注入键后协程没被唤醒」。
+function TestCoroutineScheduler.testSurvivesInputManagerReload()
+    print("\n=== Test: input_manager 重载后仍能收到注入键 ===")
+    local savedIM = rawget(_G, "InputManager")
+    local savedEngineAPI = rawget(_G, "EngineAPI")
+    rawset(_G, "EngineAPI", { time = { getTimeSeconds = function() return 0 end } })
+
+    local Scheduler = require("framework.coroutine_scheduler")
+    local sched = Scheduler.getInstance()
+    sched:clear()
+
+    -- 模拟别的用例清缓存
+    package.loaded["framework.input_manager"] = nil
+    local IM = require("framework.input_manager")
+    IM.getInstance():init()
+
+    local resumed = nil
+    local co = sched:create(function()
+        resumed = require("framework.input_async").WaitKeyCoroutine()
+    end, "reload_test")
+    sched:start(co)
+
+    IM.enqueueKeyEvent(32)
+    sched:update(0.016)
+
+    TestHelper.assertEquals(32, resumed,
+        "清缓存后注入的键仍必须能唤醒协程（scheduler 不得缓存旧模块表）")
+
+    rawset(_G, "InputManager", savedIM)
+    rawset(_G, "EngineAPI", savedEngineAPI)
+end
+
 -- 运行所有测试
 function TestCoroutineScheduler.runAll()
     print("\n========================================")
@@ -203,6 +243,7 @@ function TestCoroutineScheduler.runAll()
     TestCoroutineScheduler.testWaitForKeyWithDisableInput()
     TestCoroutineScheduler.testMultipleCoroutinesWaitForKey()
     TestCoroutineScheduler.testPersonStatusScenario()
+    TestCoroutineScheduler.testSurvivesInputManagerReload()
     
     return TestHelper.printSummary()
 end

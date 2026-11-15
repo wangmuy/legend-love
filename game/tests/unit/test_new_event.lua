@@ -566,10 +566,42 @@ end
 function TestNewEvent.testWarMainRecoversFromCoroutineError()
     print("\n=== Test: 战斗协程异常死亡后必须能恢复状态 ===")
     local src = stripComments(readSource("framework/async_globals.lua"))
-    TestHelper.assertTrue(src:find('info.status == "error"', 1, true) ~= nil,
-        "WarMain 包装器必须检测战斗协程 error 状态")
+
+    -- **不能用 `info.status == "error"`**：scheduler 在协程抛错时会
+    -- `coroutines[id] = nil` 清理它，于是 getInfo() 返回 nil，
+    -- 那个条件永远不成立 → 恢复逻辑从不执行。
+    --
+    -- 用户实测：佣兵任务失败后游戏无响应（JY.Status 停在 GAME_WMAP）。
+    TestHelper.assertEquals(nil, src:find('info.status == "error"', 1, true),
+        "不得依赖 info.status（协程出错后 getInfo 返回 nil）")
+
+    -- 正确判据：协程已不活跃 + 没有结果 = 异常结束
+    TestHelper.assertTrue(src:find("isActive(warCo)", 1, true) ~= nil,
+        "必须用 isActive(warCo) 判断协程是否还活着")
+    TestHelper.assertTrue(src:find("getResult(warCo)", 1, true) ~= nil,
+        "必须用 getResult(warCo) 判断是否拿到了结果")
     TestHelper.assertTrue(src:find("JY.Status = GAME_SMAP", 1, true) ~= nil,
-        "检测到 error 后必须把 JY.Status 从 GAME_WMAP 拉回 GAME_SMAP")
+        "检测到异常结束必须把 JY.Status 从 GAME_WMAP 拉回 GAME_SMAP")
+end
+
+function TestNewEvent.testWarMainDistinguishesErrorFromDefeat()
+    print("\n=== Test: 战败（false）不得触发异常兜底 ===")
+    -- 两种「协程结束」必须区分：
+    --   * 正常战败：getResult 返回 false → 交给调用方脚本处理
+    --     （韦大宝「佣兵行会」会 instruct_13 + "战斗失败..."）
+    --   * 异常崩溃：getInfo 为 nil、getResult 为 nil → 兜底恢复状态
+    --
+    -- 若把两者混为一谈，战败时会被兜底逻辑抢先改状态/清 disableInput，
+    -- 调用方的消息框就起不来（用户实测「战斗失败后无响应」）。
+    local src = stripComments(readSource("framework/async_globals.lua"))
+    local iWar = src:find("rawset(_G, \"WarMain\"", 1, true)
+    TestHelper.assertNotNil(iWar, "找到 WarMain 包装器")
+    local seg = src:sub(iWar, iWar + 3000)
+
+    TestHelper.assertTrue(seg:find("getResult(warCo)", 1, true) ~= nil,
+        "必须读取协程结果")
+    TestHelper.assertTrue(seg:find("result == nil", 1, true) ~= nil,
+        "兜底必须以「没有结果」为前提（false 是合法结果）")
 end
 
 -- ============================================================
@@ -767,6 +799,7 @@ function TestNewEvent.runAll()
     TestNewEvent.testTalkDrawSkipsBattleStates()
     TestNewEvent.testWarClearsPersonExp()
     TestNewEvent.testWarMainRecoversFromCoroutineError()
+    TestNewEvent.testWarMainDistinguishesErrorFromDefeat()
     TestNewEvent.testMenuNotDrawnWhileCallbackExecutes()
     TestNewEvent.testMenuDrawGuardHasDiscriminatingPower()
     TestNewEvent.testMenuCallbackRunsInCoroutine()

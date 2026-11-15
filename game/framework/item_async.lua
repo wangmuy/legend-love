@@ -14,6 +14,17 @@ local InputAsync = require("framework.input_async")
 -- 当前显示的物品选择状态（用于draw函数）
 local currentItemSelect = nil
 
+-- 鼠标点击产生的待处理动作（REQ-MS2-9）
+--
+-- 为什么用「队列 + 唤醒键」而不是直接返回：
+--   物品选择是一个 `while true do WaitKey() ... end` 的协程，
+--   WaitKey 会在「键队列为空」时挂起。鼠标点击无法从外部让它返回，
+--   只能 ① 记录意图 ② 注入一个键把它唤醒 ③ 循环开头先消费意图。
+--
+-- 这个模式与 SceneNameAsync / PersonStatusAsync 的注入方案一致，
+-- 好处是**协程代码改动最小**，且键盘路径完全不受影响。
+local pendingItemAction = nil
+
 -- 是否正在显示物品选择（用于阻止游戏主循环处理按键）
 -- 注意：现在使用 InputManager.disableInput 替代
 
@@ -129,6 +140,40 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
     end
     
     while true do
+        -- **循环最顶部先消费鼠标意图**（REQ-MS2-9）
+        --
+        -- 必须放在「重建 currentItemSelect」之前：
+        -- 若放在它之后，悬停改了 selectedIndex 还要等下一轮才反映到
+        -- currentItemSelect（供 draw 读），实测延迟约 120ms，
+        -- 表现为「鼠标划过物品，选中框慢半拍才跟过来」。
+        --
+        -- 也不能靠注入键唤醒（会积压成「悬停一会儿自动卖出」，见
+        -- handleMouseHover 的注释）。
+        local mouseAction = pendingItemAction
+        pendingItemAction = nil
+
+        if mouseAction then
+            if mouseAction.kind == "hover" then
+                -- 只挪选中框 + 刷新信息栏（不确认、不退出）
+                selectedIndex = mouseAction.index
+            elseif mouseAction.kind == "select" then
+                -- 挪到点击的格子并直接确认（等价「选中 + 按空格」）
+                selectedIndex = mouseAction.index
+                local clicked = items[selectedIndex]
+                if clicked then
+                    currentItemSelect = nil
+                    local IM = require("framework.input_manager")
+                    IM.disableInput = false
+                    return clicked.id
+                end
+            elseif mouseAction.kind == "cancel" then
+                currentItemSelect = nil
+                local IM = require("framework.input_manager")
+                IM.disableInput = false
+                return -1
+            end
+        end
+
         -- 计算当前页显示的物品
         local pageStart = (currentPage - 1) * itemsPerPage + 1
         local pageEnd = math.min(pageStart + itemsPerPage - 1, itemCount)
@@ -163,9 +208,12 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
             }
         end
         
-        -- 异步等待按键
-        local keypress = InputAsync.WaitKeyCoroutine()
-        
+        -- 周期性等待按键（不是纯 WaitKey）
+        --
+        -- 换成 WaitKeyTimeout 的原因：悬停需要「不按键也能让协程醒一次」。
+        -- 用 50ms 超时轮询：既能让悬停及时生效，又完全不碰键队列。
+        local keypress = InputAsync.WaitKeyTimeoutBypass(0.05)
+
         -- 处理按键
         if keypress == VK_ESCAPE then
             -- ESC取消选择
@@ -244,6 +292,178 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
     end
 end
 
+--- 物品选择界面是否正在显示
+--
+-- 供 canPlayerAct 判断「玩家此刻能不能行动」。
+--
+-- **不能只看 InputManager.disableInput**：GAME_SMAP.update 每帧会把它
+-- 重算成「动画是否在播」（`if AnimationState.active then true else false`），
+-- 于是这里设的 true 下一帧就被覆盖成 false。
+-- 实测症状：显示物品清单时，鼠标点击又落到了地图寻路上。
+--
+-- @return boolean
+function ItemAsync.isActive()
+    return currentItemSelect ~= nil
+end
+
+--- 消费一条鼠标意图（协程循环内部调用）
+--
+-- 抽成纯函数的目的：
+--   ① 顺序要求（必须在 WaitKey 之后、所有判断之前）可以被单测锁死
+--   ② 延迟问题（必须在循环**顶部**之外）也可以被单测覆盖
+--
+-- @param action table pendingItemAction
+-- @param ctx table { selectedIndex=, items=, xnum=, itemsPerPage= }
+-- @return table { selectedIndex=, finished=, value= }
+function ItemAsync.applyMouseAction(action, ctx)
+    if not action then return nil end
+
+    if action.kind == "hover" then
+        return { selectedIndex = action.index }
+    end
+    if action.kind == "select" then
+        local clicked = ctx.items and ctx.items[action.index]
+        return {
+            selectedIndex = action.index,
+            finished = true,
+            value = clicked and clicked.id or -1,
+        }
+    end
+    if action.kind == "cancel" then
+        return { finished = true, value = -1 }
+    end
+    return nil
+end
+
+--- 当前选中项的索引（调试/测试用）
+--
+-- 只读访问器：currentItemSelect 是模块局部变量，外部无法观察。
+-- 悬停/键盘的优先级测试需要读它，调试时也用得上。
+--
+-- @return number|nil
+function ItemAsync.selectedIndex()
+    return currentItemSelect and currentItemSelect.selectedIndex or nil
+end
+
+--- 计算物品网格的布局（供 draw 与鼠标命中**共用**）
+--
+-- 与 draw 里的布局计算逐字一致。两处若各写一份，
+-- 迟早会漂移成「看到的格子」和「点到的格子」不一致。
+--
+-- @param select table currentItemSelect
+-- @return table { dx=, dy=, w=, h=, y3_1=, xnum=, ynum=, cellW=, cellH=, gapIn=, gapOut= }
+function ItemAsync.layout(select)
+    if not select then return nil end
+    local xnum = select.xnum
+    local ynum = select.ynum
+
+    local w = CC.ThingPicWidth * xnum + (xnum - 1) * CC.ThingGapIn + 2 * CC.ThingGapOut
+    local h = CC.ThingPicHeight * ynum + (ynum - 1) * CC.ThingGapIn + 2 * CC.ThingGapOut
+    local dx = (CC.ScreenW - w) / 2
+    local dy = (CC.ScreenH - h - 2 * (CC.ThingFontSize + 2 * CC.MenuBorderPixel + 5)) / 2
+
+    local y1_1 = dy
+    local y1_2 = y1_1 + CC.ThingFontSize + 2 * CC.MenuBorderPixel
+    local y2_1 = y1_2 + 5
+    local y2_2 = y2_1 + CC.ThingFontSize + 2 * CC.MenuBorderPixel
+    local y3_1 = y2_2 + 5
+
+    return {
+        dx = dx, dy = dy, w = w, h = h,
+        y3_1 = y3_1,
+        xnum = xnum, ynum = ynum,
+        cellW = CC.ThingPicWidth, cellH = CC.ThingPicHeight,
+        gapIn = CC.ThingGapIn, gapOut = CC.ThingGapOut,
+    }
+end
+
+--- 点 (mx,my) 落在第几个物品上（纯函数，可独立测试）
+--
+-- 抽出来的理由：命中循环的行列公式（尤其换行用的 floor）是很容易写错的
+-- 地方，写在 handleMouseClick 内部就只能在真机上手点验证。
+-- 抽成纯函数后可以直接对坐标做断言。
+--
+-- @param select table currentItemSelect
+-- @param mx, my number
+-- @return number|nil 物品的全局索引（可直接用作 selectedIndex）
+function ItemAsync.indexAt(select, mx, my)
+    if not select then return nil end
+    local L = ItemAsync.layout(select)
+    if not L then return nil end
+
+    local pageCount = select.pageEnd - select.pageStart + 1
+    for localIndex = 0, pageCount - 1 do
+        -- 换行用 floor：第 0..xnum-1 个是第 1 行，第 xnum.. 是第 2 行。
+        -- 用 ceil 会让第 0 个算出 row=0、第 1 个算出 row=1（错位一格）。
+        local col = localIndex % L.xnum
+        local row = math.floor(localIndex / L.xnum)
+
+        local x1 = L.dx + L.gapOut + col * (L.cellW + L.gapIn)
+        local y1 = L.y3_1 + L.gapOut + row * (L.cellH + L.gapIn)
+        local x2, y2 = x1 + L.cellW, y1 + L.cellH
+
+        if mx >= x1 and mx <= x2 and my >= y1 and my <= y2 then
+            return select.pageStart + localIndex
+        end
+    end
+    return nil
+end
+
+--- 悬停在物品网格某一格 → 移动选中框（REQ-MS2-11）
+--
+-- 与键盘方向键的效果完全相同：选中框移到该格，
+-- 上方信息栏随之显示该物品的名称/说明/数量。
+--
+-- @param mx, my number 屏幕坐标
+-- @return boolean 是否需要重绘
+function ItemAsync.handleMouseHover(mx, my)
+    local select = currentItemSelect
+    if not select then return false end
+
+    local index = ItemAsync.indexAt(select, mx, my)
+    if not index or index == select.selectedIndex then
+        return false    -- 空白区或已选中：不重绘
+    end
+
+    -- **悬停不注入键**（用户实测 bug：悬停一会儿会自动卖掉物品）
+    --
+    -- 为什么：物品格协程挂在 WaitKeyCoroutine 上，只在「键事件到来」时迭代。
+    -- 若悬停靠注入键唤醒，而注入频率高于消费频率（协程有 waitForTime 帧
+    -- 不消费键），键就会在队列里积压。等鼠标停在「已选中」的格子上
+    -- （此时不再产生 pending），下一个残留键被消费 → keypress=VK_SPACE、
+    -- pending=nil → 走确认分支 → **自动卖出**。
+    -- 实测复现：12 帧内队列从 -1 变成常驻 32。
+    --
+    -- 改为：只记录意图，由协程的 WaitKeyTimeout 周期性醒来消费。
+    pendingItemAction = { kind = "hover", index = index }
+    return true
+end
+
+--- 点击物品网格里的某一格 → 记录意图并唤醒协程（REQ-MS2-9）
+--
+-- @param mx, my number 屏幕坐标
+-- @return boolean 是否处理了
+function ItemAsync.handleMouseClick(mx, my)
+    local select = currentItemSelect
+    if not select then return false end
+
+    local index = ItemAsync.indexAt(select, mx, my)
+    if index then
+        -- 只记录意图，**不注入键**
+        --
+        -- 注入键会被协程的「等待按键」分支先消费掉：
+        --   WaitKeyTimeoutBypass 返回 32 → 走 VK_SPACE 分支
+        --   → return selectedItem.id（旧值，还没读到 pending）
+        --   → 永远轮不到循环顶部去消费 pending。
+        --
+        -- 现在协程用 50ms 超时轮询，pending 最迟 50ms 后被消费，
+        -- 用户感知不到延迟，而且完全不碰键队列。
+        pendingItemAction = { kind = "select", index = index }
+    end
+    -- 点在信息框 / 空白处：吃掉点击但不动作（避免误选）
+    return true
+end
+
 -- 绘制物品选择界面（在draw函数中调用）
 function ItemAsync.draw()
     if not currentItemSelect then
@@ -259,17 +479,14 @@ function ItemAsync.draw()
     local selectedIndex = select.selectedIndex
     local selectedItem = select.selectedItem
     
-    -- 计算布局
-    local w = CC.ThingPicWidth * xnum + (xnum - 1) * CC.ThingGapIn + 2 * CC.ThingGapOut
-    local h = CC.ThingPicHeight * ynum + (ynum - 1) * CC.ThingGapIn + 2 * CC.ThingGapOut
-    local dx = (CC.ScreenW - w) / 2
-    local dy = (CC.ScreenH - h - 2 * (CC.ThingFontSize + 2 * CC.MenuBorderPixel + 5)) / 2
-    
+    -- 布局（与 ItemAsync.handleMouseClick 共用同一份计算，避免漂移）
+    local L = ItemAsync.layout(select)
+    local w, h, dx, dy = L.w, L.h, L.dx, L.dy
+    local y3_1 = L.y3_1
     local y1_1 = dy
     local y1_2 = y1_1 + CC.ThingFontSize + 2 * CC.MenuBorderPixel
     local y2_1 = y1_2 + 5
     local y2_2 = y2_1 + CC.ThingFontSize + 2 * CC.MenuBorderPixel
-    local y3_1 = y2_2 + 5
     local y3_2 = y3_1 + h
     
     -- 绘制信息框（名称和说明）

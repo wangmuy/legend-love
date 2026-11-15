@@ -75,6 +75,29 @@ function M.sprite.getSize(archiveId, spriteId) end
 -- @param alpha number|nil 透明度 0-255
 function M.sprite.draw(archiveId, spriteId, x, y, flags, alpha) end
 
+--- 绘制染色精灵
+--
+-- 与 `sprite.draw` 的区别：用 `color` 表染色，而非位域 flag。
+--
+-- 为什么需要它（REQ-MS1-3）：
+--   现有 `draw` 的颜色能力只有「原色 / 全黑 / 全白」三档
+--   （`lib_love.lua` 的 PicLoadCache 用 flag 的 0x4 / 0x8 位）。
+--   鼠标功能的「寻路失败红闪」需要红色，现有接口无法表达。
+--
+-- 为什么用 {r,g,b} 而不是再加一个 flag 位：
+--   flag 是原版 PAL 引擎的位域约定，加位会污染该契约，且只能表达有限颜色。
+--   {r,g,b} 是通用的颜色概念，引擎无关，且同一个函数能覆盖
+--   「悬停高亮（黑）」「红闪（红）」「物品金色高亮」等全部用例。
+--
+-- spriteId 可任意 —— 不只用于菱形，未来任何精灵都能染色。
+--
+-- @param archiveId number 档案编号
+-- @param spriteId number 精灵编号
+-- @param x, y number 绘制位置
+-- @param color table {r=, g=, b=} 0-1 浮点；nil 或分量缺失时按原色绘制
+-- @param alpha number|nil 透明度 0-255（默认 255）
+function M.sprite.drawTinted(archiveId, spriteId, x, y, color, alpha) end
+
 --------------------------------------------------------------------
 -- map - 等距地图系统
 --------------------------------------------------------------------
@@ -141,6 +164,35 @@ function M.input.waitForKey() end
 -- @param interval number 重复间隔（秒）
 function M.input.setKeyRepeat(delay, interval) end
 
+--- 获取鼠标位置
+--
+-- **契约：返回【逻辑坐标】，与 DrawString / DrawRect 同一坐标空间。**
+-- 引擎负责把物理/DPI 缩放坐标换算到该空间，调用方无需感知 DPI。
+--
+-- 实测依据（Windows 150% 缩放，LÖVE 11.5，conf.lua 开启
+-- highdpi + usedpiscale）：
+--   setPosition(1023, 767) → getPosition 返回 (1023, 767)   比值 1.000
+--   setPosition( 100,  80) → getPosition 返回 ( 100,  80)   比值 1.000
+-- 即 love.mouse.getPosition() 已经是逻辑坐标，love2d 实现无需换算。
+--
+-- 未验证平台：macOS Retina、Android。若实测发现返回物理像素，
+-- 在该引擎实现内部加换算（如 love.window.toDensity），**契约不变**。
+--
+-- 无鼠标的引擎（mud/web）返回 -1, -1（而非 nil，避免调用方做 nil 判断）。
+--
+-- @return number x, y
+function M.input.mousePosition() end
+
+--- 查询鼠标按键是否按下
+--
+-- 注意：这是**状态查询**（按住期间持续为 true），不是事件。
+-- 需要「一次点击只触发一次」时必须做边沿检测，或使用鼠标事件队列
+-- （见 input_manager 的 enqueueMouseEvent / getMouseEvent）。
+--
+-- @param button number 1=左键 2=右键 3=中键
+-- @return boolean
+function M.input.mouseButton(button) end
+
 --------------------------------------------------------------------
 -- audio - 音频系统
 --------------------------------------------------------------------
@@ -156,6 +208,36 @@ function M.audio.playSFX(filename) end
 
 --- 停止音乐
 function M.audio.stopMusic() end
+
+--- 设置音乐音量
+--
+-- 量程 **0-128**，与原版 SDL_mixer 的 `Mix_Volume` 一致。
+-- 引擎内部按**线性**映射到 LÖVE 的 `Source:setVolume`（增益 = value/128），
+-- 因为两者都是线性振幅，这是精确等值映射。
+--
+-- 实现要求：既立即应用到正在播放的音乐，也作为后续 newSource 的初值
+-- （推 + 拉）。不得用 `love.audio.setVolume`（那是全局音量，
+-- 无法区分音乐与音效）。
+--
+-- @param value number 0-128
+function M.audio.setMusicVolume(value) end
+
+--- 取当前音乐音量
+-- @return number 0-128
+function M.audio.getMusicVolume() end
+
+--- 设置音效音量
+--
+-- 量程 **0-128**，增益 = value/128。
+-- 音效 source 即用即弃（不保留引用），因此只能「拉」：在每次创建
+-- 音效 source 时应用。已在播放的短音效不受事后调节影响。
+--
+-- @param value number 0-128
+function M.audio.setSFXVolume(value) end
+
+--- 取当前音效音量
+-- @return number 0-128
+function M.audio.getSFXVolume() end
 
 --------------------------------------------------------------------
 -- time - 计时系统
@@ -354,5 +436,34 @@ M.app = {}
 
 --- 退出游戏
 function M.app.quit() end
+
+--------------------------------------------------------------------
+-- system - 系统/平台信息
+--
+-- 用途：让「平台差异化默认值」有一个引擎无关的来源。
+-- 例如鼠标操作开关：桌面默认开、Android 默认关（Android 可接鼠标，
+-- 但其主要输入方式是虚拟按键）。
+--
+-- 为什么需要独立模块而不是各调用点自己写 love.system.getOS()：
+--   framework/ 的约定是「只通过 EngineAPI 调引擎」，散落的具体引擎调用
+--   会让 framework 依赖 love，破坏既有的分层（见 ADR-MS-001）。
+--------------------------------------------------------------------
+M.system = {}
+
+--- 取当前运行平台
+--
+-- 返回值限定集合（调用方可以放心用字符串相等判断）：
+--   "Windows" | "Linux" | "macOS" | "Android" | "iOS" | "web" | "unknown"
+--
+-- 实现差异（必须遵守）：
+--   love2d  → love.system.getOS()
+--   mud     → "unknown"（无平台概念）
+--   web     → **硬编码 "web"**，不得透传 love.system
+--             （LÖVE 的 web 构建理论上返回 "Linux"，会让平台的
+--              鼠标默认值误判为「桌面开」，导致 web 端以为有鼠标）
+--   test    → 可注入（便于测试各平台分支）
+--
+-- @return string
+function M.system.getOS() end
 
 return M

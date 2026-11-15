@@ -29,6 +29,21 @@ local TestTextBoxLayout = require("tests.unit.test_text_box_layout")
 local TestMmapDepth = require("tests.unit.test_mmap_depth")
 local TestCloud = require("tests.unit.test_cloud")
 local TestVersionCompat = require("tests.unit.test_version_compat")
+local TestSettings = require("tests.unit.test_settings")
+local TestSettingsStore = require("tests.unit.test_settings_store")
+local TestAudioSettings = require("tests.unit.test_audio_settings")
+local TestMenuValueItem = require("tests.unit.test_menu_value_item")
+local TestStartMenuLayout = require("tests.unit.test_start_menu_layout")
+local TestEngineSystem = require("tests.unit.test_engine_system")
+local TestMouseInput = require("tests.unit.test_mouse_input")
+local TestMenuHitTest = require("tests.unit.test_menu_hit_test")
+local TestMouseMenu = require("tests.unit.test_mouse_menu")
+local TestPathfind = require("tests.unit.test_pathfind")
+local TestMouseHover = require("tests.unit.test_mouse_hover")
+local TestAutoMove = require("tests.unit.test_auto_move")
+local TestInteract = require("tests.unit.test_interact")
+local TestItemStatusMouse = require("tests.unit.test_item_status_mouse")
+local TestBattleMouse = require("tests.unit.test_battle_mouse")
 
 local TestRunner = {}
 
@@ -422,6 +437,129 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + vcStats.failed
     allPassed = allPassed and vcResult
 
+    print("\n" .. string.rep("-", 60))
+    print("运行设置系统测试...")
+    print(string.rep("-", 60))
+    TestHelper.resetCounts()
+    local stResult = TestSettings.runAll()
+    local stStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + stStats.total
+    totalStats.passed = totalStats.passed + stStats.passed
+    totalStats.failed = totalStats.failed + stStats.failed
+    allPassed = allPassed and stResult
+
+    TestHelper.resetCounts()
+    local ssResult = TestSettingsStore.runAll()
+    local ssStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + ssStats.total
+    totalStats.passed = totalStats.passed + ssStats.passed
+    totalStats.failed = totalStats.failed + ssStats.failed
+    allPassed = allPassed and ssResult
+
+    TestHelper.resetCounts()
+    local asResult = TestAudioSettings.runAll()
+    local asStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + asStats.total
+    totalStats.passed = totalStats.passed + asStats.passed
+    totalStats.failed = totalStats.failed + asStats.failed
+    allPassed = allPassed and asResult
+
+    TestHelper.resetCounts()
+    local mvResult = TestMenuValueItem.runAll()
+    local mvStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + mvStats.total
+    totalStats.passed = totalStats.passed + mvStats.passed
+    totalStats.failed = totalStats.failed + mvStats.failed
+    allPassed = allPassed and mvResult
+
+    TestHelper.resetCounts()
+    local smlResult = TestStartMenuLayout.runAll()
+    local smlStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + smlStats.total
+    totalStats.passed = totalStats.passed + smlStats.passed
+    totalStats.failed = totalStats.failed + smlStats.failed
+    allPassed = allPassed and smlResult
+
+    TestHelper.resetCounts()
+    local mesResult = TestEngineSystem.runAll()
+    local mesStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + mesStats.total
+    totalStats.passed = totalStats.passed + mesStats.passed
+    totalStats.failed = totalStats.failed + mesStats.failed
+    allPassed = allPassed and mesResult
+
+    TestHelper.resetCounts()
+    local minResult = TestMouseInput.runAll()
+    local minStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + minStats.total
+    totalStats.passed = totalStats.passed + minStats.passed
+    totalStats.failed = totalStats.failed + minStats.failed
+    allPassed = allPassed and minResult
+
+    TestHelper.resetCounts()
+    local mhtResult = TestMenuHitTest.runAll()
+    local mhtStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + mhtStats.total
+    totalStats.passed = totalStats.passed + mhtStats.passed
+    totalStats.failed = totalStats.failed + mhtStats.failed
+    allPassed = allPassed and mhtResult
+
+    TestHelper.resetCounts()
+    local mmnResult = TestMouseMenu.runAll()
+    local mmnStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + mmnStats.total
+    totalStats.passed = totalStats.passed + mmnStats.passed
+    totalStats.failed = totalStats.failed + mmnStats.failed
+    allPassed = allPassed and mmnResult
+
+    TestHelper.resetCounts()
+    local pfResult = TestPathfind.runAll()
+    local pfStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + pfStats.total
+    totalStats.passed = totalStats.passed + pfStats.passed
+    totalStats.failed = totalStats.failed + pfStats.failed
+    allPassed = allPassed and pfResult
+
+    TestHelper.resetCounts()
+    local mhResult = TestMouseHover.runAll()
+    local mhStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + mhStats.total
+    totalStats.passed = totalStats.passed + mhStats.passed
+    totalStats.failed = totalStats.failed + mhStats.failed
+    allPassed = allPassed and mhResult
+
+    TestHelper.resetCounts()
+    local amResult = TestAutoMove.runAll()
+    local amStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + amStats.total
+    totalStats.passed = totalStats.passed + amStats.passed
+    totalStats.failed = totalStats.failed + amStats.failed
+    allPassed = allPassed and amResult
+
+    TestHelper.resetCounts()
+    local itxResult = TestInteract.runAll()
+    local itxStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + itxStats.total
+    totalStats.passed = totalStats.passed + itxStats.passed
+    totalStats.failed = totalStats.failed + itxStats.failed
+    allPassed = allPassed and itxResult
+
+    TestHelper.resetCounts()
+    local ismResult = TestItemStatusMouse.runAll()
+    local ismStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + ismStats.total
+    totalStats.passed = totalStats.passed + ismStats.passed
+    totalStats.failed = totalStats.failed + ismStats.failed
+    allPassed = allPassed and ismResult
+
+    TestHelper.resetCounts()
+    local btmResult = TestBattleMouse.runAll()
+    local btmStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + btmStats.total
+    totalStats.passed = totalStats.passed + btmStats.passed
+    totalStats.failed = totalStats.failed + btmStats.failed
+    allPassed = allPassed and btmResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -494,9 +632,39 @@ function TestRunner.runModule(moduleName)
         return TestCloud.runAll()
     elseif moduleName == "version_compat" then
         return TestVersionCompat.runAll()
+    elseif moduleName == "settings" then
+        return TestSettings.runAll()
+    elseif moduleName == "settings_store" then
+        return TestSettingsStore.runAll()
+    elseif moduleName == "audio_settings" then
+        return TestAudioSettings.runAll()
+    elseif moduleName == "menu_value_item" then
+        return TestMenuValueItem.runAll()
+    elseif moduleName == "start_menu_layout" then
+        return TestStartMenuLayout.runAll()
+    elseif moduleName == "engine_system" then
+        return TestEngineSystem.runAll()
+    elseif moduleName == "mouse_input" then
+        return TestMouseInput.runAll()
+    elseif moduleName == "menu_hit_test" then
+        return TestMenuHitTest.runAll()
+    elseif moduleName == "mouse_menu" then
+        return TestMouseMenu.runAll()
+    elseif moduleName == "pathfind" then
+        return TestPathfind.runAll()
+    elseif moduleName == "mouse_hover" then
+        return TestMouseHover.runAll()
+    elseif moduleName == "auto_move" then
+        return TestAutoMove.runAll()
+    elseif moduleName == "interact" then
+        return TestInteract.runAll()
+    elseif moduleName == "item_status_mouse" then
+        return TestItemStatusMouse.runAll()
+    elseif moduleName == "battle_mouse" then
+        return TestBattleMouse.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse")
         return false
     end
 end

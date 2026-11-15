@@ -5,6 +5,12 @@
 local MenuStateMachine = {}
 MenuStateMachine.__index = MenuStateMachine
 
+-- 值调节项与显示宽度计算需要。
+-- Settings 是纯逻辑模块（无引擎依赖），TextBoxLayout 同样（引擎无关纯模块），
+-- 引入它们不会让本文件依赖具体引擎。
+local Settings = require("framework.settings")
+local TextBoxLayout = require("framework.text_box_layout")
+
 -- 菜单状态
 local MENU_STATE = {
     IDLE = "idle",           -- 空闲状态
@@ -43,6 +49,34 @@ function MenuStateMachine:_debug(msg)
     end
 end
 
+--------------------------------------------------------------------
+-- 菜单几何（绘制与鼠标命中**共用**，避免两处公式不同步）
+-- 见 ADR-MS2-002：命中测试必须与 draw 用同一套行高
+--------------------------------------------------------------------
+
+--- 一行的高度（字号 + 行距）
+-- @param menu table
+-- @return number
+local function rowHeight(menu)
+    return menu.size + CC.RowPixel
+end
+
+--- 第 i 项的绘制起始 Y
+--
+-- 关键：必须用 `(i - menu.start)`，不是 `(i - 1)`。
+-- 滚动菜单（numShow != 0 且 start > 1）时，屏幕第 1 行显示的是
+-- newMenu[start]，用错偏移会让点击命中错项。
+--
+-- @param menu table
+-- @param i number 项索引（对应 newMenu 下标）
+-- @return number y
+local function rowY(menu, i)
+    return menu.y1 + CC.MenuBorderPixel + (i - menu.start) * rowHeight(menu)
+end
+
+MenuStateMachine._rowHeight = rowHeight
+MenuStateMachine._rowY = rowY
+
 -- 初始化
 function MenuStateMachine:init()
     self.activeMenu = nil
@@ -71,7 +105,19 @@ function MenuStateMachine:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2,
             newMenu[newNumItem] = {menuItem[i][1], menuItem[i][2], menuItem[i][3], i}
         end
     end
-    
+
+    -- 值项初始化待定值（REQ-MENU-1）
+    --
+    -- pending 存**在描述符上**，所以描述符必须由调用方每次新建
+    -- （audio_menu.buildVolumeMenu 每次返回新表）。
+    -- 从 Settings.get 起步：进入界面时显示的就是当前真实值。
+    for i = 1, newNumItem do
+        local desc = newMenu[i][2]
+        if type(desc) == "table" and desc.kind == "number" and desc.pending == nil then
+            desc.pending = Settings.get(desc.key) or desc.min or 0
+        end
+    end
+
     -- 计算实际显示项数
     local num = numShow
     if numShow == 0 or numShow > newNumItem then
@@ -82,13 +128,52 @@ function MenuStateMachine:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2,
     local w, h
     local maxlength = 0
     if x2 == 0 and y2 == 0 then
+        -- 宽度分两条分支（ADR-AS-009）：
+        --
+        --   值项      → 按**显示宽度**算（汉字 1.0em / ASCII 0.5em）
+        --   既有菜单  → 保持原来的 string.len 语义，**一个像素都不改**
+        --
+        -- 为什么不一并修：string.len 是 UTF-8 字节数，中文框会被算宽约 4.5 倍。
+        -- 但 ShowMenu 影响全游戏 20+ 个菜单，全局改会改变它们的所有视觉尺寸，
+        -- 超出本 change 边界。值项必然含中文（音乐音量 64/128），所以只给它
+        -- 用正确的度量。
+        local maxwidth = 0
+        local hasValueItem = false
         for i = 1, newNumItem do
-            if string.len(newMenu[i][1]) > maxlength then
-                maxlength = string.len(newMenu[i][1])
+            local desc = newMenu[i][2]
+            local isValue = type(desc) == "table" and desc.kind == "number"
+            if isValue then hasValueItem = true end
+            if isValue then
+                -- 多行文本取最长行；format 需要 pending 才有意义
+                local text = newMenu[i][1] or ""
+                if type(desc.format) == "function" then
+                    local ok, rendered = pcall(desc.format, desc.pending)
+                    if ok and type(rendered) == "string" then text = rendered end
+                end
+                for line in (text .. "\n"):gmatch("(.-)\n") do
+                    local wLine = TextBoxLayout.textWidth(line, size)
+                    if wLine > maxwidth then maxwidth = wLine end
+                end
+            else
+                if string.len(newMenu[i][1]) > maxlength then
+                    maxlength = string.len(newMenu[i][1])
+                end
             end
         end
-        w = size * maxlength / 2 + 2 * CC.MenuBorderPixel
-        h = (size + CC.RowPixel) * num + CC.MenuBorderPixel
+        if hasValueItem then
+            local byteWidth = size * maxlength / 2
+            if maxwidth > byteWidth then
+                w = maxwidth + 2 * CC.MenuBorderPixel
+            else
+                w = byteWidth + 2 * CC.MenuBorderPixel
+            end
+        else
+            w = size * maxlength / 2 + 2 * CC.MenuBorderPixel
+        end
+        -- 值项是三行文本，高度按行数算
+        local lineCount = 1
+        if hasValueItem then lineCount = 3 end
+        h = (size + CC.RowPixel) * num * lineCount + CC.MenuBorderPixel
     else
         w = x2 - x1
         h = y2 - y1
@@ -224,6 +309,111 @@ function MenuStateMachine:update(dt)
     self:handleInput()
 end
 
+--------------------------------------------------------------------
+-- 鼠标命中测试（REQ-MS2-2）
+--
+-- 全部是**纯几何计算**，不依赖状态机实例，可脱离渲染完全单测。
+-- 行高与绘制共用 rowY / rowHeight，杜绝两处公式不同步。
+--------------------------------------------------------------------
+
+--- 判断点是否落在菜单矩形内（含边框）
+-- @param menu table
+-- @param x, y number 鼠标坐标（逻辑坐标）
+-- @return boolean
+function MenuStateMachine.hitMenu(menu, x, y)
+    if not menu then return false end
+    return x >= menu.x1 and x <= menu.x1 + menu.w
+       and y >= menu.y1 and y <= menu.y1 + menu.h
+end
+
+--- 返回点命中的菜单项下标（对应 newMenu 的下标，1-based）
+--
+-- 返回 nil 有两种情况，调用方需区分：
+--   * 点在菜单外        → 关闭菜单
+--   * 点在菜单内空白区  → 无动作（不关闭）
+--
+-- @param menu table
+-- @param x, y number
+-- @return number|nil
+function MenuStateMachine.hitItem(menu, x, y)
+    if not MenuStateMachine.hitMenu(menu, x, y) then
+        return nil
+    end
+    if menu.isHorizontal then
+        -- 横向菜单：按列均分
+        local itemWidth = menu.w / menu.num
+        for i = menu.start, menu.start + menu.num - 1 do
+            if i > menu.newNumItem then break end
+            local colX = menu.x1 + CC.MenuBorderPixel
+                + (i - menu.start) * itemWidth
+            if x >= colX and x < colX + itemWidth then
+                return i
+            end
+        end
+        return nil
+    end
+
+    -- 注意：每个项占的行数**不一样**。
+    --
+    -- 普通项占 1 行；值项（kind == "number"）是三行文本
+    -- （▲ / 值 / ▼，见 audio_menu.buildThreeLine），占 3 行。
+    -- 若一律按 1 行算，值项的第 3 行（▼）会落到下一项的位置，
+    -- 导致「点 ▼ 没反应」或「点错项」—— 这是实测踩到的缺陷。
+    --
+    -- 因此这里按累计高度遍历，不能用 rowY(menu, i) 直接算
+    -- （rowY 假设每项 1 行）。
+    local rh = rowHeight(menu)
+    local yCursor = menu.y1 + CC.MenuBorderPixel
+    for i = menu.start, menu.start + menu.num - 1 do
+        if i > menu.newNumItem then break end
+        local item = menu.newMenu[i]
+        local desc = item and item[2]
+        local rows = 1
+        if type(desc) == "table" and desc.kind == "number" then
+            rows = 3
+        end
+        local itemH = rh * rows
+        if y >= yCursor and y < yCursor + itemH then
+            return i
+        end
+        yCursor = yCursor + itemH
+    end
+    return nil
+end
+
+--- 值项的三行布局：判断点命中第几行
+--
+-- 值项把 `▲ / 值 / ▼` 拼成三行文本（见 audio_menu.buildThreeLine）。
+-- @param menu table
+-- @param itemIndex number 该值项的下标
+-- @param x, y number
+-- @return number|nil 1=▲ 2=中间值行 3=▼；nil = 不在该值项内
+function MenuStateMachine.hitValueLine(menu, itemIndex, x, y)
+    if not menu then return nil end
+    local rh = rowHeight(menu)
+
+    -- 累计到该值项的起始 Y（前面可能有普通项占 1 行、其他值项占 3 行）
+    local y0 = menu.y1 + CC.MenuBorderPixel
+    for i = menu.start, itemIndex - 1 do
+        if i > menu.newNumItem then break end
+        local item = menu.newMenu[i]
+        local desc = item and item[2]
+        local rows = 1
+        if type(desc) == "table" and desc.kind == "number" then
+            rows = 3
+        end
+        y0 = y0 + rh * rows
+    end
+
+    if y < y0 or y >= y0 + rh * 3 then
+        return nil
+    end
+    local line = math.floor((y - y0) / rh) + 1
+    if line < 1 then line = 1 end
+    if line > 3 then line = 3 end
+    return line
+end
+
 -- 处理输入
 function MenuStateMachine:handleInput()
     if not self.activeMenu then
@@ -253,7 +443,43 @@ function MenuStateMachine:handleInput()
             return
         end
     end
-    
+
+    -- 值项（REQ-MENU-1）：上下键只改「待定值」，确认键才提交
+    --
+    -- 为什么必须有待定值：
+    --   直接把每次上下键写进设置会让误触/连按立即改变音量，
+    --   而且无法整体撤销（声音已经变了）。需求方明确要求「按下确认才执行」。
+    --
+    -- 因此这里的三条规则：
+    --   ▲/▼        只改 desc.pending，不调用 Settings.set
+    --   Enter/Space 提交（唯一的副作用点）并关闭菜单
+    --   ESC         由上面的 isEsc 分支 closeMenu(0)，pending 自然丢弃
+    --
+    -- 注意：待定值存在描述符上，所以 audio_menu 每次构建必须返回新表。
+    if menu.newNumItem == 1 and menu.current == 1 then
+        local valueItem = menu.newMenu[1]
+        local desc = valueItem and valueItem[2]
+        if type(desc) == "table" and desc.kind == "number" then
+            if key == VK_UP or key == VK_DOWN then
+                local step = desc.step or 1
+                if key == VK_DOWN then step = -step end
+                local v = (desc.pending or 0) + step
+                local lo = desc.min or 0
+                local hi = desc.max or 100
+                -- 钳制，不回绕：环绕对鼠标点击反直觉，且按住会无限转圈
+                if v < lo then v = lo end
+                if v > hi then v = hi end
+                desc.pending = v
+                return
+            elseif key == VK_SPACE or key == VK_RETURN then
+                -- 唯一的提交点：写 user 层并触发 onChange → 引擎应用音量
+                Settings.set(desc.key, desc.pending)
+                self:closeMenu(valueItem[4])
+                return
+            end
+        end
+    end
+
     -- 处理方向键
     if key == VK_DOWN then
         menu.prevCurrent = menu.current
@@ -302,6 +528,24 @@ function MenuStateMachine:handleInput()
         if menu.newNumItem >= 2 then
             menu.current = 2
             self:selectMenuItem()
+        end
+    end
+
+    -- onCursorChange 钩子（REQ-MENU-2）
+    --
+    -- 纯通知：光标换行后告诉调用方「从哪到哪」，组件不因它改变任何状态。
+    -- 未注册的菜单（既有 20+ 个）零影响。
+    --
+    -- 明确约束：本钩子**不用于音量变更**。「按键即改音量」会让误触/连按
+    -- 瞬间把音量推到极端值且无法撤销 —— 音量只走值项的确认键
+    -- （见本函数上方的值项分支）。
+    --
+    -- 用 pcall 包裹：钩子抛错不得中断主循环（与 globalDrawCallback 一致）。
+    if menu.onCursorChange and menu.current ~= menu.prevCurrent then
+        local ok, err = pcall(menu.onCursorChange, menu,
+            menu.current, menu.prevCurrent)
+        if not ok then
+            self:_debug("onCursorChange 钩子抛错: " .. tostring(err))
         end
     end
 end
@@ -393,6 +637,197 @@ function MenuStateMachine:pollCallback()
     if menu.isBox == 1 then
         DrawBox(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
     end
+end
+
+--------------------------------------------------------------------
+-- 鼠标点击分发（REQ-MS2-2 / REQ-MS2-3）
+--
+-- 核心原则（ADR-MS2-001）：鼠标点击只做「翻译成已有键盘语义」，
+-- 不引入第二套选中逻辑。这样协程隔离、菜单栈恢复、值项待定值语义
+-- 全部自动继承。
+--------------------------------------------------------------------
+
+-- 点击某一行的等价动作：光标移过去 + 触发选中（等价 Keyboard 的 Enter）
+function MenuStateMachine:_clickRow(menu, itemIndex)
+    if not menu or not itemIndex then return end
+    local item = menu.newMenu[itemIndex]
+    if not item then return end
+
+    menu.current = itemIndex
+    self:selectMenuItem()
+end
+
+-- 点击值项的 ▲/▼：等价于上下键（只改 pending，不写设置）
+function MenuStateMachine:_clickValueArrow(menu, itemIndex, direction)
+    local item = menu.newMenu[itemIndex]
+    if not item then return end
+    local desc = item[2]
+    if type(desc) ~= "table" or desc.kind ~= "number" then return end
+
+    local step = desc.step or 1
+    if direction < 0 then step = -step end
+    local v = (desc.pending or 0) + step
+    local lo = desc.min or 0
+    local hi = desc.max or 100
+    if v < lo then v = lo end
+    if v > hi then v = hi end
+    desc.pending = v
+end
+
+--- 逐层关闭菜单，直到菜单栈深度为 depth
+--
+-- **不能**用 clear() 一把清空：那会丢失所有回调，
+-- 而 ShowMenuCoroutine 里的 `while not menuClosed do yield end`
+-- 会永久挂起（MenuStateMachine:clear 的注释里已记录这个教训）。
+-- 必须逐层 doCloseMenu()，让每层的回调都触发。
+--
+-- @param depth number 目标深度（栈内保留的菜单数）
+function MenuStateMachine:popToDepth(depth)
+    local guard = 0
+    while #self.menuStack > depth and self.activeMenu do
+        guard = guard + 1
+        if guard > 16 then
+            self:_debug("popToDepth: 超过 16 层，强制停止（可能回调又开了新菜单）")
+            break
+        end
+        self:closeMenu(0)
+        -- closeMenu 在动画禁用时立即 doCloseMenu，activeMenu 已恢复为父菜单
+        if self.activeMenu and self.activeMenu.state == MENU_STATE.EXECUTING then
+            -- 回调协程还在跑，等它结束再继续（避免重入）
+            break
+        end
+    end
+end
+
+--- 鼠标悬停：把光标移到所指的项上（REQ-MS2-11）
+--
+-- 设计取舍（用户问：直接选中 vs 额外画一个悬停效果）：
+--
+--   选「直接移动光标」，不新增视觉状态。理由：
+--     ① 键盘选中已经有一套完整效果（颜色 + 值项预览 + 滚动跟随），
+--        再画一层「悬停高亮」就有两套指示，玩家不知道哪个是真的
+--     ② 多级菜单天然正确：只有 activeMenu 会被绘制和命中测试，
+--        父菜单虽然还在 menuStack 里，但不会响应悬停
+--     ③ 实现复用：只改 menu.current，draw 与 onCursorChange 全部自动跟上
+--
+-- **只移动光标，不触发选中**（那会变成「鼠标一划过就执行菜单命令」）。
+-- 触发仍由左键点击负责（handleMouseClick → _clickRow → selectMenuItem）。
+--
+-- @param x, y number 屏幕坐标
+-- @return boolean 是否需要重绘（光标真的移动了）
+function MenuStateMachine:hoverAt(x, y)
+    local menu = self.activeMenu
+    if not menu then return false end
+
+    -- 回调执行期间不接受悬停（与 handleInput / handleMouseClick 一致）
+    --
+    -- 这不是形式主义：菜单回调里常写 `menu[current]` 来改写自身文本
+    -- （例如音量项、鼠标开关），若悬停在这期间改了 current，
+    -- 回调就会改错行。
+    if menu.state == MENU_STATE.EXECUTING then
+        return false
+    end
+    if menu.animationState ~= "open" and menu.animationState ~= "opening" then
+        return false
+    end
+
+    local hit = MenuStateMachine.hitItem(menu, x, y)
+    if not hit or hit == menu.current then
+        return false    -- 空白区或已在该项上：不重绘
+    end
+
+    -- 与方向键完全相同的收尾：记录旧位置 → 改 current → 必要时滚动
+    menu.prevCurrent = menu.current
+    menu.current = hit
+
+    -- 滚动跟随（与 VK_DOWN / VK_UP 的处理一致）
+    if menu.current > (menu.start + menu.num - 1) then
+        menu.start = menu.current - menu.num + 1
+    elseif menu.current < menu.start then
+        menu.start = menu.current
+    end
+
+    -- 复用同一个 onCursorChange 钩子，让注册过的菜单得到一致通知。
+    -- 该钩子只做纯通知（不用于音量，见 ADR-AS-008），所以悬停调用它安全。
+    if menu.onCursorChange and menu.current ~= menu.prevCurrent then
+        local ok, err = pcall(menu.onCursorChange, menu,
+            menu.current, menu.prevCurrent)
+        if not ok then
+            self:_debug("onCursorChange 钩子抛错（悬停）: " .. tostring(err))
+        end
+    end
+
+    return true
+end
+
+--- 鼠标左键点击的总入口
+--
+-- 处理优先级（ADR-MS2-003）：
+--   ① 点在最内层菜单的项上   → 选中该项
+--   ② 点在某层父菜单的项上   → 先关闭更内层的菜单，再选中父菜单那一项
+--   ③ 点在所有菜单之外       → 关闭最内层（等价 ESC）
+--   ④ 点在菜单内空白区       → 无动作
+--
+-- @param x, y number 鼠标坐标（逻辑坐标）
+-- @return boolean 是否处理了（false = 没有菜单，调用方可另作处理）
+function MenuStateMachine:handleMouseClick(x, y)
+    local menu = self.activeMenu
+    if not menu then return false end
+
+    -- 回调执行期间不接受点击（与 handleInput 一致）
+    if menu.state == MENU_STATE.EXECUTING then
+        return true
+    end
+    if menu.animationState ~= "open" and menu.animationState ~= "opening" then
+        return true
+    end
+
+    -- ① 最内层
+    local hit = MenuStateMachine.hitItem(menu, x, y)
+    if hit then
+        local item = menu.newMenu[hit]
+        local desc = item and item[2]
+        if type(desc) == "table" and desc.kind == "number" then
+            local line = MenuStateMachine.hitValueLine(menu, hit, x, y)
+            if line == 1 then
+                self:_clickValueArrow(menu, hit, 1)
+                return true
+            elseif line == 3 then
+                self:_clickValueArrow(menu, hit, -1)
+                return true
+            elseif line == 2 then
+                -- 点中间值行：无动作（避免误触改值）
+                return true
+            end
+        end
+        self:_clickRow(menu, hit)
+        return true
+    end
+
+    -- ② 父菜单（由内向外）
+    for depth = #self.menuStack, 1, -1 do
+        local parent = self.menuStack[depth]
+        local parentHit = MenuStateMachine.hitItem(parent, x, y)
+        if parentHit then
+            -- 先关到只剩 depth-1 层，让 parent 成为 activeMenu
+            self:popToDepth(depth - 1)
+            if self.activeMenu == parent then
+                self:_clickRow(parent, parentHit)
+            else
+                -- 回调期间换掉了菜单，放弃本次点击
+                self:_debug("handleMouseClick: 父菜单切换期间被替换，忽略点击")
+            end
+            return true
+        end
+    end
+
+    -- ③ 所有菜单之外 → 关闭最内层（等价 ESC）
+    if MenuStateMachine.hitMenu(menu, x, y) then
+        -- 在菜单矩形内但没命中任何项（空白区）→ 无动作
+        return true
+    end
+    self:closeMenu(0)
+    return true
 end
 
 -- 执行关闭
@@ -488,8 +923,31 @@ function MenuStateMachine:draw()
             DrawString(x, y, menu.newMenu[i][1], drawColor, menu.size)
         else
             -- 竖向布局：菜单项垂直排列（默认）
-            local y = menu.y1 + CC.MenuBorderPixel + (i - menu.start) * (menu.size + CC.RowPixel)
-            DrawString(menu.x1 + CC.MenuBorderPixel, y, menu.newMenu[i][1], drawColor, menu.size)
+            local y = rowY(menu, i)
+            local text = menu.newMenu[i][1]
+            local desc = menu.newMenu[i][2]
+            local isValue = type(desc) == "table" and desc.kind == "number"
+
+            -- 值项文本必须按 **pending** 重算，不能读 Settings.get：
+            -- 若读 get，待定值就无从显示（上下键改了却看不到）。
+            if isValue and type(desc.format) == "function" then
+                local ok, rendered = pcall(desc.format, desc.pending)
+                if ok and type(rendered) == "string" then text = rendered end
+            elseif isValue then
+                text = tostring(desc.pending or 0)
+            end
+
+            -- 多行文本项（值项的 ▲/值/▼ 三行）：按 \n 逐行绘制，行高 size+RowPixel
+            if type(text) == "string" and text:find("\n", 1, true) then
+                local lineY = y
+                for line in (text .. "\n"):gmatch("(.-)\n") do
+                    DrawString(menu.x1 + CC.MenuBorderPixel, lineY,
+                        line, drawColor, menu.size)
+                    lineY = lineY + menu.size + CC.RowPixel
+                end
+            else
+                DrawString(menu.x1 + CC.MenuBorderPixel, y, text, drawColor, menu.size)
+            end
         end
     end
 end

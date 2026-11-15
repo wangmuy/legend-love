@@ -75,6 +75,11 @@ EngineAPI.sprite.draw = function(archiveId, spriteId, x, y, flags, alpha)
     lib.PicLoadCache(archiveId, spriteId, x, y, flags, alpha)
 end
 
+-- 染色绘制（REQ-MS1-3）：颜色来自 {r,g,b}，不是位域 flag
+EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
+    lib.DrawPicTinted(archiveId, spriteId, x, y, color, alpha)
+end
+
 -- map 模块
 EngineAPI.map.loadMain = function(earthFile, surfaceFile, buildingFile, buildXFile, buildYFile, width, height, x, y)
     lib.LoadMMap(earthFile, surfaceFile, buildingFile, buildXFile, buildYFile, width, height, x, y)
@@ -124,6 +129,33 @@ EngineAPI.input.setKeyRepeat = function(delay, interval)
     lib.EnableKeyRepeat(delay, interval)
 end
 
+-- 鼠标（REQ-MS1-2）
+--
+-- 契约是「返回**逻辑坐标**，与 DrawString/DrawRect 同一空间」。
+-- 实测（Windows 150% 缩放 + conf.lua 的 highdpi/usedpiscale 都开）：
+--   setPosition(1023,767) → getPosition 返回 (1023,767)，比值 1.000
+-- 即 LÖVE 已按 DPI-aware 处理，此处**不需要任何换算**。
+-- 若未来在 macOS/Android 上实测发现返回物理像素，在这一行加换算即可，
+-- 契约与所有调用方都不受影响。
+EngineAPI.input.mousePosition = function()
+    if not (love and love.mouse and love.mouse.getPosition) then
+        return -1, -1
+    end
+    local ok, mx, my = pcall(love.mouse.getPosition)
+    if not ok or type(mx) ~= "number" then
+        return -1, -1
+    end
+    return mx, my
+end
+
+EngineAPI.input.mouseButton = function(button)
+    if not (love and love.mouse and love.mouse.isDown) then
+        return false
+    end
+    local ok, down = pcall(love.mouse.isDown, tonumber(button) or 1)
+    return ok and down == true
+end
+
 -- audio 模块
 EngineAPI.audio.playMusic = function(filename)
     lib.PlayMIDI(filename)
@@ -135,6 +167,24 @@ end
 
 EngineAPI.audio.stopMusic = function()
     lib.PlayMIDI("")
+end
+
+-- 音量（REQ-VOL-1 / REQ-VOL-2）：量程 0-128，增益线性 value/128。
+-- 实现在 lib_love.lua（它持有 currentMusic 与源路径解析）。
+EngineAPI.audio.setMusicVolume = function(value)
+    lib.SetMusicVolume(value)
+end
+
+EngineAPI.audio.getMusicVolume = function()
+    return lib.GetMusicVolume()
+end
+
+EngineAPI.audio.setSFXVolume = function(value)
+    lib.SetSFXVolume(value)
+end
+
+EngineAPI.audio.getSFXVolume = function()
+    return lib.GetSFXVolume()
 end
 
 -- time 模块
@@ -635,6 +685,26 @@ end
 EngineAPI.app = EngineAPI.app or {}
 EngineAPI.app.quit = function()
     love.event.quit()
+end
+
+-- system 模块（REQ-MS1-1）
+--
+-- love.system.getOS() 返回 "Windows"|"Linux"|"OS X"|"Android"|"iOS"。
+-- 注意 LÖVE 用的是 "OS X" 而不是 "macOS"，这里统一成 "macOS"，
+-- 让调用方的字符串判断与文档一致（只此一处做映射）。
+EngineAPI.system = EngineAPI.system or {}
+EngineAPI.system.getOS = function()
+    if not (love and love.system and love.system.getOS) then
+        return "unknown"
+    end
+    local ok, osName = pcall(love.system.getOS)
+    if not ok or type(osName) ~= "string" then
+        return "unknown"
+    end
+    if osName == "OS X" then
+        return "macOS"
+    end
+    return osName
 end
 
 return EngineAPI

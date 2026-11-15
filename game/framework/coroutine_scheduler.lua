@@ -6,7 +6,17 @@ local CoroutineScheduler = {}
 CoroutineScheduler.__index = CoroutineScheduler
 
 -- 导入依赖模块
-local InputManager = require("framework.input_manager")
+-- **不在模块级缓存 InputManager 表**
+--
+-- 原因：事件队列是 input_manager.lua 的模块级 upvalue。若有人在运行时
+-- 清掉 package.loaded["framework.input_manager"]（测试里会这么做），
+-- 重新 require 会得到**全新的模块表 + 全新的空队列**，而这里缓存的
+-- 还是旧表 → scheduler 看不见测试注入的键，协程永远醒不来。
+--
+-- 实测症状：单跑 battle_mouse 用例全过，混进全套件后
+-- 「注入键后协程没被唤醒」——因为 test_mouse_hover 清过 input_manager。
+--
+-- 每次取用都重新 require（package.loaded 命中时开销只是一个表查找）。
 
 -- 协程列表
 local coroutines = {}
@@ -227,7 +237,7 @@ function CoroutineScheduler:update(dt)
     local pressedKey = -1
     if #keyWaitingCoroutines > 0 then
         -- 使用内部方法绕过 disableInput 标志
-        local im = InputManager.getInstance()
+        local im = require("framework.input_manager").getInstance()
         pressedKey = im:_peekKeyInternal()
         if pressedKey ~= -1 then
             im:_getKeyInternal()

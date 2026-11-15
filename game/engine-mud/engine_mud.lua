@@ -93,6 +93,11 @@ EngineAPI.sprite.draw = function(archiveId, spriteId, x, y, flags, alpha)
     logCall("sprite.draw", archiveId, spriteId, x, y, flags, alpha)
 end
 
+-- 染色绘制（REQ-MS1-3）：MUD 引擎无渲染，记录调用即可
+EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
+    logCall("sprite.drawTinted", archiveId, spriteId, x, y, color, alpha)
+end
+
 --------------------------------------------------------------------
 -- map 模块 - load* 正常加载数据，draw* 为空操作
 --------------------------------------------------------------------
@@ -144,6 +149,18 @@ EngineAPI.input.setKeyRepeat = function(delay, interval)
     logCall("input.setKeyRepeat", delay, interval)
 end
 
+-- 鼠标（REQ-MS1-2）：MUD 引擎无鼠标，返回 -1,-1 而非 nil
+-- （调用方无需做 nil 判断，且 -1 天然落在屏幕外，可被坐标范围检查过滤）
+EngineAPI.input.mousePosition = function()
+    logCall("input.mousePosition")
+    return -1, -1
+end
+
+EngineAPI.input.mouseButton = function(button)
+    logCall("input.mouseButton", button)
+    return false
+end
+
 --------------------------------------------------------------------
 -- audio 模块 - 所有函数为空操作
 --------------------------------------------------------------------
@@ -157,6 +174,29 @@ end
 
 EngineAPI.audio.stopMusic = function()
     logCall("audio.stopMusic")
+end
+
+-- 音量（REQ-VOL-1）：MUD 引擎无音频，4 个函数为 no-op 但保留状态，
+-- 便于测试断言「框架确实调到了引擎」，也让 Settings 的读写有回读。
+local mudMusicVolume = 64
+local mudSFXVolume = 90
+
+EngineAPI.audio.setMusicVolume = function(value)
+    mudMusicVolume = tonumber(value) or mudMusicVolume
+    logCall("audio.setMusicVolume", value)
+end
+
+EngineAPI.audio.getMusicVolume = function()
+    return mudMusicVolume
+end
+
+EngineAPI.audio.setSFXVolume = function(value)
+    mudSFXVolume = tonumber(value) or mudSFXVolume
+    logCall("audio.setSFXVolume", value)
+end
+
+EngineAPI.audio.getSFXVolume = function()
+    return mudSFXVolume
 end
 
 --------------------------------------------------------------------
@@ -341,6 +381,12 @@ _G.lib = setmetatable(EngineAPI, { __index = {
     GetTime = EngineAPI.time.getTime,
     Delay = EngineAPI.time.sleep,
 } })
+
+-- system 模块（REQ-MS1-1）：MUD 引擎无平台概念
+EngineAPI.system = EngineAPI.system or {}
+EngineAPI.system.getOS = function()
+    return "unknown"
+end
 
 EngineAPI.init = function() end
 

@@ -562,7 +562,29 @@ function SetGlobalConst()
 
 	end
 
-    CC.StartMenuY=CC.ScreenH-3*(CC.StartMenuFontSize+CC.RowPixel)-20;
+    -- 开始菜单的纵向位置
+    --
+    -- 公式必须按「该位置容纳的最大项数」留足空间，否则最后一项会超出屏幕底部。
+    --
+    -- 历史缺陷：旧公式写死 3 项
+    --     CC.StartMenuY = CC.ScreenH - 3*(字号+行距) - 20
+    -- 加入「设置」后菜单变成 4 项，底部溢出（1024x768 实测）：
+    --     Y = 768 - 3*36 - 20 = 640
+    --     菜单高 = (32+4)*4 + 5 = 149
+    --     底 = 789 > 768，超出 21px
+    -- 字号 32 的开始菜单行高较大，21px 已经盖住了「离开游戏」的下半截。
+    --
+    -- 现改为按最大项数计算，并把项数提成常量：以后增删开始菜单项，
+    -- 只需同步改 CC.StartMenuItemMax，无需再推算公式。
+    --
+    -- 验算（两种分辨率都留 20px 底边距）：
+    --   1024x768  字号32  → Y=599  高=149  底=748  余量 20
+    --    320x240  字号16  → Y=135  高= 85  底=220  余量 20
+    CC.StartMenuItemMax=4;      -- 重新开始/载入进度/设置/离开游戏
+    CC.StartMenuY=CC.ScreenH
+        - CC.StartMenuItemMax*(CC.StartMenuFontSize+CC.RowPixel)
+        - CC.MenuBorderPixel - 20;
+
 	CC.NewGameY=CC.ScreenH-4*(CC.NewGameFontSize+CC.RowPixel)-10;
 
 	--子菜单的开始坐标

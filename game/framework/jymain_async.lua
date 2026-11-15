@@ -15,6 +15,13 @@ local ItemAsync = require("framework.item_async")
 local PersonStatusAsync = require("framework.person_status_async")
 local TextBoxLayout = require("framework.text_box_layout")
 
+-- 音量菜单与设置（REQ-MENU-3）
+-- Settings 是纯逻辑模块；AudioMenu 只产出菜单项结构，不碰引擎。
+local Settings = require("framework.settings")
+local AudioSettings = require("framework.audio_settings")
+local AudioMenu = require("framework.audio_menu")
+local MouseMenu = require("framework.mouse_menu")
+
 -- ============================================
 -- 主菜单系统
 -- ============================================
@@ -65,13 +72,19 @@ end
 function JyMainAsync.Menu_System()
     if lib and lib.Debug then lib.Debug("Menu_System: started") end
     
+    -- REQ-MENU-3：音量入口插在「保存进度」之后、「离开游戏」之前。
+    -- 3 层结构，无中间的「音量设置」容器层：
+    --   系统 → 音乐音量 → 值调节界面
     local menu = {
         {"读取进度", nil, 1},
         {"保存进度", nil, 1},
+        {"音乐音量", nil, 1},
+        {"音效音量", nil, 1},
+        MouseMenu.buildToggleItem(),      -- REQ-MS2-4
         {"离开游戏", nil, 1},
     }
     
-    local r = MenuAsync.ShowMenuCoroutine(menu, 3, 0, CC.MainSubMenuX, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
+    local r = MenuAsync.ShowMenuCoroutine(menu, 6, 0, CC.MainSubMenuX, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
     
     if lib and lib.Debug then lib.Debug("Menu_System: selected r=" .. tostring(r)) end
     
@@ -87,10 +100,46 @@ function JyMainAsync.Menu_System()
         if lib and lib.Debug then lib.Debug("Menu_System: Menu_SaveRecord returned") end
         return 0
     elseif r == 3 then
+        JyMainAsync.Menu_AudioVolume(AudioSettings.MUSIC_KEY, "音乐音量")
+        return 0
+    elseif r == 4 then
+        JyMainAsync.Menu_AudioVolume(AudioSettings.SFX_KEY, "音效音量")
+        return 0
+    elseif r == 5 then
+        -- 鼠标开关已在回调里切换，重新打开系统菜单继续操作
+        JyMainAsync.Menu_System()
+        return 0
+    elseif r == 6 then
         JyMainAsync.Menu_Exit()
         return 1
     end
     return 0
+end
+
+-- 音量值调节界面（第 3 层）
+--
+-- 上下键只改待定值，确认键才提交，取消键放弃（REQ-MENU-1）。
+-- 这段逻辑在 menu_state_machine 的值项分支里，本函数只负责构建与持久化。
+--
+-- 提交后立即写盘：音量是玩家最常调的设置，若只在退出游戏时保存，
+-- 崩溃/强杀会丢掉刚调的值。
+function JyMainAsync.Menu_AudioVolume(key, label)
+    if lib and lib.Debug then lib.Debug("Menu_AudioVolume: " .. tostring(key)) end
+
+    local before = Settings.get(key)
+    local items = AudioMenu.buildValueMenu(key, label)
+
+    MenuAsync.ShowMenuCoroutine(items, 1, 0,
+        CC.MainSubMenuX2, CC.MainSubMenuY, 0, 0, 1, 1,
+        CC.DefaultFont, C_ORANGE, C_WHITE)
+
+    -- 值真的变了才落盘（ESC 放弃时 before == after，不产生写盘）
+    if Settings.get(key) ~= before then
+        local ok, err = Settings.save()
+        if not ok and lib and lib.Debug then
+            lib.Debug("Menu_AudioVolume: Settings.save 失败: " .. tostring(err))
+        end
+    end
 end
 
 -- 离开菜单

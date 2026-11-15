@@ -25,7 +25,7 @@
 
 ## EngineAPI 架构
 
-EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 12 个模块（render/sprite/map/input/audio/time/file/script/font/dialog/color/debug/coroutine）。所有引擎操作通过 `EngineAPI.*` 或 `lib.*` 调用，`game/script/` 中的脚本不直接依赖任何引擎。
+EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 15 个模块（render/sprite/map/input/audio/time/file/script/font/dialog/color/debug/coroutine/app/system）。所有引擎操作通过 `EngineAPI.*` 或 `lib.*` 调用，`game/script/` 中的脚本不直接依赖任何引擎。
 
 ```
 game/script/ (游戏逻辑)
@@ -59,7 +59,7 @@ game/
 
 ### 换引擎方式
 
-1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 51 个函数
+1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 59 个函数
 2. 实现对应的 `main.lua` 入口（Love2D 用 `love.*` 回调，MUD 用 `main()`）
 3. `framework/` 和 `script/` 完全不变
 

@@ -14,6 +14,14 @@ local InputAsync = require("framework.input_async")
 local EventExecutor = require("framework.event_executor")
 local PerfLog = require("framework.perf_log")
 
+-- 音量设置（REQ-MENU-3）
+-- Settings 纯逻辑；AudioSettings 负责声明与引擎接线；AudioMenu 只产出菜单项。
+local Settings = require("framework.settings")
+local SettingsStore = require("framework.settings_store")
+local AudioSettings = require("framework.audio_settings")
+local AudioMenu = require("framework.audio_menu")
+local MouseMenu = require("framework.mouse_menu")
+
 -- 游戏初始化标志
 local isInitialized = false
 local initCoroutine = nil
@@ -70,6 +78,61 @@ function JYMainAdapter.initCoroutine()
     -- （分辨率、常量等）。映射表同时覆盖 CONFIG.* 与 CC.*，故无需重跑 SetGlobalConst。
     -- 未激活时为 no-op，保持默认值不变。
     do
+        -- 设置系统的初始化顺序在这里很关键：
+        --
+        --   ① Settings.load()  读 user 层（settings.ini）
+        --   ② ModData.LoadIni() 注入 mod 层（kysmod.ini 的音量）
+        --   ③ AudioSettings.init() 注册引擎监听 + 推初值
+        --
+        -- 若 ② 在 ① 之前，mod 层会先写入、user 层再写入 —— 看起来没问题，
+        -- 但 Settings.load 只是 setLayer，不改变优先级判定，
+        -- 真正的风险是「先 init 后 load」：init 时的 pushAll 会把默认值
+        -- 推给引擎，而 load 的变更通知会纠正它。顺序按 ①→②→③ 最直观。
+        local okSet = pcall(function()
+            -- REQ-MS1-4：注入平台名（必须在使用 platformDefaults 的 define 之前）。
+            --
+            -- 平台名只是一个字符串 —— settings.lua 不 require 引擎，
+            -- 由宿主把 EngineAPI.system.getOS() 的结果传进去（ADR-MS-005）。
+            -- 取不到时退化为 "unknown"，platformDefaults 不命中 → 落到 default。
+            local pName = "unknown"
+            local okSys = pcall(function()
+                if EngineAPI and EngineAPI.system
+                    and type(EngineAPI.system.getOS) == "function" then
+                    pName = EngineAPI.system.getOS() or "unknown"
+                end
+            end)
+            if okSys then
+                Settings.setPlatform(pName)
+                lib.Debug("Settings.setPlatform: " .. tostring(Settings.getPlatform()))
+            end
+
+            Settings.define("audio.music", {
+                default = AudioSettings.MUSIC_DEFAULT,
+                type    = "int",
+                min     = AudioSettings.MIN,
+                max     = AudioSettings.MAX,
+                label   = "音乐音量",
+            })
+            Settings.define("audio.sfx", {
+                default = AudioSettings.SFX_DEFAULT,
+                type    = "int",
+                min     = AudioSettings.MIN,
+                max     = AudioSettings.MAX,
+                label   = "音效音量",
+            })
+            -- 鼠标开关（REQ-MS2-4）：平台默认桌面开、Android 关
+            MouseMenu.define()
+
+            -- 鼠标消费入口（REQ-MS2-1 / REQ-MS2-2）
+            JYMainAdapter.installMouseHandling()
+
+            Settings.setStore(SettingsStore, SettingsStore.FILENAME)
+            Settings.load()
+        end)
+        if not okSet then
+            lib.Debug("Settings 初始化失败（不影响启动）")
+        end
+
         local ok, ModData = pcall(require, "framework.mod_data")
         if ok and ModData and ModData.LoadIni then
             local parsed = ModData.LoadIni()
@@ -85,6 +148,12 @@ function JYMainAdapter.initCoroutine()
             if loaded then
                 lib.Debug("ModData.LoadEffectTable: " .. tostring(n) .. " entries")
             end
+        end
+
+        -- 引擎接线（注册 onChange + 推初值）
+        local okAudio = pcall(AudioSettings.init)
+        if not okAudio then
+            lib.Debug("AudioSettings.init 失败（音量不可调，但不影响启动）")
         end
     end
     
@@ -130,6 +199,32 @@ function JYMainAdapter.initCoroutine()
     lib.Debug("JYMainAdapter.initCoroutine completed")
 end
 
+--- 按菜单真实宽度求水平居中位置（REQ-MS2-13）
+--
+-- 为什么必须逐个菜单算：菜单宽度由最长项文本决定（isBox=0 时）。
+-- 「离开游戏」是 128px，而「音乐音量」/「鼠标操作    关」是 224px ——
+-- 若所有子菜单都沿用开始菜单的 menux，宽菜单会向右溢出，
+-- 视觉上明显偏左（用户实测报告）。
+--
+-- @param items table 菜单项数组
+-- @param size number 字号
+-- @return number menux
+function JYMainAdapter.centeredMenuX(items, size)
+    local TextBoxLayout = require("framework.text_box_layout")
+    local maxW = 0
+    for _, it in ipairs(items or {}) do
+        local text = type(it) == "table" and it[1] or it
+        if type(text) == "string" then
+            local w = TextBoxLayout.textWidth(text, size)
+            if w > maxW then maxW = w end
+        end
+    end
+    local menuW = maxW + 2 * CC.MenuBorderPixel
+    local x = math.floor((CC.ScreenW - menuW) / 2)
+    if x < 0 then x = 0 end
+    return x
+end
+
 -- 显示开始菜单（协程版本）
 function JYMainAdapter.showStartMenuCoroutine()
     local scheduler = CoroutineScheduler.getInstance()
@@ -144,19 +239,582 @@ function JYMainAdapter.showStartMenuCoroutine()
     local menu = {
         {"重新开始", nil, 1},
         {"载入进度", nil, 1},
+        {"设置",     nil, 1},
         {"离开游戏", nil, 1}
     }
-    local menux = (CC.ScreenW - 4 * CC.StartMenuFontSize - 2 * CC.MenuBorderPixel) / 2
+    -- 水平居中：用真实宽度（见 centeredMenuX 注释）
+    local menux = JYMainAdapter.centeredMenuX(menu, CC.StartMenuFontSize)
     
-    local menuReturn = MenuAsync.ShowMenuCoroutine(menu, 3, 0, menux, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
+    local menuReturn = MenuAsync.ShowMenuCoroutine(menu, 4, 0, menux, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
     
     if menuReturn == 1 then
         JYMainAdapter.startNewGame(menux)
     elseif menuReturn == 2 then
         JYMainAdapter.loadGame()
     elseif menuReturn == 3 then
+        JYMainAdapter.showSettingsCoroutine(menux)
+    elseif menuReturn == 4 then
         JY.Status = getStateId("GAME_END")
         EngineAPI.app.quit()
+    end
+end
+
+--------------------------------------------------------------------
+-- 鼠标处理（REQ-MS2-1 ~ REQ-MS2-3）
+--
+-- 分工：
+--   右键 → 呼出菜单（只在 MMAP/SMAP，且继承既有的输入屏蔽条件）
+--   左键 → 交给 menu_state_machine 做命中测试与点击分发
+--
+-- 两个入口都先查 MouseMenu.isEnabled()：开关关闭时全程 no-op。
+--------------------------------------------------------------------
+
+local mouseHandlingInstalled = false
+
+-- 上一帧的鼠标位置（供 pollHover 判断「鼠标是否真的移动过」）
+local lastHoverX, lastHoverY = -1, -1
+
+--- 对话显示中：把鼠标点击转成「推进」按键（REQ-MS2-6）
+--
+-- 判定条件（任一为真即认为在等玩家推进对话）：
+--   ① TalkAsync.getCurrentTalk() ~= nil       打字机对话
+--   ② AsyncDialog:getCurrentDialog() ~= nil   消息框/是否框/输入框
+--
+-- 注入 VK_SPACE（不是 VK_RETURN）：两条等待路径都接受空格；
+-- 而 async_dialog 的 input 类型只认 VK_RETURN 提交、空格会进字符缓冲，
+-- 所以那种情况不注入（避免把空格打进输入框）。
+--
+-- @return boolean 是否注入了按键
+--- 注入一个「任意键」到模态 UI（左键用）
+--
+-- 场景名提示的语义是「按任意键关闭」，所以左键应该和键盘一样能关掉它。
+-- 用 VK_SPACE：在 item/status/scene_name 这三个界面里，
+-- SPACE 都不会触发破坏性操作（item 的 SPACE 是「确认选中物品」，
+-- 但那条路径在左键点击时本来也不该被触发 —— 所以 item 排除）。
+--
+-- @return boolean 是否注入了
+function JYMainAdapter.injectAnyKeyForModal()
+    local okIM, InputManager = pcall(require, "framework.input_manager")
+    if not okIM or not InputManager or not InputManager.enqueueKeyEvent then
+        return false
+    end
+    local vkSpace = rawget(_G, "VK_SPACE") or 32
+
+    -- 场景名提示：任意点击/按键都消失
+    local okSN, SceneNameAsync = pcall(require, "framework.scene_name_async")
+    if okSN and SceneNameAsync and SceneNameAsync.isActive then
+        local okA, active = pcall(SceneNameAsync.isActive)
+        if okA and active then
+            InputManager.enqueueKeyEvent(vkSpace)
+            return true
+        end
+    end
+
+    -- 人物状态页：左键吃掉（翻页由 injectEscapeForModal 之外的专门函数处理，
+    -- 见 handleStatusClickForMouse）
+    local okPS, PersonStatusAsync = pcall(require, "framework.person_status_async")
+    if okPS and PersonStatusAsync and PersonStatusAsync.isActive then
+        local okA, active = pcall(PersonStatusAsync.isActive)
+        if okA and active then
+            return true
+        end
+    end
+
+    return false
+end
+
+--- 每帧轮询鼠标悬停（REQ-MS2-11）
+--
+-- 为什么用「每帧轮询」而不是 love.mousemoved 回调：
+--   悬停效果必须与鼠标真实位置一致。回调只在移动时触发，
+--   若悬停期间菜单滚动/换页，光标位置变了但鼠标没动 —— 回调不会来，
+--   悬停指示就停在错误的位置。轮询天然免疫这种情况。
+--
+-- 成本：每帧一次 hitItem（纯算术，几十次比较）。菜单/物品格数量都在
+-- 个位数到几十，可忽略。
+--
+-- 只在「有菜单」或「物品清单开着」时工作 —— 地图上的悬停菱形
+-- 走的是 MouseHover（另一条路径，见 event_bridge 的 hoverOverlay）。
+function JYMainAdapter.pollHover()
+    if not MouseMenu.isEnabled() then
+        return
+    end
+
+    local EngineAPI = rawget(_G, "EngineAPI")
+    if not (EngineAPI and EngineAPI.input and EngineAPI.input.mousePosition) then
+        return
+    end
+    local okPos, mx, my = pcall(EngineAPI.input.mousePosition)
+    if not okPos or type(mx) ~= "number" or mx < 0 then
+        return
+    end
+
+    -- **只在鼠标真的移动过时才处理悬停**（用户实测 bug）
+    --
+    -- 不加这个判断的后果：鼠标停在某个物品上不动，然后按方向键换一项，
+    -- 下一帧 pollHover 又把选中项拉回鼠标所指的位置 —— 键盘完全失效。
+    --
+    -- 语义应该是：「鼠标移到这里了」才夺走焦点；鼠标没动时，
+    -- 焦点归键盘。这也是绝大多数桌面 UI 的惯例。
+    --
+    -- 判定用整数像素比较：亚像素抖动（触摸板/高 DPI）不至于反复夺权。
+    if mx == lastHoverX and my == lastHoverY then
+        return
+    end
+    lastHoverX, lastHoverY = mx, my
+
+    -- ① 对话框（是/否、选择框）：悬停挪选项光标
+    --
+    -- 必须排在物品/菜单之前：对话框是最后画、盖在最上面的，
+    -- 悬停判定也该按这个层级来。
+    local okAD, AsyncDialog = pcall(require, "framework.async_dialog")
+    if okAD and AsyncDialog then
+        local okInst, inst = pcall(AsyncDialog.getInstance)
+        if okInst and inst and inst.getCurrentDialog then
+            local okCur, dlg = pcall(inst.getCurrentDialog, inst)
+            if okCur and dlg ~= nil then
+                if inst.handleMouseHover then
+                    pcall(inst.handleMouseHover, inst, mx, my)
+                end
+                return      -- 对话框开着时，下层 UI 不响应悬停
+            end
+        end
+    end
+
+    -- ② 物品清单：悬停挪选中框（与键盘方向键效果一致）
+    local okItem, ItemAsync = pcall(require, "framework.item_async")
+    if okItem and ItemAsync and ItemAsync.isActive and ItemAsync.handleMouseHover then
+        local okA, active = pcall(ItemAsync.isActive)
+        if okA and active then
+            pcall(ItemAsync.handleMouseHover, mx, my)
+            return
+        end
+    end
+
+    -- ②-b 战斗中：悬停挪光标（REQ-MS4-1）
+    local okBM, BattleMouse = pcall(require, "framework.battle_mouse")
+    if okBM and BattleMouse and BattleMouse.hoverTo then
+        local okB, moved = pcall(BattleMouse.hoverTo, mx, my)
+        if okB and moved then
+            return      -- 战斗中不再往下走（地图悬停菱形不适用）
+        end
+        -- 即使没移动，也不该落到地图悬停逻辑（战斗中没有地图菱形）
+        local okCan = BattleMouse.canOperate and BattleMouse.canOperate()
+        if okCan then return end
+    end
+
+    -- ③ 菜单：悬停挪光标（含多级菜单 —— 只有 activeMenu 会响应）
+    local okMSM, MSM = pcall(require, "framework.menu_state_machine")
+    if okMSM and MSM then
+        local msm = MSM.getInstance()
+        -- 同样跳过 EXECUTING：那种菜单屏幕上看不见逻辑上前台是回调
+        if msm and msm.activeMenu
+            and msm.activeMenu.state ~= "executing" and msm.hoverAt then
+            pcall(msm.hoverAt, msm, mx, my)
+        end
+    end
+end
+
+--- 把左键点击交给人物状态页（REQ-MS2-10）
+-- @param mx, my number 屏幕坐标
+-- @return boolean 是否处理了
+function JYMainAdapter.clickStatusForMouse(mx, my)
+    local okPS, PersonStatusAsync = pcall(require, "framework.person_status_async")
+    if not okPS or not PersonStatusAsync then return false end
+    if not PersonStatusAsync.isActive or not PersonStatusAsync.handleMouseClick then
+        return false
+    end
+
+    local okA, active = pcall(PersonStatusAsync.isActive)
+    if not okA or not active then return false end
+
+    pcall(PersonStatusAsync.handleMouseClick, mx, my)
+    return true
+end
+
+--- 把左键点击交给物品清单网格（REQ-MS2-9）
+--
+-- 物品清单是 `while true do WaitKey() end` 的协程，无法从外部让它返回。
+-- 采用「记录意图 + 注入唤醒键」的模式（与 SceneNameAsync 一致）：
+--   handleMouseClick 负责命中测试并记下 pendingItemAction
+--   协程在循环开头先消费 pending，再做键盘处理
+--
+-- @param mx, my number 屏幕坐标
+-- @return boolean 是否处理了
+function JYMainAdapter.clickItemForMouse(mx, my)
+    local okItem, ItemAsync = pcall(require, "framework.item_async")
+    if not okItem or not ItemAsync then return false end
+    if not ItemAsync.isActive or not ItemAsync.handleMouseClick then return false end
+
+    local okA, active = pcall(ItemAsync.isActive)
+    if not okA or not active then return false end
+
+    pcall(ItemAsync.handleMouseClick, mx, my)
+    return true
+end
+
+--- 注入一个 ESC 等价键（关闭当前模态 UI）
+--
+-- 用于「右键 = ESC」的统一语义（用户需求 REQ-MS2-8）。
+--
+-- 这些界面都是「协程挂起等键」，注入 VK_ESCAPE 就能让它们走自己的
+-- 取消分支 —— 不需要给每个模块写鼠标专用代码。
+--
+-- 注意顺序：**先判模态 UI，再判菜单**。
+-- 因为菜单是「最后画的」，但模态 UI 可能盖在它上面。
+--
+-- @return boolean 是否注入了
+function JYMainAdapter.injectEscapeForModal()
+    local okIM, InputManager = pcall(require, "framework.input_manager")
+    if not okIM or not InputManager or not InputManager.enqueueKeyEvent then
+        return false
+    end
+    local vkEsc = rawget(_G, "VK_ESCAPE") or 27
+
+    -- 物品选择界面
+    local okItem, ItemAsync = pcall(require, "framework.item_async")
+    if okItem and ItemAsync and ItemAsync.isActive then
+        local okA, active = pcall(ItemAsync.isActive)
+        if okA and active then
+            InputManager.enqueueKeyEvent(vkEsc)
+            return true
+        end
+    end
+
+    -- 人物状态页
+    local okPS, PersonStatusAsync = pcall(require, "framework.person_status_async")
+    if okPS and PersonStatusAsync and PersonStatusAsync.isActive then
+        local okA, active = pcall(PersonStatusAsync.isActive)
+        if okA and active then
+            InputManager.enqueueKeyEvent(vkEsc)
+            return true
+        end
+    end
+
+    -- 场景名提示（任意点击/按键都消失）
+    local okSN, SceneNameAsync = pcall(require, "framework.scene_name_async")
+    if okSN and SceneNameAsync and SceneNameAsync.isActive then
+        local okA, active = pcall(SceneNameAsync.isActive)
+        if okA and active then
+            InputManager.enqueueKeyEvent(vkEsc)
+            return true
+        end
+    end
+
+    return false
+end
+
+--- 把鼠标点击交给 AsyncDialog（是/否框、选择框、消息框）
+--
+-- 与 injectAdvanceKeyForMouse 的分工：
+--   本函数处理「有明确选项位置」的对话框（需要知道点在哪一行）
+--   injectAdvanceKeyForMouse 处理「点哪都一样」的打字机对话
+--
+-- @param mx, my number 屏幕坐标
+-- @return boolean 是否处理了
+function JYMainAdapter.clickDialogForMouse(mx, my)
+    local okAD, AsyncDialog = pcall(require, "framework.async_dialog")
+    if not okAD or not AsyncDialog then return false end
+
+    local okInst, inst = pcall(AsyncDialog.getInstance)
+    if not okInst or not inst then return false end
+    if not inst.getCurrentDialog then return false end
+
+    local okCur, dlg = pcall(inst.getCurrentDialog, inst)
+    if not okCur or dlg == nil then return false end
+
+    if inst.handleMouseClick then
+        local okClick = pcall(inst.handleMouseClick, inst, mx, my)
+        if okClick then return true end
+    end
+    return false
+end
+
+function JYMainAdapter.injectAdvanceKeyForMouse(_, useEsc)
+    -- ① 打字机对话
+    local okTalk, TalkAsync = pcall(require, "framework.talk_async")
+    if okTalk and TalkAsync and TalkAsync.getCurrentTalk then
+        local okGet, cur = pcall(TalkAsync.getCurrentTalk)
+        if okGet and cur ~= nil then
+            local okIM, InputManager = pcall(require, "framework.input_manager")
+            if okIM and InputManager and InputManager.enqueueKeyEvent then
+                -- 左键 → SPACE（继续/翻页）；右键 → ESC（跳过/结束）
+                local key
+                if useEsc then
+                    key = rawget(_G, "VK_ESCAPE") or 27
+                else
+                    key = rawget(_G, "VK_SPACE") or 32
+                end
+                InputManager.enqueueKeyEvent(key)
+                return true
+            end
+        end
+    end
+
+    -- ② AsyncDialog 由 clickDialogForMouse 处理（它需要坐标），
+    --    这里只管「点哪都一样」的打字机对话。
+    return false
+end
+
+--- 消费一个鼠标事件（由 EventBridge 的 update 每帧调用，或在 update 内轮询）
+-- @return boolean 是否消费了事件
+function JYMainAdapter.pollMouse()
+    if not MouseMenu.isEnabled() then
+        return false
+    end
+
+    local InputManager = require("framework.input_manager")
+    local ev = InputManager.getMouseEvent()
+    if not ev then return false end
+
+    -- 只处理「按下」，忽略 released（当前不需要）
+    if ev.type ~= "pressed" then
+        return true
+    end
+
+    local MenuAsync = require("framework.menu_async")
+
+    -- ---- 右键：ESC 的等价物（REQ-MS2-8）----
+    --
+    -- 需求：右键「不管什么情况都等同于 ESC」——
+    --   菜单打开时 → 逐层返回（先关子菜单，再关父菜单）
+    --   模态 UI 显示时 → 关闭它（物品清单 / 状态页 / 场景名 / 对话框）
+    --   什么都没有时 → 呼出主菜单（等价 ESC 在地图上的效果）
+    --
+    -- 为什么不复用左键的推进逻辑：
+    --   左键在对话里是「确认/继续」（SPACE），右键是「取消/返回」（ESC）。
+    --   两者在最常见场景（是/否框）里结果相反：SPACE=选是，ESC=选否。
+    if ev.button == 2 then
+        -- ① 有菜单 → 逐层返回（等价菜单里的 ESC）
+        local MSM = require("framework.menu_state_machine")
+        local msm = MSM.getInstance()
+        if msm.activeMenu then
+            -- **必须尊重 menu.isEsc**，与 handleInput 的 ESC 分支逐字一致：
+            --     if key == VK_ESCAPE and menu.isEsc == 1 then closeMenu(0) end
+            -- 若这里无条件关闭，右键就能关掉键盘 ESC 关不掉的菜单
+            -- （强制选择类菜单 isEsc==0），两条输入路径行为不一致。
+            if msm.activeMenu.isEsc == 1 then
+                msm:closeMenu(0)
+            end
+            return true     -- 无论能否关闭都吃掉这次点击
+        end
+
+        -- ①-b 战斗中：右键取消当前选择（等价 ESC）
+        local okBM, BattleMouse = pcall(require, "framework.battle_mouse")
+        if okBM and BattleMouse and BattleMouse.cancel then
+            local okB, handled = pcall(BattleMouse.cancel)
+            if okB and handled then return true end
+        end
+
+        -- ② 有模态 UI（物品/状态/场景名）→ 注入 ESC 让它自己退出
+        if JYMainAdapter.injectEscapeForModal() then
+            return true
+        end
+
+        -- ③ 有对话框（是否框/选择框/消息框）→ ESC 语义
+        local okAD, AsyncDialog = pcall(require, "framework.async_dialog")
+        if okAD and AsyncDialog then
+            local okInst, inst = pcall(AsyncDialog.getInstance)
+            if okInst and inst and inst.getCurrentDialog then
+                local okG, d = pcall(inst.getCurrentDialog, inst)
+                if okG and d ~= nil then
+                    -- 走 AsyncDialog 自己的取消语义（与 ESC 完全一致）
+                    if inst.handleEscape then
+                        inst:handleEscape()
+                    else
+                        inst:closeDialog(nil)
+                    end
+                    return true
+                end
+            end
+        end
+
+        -- ④ 打字机对话 → ESC 跳过/结束（talk 的等键也认 ESC）
+        if JYMainAdapter.injectAdvanceKeyForMouse(nil, true) then
+            return true
+        end
+
+        -- ⑤ 什么都没开 → 呼出主菜单（与键盘 ESC 在 MMAP/SMAP 上的效果一致）
+        local okAM, AutoMove = pcall(require, "framework.auto_move")
+        if not okAM or not AutoMove or not AutoMove.canPlayerAct() then
+            return true
+        end
+
+        JYMainAdapter.requestMenu()
+        return true
+    end
+
+    -- ---- 左键 ----
+    if ev.button == 1 then
+        -- ① 有菜单 → 菜单点击
+        --
+        -- **但要跳过「回调执行中」的菜单**（用户实测 bug）：
+        -- 韦大宝选「地下市场」后，回调 Menu_Shop 在独立协程里跑 TalkEx，
+        -- 此时 activeMenu 仍在（state=EXECUTING）。若把点击交给菜单，
+        -- handleMouseClick 会直接吞掉它（EXECUTING 期间不接受点击），
+        -- 于是对话无法用鼠标推进 —— 而键盘能推进（走 scheduler，不经菜单）。
+        --
+        -- 正确顺序：EXECUTING 的菜单只管轮询回调，点击继续往下走给对话。
+        local MSM = require("framework.menu_state_machine")
+        local msm = MSM.getInstance()
+        if msm.activeMenu and msm.activeMenu.state ~= "executing" then
+            msm:handleMouseClick(ev.x, ev.y)
+            return true
+        end
+
+        -- ①-a 物品清单：点击格子 = 选中并使用该物品（REQ-MS2-9）
+        --
+        -- 必须排在「注入任意键」之前：物品清单里点击是「选中第 N 个」，
+        -- 不是「随便按个键确认当前项」。
+        if JYMainAdapter.clickItemForMouse(ev.x, ev.y) then
+            return true
+        end
+
+        -- ①-b 人物状态页：点击框内 = 翻下一页（循环）
+        if JYMainAdapter.clickStatusForMouse(ev.x, ev.y) then
+            return true
+        end
+
+        -- ①-c 场景名等模态 UI：左键等价「任意键」
+        if JYMainAdapter.injectAnyKeyForModal() then
+            return true
+        end
+
+        -- ② 对话显示中
+        --
+        -- 分两类处理，不能一律注入 SPACE：
+        --   AsyncDialog（消息框/是否框/选择框）→ 走 handleMouseClick
+        --       原因：SPACE 语义是「确认当前选项」，而默认选中的是「是」。
+        --       一律注入 SPACE 会导致点「否」也变成「是」（用户实测 bug）。
+        --   TalkAsync（打字机对话）→ 注入 SPACE（语义就是「翻页/继续」）
+        if JYMainAdapter.clickDialogForMouse(ev.x, ev.y) then
+            return true
+        end
+        if JYMainAdapter.injectAdvanceKeyForMouse() then
+            return true
+        end
+
+        -- ②-b 战斗中：驱动光标（REQ-MS4-1）
+        --
+        -- 战斗有自己的光标选择系统（WAR.MoveCursorX/Y + DrawMode），
+        -- 与地图寻路完全是两套逻辑。canPlayerAct 会在战斗中返回 false
+        -- （它要求 MMAP/SMAP），所以战斗必须单独接一条路径。
+        local okBM, BattleMouse = pcall(require, "framework.battle_mouse")
+        if okBM and BattleMouse and BattleMouse.clickAt then
+            local okB, handled = pcall(BattleMouse.clickAt, ev.x, ev.y)
+            if okB and handled then return true end
+        end
+
+        -- ③ 无菜单无对话 → 点击地图寻路（REQ-MS3-3）
+        local GameStates = require("framework.game_states")
+        if GameStates and GameStates._handleMapClick then
+            local ok, handled = pcall(GameStates._handleMapClick, ev.x, ev.y)
+            if ok and handled then return true end
+        end
+        return false
+    end
+
+    return true
+end
+
+--- 请求呼出主菜单（等价 ESC）
+--
+-- 不直接调 MMenuCoroutine，而是走与键盘 ESC 相同的入口，
+-- 保证两条路径的行为完全一致（含菜单栈、disableInput 等）。
+function JYMainAdapter.requestMenu()
+    local GameStates = require("framework.game_states")
+    if GameStates and GameStates.requestMainMenu then
+        GameStates.requestMainMenu()
+    end
+end
+
+--- 安装鼠标处理（幂等）
+--
+-- 把 pollMouse 接到 EventBridge 的 update 钩子上。
+-- 之所以不用 love.mousepressed 直接处理：菜单命中需要每帧一致的
+-- 输入上下文（disableInput、hasActiveMenu 等），走队列 + 每帧消费更稳。
+function JYMainAdapter.installMouseHandling()
+    if mouseHandlingInstalled then return true end
+    local ok = pcall(function()
+        local EventBridge = require("framework.event_bridge")
+        EventBridge.setMousePollHook(function()
+            -- 先消费点击（离散事件），再更新悬停（连续状态）
+            local okPoll = pcall(JYMainAdapter.pollMouse)
+            if not okPoll then
+                lib.Debug("pollMouse 抛错（不影响主循环）")
+            end
+            local okHover = pcall(JYMainAdapter.pollHover)
+            if not okHover then
+                lib.Debug("pollHover 抛错（不影响主循环）")
+            end
+        end)
+        -- 悬停高亮（REQ-MS3-1）：位置 ①，StateMachine:draw() 之后
+        EventBridge.setHoverOverlay(function()
+            local okHover, MouseHover = pcall(require, "framework.mouse_hover")
+            if okHover and MouseHover and MouseHover.draw then
+                MouseHover.draw()
+            end
+        end)
+    end)
+    mouseHandlingInstalled = ok
+    return ok
+end
+
+--- 开始菜单的「设置」子菜单（REQ-MENU-3）
+--
+-- 结构与大地的「系统」并列，不重复：
+--   设置 → 音乐音量 → 值调节界面
+--        → 音效音量 → 值调节界面
+--
+-- 选完音量后回到设置菜单（而非直接回开始菜单），方便连续调两项。
+function JYMainAdapter.showSettingsCoroutine(menux)
+    -- REQ-MS2-4：鼠标开关插在音效之后、「返回」之前
+    local menu = {
+        {"音乐音量", nil, 1},
+        {"音效音量", nil, 1},
+        MouseMenu.buildToggleItem(),
+        {"返回",     nil, 1},
+    }
+
+    -- 设置菜单比开始菜单宽（「音乐音量」224px vs 「离开游戏」128px），
+    -- 不能沿用 menux，否则视觉上偏左（用户实测）
+    local myX = JYMainAdapter.centeredMenuX(menu, CC.StartMenuFontSize)
+
+    local r = MenuAsync.ShowMenuCoroutine(menu, 4, 0, myX, CC.StartMenuY,
+        0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
+
+    if r == 1 then
+        JYMainAdapter.showVolumeCoroutine(AudioSettings.MUSIC_KEY, "音乐音量", menux)
+        -- 返回设置菜单
+        JYMainAdapter.showSettingsCoroutine(menux)
+    elseif r == 2 then
+        JYMainAdapter.showVolumeCoroutine(AudioSettings.SFX_KEY, "音效音量", menux)
+        JYMainAdapter.showSettingsCoroutine(menux)
+    elseif r == 3 then
+        -- 鼠标开关已在回调里切换，回到设置菜单继续操作
+        JYMainAdapter.showSettingsCoroutine(menux)
+    else
+        -- 选「返回」或按 ESC：回到开始菜单
+        JYMainAdapter.showStartMenuCoroutine()
+    end
+end
+
+--- 音量值调节界面（第 3 层）
+--
+-- 上下键只改待定值、确认键提交，逻辑在 menu_state_machine 的值项分支里。
+-- 本函数只负责构建菜单并（值真的变了时）落盘。
+function JYMainAdapter.showVolumeCoroutine(key, label, menux)
+    local before = Settings.get(key)
+    local items = AudioMenu.buildValueMenu(key, label)
+
+    MenuAsync.ShowMenuCoroutine(items, 1, 0, menux, CC.StartMenuY,
+        0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
+
+    if Settings.get(key) ~= before then
+        local ok, err = Settings.save()
+        if not ok and lib and lib.Debug then
+            lib.Debug("showVolumeCoroutine: Settings.save 失败: " .. tostring(err))
+        end
     end
 end
 
@@ -420,7 +1078,8 @@ function JYMainAdapter.loadGame()
         {"进度三", nil, 1}
     }
     
-    local menux2 = (CC.ScreenW - 3 * CC.StartMenuFontSize - 2 * CC.MenuBorderPixel) / 2
+    -- 同样用真实宽度居中（旧公式「假设 3 个字宽」会偏左）
+    local menux2 = JYMainAdapter.centeredMenuX(loadMenu, CC.StartMenuFontSize)
     
     local r = MenuAsync.ShowMenuCoroutine(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
     

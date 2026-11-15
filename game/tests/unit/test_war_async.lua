@@ -732,6 +732,74 @@ function TestWarAsync.testPracticeBattleReturnsFalse()
     TestHelper.assertEquals("game_over", result, "Normal battle should trigger game_over")
 end
 
+-- ============================================================
+-- 战败后自动战斗的回溯循环不得死循环（用户实测：战斗失败后无响应）
+--
+-- 原实现 `while true do ... end` 没有退出保证：
+--   目标格第 3 层 = 255（不可达）→ i > 移动步数 → 不 break
+--   四方向都找不到 i-1 (254) → x,y 不变 → 原地空转 → love.update 卡死
+-- ============================================================
+
+function TestWarAsync.testBacktrackLoopTerminatesOnUnreachable()
+    print("\n=== Test: 回溯循环在不可达目标上必须退出 ===")
+    local savedLib = rawget(_G, "lib")
+    local savedGetWarMap = rawget(_G, "GetWarMap")
+    rawset(_G, "lib", { Debug = function() end })
+    rawset(_G, "GetWarMap", function(x, y, layer)
+        if layer ~= 3 then return 0 end
+        return 255      -- 所有格都不可达（战败后我方全灭的典型情形）
+    end)
+
+    -- 复刻修复后的回溯循环（带守卫）
+    local function backtrack(steps, x0, y0)
+        local x, y = x0, y0
+        local prevI = nil
+        local iterations = 0
+        while true do
+            iterations = iterations + 1
+            if iterations > 200 then return "INFINITE", iterations end
+            local i = GetWarMap(x, y, 3)
+            if i <= steps then return "REACHED", iterations end
+            if prevI ~= nil and i >= prevI then return "NOPROGRESS", iterations end
+            prevI = i
+            if i >= 255 then return "UNREACHABLE", iterations end
+            if     GetWarMap(x - 1, y, 3) == i - 1 then x = x - 1
+            elseif GetWarMap(x + 1, y, 3) == i - 1 then x = x + 1
+            elseif GetWarMap(x, y - 1, 3) == i - 1 then y = y - 1
+            elseif GetWarMap(x, y + 1, 3) == i - 1 then y = y + 1
+            else return "NOBACKTRACK", iterations end
+        end
+    end
+
+    local verdict, iters = backtrack(2, 6, 6)
+    TestHelper.assertEquals("UNREACHABLE", verdict,
+        "不可达目标必须立即放弃（修复前这里永不返回）")
+    TestHelper.assertTrue(iters < 5, "迭代次数必须很少（实测 " .. iters .. "）")
+
+    rawset(_G, "lib", savedLib)
+    rawset(_G, "GetWarMap", savedGetWarMap)
+end
+
+function TestWarAsync.testWarAutoBacktrackHasProgressGuard()
+    print("\n=== Test: 源码里必须有回溯进度守卫 ===")
+    -- 行为测试复刻的是「修复后的写法」，无法证明源文件也改了。
+    -- 这里直接检查源文件：`while true` 回溯段必须包含进度判定。
+    local f = io.open("framework/war_async.lua", "r")
+    if not f then
+        TestHelper.assertTrue(false, "无法打开 war_async.lua")
+        return
+    end
+    local src = f:read("*a")
+    f:close()
+
+    local iPrev = src:find("local prevI = nil", 1, true)
+    TestHelper.assertNotNil(iPrev, "回溯循环必须有 prevI 进度记录")
+    local iGuard = src:find("if prevI ~= nil and i >= prevI then", 1, true)
+    TestHelper.assertNotNil(iGuard, "必须有「无进展则放弃」的守卫")
+    local i255 = src:find("if i >= 255 then", 1, true)
+    TestHelper.assertNotNil(i255, "必须直接识别 255（不可达）")
+end
+
 function TestWarAsync.runAll()
     print("\n========================================")
     print("War Async Unit Tests")
@@ -773,6 +841,9 @@ function TestWarAsync.runAll()
     TestWarAsync.testDefeatWithExpShowsGameOver()
     TestWarAsync.testDefeatWithoutExpReturnsFalse()
     
+    TestWarAsync.testBacktrackLoopTerminatesOnUnreachable()
+    TestWarAsync.testWarAutoBacktrackHasProgressGuard()
+
     return TestHelper.printSummary()
 end
 

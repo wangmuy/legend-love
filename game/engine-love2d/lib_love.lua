@@ -568,6 +568,56 @@ end
 
 local JY_LoadPic = PicLoadCache
 
+--- 绘制染色精灵（REQ-MS1-3）
+--
+-- 与 PicLoadCache 的唯一差别：颜色来自参数而非位域 flag。
+-- flag 只能表达「原色 / 全黑 / 全白」，无法做红闪等任意颜色。
+--
+-- 参数容错：color 为 nil / 非 table / 分量非数字时按原色（1,1,1）绘制，
+-- alpha 缺省 255。**宁可画成原色也不要抛错** —— 调用方是 UI 逻辑，
+-- 色彩算错不该让游戏崩。
+--
+-- @param fileid number 档案编号
+-- @param picid number 精灵编号
+-- @param x, y number 绘制位置
+-- @param color table|nil {r=, g=, b=} 0-1 浮点
+-- @param alpha number|nil 0-255
+function DrawPicTinted(fileid, picid, x, y, color, alpha)
+    local r, g, b = 1, 1, 1
+    if type(color) == "table" then
+        if type(color.r) == "number" then r = color.r end
+        if type(color.g) == "number" then g = color.g end
+        if type(color.b) == "number" then b = color.b end
+    end
+    local a = tonumber(alpha)
+    if a == nil then a = 255 end
+    if a < 0 then a = 0 end
+    if a > 255 then a = 255 end
+
+    fileid = fileid + 1
+    picid = math.floor((picid or 0) / 2) + 1
+    local picfile = picFileCache[fileid]
+    if picfile == nil or picid < 1 or picid > #(picfile.idx) then
+        return
+    end
+    local piccache = picfile:getPic(picid)
+    if piccache == nil then return end
+
+    local xnew = x - piccache.xoff
+    local ynew = y - piccache.yoff
+
+    -- 跳过屏幕外的贴图（与 PicLoadCache 一致）
+    if xnew < -1000 or xnew > CONFIG.Width + 1000
+        or ynew < -1000 or ynew > CONFIG.Height + 1000 then
+        return
+    end
+
+    local oldR, oldG, oldB, oldA = love.graphics.getColor()
+    love.graphics.setColor(r, g, b, a / 255)
+    love.graphics.draw(piccache.img, xnew, ynew)
+    love.graphics.setColor(oldR, oldG, oldB, oldA)
+end
+
 function FullScreen()
     love.graphics.toggleFullscreen()
 end
@@ -599,6 +649,74 @@ function LoadPicture(filename, x, y)
 end
 
 local currentMusic = nil
+
+-- ---------------------------------------------------------------------------
+-- 音量（REQ-VOL-1 / REQ-VOL-2）
+--
+-- 量程 0-128，增益线性 `value / 128`。这两个数字不是随意选的：
+--
+--   SDL_mixer:  Mix_Volume(ch, v)     v ∈ [0,128]   线性振幅
+--   LÖVE 11.x:  Source:setVolume(g)   g ∈ [0,1]     线性振幅
+--
+--   →  g = v / 128  是【精确等值映射】，零失真。
+--
+-- 为什么不能用平方增益（(v/128)^2）：
+--   20 个 MOD 的 kysmod.ini 都有按 0-128 线性调好的 VOLUME（5/10/17/22），
+--   改成平方会把它们压到原来的 1/5 ~ 1/25（VOLUME=32 的 0.25 变成 0.0625）。
+--   「保留 MOD 作者调音意图」是本功能的核心需求，平方会让它完全落空。
+--   详见 openspec/changes/audio-settings/design.md ADR-AS-003。
+--
+-- 为什么不能用 love.audio.setVolume：
+--   它是**全局**音量，无法区分音乐与音效，而两者需要独立调节。
+--   因此必须对每个 Source 单独 `:setVolume()`。
+-- ---------------------------------------------------------------------------
+
+-- 默认值 64 / 90（= 50% / 70%）。真正的初始值由 framework/audio_settings.lua
+-- 在初始化时通过 EngineAPI.audio.setMusicVolume / setSFXVolume 推入；
+-- 这里只是「框架尚未接线时」的兜底，避免出现 0 音量。
+local musicVolume = 64
+local sfxVolume = 90
+
+local function toGain(value)
+    local v = tonumber(value) or 0
+    if v < 0 then v = 0 end
+    if v > 128 then v = 128 end
+    return v / 128
+end
+
+--- 设置音乐音量（0-128）
+-- 推 + 拉：既立即应用到正在播放的 currentMusic，也作为后续 newSource 的初值。
+-- @param value number 0-128
+function SetMusicVolume(value)
+    musicVolume = tonumber(value) or musicVolume
+    if musicVolume < 0 then musicVolume = 0 end
+    if musicVolume > 128 then musicVolume = 128 end
+    if currentMusic and currentMusic.setVolume then
+        pcall(currentMusic.setVolume, currentMusic, toGain(musicVolume))
+    end
+end
+
+--- 取当前音乐音量（0-128）
+-- @return number
+function GetMusicVolume()
+    return musicVolume
+end
+
+--- 设置音效音量（0-128）
+-- 只有「拉」：音效 source 是即用即弃的（不保留引用），所以只能在
+-- PlayWAV 创建时应用。已在播放的短音效不受事后调节影响（时长都很短）。
+-- @param value number 0-128
+function SetSFXVolume(value)
+    sfxVolume = tonumber(value) or sfxVolume
+    if sfxVolume < 0 then sfxVolume = 0 end
+    if sfxVolume > 128 then sfxVolume = 128 end
+end
+
+--- 取当前音效音量（0-128）
+-- @return number
+function GetSFXVolume()
+    return sfxVolume
+end
 
 -- ---------------------------------------------------------------------------
 -- Audio path resolution (REQ-MIDI-1 / REQ-MIDI-2)
@@ -723,6 +841,10 @@ function PlayMIDI(filename)
         end
         currentMusic = source_or_err
         currentMusic:setLooping(true)
+        -- 拉：新 source 必须应用当前音乐音量，否则只有第一次生效
+        if currentMusic.setVolume then
+            pcall(currentMusic.setVolume, currentMusic, toGain(musicVolume))
+        end
         currentMusic:play()
     end
 end
@@ -746,6 +868,10 @@ function PlayWAV(filename)
     
     local success, source_or_err = pcall(love.audio.newSource, filepath, "static")
     if success then
+        -- 拉：音效 source 即用即弃，音量只能在这里应用
+        if source_or_err.setVolume then
+            pcall(source_or_err.setVolume, source_or_err, toGain(sfxVolume))
+        end
         source_or_err:play()
     end
 end

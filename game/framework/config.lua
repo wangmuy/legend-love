@@ -59,8 +59,25 @@ CONFIG.SMapAddY=16;
 CONFIG.WMapAddX=2;
 CONFIG.WMapAddY=18;
 
-CONFIG.MusicVolume=16;            --设置播放音乐的音量(0-128)
-CONFIG.SoundVolume=32;            --设置播放音效的音量(0-128)
+-- 音量（已迁移到统一的设置系统，见 framework/audio_settings.lua）
+--
+-- 下面两行是**历史遗留**，自建立起就没有任何读取点，已不再生效。
+-- 保留为注释是为了记录原版量程与默认值：
+--
+--   CONFIG.MusicVolume=16;   -- 原版：音乐音量，量程 0-128（= 12.5%）
+--   CONFIG.SoundVolume=32;   -- 原版：音效音量，量程 0-128（= 25%）
+--
+-- 现在的音量：
+--   * 定义   framework/audio_settings.lua（Settings.define）
+--   * 默认   音乐 64/128（50%）、音效 90/128（70%）
+--   * 可调   大地图「系统」与开始菜单「设置」，玩家修改后持久化到
+--            settings.ini
+--   * MOD    kysmod.ini 的 [music] VOLUME / VOLUMEWAV 原样注入 Settings
+--            的 mod 层（量程同为 0-128，零换算）
+--
+-- 量程说明：0-128 是 SDL_mixer 的 MIX_MAX_VOLUME，原版引擎的 Mix_Volume
+-- 就用这个范围。LÖVE 的 Source:setVolume 是 0-1 线性振幅，
+-- 引擎侧按 value/128 线性映射（精确等值，不做平方变换）。
 
 local LargeMemory=1;             --设置内存使用方式 1 多使用内存，0 少使用内存
 

@@ -13,8 +13,21 @@ local MenuAsync = require("framework.menu_async")
 local TalkAsync = require("framework.talk_async")
 local PerfLog = require("framework.perf_log")
 
+-- 鼠标点击寻路（slice 3）
+local AutoMove = require("framework.auto_move")
+local MouseHover = require("framework.mouse_hover")
+local Pathfind = require("framework.pathfind")
+local MouseMenu = require("framework.mouse_menu")
+local Settings = require("framework.settings")
+local Interact = require("framework.interact")
+
 -- 游戏状态处理器表
 local handlers = {}
+
+-- 前向声明：getStateId 在后面才定义，但 enterSubScene 等更早的函数要用它。
+-- 若不加这行，`local function getStateId` 在 275 行才生效，
+-- 之前引用的会被解析成**全局** getStateId（nil）→ 运行时 attempt to call a nil value。
+local getStateId
 
 -- 启动菜单协程的辅助函数
 local function startMenuCoroutine()
@@ -31,9 +44,309 @@ local function startMenuCoroutine()
     scheduler:start(co)
 end
 
+--------------------------------------------------------------------
+-- 点击寻路（REQ-MS3-3）
+--------------------------------------------------------------------
+
+-- 主地图可走性：**逐字对照** Game_MMap 的判定（jymain.lua:429）
+--   边界：limitX(x, 10, CC.MWidth-10)
+--   条件：GetMMap(x,y,3)==0 and GetMMap(x,y,4)==0
+local function mmapWalkable(x, y)
+    if x < 10 or y < 10 or x > CC.MWidth - 10 or y > CC.MHeight - 10 then
+        return false
+    end
+    return lib.GetMMap(x, y, 3) == 0 and lib.GetMMap(x, y, 4) == 0
+end
+
+-- 子场景可走性：**直接复用 SceneCanPass**，不得重写
+--   （SceneCanPass 内含「水面 / 物品 / 事件 D* 数据」三条判定，
+--     自行重写必然漏条件 —— 见 ADR-MS3-007）
+local function smapWalkable(x, y)
+    if x < 1 or y < 1 or x > CC.SWidth - 2 or y > CC.SHeight - 2 then
+        return false
+    end
+    return SceneCanPass(x, y) == true
+end
+
+--- 进入子场景（**键盘与自动移动共用**）
+--
+-- 为什么不各自写一份：进场景不只是改 JY.Status，还要
+--   ① 把主角放到场景的入口坐标（人X1/人Y1）
+--   ② 通过 switchState 触发 GAME_SMAP.enter → Init_SMap(1) → 载入场景数据
+--   ③ 传 showname=1 让场景名显示
+-- 漏掉任何一步的表现：进去后站在大地图坐标上、场景黑屏、没有场景名。
+--
+-- （实测踩过：自动移动最初直接写 `JY.Status = GAME_SMAP`，
+--   跳过 enter 导致 Init_SMap 未执行。）
+--
+-- @param subScene number 场景 id
+local function enterSubScene(subScene)
+    PerfLog.mark("GAME_MMAP entering subscene", tostring(subScene))
+    lib.Debug("Entering subscene: " .. tostring(subScene))
+
+    local newState = getStateId("GAME_SMAP")
+    JY.MmapMusic = -1
+
+    JY.MyPic = GetMyPic()
+    JY.Base["人X1"] = JY.Scene[subScene]["入口X"]
+    JY.Base["人Y1"] = JY.Scene[subScene]["入口Y"]
+
+    -- 对齐原版 Game_MMap：进子场景后调用 Init_SMap(1) 提示场景名
+    -- （原版 jymain.lua:430）。通过 switchTo 的 data 把 showname 传给
+    -- GAME_SMAP.enter，避免在 update 里直接调 Init_SMap 造成闪烁。
+    PerfLog.mark("GAME_MMAP.switchState(GAME_SMAP, showname=1)")
+    EventBridge.getInstance():switchState(newState, { showname = 1 })
+
+    lib.Debug("Subscene transition completed")
+end
+
+GameStates._enterSubScene = enterSubScene
+
+--- 处理一次鼠标左键点击（无菜单时）
+-- @param mx, my number 屏幕坐标
+-- @return boolean 是否处理了
+local function handleMapClick(mx, my)
+    if not MouseMenu.isEnabled() then return false end
+
+    -- **关键守卫**：与键盘完全一致的冻结条件
+    --
+    -- 不加这层的后果（用户实测报告）：对话期间点击地图，主角照样走过去，
+    -- 还能在对话框上叠加悬停菱形 —— 因为鼠标是独立输入通道，
+    -- 绕过了 GAME_SMAP.update 里对 keypress 的 CurrentD/talkActive 检查。
+    --
+    -- canPlayerAct 汇总了 6 项检查（菜单/disableInput/CurrentD/talkActive/
+    -- 动画/状态），保证鼠标与键盘走同一套闸门。
+    if not AutoMove.canPlayerAct() then
+        return false
+    end
+
+    local isMMAP = (JY.Status == GAME_MMAP)
+
+    -- **必须带相机**：屏幕格点 ≠ 世界格坐标，差一个相机偏移。
+    -- 不带相机的后果（用户实测）：点近处不动、点别处跑很远、走出大地图。
+    local camX, camY = MouseHover.camera(isMMAP and "MMAP" or "SMAP")
+    local gx, gy = MouseHover.screenToTile(mx, my, camX, camY)
+
+    -- 当前所在格
+    local curX, curY
+    if isMMAP then
+        curX, curY = JY.Base["人X"], JY.Base["人Y"]
+    else
+        curX, curY = JY.Base["人X1"], JY.Base["人Y1"]
+    end
+
+    -- 点自己脚下：无动作
+    if gx == curX and gy == curY then return true end
+
+    local walkable = isMMAP and mmapWalkable or smapWalkable
+    local mapKind = isMMAP and "MMAP" or "SMAP"
+
+    -- **交互目标**：不可站立但可以交互的格子（REQ-MS3-6）
+    --
+    -- 典型：客栈门口（建筑，不可走）、场景里的 NPC / 物品（D* 事件格）。
+    -- 键盘早就能处理（CanEnterScene 在可走性检查**之前**判定；
+    -- SPACE 键直接取「面前一格」的事件），但 A* 要求终点可走，
+    -- 所以点这些格子只会红闪 —— 表现为「只能走到门口，进不去」。
+    --
+    -- 处理方式与键盘一致：走到**旁边的可走格**，面朝它，再触发。
+    if not walkable(gx, gy) then
+        local plan = Interact.plan(mapKind, gx, gy, curX, curY, walkable)
+        if plan then
+            -- 目标本身就是接近点（人已站在旁边）→ 直接触发
+            if plan.ax == curX and plan.ay == curY then
+                Interact.trigger(mapKind, gx, gy)
+                return true
+            end
+
+            -- 先走到接近点，到达后再触发
+            local p2 = Pathfind.find(curX, curY, plan.ax, plan.ay, walkable,
+                { maxNodes = Pathfind.DEFAULT_MAX_NODES })
+            if p2 then
+                AutoMove.start(p2, mapKind, {
+                    -- 到达后要做的事（由 stepAutoMove 检查）
+                    onArrive = { kind = "interact", tx = gx, ty = gy },
+                })
+                return true
+            end
+        end
+        -- 既不可走也不可交互 → 红闪
+        MouseHover.flashDenied(gx, gy)
+        return true
+    end
+
+    -- A* 只在**点击瞬间**跑一次（REQ-MS3-4）
+    local path, err = Pathfind.find(curX, curY, gx, gy, walkable,
+        { maxNodes = Pathfind.DEFAULT_MAX_NODES })
+
+    if not path then
+        MouseHover.flashDenied(gx, gy)
+        lib.Debug("handleMapClick: 寻路失败 err=" .. tostring(err))
+        return true
+    end
+
+    AutoMove.start(path, mapKind)
+    return true
+end
+
+--- 路径走完后执行「到达动作」（REQ-MS3-6）
+--
+-- 目前只有一种：走到可交互目标的旁边，面朝它并触发
+-- （大地图进门 / 小场景开箱对话）。
+--
+-- 为什么必须等走到位再触发：
+--   若在点击瞬间就触发，人会站在原地（甚至隔着半张地图）进场景，
+--   视觉上是明显的 bug。必须等真的走到旁边。
+--
+-- @param mapKind string "MMAP" | "SMAP"
+function runOnArrive(mapKind)
+    local action = AutoMove.takeOnArrive()
+    if not action or action.kind ~= "interact" then
+        return
+    end
+    local ok, triggered = pcall(Interact.trigger, mapKind, action.tx, action.ty)
+    if not ok then
+        lib.Debug("runOnArrive: 触发交互失败")
+        return
+    end
+    if not triggered then
+        -- 走到了但触发不了（例如中途数据变化）→ 红闪一下，别静默失败
+        MouseHover.flashDenied(action.tx, action.ty)
+    end
+end
+
+--- 主地图自动移动一步
+-- @return boolean 是否走了一格
+function stepAutoMoveMMap()
+    local nextPt = AutoMove.peek()
+    if not nextPt then
+        AutoMove.stop()
+        return false
+    end
+
+    local cx, cy = JY.Base["人X"], JY.Base["人Y"]
+    -- 只允许相邻一格（4 向），否则说明路径与当前位置脱节
+    local dx = nextPt.x - cx
+    local dy = nextPt.y - cy
+    if math.abs(dx) + math.abs(dy) ~= 1 then
+        AutoMove.stop()
+        return false
+    end
+
+    -- 方向码：0=上 1=右 2=左 3=下（与 CC.DirectX/DirectY 一致）
+    local direct
+    if dx == 0 and dy == -1 then direct = 0
+    elseif dx == 1 and dy == 0 then direct = 1
+    elseif dx == -1 and dy == 0 then direct = 2
+    else direct = 3 end
+
+    -- MyTick 是「无按键的持续帧数」，键盘路径每次按键都会清零
+    -- （jymain.lua:397 / game_states 的 `if keypress ~= -1 then JY.MyTick = 0`）。
+    -- 它累加到 20 时会把 MyCurrentPic 复位成站立帧；自动移动若不重置，
+    -- 走路动画每 20 帧会「闪一下站立姿势」，看起来一顿一顿的。
+    JY.MyTick = 0
+
+    AddMyCurrentPic()
+    JY.Base["人方向"] = direct
+    JY.Base["人X"] = nextPt.x
+    JY.Base["人Y"] = nextPt.y
+    JY.oldMMapX = -1
+    JY.oldMMapY = -1
+
+    -- 进子场景判定（走到入口格就直接进入，剩余路径丢弃 —— 需求明确）
+    local sub = CanEnterScene(nextPt.x, nextPt.y)
+    JY.SubScene = sub
+    if sub and sub >= 0 then
+        AutoMove.interruptBySceneChange()
+        -- 必须走共享函数：直接改 JY.Status 会跳过 GAME_SMAP.enter，
+        -- 导致 Init_SMap 未执行、主角坐标没设成入口（实测踩过）
+        enterSubScene(sub)
+        return true
+    end
+
+    AutoMove.markStep()
+    local hasMore = AutoMove.advance()
+    if not hasMore then
+        -- 路径走完 —— 若这次点击是「走过去交互」，现在执行（REQ-MS3-6）
+        runOnArrive("MMAP")
+    end
+    return true
+end
+
+--- 子场景自动移动一步
+-- @return boolean 是否走了一格
+function stepAutoMoveSMAP()
+    local nextPt = AutoMove.peek()
+    if not nextPt then
+        AutoMove.stop()
+        return false
+    end
+
+    local cx, cy = JY.Base["人X1"], JY.Base["人Y1"]
+    local dx = nextPt.x - cx
+    local dy = nextPt.y - cy
+    if math.abs(dx) + math.abs(dy) ~= 1 then
+        AutoMove.stop()
+        return false
+    end
+
+    local direct
+    if dx == 0 and dy == -1 then direct = 0
+    elseif dx == 1 and dy == 0 then direct = 1
+    elseif dx == -1 and dy == 0 then direct = 2
+    else direct = 3 end
+
+    JY.MyTick = 0    -- 与键盘路径一致，保持走路动画连续（见 MMAP 分支注释）
+
+    AddMyCurrentPic()
+    JY.Base["人方向"] = direct
+    JY.Base["人X1"] = nextPt.x
+    JY.Base["人Y1"] = nextPt.y
+    JY.oldSMapX = -1
+    JY.oldSMapY = -1
+
+    -- **必须重算贴图**（用户实测报告的 bug）
+    --
+    -- 小场景的绘制链是 DrawSMap(0) → lib.DrawSMap(..., JY.MyPic)，
+    -- 它直接用全局 JY.MyPic，**不像 MMAP 那样每帧 GetMyPic() 重算**
+    -- （对比：GAME_MMAP.draw 里 `local pic = GetMyPic()`，
+    --          GAME_SMAP.draw 里只有 `DrawSMap(0)`）。
+    --
+    -- 键盘移动路径会在 update 结束时执行 `JY.MyPic = GetMyPic()`，
+    -- 但自动移动是**提前 return** 的，跳过了那一步 —— 于是 JY.MyPic 一直
+    -- 停留在点击前的朝向，表现为「人朝新方向滑走，贴图还是旧朝向」。
+    --
+    -- 为什么大地图没这个问题：MMAP.draw 每帧重算，朝向自动跟上。
+    --
+    -- 守卫条件与键盘路径逐字一致（动画/对话/事件执行中不覆盖贴图）。
+    local _talkActive = TalkAsync.getCurrentTalk() ~= nil
+    -- 注意 CurrentD 要写成 `JY.CurrentD and JY.CurrentD >= 0`：
+    -- 既有代码用的是 `JY.CurrentD >= 0`，在 CurrentD 为 nil 时（测试环境、
+    -- 或某些初始化顺序下）会 `attempt to compare number with nil`。
+    local _eventRunning = JY.CurrentD ~= nil and JY.CurrentD >= 0
+    if not JY.AnimationState.active and not _talkActive
+        and not _eventRunning then
+        JY.MyPic = GetMyPic()
+    end
+    DtoSMap()
+
+    AutoMove.markStep()
+    local hasMore = AutoMove.advance()
+    if not hasMore then
+        runOnArrive("SMAP")
+    end
+    return true
+end
+
+GameStates._handleMapClick = handleMapClick
+GameStates._mmapWalkable = mmapWalkable
+GameStates._smapWalkable = smapWalkable
+GameStates._stepAutoMoveMMap = stepAutoMoveMMap
+GameStates._stepAutoMoveSMAP = stepAutoMoveSMAP
+GameStates._runOnArrive = runOnArrive
+
 -- 获取状态ID的辅助函数
 -- 在模块加载时，常量可能还未定义，所以使用函数延迟获取
-local function getStateId(stateName)
+getStateId = function(stateName)
     if stateName == "GAME_MMAP" then
         return GAME_MMAP or 2
     elseif stateName == "GAME_SMAP" then
@@ -59,6 +372,9 @@ handlers["GAME_MMAP"] = {
     -- 状态进入时调用
     enter = function()
         lib.Debug("Enter GAME_MMAP state")
+        -- REQ-MS3-5：进入地图状态时清空自动移动（避免跨状态残留路径）
+        AutoMove.reset()
+
         -- 初始化主地图
         -- 注意：需要加载地图数据，否则会导致黑屏
         Init_MMap()
@@ -79,6 +395,37 @@ handlers["GAME_MMAP"] = {
         -- 如果有活动菜单，不处理游戏输入
         if MenuAsync.hasActiveMenu() then
             return
+        end
+
+        -- REQ-MS3-3 / REQ-MS3-5：自动移动优先于按键
+        --
+        -- **但必须先确认玩家可以行动**：对话/动画/事件期间不能推进路径，
+        -- 否则自动移动会穿透对话冻结（用户实测报告的核心问题）。
+        if AutoMove.isActive() then
+            if not AutoMove.canPlayerAct() then
+                -- 冻结期间：暂停推进，但保留路径（对话结束后继续走完）
+                return
+            end
+            local keypress = lib.GetKey()
+            if keypress ~= -1 then
+                -- 按键中断：吃掉这次按键与后续 repeat，不响应为方向移动
+                AutoMove.interruptByKey(keypress)
+                return
+            end
+            -- 步进节流：未到间隔就不推进（否则 60fps 下 60 格/秒 = 瞬移）
+            if not AutoMove.readyToStep() then
+                return
+            end
+            if stepAutoMoveMMap() then
+                return    -- 本帧走了一格
+            end
+            -- 路径走完或中断，落到下面的普通逻辑
+        elseif AutoMove.isDraining() then
+            -- drain 期间吞掉被中断的那个键的 repeat
+            local keypress = lib.GetKey()
+            if keypress ~= -1 and AutoMove.shouldDrainKey(keypress) then
+                return
+            end
         end
         
         -- 原有的Game_MMap逻辑(除去渲染部分)
@@ -132,27 +479,9 @@ handlers["GAME_MMAP"] = {
             JY.Base["乘船"] = 0
         end
         
-        -- 检查是否进入子场景
+        -- 检查是否进入子场景（与自动移动共用 enterSubScene）
         if JY.SubScene >= 0 then
-            PerfLog.mark("GAME_MMAP entering subscene", tostring(JY.SubScene))
-            lib.Debug("Entering subscene: " .. tostring(JY.SubScene))
-            
-            local newState = getStateId("GAME_SMAP")
-            lib.Debug("Entering GAME_SMAP: " .. tostring(newState))
-            JY.MmapMusic = -1
-
-            JY.MyPic = GetMyPic()
-            JY.Base["人X1"] = JY.Scene[JY.SubScene]["入口X"]
-            JY.Base["人Y1"] = JY.Scene[JY.SubScene]["入口Y"]
-
-            -- 对齐原版 Game_MMap：进子场景后调用 Init_SMap(1) 提示场景名
-            -- （原版 jymain.lua:430）。这里通过 switchTo 的 data 把
-            -- showname 传给 GAME_SMAP.enter，避免在 update 里直接调
-            -- Init_SMap 造成「先画一帧无名、再画一帧有名」的闪烁。
-            PerfLog.mark("GAME_MMAP.switchState(GAME_SMAP, showname=1)")
-            EventBridge.getInstance():switchState(newState, { showname = 1 })
-
-            lib.Debug("Subscene transition completed")
+            enterSubScene(JY.SubScene)
         end
 
         -- 云朵漂移：原版 kys_main.cpp 主循环每 40ms 移动一次（MMAPAMI>0 门控
@@ -211,6 +540,26 @@ handlers["GAME_SMAP"] = {
     
     exit = function()
         lib.Debug("Exit GAME_SMAP state")
+
+        -- 清掉场景名提示（用户实测：出场景后名字一直留在屏幕上）
+        --
+        -- 场景名靠一个挂起等键的协程维持，切走状态时它不会被唤醒。
+        -- 不清的连锁后果：
+        --   ① currentName 残留 → 每帧照画 → 名字不消失
+        --   ② disableInput 残留 true → 之后所有点击被判为「不可行动」
+        --      → 「小场景内点箱子/NPC 都没反应」
+        pcall(function()
+            local SceneNameAsync = require("framework.scene_name_async")
+            if SceneNameAsync and SceneNameAsync.dismissOnStateChange then
+                SceneNameAsync.dismissOnStateChange()
+            end
+        end)
+
+        -- 顺带清掉自动移动（场景已离开，旧路径无意义）
+        AutoMove.reset()
+        pcall(function()
+            if MouseHover and MouseHover.clearFlash then MouseHover.clearFlash() end
+        end)
     end,
     
     update = function(dt)
@@ -260,7 +609,43 @@ handlers["GAME_SMAP"] = {
         local d_pass = GetS(JY.SubScene, JY.Base["人X1"], JY.Base["人Y1"], 3)
         if d_pass >= 0 then
             if d_pass ~= JY.OldDPass then
-                EventExecuteSync(d_pass, 3)
+                -- REQ-MS3-5：事件触发中断自动移动，且**不恢复**剩余路径。
+                --
+                -- **只在事件真的会做事时才中断**（用户实测报告）。
+                --
+                -- 背景：门槛/入口这类 tile 的事件通常是「一次性」的 ——
+                -- 首次进入时脚本执行，之后事件数据被改（或脚本里自带
+                -- 「已触发」判断），再踩上去是 no-op。
+                --
+                -- 但 OldDPass 在离开该格时会被重置成 -1，所以**每次**
+                -- 踩上去都满足 `d_pass ~= OldDPass`，都会走到这里并调用
+                -- EventExecuteSync。此时若无条件中断自动移动：
+                --   玩家从客栈一侧点到另一侧 → 路径在门口被砍断
+                --   → 停在门口、什么也没发生 → 表现为「点远处只走到门口」
+                --
+                -- 修法：先问「这个事件还能不能跑」。不能跑就**不中断**，
+                -- 让自动移动继续走完剩余路径。
+                -- 先看静态判据（tile 上还有没有事件号）：
+                -- 已经完全没有事件的 tile → 连 EventExecuteSync 都不用调，
+                -- 自动移动直接继续。
+                local willRun = AutoMove.eventWouldRun(JY.SubScene, d_pass)
+                if AutoMove.isActive() then
+                    if not willRun then
+                        lib.Debug("Game_SMAP: 路过事件已被清空，不中断自动移动 d="
+                            .. tostring(d_pass))
+                    else
+                        -- 还有事件号，但脚本可能自己 no-op（一次性事件）。
+                        -- 静态判断不了，改为「下一帧看 CurrentD 是否跨帧保持」：
+                        -- 真事件会 yield（对话/动画），CurrentD 保持 >= 0；
+                        -- no-op 同帧跑完，CurrentD 已回 -1。
+                        AutoMove.watchEvent(JY.SubScene, d_pass)
+                        lib.Debug("Game_SMAP: 登记路过事件待判定 d="
+                            .. tostring(d_pass))
+                    end
+                end
+                if willRun then
+                    EventExecuteSync(d_pass, 3)
+                end
                 JY.OldDPass = d_pass
                 JY.oldSMapX = -1
                 JY.oldSMapY = -1
@@ -329,6 +714,32 @@ handlers["GAME_SMAP"] = {
         local InputManager = require("framework.input_manager")
         if InputManager.disableInput then
             keypress = -1  -- 忽略按键
+        end
+
+        -- REQ-MS3-3 / REQ-MS3-5：自动移动优先于按键（与 MMAP 同构）
+        -- 同样必须先确认玩家可以行动（见 MMAP 分支的注释）
+        if AutoMove.isActive() then
+            -- 先确认上一帧触发的事件是否真的在跑（真事件 → 中断路径）
+            if AutoMove.checkWatchedEvent() then
+                return
+            end
+            if not AutoMove.canPlayerAct() then
+                return
+            end
+            if keypress ~= -1 then
+                AutoMove.interruptByKey(keypress)
+                return
+            end
+            if not AutoMove.readyToStep() then
+                return
+            end
+            if stepAutoMoveSMAP() then
+                return
+            end
+        elseif AutoMove.isDraining() then
+            if keypress ~= -1 and AutoMove.shouldDrainKey(keypress) then
+                return
+            end
         end
 
         -- 事件执行期间（JY.CurrentD >= 0，含开场强制对话）冻结玩家输入：
@@ -493,6 +904,15 @@ handlers["GAME_FIRSTMMAP"] = {
 handlers["GAME_WMAP"] = {
     enter = function()
         lib.Debug("Enter GAME_WMAP state (battle)")
+        -- REQ-MS3-5：进入战斗时清空自动移动与 drain
+        --
+        -- 不清空的后果：战斗结束后回到 MMAP，之前的路径会继续走 ——
+        -- 玩家会看到主角「自己」在战斗后莫名移动。
+        AutoMove.reset()
+        pcall(function()
+            local MouseHover = require("framework.mouse_hover")
+            if MouseHover and MouseHover.clearFlash then MouseHover.clearFlash() end
+        end)
     end,
     
     exit = function()
@@ -619,6 +1039,17 @@ end
 -- 获取状态ID
 function GameStates.getStateId(stateName)
     return getStateId(stateName)
+end
+
+--- 请求呼出主菜单（等价 ESC）
+--
+-- 供鼠标右键调用（REQ-MS2-1）。走与键盘 ESC 完全相同的路径，
+-- 保证两条入口行为一致（菜单栈、disableInput、状态恢复都相同）。
+--
+-- 注意：调用方负责判断「当前是否允许呼出」（状态、事件执行中、
+-- 阻塞输入等），本函数只负责真正启动菜单协程。
+function GameStates.requestMainMenu()
+    startMenuCoroutine()
 end
 
 return GameStates

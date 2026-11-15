@@ -401,6 +401,223 @@ function AsyncDialog:drawSelect(dialog, x, y, w, h)
     end
 end
 
+----------------------------------------------------------------------
+-- 鼠标点击（REQ-MS2-7）
+--
+-- 「是/否」框点「否」却选中「是」的根因：
+--   原来鼠标在对话里只会注入一个 VK_SPACE，而 SPACE 的语义是
+--   「确认当前选项」—— 默认选中的是「是」，于是点哪儿都变「是」。
+--
+-- 所以对话里的鼠标不能一律翻译成 SPACE，要按类型分开：
+--   message → 点任意处 = 确认（等价 SPACE）
+--   yesno   → 命中哪一行就选哪一行再确认
+--   select  → 命中哪一项就选哪一项再确认
+--   input   → 不处理（打字只能键盘）
+--
+-- 命中判据必须与 drawYesNo / drawSelect 的绘制坐标逐字一致，
+-- 否则「看到的位置」和「点到的位置」会对不上。
+----------------------------------------------------------------------
+
+--- 「是/否」选项的几何（供 draw / 点击 / 悬停**共用**）
+--
+-- 抽出来的理由：这三处都要算「是」「否」两行的 Y 区间。
+-- 各写一份必然漂移成「看到的位置」和「点到的位置」不一致
+-- （上一轮物品网格就踩过这个坑）。
+--
+-- 与 drawYesNo 的绘制公式逐字一致：
+--     msgY = y + pad
+--     optionStartY = msgY + lineH + CC.RowPixel
+--     「是」占 [optionStartY, +rowH)，「否」占 [+rowH, +2*rowH)
+--
+-- @param dialog table
+-- @return table { x1=, x2=, yesY1=, yesY2=, noY1=, noY2= }
+function AsyncDialog.yesNoGeometry(dialog)
+    if not dialog then return nil end
+    local pad = dialog.pad or CC.MenuBorderPixel
+    local lineH = dialog.lineHeight or CC.DefaultFont
+    local rowH = lineH + CC.RowPixel
+    local msgY = dialog.y + pad
+    local optionStartY = msgY + lineH + CC.RowPixel
+
+    return {
+        -- 横向用整个框宽：文字本身只有「是」那么窄，
+        -- 要求严格点中字形太苛刻（实测容易点不中）
+        x1 = dialog.x,
+        x2 = dialog.x + dialog.width,
+        yesY1 = optionStartY,
+        yesY2 = optionStartY + rowH,
+        noY1 = optionStartY + rowH,
+        noY2 = optionStartY + rowH * 2,
+    }
+end
+
+--- 「选择框」选项的几何（供 draw / 点击 / 悬停共用）
+-- @param dialog table
+-- @return table { x1=, x2=, rows = { {y1=,y2=}, ... } }
+function AsyncDialog.selectGeometry(dialog)
+    if not dialog then return nil end
+    local startY = dialog.y + 40
+    local rowH = 30
+    local rows = {}
+    for i = 1, #(dialog.items or {}) do
+        rows[i] = {
+            y1 = startY + (i - 1) * rowH,
+            y2 = startY + (i - 1) * rowH + rowH,
+        }
+    end
+    return {
+        x1 = dialog.x,
+        x2 = dialog.x + dialog.width,
+        rows = rows,
+    }
+end
+
+--- 鼠标悬停：把选项光标移到所指那一行（REQ-MS2-12）
+--
+-- 用户报告：客栈老板问「是否住宿」，鼠标悬停时选中项不跟随。
+-- 原因：AsyncDialog 只实现了点击（handleMouseClick），没有悬停。
+--
+-- 与菜单/物品格的做法一致：**只移动光标，不确认**。
+-- 确认仍由点击（handleMouseClick）或键盘（SPACE/RETURN）负责。
+--
+-- 支持的类型：
+--   yesno  → 悬停「是」/「否」改变 selected
+--   select → 悬停某一项改变 selected
+--   其它   → 无悬停概念（message 只有一个动作，input 要打字）
+--
+-- @param mx, my number 屏幕坐标
+-- @return boolean 是否需要重绘（光标真的移动了）
+function AsyncDialog:handleMouseHover(mx, my)
+    local d = currentDialog
+    if not d then return false end
+    if d.state ~= "open" then return false end
+
+    if d.type == "yesno" then
+        local G = AsyncDialog.yesNoGeometry(d)
+        if not G then return false end
+        -- 横向在框外：不处理（避免鼠标在别处时误改选中项）
+        if mx < G.x1 or mx > G.x2 then return false end
+
+        local target
+        if my >= G.yesY1 and my < G.yesY2 then
+            target = 1
+        elseif my >= G.noY1 and my < G.noY2 then
+            target = 2
+        else
+            return false    -- 在消息区/空白处：保持原选中
+        end
+
+        if target == d.selected then return false end
+        d.selected = target
+        return true
+    end
+
+    if d.type == "select" then
+        local G = AsyncDialog.selectGeometry(d)
+        if not G then return false end
+        if mx < G.x1 or mx > G.x2 then return false end
+
+        for i, row in ipairs(G.rows) do
+            if my >= row.y1 and my < row.y2 then
+                if i == d.selected then return false end
+                d.selected = i
+                return true
+            end
+        end
+        return false
+    end
+
+    return false
+end
+
+--- 对话框鼠标点击
+-- @param mx, my number 屏幕逻辑坐标
+-- @return boolean 是否处理了（false = 该对话框不吃鼠标）
+function AsyncDialog:handleMouseClick(mx, my)
+    local d = currentDialog
+    if not d then return false end
+    -- 只有完全打开后才接受点击（opening/closing 动画期间不接受）
+    if d.state ~= "open" then return true end
+
+    local x, y = d.x, d.y
+    local w, h = d.width, d.height
+
+    -- ---- 消息框：点任意处确认 ----
+    if d.type == "message" then
+        self:closeDialog(true)
+        return true
+    end
+
+    -- ---- 是/否：命中哪一行就选哪一行 ----
+    --
+    -- 几何用共享函数（与 drawYesNo / handleMouseHover 同一份公式）
+    if d.type == "yesno" then
+        local G = AsyncDialog.yesNoGeometry(d)
+        if not G then return true end
+
+        if mx < G.x1 or mx > G.x2 then
+            return true     -- 点在框外：吃掉但不动作（避免误触改变决定）
+        end
+
+        if my >= G.yesY1 and my < G.yesY2 then
+            d.selected = 1
+            self:closeDialog(true)
+            return true
+        end
+        if my >= G.noY1 and my < G.noY2 then
+            d.selected = 2
+            self:closeDialog(false)
+            return true
+        end
+        return true         -- 点在框内但不在选项上：吃掉不动作
+    end
+
+    -- ---- 选择框：命中哪一项就选哪一项 ----
+    if d.type == "select" then
+        local G = AsyncDialog.selectGeometry(d)
+        if not G then return true end
+        if mx < G.x1 or mx > G.x2 then return true end
+
+        for i, row in ipairs(G.rows) do
+            if my >= row.y1 and my < row.y2 then
+                d.selected = i
+                local item = d.items and d.items[i]
+                self:closeDialog(item and item.value)
+                return true
+            end
+        end
+        return true
+    end
+
+    -- ---- 输入框：不吃鼠标（打字只能键盘）----
+    return true
+end
+
+--- ESC 等价操作（供鼠标右键调用，REQ-MS2-8）
+--
+-- 语义必须与 handleInput 里的 ESC 分支**完全一致**，否则
+-- 「按键盘 ESC」和「点右键」的结果会不同（那是最难查的一类 bug）。
+-- 对照 handleInput：
+--   message → 任何键都只是确认（ESC 也当确认）
+--   yesno   → ESC = 取消 = false
+--   input   → ESC = nil（放弃输入）
+--   select  → ESC = nil（不选）
+function AsyncDialog:handleEscape()
+    local d = currentDialog
+    if not d then return false end
+    if d.state ~= "open" then return true end
+
+    if d.type == "message" then
+        self:closeDialog(true)
+    elseif d.type == "yesno" then
+        self:closeDialog(false)
+    else
+        -- input / select：与 ESC 一致，返回 nil
+        self:closeDialog(nil)
+    end
+    return true
+end
+
 -- 检查是否有对话框显示
 function AsyncDialog:hasDialog()
     return #dialogStack > 0

@@ -17,6 +17,25 @@ local queueHead = 1
 local queueTail = 1
 local maxQueueSize = 64
 
+-- 鼠标事件队列（REQ-MS1-5）
+--
+-- **独立于键盘队列**，不混在一起。原因有两个：
+--
+--   ① 若混入同一队列，getKey() 会把鼠标事件当按键返回
+--      （鼠标事件没有 key 字段，会返回 nil 或 x 坐标），
+--      污染全仓 20+ 处 lib.GetKey() 的调用点，风险全在既有功能上。
+--
+--   ② 鼠标按下是【状态】不是【事件】（love.mouse.isDown 按住期间持续 true），
+--      必须在 love.mousepressed 回调里入队，否则一次点击会触发几十次。
+--
+-- 事件形状：
+--   { type = "pressed"|"released", x = number, y = number,
+--     button = number, time = number }
+local mouseQueue = {}
+local mouseHead = 1
+local mouseTail = 1
+local maxMouseQueueSize = 64
+
 -- 按键状态（用于判断是否按住）
 local keyStates = {}
 
@@ -66,6 +85,9 @@ function InputManager:init()
     queueTail = 1
     keyStates = {}
     keyRepeatTimers = {}
+    mouseQueue = {}
+    mouseHead = 1
+    mouseTail = 1
 end
 
 -- 添加事件到队列
@@ -160,6 +182,17 @@ function InputManager:onKeyReleased(key, scancode)
     -- 更新按键状态
     keyStates[gameKey] = false
     keyRepeatTimers[gameKey] = nil
+
+    -- REQ-MS3-5：自动移动被按键中断后，松开该键才解除 drain
+    --
+    -- 用 pcall 是因为 auto_move 可能未加载（如纯输入测试），
+    -- 且这里绝不能因 drain 逻辑抛错而丢按键状态。
+    pcall(function()
+        local AutoMove = require("framework.auto_move")
+        if AutoMove and AutoMove.onKeyReleased then
+            AutoMove.onKeyReleased(gameKey)
+        end
+    end)
 end
 
 -- 更新按键重复
@@ -202,14 +235,145 @@ function InputManager:getKey()
     if InputManager.disableInput then
         return -1
     end
-    
-    -- 从队列中获取事件
-    local event = dequeueEvent()
-    if event then
-        return event.key
+
+    -- 跳过「注入的键」（synthetic）—— 这是本函数与 _peekKeyInternal 的**唯一**差别
+    --
+    -- 注入的键（enqueueKeyEvent）只服务于「协程等键」：
+    --   对话推进 / 场景名关闭 / 物品选中 / 状态页翻页
+    -- 它们消费键的路径是 scheduler 的 _peekKeyInternal（绕过 disableInput）。
+    --
+    -- **主循环的 getKey() 必须看不到它们**，否则会当成玩家真按了键：
+    --   实测 bug（用户报告）：河洛客栈站在店小二旁，鼠标悬停物品格
+    --   → 悬停注入 VK_SPACE 唤醒物品协程
+    --   → 同一帧 GAME_SMAP.update 的 getKey() 也读到这个 SPACE
+    --   → 走进 SPACE 分支「触发面向 tile 的事件」→ 冒出店小二对话
+    --
+    -- 丢弃 synthetic 事件是安全的：它们本就是为「唤醒某个协程」而生，
+    -- 协程已经通过 _peekKeyInternal 拿走同一位置的事件；
+    -- 若协程当时不在等键，留着它也只会被下一帧再次误读。
+    while true do
+        local event = dequeueEvent()
+        if not event then
+            return -1
+        end
+        if not event.synthetic then
+            return event.key
+        end
+        -- synthetic：丢弃，继续取下一个
     end
-    
-    return -1
+end
+
+--------------------------------------------------------------------
+-- 鼠标事件队列（REQ-MS1-5）
+--
+-- 与键盘队列完全独立：
+--   getKey()        → 只消费键队列（既有 20+ 处调用零影响）
+--   getMouseEvent() → 只消费鼠标队列
+--
+-- 不做跨队列的严格时序保证：实际游戏中不会出现「同一帧内既按键又点击」
+-- 且顺序有意义的场景。若将来需要，再引入统一序列号（见 ADR-MS-004）。
+--------------------------------------------------------------------
+
+--- 入队一个鼠标事件（由 love.mousepressed / mousereleased 回调调用）
+--
+-- 容量上限与键盘队列同策略：满了丢最旧的，不阻塞。
+--
+-- @param event table { type, x, y, button, time }
+-- @return boolean 是否入队成功
+function InputManager.enqueueMouseEvent(event)
+    if type(event) ~= "table" then return false end
+
+    local nextTail = mouseTail + 1
+    if nextTail > maxMouseQueueSize then
+        nextTail = 1
+    end
+    if nextTail == mouseHead then
+        -- 满了：丢掉最旧的一个
+        mouseHead = mouseHead + 1
+        if mouseHead > maxMouseQueueSize then
+            mouseHead = 1
+        end
+    end
+    if event.time == nil then
+        event.time = getTimeSeconds()
+    end
+    mouseQueue[mouseTail] = event
+    mouseTail = nextTail
+    return true
+end
+
+--- 取出一个鼠标事件（消费）
+--
+-- 命名注意：内部实现叫 `_dequeueMouseEvent`，**不能**直接叫
+-- `InputManager.getMouseEvent` 再写一个 `InputManager:getMouseEvent` 转发 ——
+-- `:` 语法是 `function InputManager.getMouseEvent(self)` 的糖，
+-- 会覆盖同名点方法，于是 `InputManager.getMouseEvent()` 调到自己，
+-- 且是尾调用不增长栈 → 永久死循环（不报栈溢出，只是卡住）。
+--
+-- @return table|nil
+function InputManager._dequeueMouseEvent()
+    if mouseHead == mouseTail then
+        return nil
+    end
+    local event = mouseQueue[mouseHead]
+    mouseQueue[mouseHead] = nil
+    mouseHead = mouseHead + 1
+    if mouseHead > maxMouseQueueSize then
+        mouseHead = 1
+    end
+    return event
+end
+
+--- 查看鼠标队列中的下一个事件但不消费
+-- @return table|nil
+function InputManager.peekMouseEvent()
+    if mouseHead == mouseTail then
+        return nil
+    end
+    return mouseQueue[mouseHead]
+end
+
+--- 清空鼠标队列（场景切换等）
+function InputManager.clearMouseQueue()
+    mouseQueue = {}
+    mouseHead = 1
+    mouseTail = 1
+end
+
+--- 取鼠标事件（实例方法）
+-- @return table|nil
+function InputManager:getMouseEvent()
+    return InputManager._dequeueMouseEvent()
+end
+
+--- 往键队列注入一个按键事件（供鼠标等非键盘输入使用）
+--
+-- 用途（REQ-MS2-6）：对话期间鼠标点击要等价于空格/Enter。
+--
+-- 为什么不给每条对话路径单独加鼠标处理：
+--   对话推进有三条独立实现，各自都在等按键
+--     talk_async:160         InputAsync.WaitKeyCoroutine()
+--     async_dialog:246       VK_RETURN / VK_SPACE
+--     coroutine_scheduler    update() 里 _peekKeyInternal() 偷看队列
+--   逐条加鼠标分支会漏、会重复。注入一个键事件则**复用全部既有逻辑**：
+--   键盘与鼠标走的是同一条路径，行为必然一致。
+--
+-- 注意：注入的事件进的是**键队列**，所以
+--   * getKey() 能取到（菜单、地图逻辑）
+--   * _peekKeyInternal() 也能取到（对话等待，绕过 disableInput）
+-- 这正是我们要的 —— 对话期间 disableInput 可能为 true，但对话仍在等键。
+--
+-- @param key number 按键码（如 VK_SPACE / VK_RETURN）
+-- @return boolean 是否入队
+function InputManager.enqueueKeyEvent(key)
+    if type(key) ~= "number" then return false end
+    enqueueEvent({
+        type = "pressed",
+        key = key,
+        time = getTimeSeconds(),
+        synthetic = true,     -- 标记来源，便于调试
+    })
+    return true
 end
 
 -- 查看队列中的下一个按键但不消费

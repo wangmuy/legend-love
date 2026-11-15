@@ -36,6 +36,8 @@ function TestEngineAPI.testSpriteModule()
     TestHelper.assertNotNil(EngineAPI.sprite.loadArchive, "sprite.loadArchive should exist")
     TestHelper.assertNotNil(EngineAPI.sprite.getSize, "sprite.getSize should exist")
     TestHelper.assertNotNil(EngineAPI.sprite.draw, "sprite.draw should exist")
+    -- REQ-MS1-3
+    TestHelper.assertNotNil(EngineAPI.sprite.drawTinted, "sprite.drawTinted should exist")
     
     -- 验证 initPalette 不存在
     TestHelper.assertEquals(nil, EngineAPI.sprite.initPalette, "sprite.initPalette should NOT exist")
@@ -67,6 +69,20 @@ function TestEngineAPI.testInputModule()
     TestHelper.assertNotNil(EngineAPI.input.getKey, "input.getKey should exist")
     TestHelper.assertNotNil(EngineAPI.input.waitForKey, "input.waitForKey should exist")
     TestHelper.assertNotNil(EngineAPI.input.setKeyRepeat, "input.setKeyRepeat should exist")
+    -- REQ-MS1-2
+    TestHelper.assertNotNil(EngineAPI.input.mousePosition, "input.mousePosition should exist")
+    TestHelper.assertNotNil(EngineAPI.input.mouseButton, "input.mouseButton should exist")
+end
+
+-- REQ-MS1-1：system 模块（第 15 个）
+function TestEngineAPI.testSystemModule()
+    setup()
+    print("\n=== Test: EngineAPI system module ===")
+
+    local EngineAPI = require("engine-love2d.engine_api")
+
+    TestHelper.assertNotNil(EngineAPI.system, "system module should exist")
+    TestHelper.assertNotNil(EngineAPI.system.getOS, "system.getOS should exist")
 end
 
 function TestEngineAPI.testAudioModule()
@@ -168,6 +184,7 @@ function TestEngineAPI.runAll()
     TestEngineAPI.testRenderModule()
     TestEngineAPI.testSpriteModule()
     TestEngineAPI.testMapModule()
+    TestEngineAPI.testSystemModule()
     TestEngineAPI.testInputModule()
     TestEngineAPI.testAudioModule()
     TestEngineAPI.testTimeModule()

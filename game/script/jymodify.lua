@@ -19,10 +19,12 @@
 --注意这里可以定义全程变量。
 function SetModify()
 
-   --这是一个定义函数的例子。这里重新修改主菜单中的系统菜单，增加在游戏运行中控制音效的功能。
-   --原来只能在jyconst.lua中通过参数在运行前控制，不能做到实时控制。
-   Menu_System_old=Menu_System;         --备份原始函数，如果新的函数需要，还可以调用原始函数。
-   Menu_System=Menu_System_new;
+   -- 音效/音乐开关的旧实现（Menu_System_new / Menu_SetMusic / Menu_SetSound）
+   -- 已删除：它们通过覆盖全局 Menu_System 生效，但事件驱动改造后运行路径走
+   -- JyMainAsync.Menu_System，从不调用被覆盖的全局函数，因此那套开关从未
+   -- 被玩家看到过（死代码）。
+   -- 现在音量由 framework/audio_menu.lua + Settings 提供，
+   -- 入口在「系统 → 音乐音量/音效音量」（大地图）与「设置」（开始菜单）。
 
    --在此定义特殊物品。没有定义的均调用缺省物品函数
     JY.ThingUseFunction[182]=Show_Position;     --罗盘函数
@@ -35,56 +37,9 @@ function SetModify()
 end
 
 
---新的系统子菜单，增加控制音乐和音效
-function Menu_System_new()
-	local menu={
-	             {"读取进度",Menu_ReadRecord,1},
-                 {"保存进度",Menu_SaveRecord,1},
-				 {"关闭音乐",Menu_SetMusic,1},
-				 {"关闭音效",Menu_SetSound,1},
-				 {"全屏切换",Menu_FullScreen,1},
-                 {"离开游戏",Menu_Exit,1},   };
-
-    if JY.EnableMusic==0 then
-	    menu[3][1]="打开音乐";
-	end
-
-	if JY.EnableSound==0 then
-	    menu[4][1]="打开音效";
-    end
-
-
-    local r=ShowMenu(menu,6,0,CC.MainSubMenuX,CC.MainSubMenuY,0,0,1,1,CC.DefaultFont,C_ORANGE, C_WHITE);
-    if r == 0 then
-        return 0;
-    elseif r<0 then   --要退出全部菜单，
-        return 1;
- 	end
-end
-
 function Menu_FullScreen()
     lib.FullScreen();
 	lib.Debug("finish fullscreen");
-end
-
-function Menu_SetMusic()
-    if JY.EnableMusic==0 then
-	    JY.EnableMusic=1;
-		PlayMIDI(JY.CurrentMIDI);
-	else
-	    JY.EnableMusic=0;
-		lib.PlayMIDI("");
-	end
-	return 1;
-end
-
-function Menu_SetSound()
-    if JY.EnableSound==0 then
-	    JY.EnableSound=1;
-	else
-	    JY.EnableSound=0;
-	end
-	return 1;
 end
 
 

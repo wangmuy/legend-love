@@ -115,6 +115,9 @@ end
 
 function EngineAPI.sprite.draw(archiveId, spriteId, x, y, flags, alpha) end
 
+-- 染色绘制（REQ-MS1-3）：web 终端无图形渲染
+function EngineAPI.sprite.drawTinted(archiveId, spriteId, x, y, color, alpha) end
+
 --------------------------------------------------------------------------------
 -- map - no-op
 --------------------------------------------------------------------------------
@@ -178,6 +181,15 @@ end
 
 function EngineAPI.input.setKeyRepeat(delay, interval) end
 
+-- 鼠标（REQ-MS1-2）：web 是 xterm 终端，无鼠标操作概念
+function EngineAPI.input.mousePosition()
+    return -1, -1
+end
+
+function EngineAPI.input.mouseButton(button)
+    return false
+end
+
 --------------------------------------------------------------------------------
 -- audio - no-op
 --------------------------------------------------------------------------------
@@ -188,6 +200,27 @@ function EngineAPI.audio.playMusic(filename) end
 function EngineAPI.audio.playSFX(filename) end
 
 function EngineAPI.audio.stopMusic() end
+
+-- 音量（REQ-VOL-1）：web 终端版无音频实现，4 个函数为 no-op 但保留状态，
+-- 使 Settings 的读写有一致的回读（未来接 Web Audio 时在此补实现）。
+local webMusicVolume = 64
+local webSFXVolume = 90
+
+function EngineAPI.audio.setMusicVolume(value)
+    webMusicVolume = tonumber(value) or webMusicVolume
+end
+
+function EngineAPI.audio.getMusicVolume()
+    return webMusicVolume
+end
+
+function EngineAPI.audio.setSFXVolume(value)
+    webSFXVolume = tonumber(value) or webSFXVolume
+end
+
+function EngineAPI.audio.getSFXVolume()
+    return webSFXVolume
+end
 
 --------------------------------------------------------------------------------
 -- time - coroutine-based timing
@@ -420,6 +453,19 @@ end
 -- app - application control
 --------------------------------------------------------------------------------
 EngineAPI.app = {}
+
+--------------------------------------------------------------------------------
+-- system - platform info（REQ-MS1-1）
+--
+-- **硬编码 "web"，不得透传 love.system.getOS()**：
+-- LÖVE 的 web 构建（Emscripten）下 getOS() 理论上返回 "Linux"，
+-- 若透传会让 platformDefaults.Linux=true 把 web 端误判为「桌面」，
+-- 从而默认开启鼠标（而 web 是 xterm 终端，没有鼠标操作概念）。
+--------------------------------------------------------------------------------
+EngineAPI.system = EngineAPI.system or {}
+EngineAPI.system.getOS = function()
+    return "web"
+end
 
 -- 通关/结束 BANNER（去重）：同一局可能由多个地方输出“恭喜通关/游戏结束”
 -- （时空梭 finale 协程直接打印、GAME_END 状态机 enter→app.quit 各自打印等）。

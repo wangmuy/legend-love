@@ -224,6 +224,15 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     JY.Status = prevState
     warState.status = "ended"
     warState.result = (warStatus == 1)
+
+    -- 战败时不在这里弹「死亡画面」——
+    -- 原版语义是：WarMain 返回 false → 调用方脚本自己处理
+    -- （韦大宝的「佣兵行会」是 instruct_13 + "战斗失败，抱歉没有银子可挣！"）。
+    -- 这里多做任何事都会让调用方的消息框被顶掉或卡住。
+    --
+    -- 但要保证 disableInput 不留残留：战斗期间可能被别的模块设过。
+    local InputManager = require("framework.input_manager")
+    InputManager.disableInput = false
     
     return warState.result
 end
@@ -441,12 +450,40 @@ War_AutoMoveCoroutine = function(wugongnum)
         end
         
         if x and y then
+            -- **回溯到移动步数范围内**（取第 3 层的步数，逐格向起点退）
+            --
+            -- 原实现是 `while true do ... end`，但没有退出保证：
+            -- 若目标格不可达（第 3 层 = 255），
+            --     i = 255 > 移动步数 → 不 break
+            --     四个方向都找不到 i-1（254）→ x, y 不变
+            -- → **原地空转，永不退出** → love.update 卡死 → 游戏无响应。
+            --
+            -- 用户实测：佣兵任务失败后游戏无响应。
+            -- 战败时我方全灭，War_AutoCoroutine 找不到存活敌人，这个分支
+            -- 必然被走到，于是必然命中上面那个死循环。
+            --
+            -- 修法：记录上一次的步数，只要本轮没有任何前进就停下。
+            -- 语义上等价于「走不到就留在原地」，与原版意图一致。
+            local prevI = nil
             while true do
                 local i = GetWarMap(x, y, 3)
                 if i <= WAR.Person[WAR.CurID]["移动步数"] then
                     break
                 end
-                
+
+                -- 没有进展 → 该格从起点不可达，放弃这次移动
+                if prevI ~= nil and i >= prevI then
+                    lib.Debug("War_AutoCoroutine: unreachable target ("
+                        .. tostring(x) .. "," .. tostring(y) .. "), skip move")
+                    return 0
+                end
+                prevI = i
+                -- 步数 255 = 不可达（War_CalMoveStep 的初值），直接放弃
+                if i >= 255 then
+                    lib.Debug("War_AutoCoroutine: target not in move range, skip move")
+                    return 0
+                end
+
                 if GetWarMap(x - 1, y, 3) == i - 1 then
                     x = x - 1
                 elseif GetWarMap(x + 1, y, 3) == i - 1 then
@@ -455,6 +492,10 @@ War_AutoMoveCoroutine = function(wugongnum)
                     y = y - 1
                 elseif GetWarMap(x, y + 1, 3) == i - 1 then
                     y = y + 1
+                else
+                    -- 四个方向都退不了：彻底放弃
+                    lib.Debug("War_AutoCoroutine: cannot backtrack, skip move")
+                    return 0
                 end
             end
             War_MovePersonCoroutine(x, y)
@@ -584,6 +625,12 @@ local SelectAttackTargetCoroutine = function(wugong, level)
         WAR.MoveCursorY = y
         
         local key = InputAsync.WaitKeyCoroutine()
+
+        -- 同 War_MoveCoroutine：等键返回后立刻读回全局光标
+        if WAR.MoveCursorX and WAR.MoveCursorY
+            and (WAR.MoveCursorX ~= x or WAR.MoveCursorY ~= y) then
+            x, y = WAR.MoveCursorX, WAR.MoveCursorY
+        end
         
         local x2, y2 = x, y
         
@@ -966,6 +1013,21 @@ War_MoveCoroutine = function()
         
         -- 等待按键（绘制由 game_states.lua 的 draw 函数处理）
         local key = InputAsync.WaitKeyCoroutine()
+
+        -- **等键返回后立刻读回全局光标**（鼠标支持 REQ-MS4-1）
+        --
+        -- 光标有两份状态：局部 x,y（协程权威）与 WAR.MoveCursorX/Y（给 draw）。
+        -- 键盘方向键同时改两者；鼠标只能改全局（它拿不到协程局部变量）。
+        --
+        -- 位置很关键：必须在 WaitKey 之后、所有判断之前。
+        -- 若放在循环顶部，协程从 yield 点恢复后不会重新执行那段，
+        -- 于是本轮的 x,y 仍是 click 前的值 → `x == x0` 判定「没移动」
+        -- → 点了完全没反应（用户实测「悬停有效果、点击无效」的根因：
+        -- 悬停改的是全局，draw 读全局所以看得见；判断读局部所以无效）。
+        if WAR.MoveCursorX and WAR.MoveCursorY
+            and (WAR.MoveCursorX ~= x or WAR.MoveCursorY ~= y) then
+            x, y = WAR.MoveCursorX, WAR.MoveCursorY
+        end
         
         lib.Debug("War_MoveCoroutine: key=" .. key .. " at (" .. x .. "," .. y .. ")")
         
@@ -1541,6 +1603,12 @@ War_StatusMenuCoroutine = function()
     
     WAR.ShowHead = 1
     Cls()
+end
+
+--- 取当前战斗状态表（供 WarMain 包装器判断「是否异常结束」）
+-- @return table
+function WarAsync.getState()
+    return warState
 end
 
 -- 导出函数

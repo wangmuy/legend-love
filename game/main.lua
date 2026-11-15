@@ -17,6 +17,35 @@ function love.keyreleased(key, scancode)
     InputManager.getInstance():onKeyReleased(key, scancode)
 end
 
+-- 鼠标回调（REQ-MS2-1 / REQ-MS2-2）
+--
+-- 只负责「入队」，不做任何业务判断：
+--   * 业务条件（鼠标开关、状态、阻塞输入）在 jymain_adapter.pollMouse 里判断
+--   * 直接处理会有「按下即触发、按住重复触发」的问题（鼠标按下是状态不是事件）
+--
+-- 开关关闭时**不入队**：省掉每帧的无用消费，也让「关闭即彻底无反应」更明确。
+function love.mousepressed(x, y, button, istouch, presses)
+    local ok, MouseMenu = pcall(require, "framework.mouse_menu")
+    if ok and MouseMenu and not MouseMenu.isEnabled() then
+        return
+    end
+    local InputManager = require("framework.input_manager")
+    InputManager.enqueueMouseEvent({
+        type = "pressed", x = x, y = y, button = button,
+    })
+end
+
+function love.mousereleased(x, y, button, istouch, presses)
+    local ok, MouseMenu = pcall(require, "framework.mouse_menu")
+    if ok and MouseMenu and not MouseMenu.isEnabled() then
+        return
+    end
+    local InputManager = require("framework.input_manager")
+    InputManager.enqueueMouseEvent({
+        type = "released", x = x, y = y, button = button,
+    })
+end
+
 function love.load()
     -- 加载配置
     require "framework.config"

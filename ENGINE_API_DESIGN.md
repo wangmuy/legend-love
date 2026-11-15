@@ -2,7 +2,7 @@
 
 ## 背景
 
-EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 render/sprite/map/input/audio/time/file/script/font/dialog/color/debug/coroutine 共 12 个模块。当前 OpenSpec 变更（`engine-api-abstraction-layer`）已完成接口定义、Love2D 实现、测试引擎和事件驱动适配层的实现。
+EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 render/sprite/map/input/audio/time/file/script/font/dialog/color/debug/coroutine/app/system 共 15 个模块。当前 OpenSpec 变更（`engine-api-abstraction-layer`）已完成接口定义、Love2D 实现、测试引擎和事件驱动适配层的实现。
 
 ### dialog 模块（2026-11 新增，第 6 次锁内改动）
 

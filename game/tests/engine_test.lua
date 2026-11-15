@@ -93,6 +93,16 @@ EngineAPI.sprite.draw = function(archiveId, spriteId, x, y, flags, alpha)
     logCall("sprite.draw", archiveId, spriteId, x, y, flags, alpha)
 end
 
+-- 染色绘制（REQ-MS1-3）：记录调用，并把最后一次参数存起来便于断言
+EngineAPI.sprite._lastTint = nil
+EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
+    EngineAPI.sprite._lastTint = {
+        archiveId = archiveId, spriteId = spriteId,
+        x = x, y = y, color = color, alpha = alpha,
+    }
+    logCall("sprite.drawTinted", archiveId, spriteId, x, y, color, alpha)
+end
+
 --------------------------------------------------------------------
 -- map 模块 - load* 正常加载数据，draw* 为空操作
 --------------------------------------------------------------------
@@ -144,6 +154,20 @@ EngineAPI.input.setKeyRepeat = function(delay, interval)
     logCall("input.setKeyRepeat", delay, interval)
 end
 
+-- 鼠标（REQ-MS1-2）：可注入位置与按键状态
+EngineAPI.input._mouseX = -1
+EngineAPI.input._mouseY = -1
+EngineAPI.input._mouseDown = {}
+
+EngineAPI.input.mousePosition = function()
+    return EngineAPI.input._mouseX, EngineAPI.input._mouseY
+end
+
+EngineAPI.input.mouseButton = function(button)
+    logCall("input.mouseButton", button)
+    return EngineAPI.input._mouseDown[tonumber(button) or 1] == true
+end
+
 --------------------------------------------------------------------
 -- audio 模块 - 所有函数为空操作
 --------------------------------------------------------------------
@@ -158,6 +182,29 @@ end
 EngineAPI.audio.stopMusic = function()
     logCall("audio.stopMusic")
 end
+
+-- 音量（REQ-VOL-1）：测试引擎记录调用并保存状态，
+-- 这样测试既能断言「框架真的调到了引擎」，又能验证读写回读。
+EngineAPI.audio.setMusicVolume = function(value)
+    logCall("audio.setMusicVolume", value)
+    EngineAPI.audio._musicVolume = tonumber(value) or EngineAPI.audio._musicVolume
+end
+
+EngineAPI.audio.getMusicVolume = function()
+    return EngineAPI.audio._musicVolume
+end
+
+EngineAPI.audio.setSFXVolume = function(value)
+    logCall("audio.setSFXVolume", value)
+    EngineAPI.audio._sfxVolume = tonumber(value) or EngineAPI.audio._sfxVolume
+end
+
+EngineAPI.audio.getSFXVolume = function()
+    return EngineAPI.audio._sfxVolume
+end
+
+EngineAPI.audio._musicVolume = 64
+EngineAPI.audio._sfxVolume = 90
 
 --------------------------------------------------------------------
 -- time 模块 - sleep 直接返回，getTime 返回 os.clock
@@ -378,6 +425,33 @@ EngineAPI.init = function() end
 EngineAPI.app = EngineAPI.app or {}
 EngineAPI.app.quit = function()
     logCall("app.quit")
+end
+
+---------------------------------------------------------------------
+-- system 模块（REQ-MS1-1）- 平台名可注入，便于测试各平台分支
+--
+-- 用**闭包变量**存平台名，不用表字段。
+--
+-- 原因（踩过的坑）：engine_test.lua 与 engine_mud.lua 都 require 同一个
+-- engine_api 表并往上挂实现，而 TestHelper.mockEngineAPI 会把 _G.EngineAPI
+-- 指向另一个新表。若 getOS 写成「读 EngineAPI.system._os」，一旦表被替换/
+-- 重新加载，读到的就是另一个表（字段为 nil → 返回 "unknown"），
+-- 表现为「全量跑失败、单跑通过」。
+-- 闭包变量不依赖任何表，天然免疫。
+---------------------------------------------------------------------
+EngineAPI.system = EngineAPI.system or {}
+
+local testOS = "Windows"
+
+--- 注入平台名（测试用）
+-- @param name string
+function EngineAPI.system.setOS(name)
+    testOS = name or "Windows"
+end
+
+EngineAPI.system.getOS = function()
+    logCall("system.getOS")
+    return testOS
 end
 
 return EngineAPI

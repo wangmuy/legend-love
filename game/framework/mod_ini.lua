@@ -43,8 +43,8 @@ local NUMERIC_KEYS = {
     -- CONFIG
     ["CONFIG.Width"] = true,
     ["CONFIG.Height"] = true,
-    ["CONFIG.MasterVolume"] = true,
-    ["CONFIG.SoundVolume"] = true,
+    -- CONFIG.MasterVolume / CONFIG.SoundVolume 已退役：
+    -- 音量迁移到 Settings 的 audio.music / audio.sfx（见 SECTION_MAP.music）。
     ["CONFIG.KeyRepeatDelay"] = true,
     ["CONFIG.KeyRepeatInterval"] = true,
     -- CC（数值）
@@ -125,10 +125,12 @@ local SECTION_MAP = {
         -- 是 AllMod-Launcher.exe（独立 Windows 启动器）的窗口提示，与游戏逻辑无关。
         -- 映射到 CONFIG.Width/Height 会把窗口缩到 640x440，属错误适配。
         -- 详见 openspec/changes/allmods-ini-parser/reports/resolution-mapping.md
-        volume        = { {"CONFIG", "MasterVolume"} },
+        -- 音量：与 [music] 段同义（有些 MOD 把 volume 写在 [system] 下）。
+        -- 同样改为写入 Settings mod 层，零换算（见 [music] 段注释）。
+        volume        = { settings = "audio.music" },
         -- 兼容拼写变体
-        volume2       = { {"CONFIG", "MasterVolume"} },
-        volumewav     = { {"CONFIG", "SoundVolume"} },
+        volume2       = { settings = "audio.music" },
+        volumewav     = { settings = "audio.sfx" },
         -- 走路/战斗速度
         walk_speed    = { {"CC", "WalkSpeed"} },
         walk_speed2   = { {"CC", "WalkSpeed2"} },
@@ -161,8 +163,20 @@ local SECTION_MAP = {
         virtualby     = { {"CC", "VirtualBY"} },
     },
     music = {
-        volume    = { {"CONFIG", "MasterVolume"} },
-        volumewav = { {"CONFIG", "SoundVolume"} },
+        -- 音量改为写入 Settings 的 **mod 层**（不是 user 层），且**零换算**。
+        --
+        -- 之前映射到 CONFIG.MasterVolume / CONFIG.SoundVolume：
+        --   * MasterVolume 在 config.lua 里根本不存在（错名）
+        --   * SoundVolume 存在但没有读取点
+        -- 两者都是「孤儿数据」—— ModIni.Apply 确实写进去了，只是没人读。
+        -- 20 个 MOD 认真调过的 VOLUME（5/10/17/22）因此从未生效。
+        --
+        -- 现在量程统一为 0-128（与原版 SDL_mixer 的 Mix_Volume 一致），
+        -- 所以这里原样搬入，不做任何 scale 换算 ——
+        -- kysmod.ini 的 VOLUME=22 就是 Settings 的 audio.music=22。
+        -- 详见 openspec/changes/audio-settings/design.md ADR-AS-005。
+        volume    = { settings = "audio.music" },
+        volumewav = { settings = "audio.sfx" },
     },
     constant = {
         -- 新游戏入口
@@ -265,9 +279,19 @@ function ModIni.ParseIniText(text)
     return sections, order
 end
 
--- 将解析结果映射为 {CONFIG, CC, unknown, raw}
+-- 将解析结果映射为 {CONFIG, CC, settings, unknown, raw}
+--
+-- 目标类型（映射表条目形状）：
+--   { {"CONFIG", "Width"} }              写 CONFIG.Width（传统）
+--   { {"CC", "WalkSpeed"} }              写 CC.WalkSpeed（传统）
+--   { settings = "audio.music" }         写 Settings 的 mod 层（第三种）
+--
+-- 为什么需要第三种：音量属于「用户可覆盖的偏好」，不是游戏常量。
+-- 写进 CONFIG/CC 会让它变成无人读的孤儿（旧实现正是如此）；
+-- 写进 Settings 的 **mod 层**才是正确语义 —— 它是 MOD 作者的推荐值，
+-- 玩家自己的选择（user 层）能覆盖它。
 function ModIni.Map(sections, order)
-    local result = { CONFIG = {}, CC = {}, unknown = {}, raw = sections }
+    local result = { CONFIG = {}, CC = {}, settings = {}, unknown = {}, raw = sections }
 
     local function setTarget(target, key, value)
         local qualified = target .. "." .. key
@@ -284,17 +308,29 @@ function ModIni.Map(sections, order)
             for k, v in pairs(kv) do
                 local mapping = lookupMapping(sec, k)
                 if mapping then
-                    for _, t in ipairs(mapping) do
-                        local qualified = t[1] .. "." .. t[2]
-                        -- 负数表示“未设置”的索引键必须忽略，否则引擎会用 -1
-                        -- 去索引数组而崩溃（kys-loving: BEGIN_SCENE = -1）。
-                        local skip = false
-                        if NON_NEGATIVE_KEYS[qualified] then
-                            local n = tonumber(v)
-                            if n ~= nil and n < 0 then skip = true end
+                    -- 两种映射形态：
+                    --   { settings = "audio.music" }   ← 字符串键，**不是数组**
+                    --   { {"CONFIG","Width"}, ... }    ← 数组，每项是 {target,key}
+                    -- 不能一律用 ipairs：对字符串键的表它一项都不产出
+                    -- （这就是音量映射一开始没生效的原因）。
+                    if mapping.settings then
+                        local n = tonumber(v)
+                        if n ~= nil then
+                            result.settings[mapping.settings] = n
                         end
-                        if not skip then
-                            setTarget(t[1], t[2], v)
+                    else
+                        for _, t in ipairs(mapping) do
+                            local qualified = t[1] .. "." .. t[2]
+                            -- 负数表示“未设置”的索引键必须忽略，否则引擎会用 -1
+                            -- 去索引数组而崩溃（kys-loving: BEGIN_SCENE = -1）。
+                            local skip = false
+                            if NON_NEGATIVE_KEYS[qualified] then
+                                local n = tonumber(v)
+                                if n ~= nil and n < 0 then skip = true end
+                            end
+                            if not skip then
+                                setTarget(t[1], t[2], v)
+                            end
                         end
                     end
                 else
@@ -327,6 +363,7 @@ end
 -- ============================================================
 
 -- 把 parsed.CONFIG / parsed.CC 覆盖到全局 CONFIG / CC（只覆盖出现的键）
+-- parsed.settings 写入 Settings 的 **mod 层**
 -- 未激活/未解析时保持默认值不变（REQ-INI-3）
 function ModIni.Apply(parsed)
     if type(parsed) ~= "table" then return end
@@ -341,6 +378,28 @@ function ModIni.Apply(parsed)
     if gCC and type(parsed.CC) == "table" then
         for k, v in pairs(parsed.CC) do
             gCC[k] = v
+        end
+    end
+
+    -- Settings 的 mod 层（REQ-VOL-3）
+    --
+    -- 写 mod 层而非 user 层：MOD 作者设的是「推荐默认值」，
+    -- 玩家自己的选择必须能覆盖它。写 user 层等于把 MOD 的意图冒充玩家的选择。
+    --
+    -- applySettings 可注入（测试用）；默认 require framework.settings。
+    if type(parsed.settings) == "table" then
+        local apply = ModIni._applySettings
+        if apply == nil then
+            local ok, Settings = pcall(require, "framework.settings")
+            if ok and Settings then
+                apply = function(key, value) Settings.setMod(key, value) end
+                ModIni._applySettings = apply
+            end
+        end
+        if apply then
+            for key, value in pairs(parsed.settings) do
+                pcall(apply, key, value)
+            end
         end
     end
 end

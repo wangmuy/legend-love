@@ -116,8 +116,38 @@ function EventBridge:getCurrentSubState()
     return sm:getCurrentSubState()
 end
 
+-- 鼠标事件消费钩子（REQ-MS2-1 / REQ-MS2-2）
+--
+-- 由 jymain_adapter 在初始化时安装。放在 update 的最前面：
+-- 鼠标点击要尽早转换成菜单动作，避免同帧被状态 update 又消费掉按键。
+local mousePollHook = nil
+
+--- 安装鼠标轮询钩子
+-- @param fn function|nil
+function EventBridge.setMousePollHook(fn)
+    mousePollHook = fn
+end
+
+--- 悬停绘制钩子（REQ-MS3-1，位置 ①）
+--
+-- 位置：StateMachine:draw() **之后**、其他 UI（场景名/状态/对话）之前。
+-- 理由（ADR-MS3-006）：菱形属于「地图层的附属物」，应被上层 UI 遮住；
+-- 而菜单在 love.draw 的最后，永远在菱形之上。
+local hoverOverlayCallback = nil
+
+--- 安装悬停绘制钩子
+-- @param fn function|nil
+function EventBridge.setHoverOverlay(fn)
+    hoverOverlayCallback = fn
+end
+
 -- 更新 (在love.update中调用)
 function EventBridge:update(dt)
+    -- 鼠标事件消费（最早，见上方注释）
+    if mousePollHook then
+        mousePollHook()
+    end
+
     -- 更新输入管理器（处理按键重复）
     InputManager.getInstance():update(dt)
     
@@ -151,6 +181,14 @@ function EventBridge:draw()
     
     -- 渲染当前状态
     StateMachine.getInstance():draw()
+
+    -- 悬停高亮（位置 ①：地图之上、其他 UI 之下）
+    if hoverOverlayCallback then
+        local ok = pcall(hoverOverlayCallback)
+        if not ok then
+            -- 钩子抛错不得中断渲染
+        end
+    end
     
     -- 渲染场景名提示（在场景之上；场景名必须压在每帧 DrawSMap 全屏重绘之后）
     local SceneNameAsync = require("framework.scene_name_async")

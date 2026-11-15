@@ -444,8 +444,30 @@ function TestSceneName.testMmapSubscenePassesShowname()
     if not (mmapStart and smapStart) then return end
 
     local mmapSrc = src:sub(mmapStart, smapStart - 1)
-    TestHelper.assertNotNil(mmapSrc:match("switchState%(%s*newState%s*,%s*{%s*showname%s*=%s*1%s*}%)"),
-        "GAME_MMAP 进子场景必须 switchState(newState, { showname = 1 })")
+
+    -- 断言的是「进子场景必须带 showname=1」这个行为，不是「必须写在这个 handler 里」。
+    --
+    -- 该逻辑已抽到共享函数 enterSubScene()（键盘与鼠标自动移动都要用，
+    -- 见 ADR-MS3-008），所以两种形态都算通过：
+    --   ① 直接写在 GAME_MMAP.update 里（旧形态）
+    --   ② 调用 enterSubScene()，由它内部 switchState(..., {showname=1})
+    local inlineOK = mmapSrc:match(
+        "switchState%(%s*newState%s*,%s*{%s*showname%s*=%s*1%s*}%)") ~= nil
+
+    local viaHelper = false
+    if mmapSrc:match("enterSubScene%s*%(") then
+        -- 确认共享函数真的存在且传了 showname（防止调用一个空壳）
+        local helperStart = src:find("local function enterSubScene")
+        if helperStart then
+            local helperSrc = src:sub(helperStart, helperStart + 2000)
+            viaHelper = helperSrc:match(
+                "switchState%(%s*newState%s*,%s*{%s*showname%s*=%s*1%s*}%)") ~= nil
+        end
+    end
+
+    TestHelper.assertTrue(inlineOK or viaHelper,
+        "GAME_MMAP 进子场景必须 switchState(newState, { showname = 1 })"
+        .. "（可直接内联，或经 enterSubScene 共享函数）")
 end
 
 function TestSceneName.testSmapEnterHonorsShowname()
@@ -590,6 +612,74 @@ local function cleanup()
     os.remove("active_mod.txt")
 end
 
+-- ============================================================
+-- 9. 状态切换时必须清掉场景名提示（用户实测 bug）
+--
+-- 出小场景后名字一直留在屏幕上，且之后点击都没反应。
+-- 根因：ShowCoroutine 挂起等键，切状态时协程不唤醒也不取消，
+--       currentName 和 disableInput 双重残留。
+-- ============================================================
+
+function TestSceneName.testDismissClearsName()
+    print("\n=== Test: dismissOnStateChange 清掉场景名 ===")
+    local SNA = require("framework.scene_name_async")
+    SNA.Show("主角的家")
+    TestHelper.assertTrue(SNA.isActive(), "显示中")
+
+    SNA.dismissOnStateChange()
+    TestHelper.assertFalse(SNA.isActive(), "dismiss 后不再显示")
+end
+
+function TestSceneName.testDismissRestoresDisableInput()
+    print("\n=== Test: dismiss 恢复 disableInput ===")
+    local SNA = require("framework.scene_name_async")
+    local IM = require("framework.input_manager")
+    IM.disableInput = false
+
+    SNA.Show("某场景")
+    TestHelper.assertTrue(IM.disableInput, "显示中 disableInput=true")
+
+    SNA.dismissOnStateChange()
+    TestHelper.assertFalse(IM.disableInput,
+        "dismiss 后恢复 false（否则之后所有点击都被判为不可行动）")
+end
+
+function TestSceneName.testDismissDoesNotTouchOtherBlocks()
+    print("\n=== Test: 无提示时 dismiss 不误清 disableInput ===")
+    local SNA = require("framework.scene_name_async")
+    local IM = require("framework.input_manager")
+    SNA.clear()
+
+    IM.disableInput = true    -- 模拟动画/菜单设置的阻塞
+    SNA.dismissOnStateChange()
+    TestHelper.assertTrue(IM.disableInput,
+        "没有提示显示时不得改动 disableInput（避免误清别人的阻塞）")
+    IM.disableInput = false
+end
+
+function TestSceneName.testSmapExitCallsDismiss()
+    print("\n=== Test: GAME_SMAP.exit 调用了 dismiss ===")
+    local f = io.open("framework/game_states.lua", "r")
+    if not f then
+        TestHelper.assertTrue(false, "无法打开 game_states.lua")
+        return
+    end
+    local src = f:read("*a")
+    f:close()
+
+    local smapStart = src:find('handlers%["GAME_SMAP"%]')
+    TestHelper.assertNotNil(smapStart, "找到 GAME_SMAP")
+    local smapSrc = src:sub(smapStart, smapStart + 8000)
+
+    -- 在 exit 里必须调用 dismissOnStateChange
+    local exitStart = smapSrc:find("exit%s*=%s*function")
+    TestHelper.assertNotNil(exitStart, "找到 exit 函数")
+    local exitSrc = smapSrc:sub(exitStart, exitStart + 1500)
+
+    TestHelper.assertNotNil(exitSrc:match("dismissOnStateChange"),
+        "GAME_SMAP.exit 必须调用 SceneNameAsync.dismissOnStateChange()")
+end
+
 function TestSceneName.runAll()
     bootHeadless()
 
@@ -628,6 +718,11 @@ function TestSceneName.runAll()
     TestSceneName.testGameInitConstantDefined()
     TestSceneName.testSetGlobalInitializesStatus()
     TestSceneName.testSetGlobalLeavesNoStrayGlobals()
+
+    TestSceneName.testDismissClearsName()
+    TestSceneName.testDismissRestoresDisableInput()
+    TestSceneName.testDismissDoesNotTouchOtherBlocks()
+    TestSceneName.testSmapExitCallsDismiss()
 
     cleanup()
     TestHelper.printSummary()

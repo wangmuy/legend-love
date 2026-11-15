@@ -91,11 +91,35 @@ function SceneNameAsync.isActive()
     return currentName ~= nil
 end
 
--- 清空（供测试与异常恢复使用）
+-- 清空（供测试、异常恢复、**状态切换**使用）
+--
+-- 必须由状态切换调用（GAME_SMAP.exit）：场景名提示靠一个「挂起等键」的
+-- 协程维持，切走状态时那个协程不会被唤醒也不会被取消。
+-- 不清空的后果（用户实测）：
+--   ① currentName 残留 → EventBridge:draw() 每帧照画 → 名字留在屏幕上
+--   ② disableInput 残留为 true → 之后所有点击都被 canPlayerAct 挡掉
+--      → 表现为「小场景内点什么都没反应」
+--
+-- 顺带收敛 InputManager.disableInput：它是个「多人共用」的布尔量，
+-- 提示结束后必须恢复成 false，否则别的模块会一直以为在被阻塞。
 function SceneNameAsync.clear()
     currentName = nil
     local InputManager = require("framework.input_manager")
     InputManager.disableInput = false
+end
+
+-- 场景切换时的清理钩子（幂等）
+--
+-- 与 clear() 的区别：这个函数在「没有提示显示」时完全不动 disableInput，
+-- 避免误清掉别的模块（动画、菜单）设置的阻塞标志。
+function SceneNameAsync.dismissOnStateChange()
+    local had = (currentName ~= nil)
+    currentName = nil
+    if had then
+        local InputManager = require("framework.input_manager")
+        InputManager.disableInput = false
+        lib.Debug("SceneNameAsync: dismissed on state change")
+    end
 end
 
 return SceneNameAsync
