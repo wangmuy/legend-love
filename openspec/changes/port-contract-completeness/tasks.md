@@ -1,6 +1,6 @@
 # Tasks: port-contract-completeness
 
-> 父 slice: `port-slice1-contract-completeness`
+> 父 slice: `engine-portability`（openspec/changes/engine-portability/）
 > 分批策略：每批一个 commit，每批跑全量测试。**不允许一次性提交 237 处改动。**
 
 ## Task 1：契约定义（19 个新函数）

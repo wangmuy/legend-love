@@ -1,0 +1,214 @@
+---
+status: active
+parent_epic: null
+---
+# Change Manifest: engine-portability — 引擎可移植性硬化
+
+> 本 slice 统辖 3 个子 change，均位于 `openspec/changes/` 下与 slice 同级
+> （符合本仓既有 `mouse-slice1` 的组织方式）。
+
+## Change Assignments
+
+### Change: port-contract-completeness
+
+- **Repository**: this repo
+- **Scope**: fullstack（4 引擎实现 + 契约定义 + framework 调用改写 + 跨引擎测试 + 文档）
+- **Responsibility**:
+  1. 16 种 `lib.*` 提升为 EngineAPI 契约（46 处调用点）
+  2. `lib.Debug/GetKey/Delay/GetTime` → `EngineAPI.*`（191 处调用点）
+  3. 补齐 3 个缺失契约：`render.getWidth` / `render.getHeight` / `font.measureText`
+  4. **修复虚拟手柄接线 bug**（`pollVirtualPad` 依赖不存在的 `render.getWidth`）
+  5. 38 个 dead contract 决策留痕（`decisions.md`）
+  6. 4 引擎实现同步补齐
+  7. 新建 `test_engine_conformance.lua`（行为断言，MUD/Web 上真实执行）
+  8. 新建门禁 `gate_engine_contract.sh`
+  9. 文档计数同步（`AGENTS.md` / `ENGINE_API_DESIGN.md` / `SRC_FILES.md`）
+- **Depends On**: —（无前置）
+- **Status**: [ ] Created
+
+### Change: port-script-decoupling
+
+- **Repository**: this repo
+- **Scope**: fullstack（framework facade 新模块 + 140 处调用改写 + script 薄包装 + 测试）
+- **Responsibility**:
+  1. 新建 `framework/render_facade.lua`（绘制类转发，只调 `EngineAPI.render`）
+  2. 新建 `framework/flow_facade.lua`（流程类转发，只调既有 framework 模块）
+  3. 新建 `framework/game_hooks.lua`（游戏逻辑注入点，替代硬依赖 script）
+  4. framework 里 140 处 script 全局调用改写：
+     - 绘制类 87 处（DrawString 28 / Cls 28 / ShowScreen 11 / DrawBox 8 /
+       DrawStrBox 10 / DrawStrBoxYesNo 1 / DrawStrBoxWaitKey 1）→ `render_facade`
+     - 流程类 25 处（ShowMenu 8 / ShowMenu2 3 / WaitKey 11 / TalkEx 3）→ `flow_facade`
+     - 游戏逻辑 19 处（GetMyPic 13 / AddMyCurrentPic 4 / SceneCanPass 2）→ `game_hooks`
+     - 音频 8 处（PlayMIDI 6 / PlayMPEG 1）→ 契约；绘制 2 处（FillColor / DrawRect）→ facade
+  5. `game/script/jymain.lua` 的 8 个全局函数改为 facade 薄包装
+  6. 游戏逻辑回调注入接线（`jymain_adapter` 启动时注册）
+  7. 全部既有测试零回归 + 实机冒烟
+- **Depends On**: `port-contract-completeness`（需要完整契约；`render.getWidth`
+  等是 facade 的基础）
+- **Status**: [ ] Created
+
+### Change: port-sprite-animation
+
+- **Repository**: this repo
+- **Scope**: fullstack（framework 新模块 + game_states 接线 + 测试）
+  **引擎实现零改动**
+- **Responsibility**:
+  1. 新建 `framework/sprite_anim.lua`：纯逻辑动画播放器
+     - `defineSequence(id, spec)`：`{archive=, frames={}, fps=, mode=}`
+     - `play(handle, sequenceId, opts)` / `stop(handle)` / `isPlaying(handle)`
+     - `update(dt)`：唯一时间源
+     - `getFrameId(handle)`：返回不透明整数帧号
+     - 模式 `loop` / `once` / `pingpong` + `onComplete` 回调
+  2. 新建 `framework/animation_defs.lua`：本游戏的帧序列定义
+  3. `game_states.lua` 的 4 处 `AddMyCurrentPic()` 改为 `sprite_anim.update(dt)`
+  4. `jymain.lua` 的 `GetMyPic` 改为查询 `sprite_anim.getFrameId()`（签名不变）
+  5. `Settings` 新增 `animation.walkFps`（默认 15，可调，可关）
+  6. 单元测试 `test_sprite_anim.lua`（纯算法，无引擎桩）
+- **Depends On**: —（只消费既有 `EngineAPI.sprite.draw` 契约）
+  **但建议排在 `port-script-decoupling` 之后**：两者都要改
+  `game_states.lua`（前者改 16 处绘制调用，后者改 4 处动画推进点），
+  同文件冲突风险
+- **Status**: [ ] Created
+
+---
+
+## 依赖图
+
+```
+  ┌──────────────────────────────────────┐
+  │ port-contract-completeness            │
+  │  契约完整化 + 修虚拟手柄接线           │
+  │  237 处调用改动                        │
+  └───────────────┬──────────────────────┘
+                  │（必须先有完整契约）
+                  ▼
+  ┌──────────────────────────────────────┐
+  │ port-script-decoupling                │
+  │  140 处 script 全局 → facade           │
+  └──────────────────────────────────────┘
+
+  ┌──────────────────────────────────────┐
+  │ port-sprite-animation                 │
+  │  动画时间驱动（引擎侧零改动）          │
+  └──────────────────────────────────────┘
+       ▲
+       │ 无硬依赖，但建议排在上者之后（同文件冲突）
+```
+
+- change 1 **必须**先于 change 2（先有契约才能解耦）
+- change 3 与 1/2 无硬依赖，但**同改 `game_states.lua`** → 建议顺序执行
+
+---
+
+## Shared Contract Stubs
+
+以下是三个 change 之间的接口契约。**签名一经确定不得随意改动。**
+
+### change 1 → change 2 的契约（facade 依赖）
+
+```lua
+-- change 2 的 render_facade 内部要调这些，所以 change 1 必须先确保它们可用
+EngineAPI.render.getWidth()        --> number
+EngineAPI.render.getHeight()       --> number
+EngineAPI.render.text(x, y, str, color, size, fontname)
+EngineAPI.render.fillRect(x1, y1, x2, y2, color)
+EngineAPI.render.rectOutline(x1, y1, x2, y2, color)
+EngineAPI.render.setClip(x1, y1, x2, y2)
+EngineAPI.render.present()
+EngineAPI.font.measureText(str, size, fontName)  --> number
+EngineAPI.debug.log(...)
+```
+
+### change 1 → change 3 的契约（动画依赖）
+
+```lua
+-- change 3 的 sprite_anim 只调这一个
+EngineAPI.sprite.draw(archiveId, frameId, x, y, flags, alpha)
+-- frameId 是**不透明整数**，语义由引擎的 loadArchive 定义
+```
+
+### change 3 → change 2 的冲突点
+
+```lua
+-- 两者都要改 game/framework/game_states.lua，但改不同行：
+--   change 2: 16 处 Cls / DrawString / ShowScreen / lib.DrawMMap
+--   change 3: 4 处 AddMyCurrentPic
+```
+
+---
+
+## Integration Test Plan
+
+slice 完成后如何验证端到端：
+
+### 1. 契约完整性（静态验证）
+
+```bash
+# 零绕过
+grep -rn 'lib\.' game/framework/*.lua | grep -vE ':[0-9]+:\s*--' | wc -l   # 期望 0
+# 零 script 全局
+grep -rhoE '\b(DrawString|Cls|ShowScreen|DrawBox|DrawStrBox|ShowMenu|WaitKey|TalkEx)\(' \
+  game/framework/*.lua | wc -l                                              # 期望 0
+# 保持既有的零
+grep -rn 'love\.' game/framework/*.lua | grep -vE ':[0-9]+:\s*--' | wc -l  # 期望 0
+grep -rn 'require("engine' game/framework/*.lua | wc -l                     # 期望 0
+```
+
+### 2. 换引擎可行性（最强验证）
+
+构造一个"最小第三引擎" `engine_minimal/`（或复用 `engine_mud`），
+它**只实现 `engine_api.lua` 声明的函数**，不提供任何 `lib.*` 回退：
+
+```lua
+_G.lib = setmetatable(EngineAPI, { __index = {} })   -- 空回退，任何绕过都会崩
+```
+
+然后在它上面跑：
+- `framework/` 模块加载（无 nil 调用崩溃）
+- 菜单构建与点击（`menu_state_machine`）
+- 地图绘制调用链（`map_render.drawMain`）
+- 动画推进（`sprite_anim.update(dt)`）
+
+**若任何一处崩了，说明还有未契约化的绕过。**
+
+### 3. 虚拟手柄真实激活（活体缺陷验证）
+
+```lua
+-- 注入触摸点，断言端到端
+_G.EngineAPI.input._touches = { {id=1, x=<accept圆心x>, y=<accept圆心y>} }
+Settings.set("input.virtualPad", true)
+JYMainAdapter.pollVirtualPad()   -- 期望 true
+InputManager.getActionEvent()    -- 期望 {action="ui.accept", source="touch"}
+```
+
+### 4. 动画手感对照
+
+```bash
+# 改动前后录制同一段行走，逐帧对比
+# 默认 walkFps=15 时节奏应肉眼一致；不一致则校准默认值
+```
+
+### 5. 全量回归
+
+```bash
+cd game && for v in lua5.1 lua53 lua54 lua55; do
+  "D:/lua/$v.exe" tests/test_runner.lua  # 期望失败 0，断言数 ≥ 3310
+done
+luac5.1 -p / luac55 -p 全仓零失败
+LÖVE 11.5 启动冒烟
+```
+
+### 6. 门禁
+
+```bash
+gate_engine_contract.sh   # 本 slice 新增
+gate_input_actions.sh     # 既有，不得回退
+gate_base_music.sh        # 既有
+gate_ascii.sh             # 既有
+```
+
+---
+
+## Slice 完成判定
+
+slice 在 3 个 change 全部 archived 后标记 `status: done` 并移入 `archive/`。

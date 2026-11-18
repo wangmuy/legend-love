@@ -1,7 +1,6 @@
 # Change Proposal: port-contract-completeness — 引擎契约完整性
 
-> 父 slice: `port-slice1-contract-completeness`
-> 父 epic: `2026-11-engine-portability`
+> 父 slice: `engine-portability`（openspec/changes/engine-portability/）
 
 ## Why
 
