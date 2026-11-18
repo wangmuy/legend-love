@@ -245,7 +245,11 @@ function JYMainAdapter.showStartMenuCoroutine()
     -- 水平居中：用真实宽度（见 centeredMenuX 注释）
     local menux = JYMainAdapter.centeredMenuX(menu, CC.StartMenuFontSize)
     
-    local menuReturn = MenuAsync.ShowMenuCoroutine(menu, 4, 0, menux, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
+    -- align="center"：开始菜单的 4 项里「设置」只有 2 字，另 3 项 4 字。
+    -- 框宽由最长项（4 字）决定并已水平居中，但每项文本默认**左对齐**，
+    -- 于是「设置」左边贴框、右边空 64px —— 用户看到的「设置还是左对齐」。
+    -- 传 center 让每项文本在框内居中（4 字项本来就正好填满，位置不变）。
+    local menuReturn = MenuAsync.ShowMenuCoroutine(menu, 4, 0, menux, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED, "center")
     
     if menuReturn == 1 then
         JYMainAdapter.startNewGame(menux)
@@ -1154,7 +1158,8 @@ function JYMainAdapter.loadGame()
     -- 同样用真实宽度居中（旧公式「假设 3 个字宽」会偏左）
     local menux2 = JYMainAdapter.centeredMenuX(loadMenu, CC.StartMenuFontSize)
     
-    local r = MenuAsync.ShowMenuCoroutine(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
+    -- 载入进度菜单同理：档号/名字长度差异大，居中更整齐
+    local r = MenuAsync.ShowMenuCoroutine(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED, "center")
     
     Cls()
     DrawString(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)

@@ -19,13 +19,13 @@ end
 
 -- 显示菜单（异步版本）
 -- 参数与ShowMenu相同，但使用回调返回结果
-function MenuAsync.ShowMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor, callback)
+function MenuAsync.ShowMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor, callback, align)
     _debug("MenuAsync.ShowMenu called")
     
     local msm = MenuStateMachine.getInstance()
     
-    -- 创建菜单数据
-    local menuData = msm:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
+    -- 创建菜单数据（align 在最后：向后兼容，不传 = 左对齐）
+    local menuData = msm:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor, align)
     
     _debug("MenuAsync.ShowMenu: menuData created, newNumItem=" .. tostring(menuData.newNumItem))
     
@@ -118,7 +118,7 @@ function MenuAsync.clear()
 end
 
 -- 包装为协程版本（用于在协程中同步调用）
-function MenuAsync.ShowMenuCoroutine(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
+function MenuAsync.ShowMenuCoroutine(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor, align)
     local CoroutineScheduler = require("framework.coroutine_scheduler")
     local scheduler = CoroutineScheduler.getInstance()
     
@@ -132,7 +132,7 @@ function MenuAsync.ShowMenuCoroutine(menuItem, numItem, numShow, x1, y1, x2, y2,
         result = returnValue
         menuClosed = true
         _debug("ShowMenuCoroutine: set menuClosed=true, result=" .. tostring(result))
-    end)
+    end, align)
     
     _debug("ShowMenuCoroutine: waiting for menu to close")
     

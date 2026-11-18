@@ -95,7 +95,7 @@ function MenuStateMachine:init()
 end
 
 -- 创建菜单数据
-function MenuStateMachine:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
+function MenuStateMachine:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor, align)
     -- 过滤可显示的菜单项
     local newMenu = {}
     local newNumItem = 0
@@ -209,6 +209,13 @@ function MenuStateMachine:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2,
         prevCurrent = current,     -- 上一个选中项
         selectAnimationTime = 0,   -- 选项切换动画时间
         selectAnimationProgress = 0,  -- 选项切换动画进度
+        -- 项文本在框内的水平对齐："left"（默认）| "center"
+        --
+        -- 为什么默认 left：既有 20+ 个菜单全部是「等宽项」列表
+        -- （物品名、人名、招式名的长度各不相同），左对齐才能看出层级。
+        -- 只有当菜单项长度**差异明显且都是独立选项**时（开始菜单的
+        -- 「设置」2 字 vs 其余 4 字）居中才好看，所以做成 opt-in。
+        align = align or "left",
     }
 end
 
@@ -943,9 +950,15 @@ function MenuStateMachine:draw()
         if menu.isHorizontal then
             -- 横向布局：菜单项水平排列
             local itemWidth = menu.w / menu.num
-            local x = menu.x1 + CC.MenuBorderPixel + (i - menu.start) * itemWidth
+            local colX = menu.x1 + CC.MenuBorderPixel + (i - menu.start) * itemWidth
             local y = menu.y1 + CC.MenuBorderPixel
-            DrawString(x, y, menu.newMenu[i][1], drawColor, menu.size)
+            local hText = menu.newMenu[i][1]
+            if menu.align == "center" then
+                -- 横向菜单：在**本列**内居中，不是在整个菜单内居中
+                local tw = TextBoxLayout.textWidth(hText, menu.size)
+                colX = colX + math.floor((itemWidth - tw) / 2)
+            end
+            DrawString(colX, y, hText, drawColor, menu.size)
         else
             -- 竖向布局：菜单项垂直排列（默认）
             local y = rowY(menu, i)
@@ -963,6 +976,10 @@ function MenuStateMachine:draw()
             end
 
             -- 多行文本项（值项的 ▲/值/▼ 三行）：按 \n 逐行绘制，行高 size+RowPixel
+            --
+            -- 注意：多行文本**不参与 align="center"**。
+            -- 值项的三行文本自带手写前导空格（"    ▲"），是给左对齐设计的；
+            -- 再叠加居中会把它推到右边，反而不齐。
             if type(text) == "string" and text:find("\n", 1, true) then
                 local lineY = y
                 for line in (text .. "\n"):gmatch("(.-)\n") do
@@ -971,10 +988,33 @@ function MenuStateMachine:draw()
                     lineY = lineY + menu.size + CC.RowPixel
                 end
             else
-                DrawString(menu.x1 + CC.MenuBorderPixel, y, text, drawColor, menu.size)
+                DrawString(MenuStateMachine.textX(menu, text), y, text,
+                    drawColor, menu.size)
             end
         end
     end
+end
+
+--- 某一项文本的绘制起始 X（按 menu.align）
+--
+-- 为什么把这段抽成函数而不是在两个 draw 分支里各写一遍：
+--   「居中」的算法只有一个（x1 + (w - textWidth)/2），
+--   两处各写一遍迟早会算错一个（尤其横向分支要按**列**居中而不是按框）。
+--
+-- @param menu table
+-- @param text string 该项要显示的文本（单行）
+-- @return number 起始 X
+function MenuStateMachine.textX(menu, text)
+    local border = (CC and CC.MenuBorderPixel) or 0
+    local baseX = menu.x1 + border
+    if menu.align ~= "center" or type(text) ~= "string" then
+        return baseX
+    end
+    local tw = TextBoxLayout.textWidth(text, menu.size or 0)
+    local cx = menu.x1 + math.floor((menu.w - tw) / 2)
+    -- 不允许越出左内边距：框比文本窄时（理论上不会）退化为左对齐
+    if cx < baseX then return baseX end
+    return cx
 end
 
 -- 检查是否有活动的菜单
