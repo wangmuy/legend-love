@@ -72,8 +72,13 @@
 - [ ] `SpriteDecoder.loadPalette(colBytes)` → 调色板表
 - [ ] `SpriteDecoder.sniffFormat(bytes)` → `"rle"` | `"png"`（按字节签名，
       **不看扩展名**）
-- [ ] `SpriteDecoder.decodeAnchors(format, w, h, opts)` →
-      packed+RLE 用帧头；packed+PNG 用 `w/2, h`；loose 用 `opts`
+- [ ] `SpriteDecoder.decodeAnchors(format, w, h, opts, usage)` →
+      - packed+RLE → 用帧头
+      - packed+PNG + usage="avatar" → `w/2, h/2`（**中心**）
+      - packed+PNG + 其它 → `w/2, h`（脚底中心，保守默认）
+      - loose → 用 `opts.xoff/opts.yoff`
+- [ ] **头像锚点实测**：`hdgrp.grp` slot 60（100×102）应得
+      `xoff=50, yoff=51`；slot 112（100×93）应得 `xoff=50, yoff=46`
 - [ ] 文件里 `love\.` = 0、`require("engine` = 0
 - [ ] **性能**：用 raw RGBA 一次性构造（不逐像素 setPixel）
 - [ ] 单元测试：解码一帧真实 RLE，断言 `w/h/xoff/yoff` 与 RGBA 前 4 字节

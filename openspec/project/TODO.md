@@ -48,9 +48,21 @@
 
 - [ ] **新增资产格式支持（未来扩展点）**
   - 已支持：RLE（原版）+ PNG（引擎解码），两种走不同路径（ADR-PORT-014）
-  - 可低成本新增：WebP / JPG / 自定义 RLE 变体
+  - 可低成本新增：WebP / JPG / BMP / TGA / 自定义 RLE 变体
   - 扩展方式：framework 加格式嗅探 → 若引擎能解码走 `createFromEncoded`，
     若可纯 Lua 解码走 framework 解码 + `createFromRGBA` —— **两种都不改引擎**
+  - **2D 格式调研结论**（详见 ADR-PORT-014 的「调研」小节）：
+    - 图片层面：四引擎交集 = **PNG**（已支持）
+      LÖVE png/jpg/bmp/tga、Godot png/jpg/webp/svg、
+      Unreal png/jpg/bmp/tga、SDL2 png/jpg/webp
+    - 图集层面：**没有任何共同标准**
+      Godot `.tres`(SpriteFrames) / Unreal `.uasset`(PaperFlipbook) 都是引擎专属
+    - 第三方交换格式（TexturePacker JSON / Sparrow XML / Aseprite JSON）
+      需要目标引擎装导入器，不是开箱即用
+  - 因此本设计**不引入图集交换格式**：`.idx/.grp` 本身已是紧凑图集容器，
+    引擎无需理解图集布局（ADR-PORT-013）
+  - 若将来要与外部美术工具链交换：**交换格式是构建期的事，不是运行时的事**
+    （构建工具读 TexturePacker JSON → 转成 .idx/.grp；运行时契约不变）
   - 注意：glTF 等 3D 格式不适合承载 2D 像素精灵（会丢调色板交换与锚点语义）
   - 触发条件：有实际的美术资源需要用新格式时
 

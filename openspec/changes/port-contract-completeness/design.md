@@ -398,13 +398,107 @@ PNG 帧本身没有锚点字段（PNG 规范里没有），所以：
 | 容器类型 | 锚点来源 |
 |---------|---------|
 | packed + RLE | 帧头 8 字节（w,h,xoff,yoff）—— 数据自带 |
-| packed + PNG | **无自带锚点** → 约定 `xoff = w/2, yoff = h`（脚底中心对齐） |
+| packed + PNG | **无自带锚点** → 按**用途分类**取值（见下） |
 | loose 单文件 | 无锚点 → 调用方显式传 `opts.xoff/opts.yoff` |
 
-**为什么 packed+PNG 用 `w/2, h` 作为默认锚点**：实测那 2 个 PNG 帧
-（100×102、100×93）是"高清立绘"用途，视觉上是整体贴图；而 `.grp` 里
-所有 RLE 精灵都是"脚底中心锚定"（主角帧 `15x39, xoff=5, yoff=44` ≈ w/2, h）。
-所以默认值与同容器的 RLE 精灵保持一致，避免两种格式混排时错位。
+**PNG 帧的锚点按用途分类，不按容器统一**：
+
+| 用途 | 锚点 | 依据 |
+|------|------|------|
+| **头像 / 立绘**（`hdgrp`） | `xoff = w/2, yoff = h/2`（**中心**） | 见下方实测 |
+| 地图/战斗精灵 | `xoff = w/2, yoff = h`（脚底中心） | 与同容器 RLE 精灵一致 |
+| 未知用途 | `xoff = w/2, yoff = h`（脚底中心，保守默认） | 与 `.grp` 内 RLE 主流约定一致 |
+
+**为什么头像必须用中心锚定**（实测依据）：
+
+1. 那 2 个 PNG 帧在 `hdgrp.grp` 里，而 `hdgrp` 是**头像档案**：
+   `CC.HeadPicFile = { DataPath.."hdgrp.idx", DataPath.."hdgrp.grp" }`，
+   由 `PicLoadFile(..., 1)` 装载为 archive 1，绘制时用
+   `p["头像代号"] * 2` 取帧。
+
+2. 头像的绘制路径**主动忽略锚点**：
+   ```lua
+   local headw, headh = lib.PicGetXY(1, p["头像代号"]*2)   -- 只取 w,h
+   local headx = (width/2 - headw) / 2
+   local heady = (h*6 - headh) / 2
+   lib.PicLoadCache(1, ..., 1)   -- flag=1 = 不考虑 xoff/yoff
+   ```
+   居中由调用方自己算（`PicGetXY` 返回的 xoff/yoff 被丢弃）。
+
+3. 所以对头像而言**锚点的语义价值是"如果将来有人要按锚点绘制，应该得到中心对齐"**。
+   用 `w/2, h`（脚底）会让头像按锚点绘制时向上偏半个身位 —— 语义错。
+
+**注意**：当前头像绘制路径用 `flag=1`（忽略锚点），所以改这个默认值
+**不改变现有画面**；它只影响未来按锚点绘制的调用方。零回归。
+
+### 调研：2D 精灵有没有「多引擎通用的统一格式」？
+
+**结论：图片有（PNG），图集元数据没有。**
+
+#### 图片（位图）格式的交集
+
+实测/查证四个引擎能解码的格式：
+
+| 引擎 | 支持格式 |
+|------|---------|
+| LÖVE 11.5 | PNG / JPG / BMP / TGA（实测 PNG ok、JPG ok、**无 WebP**） |
+| Godot 4 | PNG / JPG / WebP / SVG |
+| Unreal 5 | PNG / JPG / BMP / TGA（`FImageUtils::ImportBufferAsTexture2D`） |
+| SDL2 + SDL_image | PNG / JPG / WebP / … |
+
+**四者交集 = PNG**（JPG 有损压缩，不适合像素精灵；BMP/TGA 体积过大）。
+
+所以**图片层面的统一格式是 PNG，已经是业界事实标准**。本设计支持它。
+
+#### 图集/精灵格式：没有任何共同标准
+
+| 引擎 | 原生图集格式 | 是否可交换 |
+|------|-------------|-----------|
+| Godot 4 | `AtlasTexture` / `SpriteFrames` → **.tres** | ✗ 引擎专属资源 |
+| Unreal 5 | `PaperSprite` / `PaperFlipbook` → **.uasset** | ✗ 引擎专属资源 |
+| LÖVE | 无图集容器概念（`Quad` + `Image`） | — |
+| SDL2 | 无（`SDL_Rect` + `SDL_Texture`） | — |
+
+**Godot 的 `.tres` 和 Unreal 的 `.uasset` 都是各自的资产管线格式，
+互不兼容，也不是设计给跨引擎交换用的。**
+
+存在一些**第三方**图集交换格式（不是引擎原生）：
+
+- **TexturePacker JSON**（hash / array 两种布局）—— 采纳最广，
+  Cocos / libGDX / Phaser / Godot 有导入器
+- Starling/Sparrow XML —— 老牌，Adobe AIR 生态
+- Aseprite JSON export —— 像素美术工具原生导出
+
+但这些都需要**在目标引擎里装导入器或写解析代码**，不是"开箱即用"。
+
+#### 因此本设计的选择
+
+**不引入任何图集交换格式，而是让"图集"这个概念本身不需要存在。**
+
+理由：
+
+1. 我们的 `.idx/.grp` 已经是一个**紧凑的图集容器**（偏移表 + 打包数据），
+   只是元数据（`w/h/xoff/yoff`）藏在每帧的 8 字节头里。
+2. 引擎侧只需要「上传一段 RGBA 字节」或「解码一段 PNG 字节」，
+   **根本不需要知道什么图集、什么偏移表** —— 那是 framework 的事（ADR-PORT-013）。
+3. 一旦引入 TexturePacker JSON 之类的外部格式，就要在 framework 里
+   再写一个解析器，且**仍然要在引擎里建 Quad/AtlasTexture 映射** ——
+   回到"引擎要懂资产布局"的老问题，与 ADR-PORT-013 的目标相反。
+
+**如果将来确实需要跟外部美术工具链交换**（美术用 Aseprite 画图，
+导出 TexturePacker JSON），正确的做法是：
+
+```
+外部工具产出（PNG 图集 + JSON 元数据）
+        │
+        ▼
+framework 的构建期工具读 JSON，转换成我们的 .idx/.grp 或直接读 packed PNG
+        │
+        ▼
+运行时 framework 只看到「字节段 + 格式标签」（与现在完全一样）
+```
+
+即：**交换格式是构建期的事，不是运行时的事。** 运行时的契约不变。
 
 ### 未来格式扩展点
 
@@ -431,6 +525,8 @@ PNG 帧本身没有锚点字段（PNG 规范里没有），所以：
 - 混合容器（同一 `.grp` 里混 RLE 与 PNG）**天然支持**，已有 2 个实例
 - 修复实测缺陷：PNG 路径不再硬置 `xoff/yoff = 0`
 - 引擎侧只多 1 个函数（`createFromEncoded`），成本远低于重写 124 行解码器
+- 锚点按**用途**而非容器分类：头像（`hdgrp`）用中心锚定，地图精灵用脚底锚定
+  （现有头像绘制用 `flag=1` 忽略锚点，故本项零回归）
 
 ---
 

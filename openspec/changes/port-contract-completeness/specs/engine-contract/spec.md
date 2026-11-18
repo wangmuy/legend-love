@@ -197,15 +197,25 @@ SHALL 在引擎实现内部做一次 swizzle，调用方无需感知。
 
 修复后 SHALL：
 - packed + RLE → 用帧头的 `xoff/yoff`
-- packed + PNG → 无自带锚点，SHALL 用约定默认值 `xoff = w/2, yoff = h`
-  （与同容器 RLE 精灵的「脚底中心锚定」约定一致）
+- packed + PNG → 无自带锚点，SHALL 按**用途**取值：
+  - 头像/立绘（`hdgrp`）→ `xoff = w/2, yoff = h/2`（**中心锚定**）
+  - 地图/战斗精灵 → `xoff = w/2, yoff = h`（脚底中心）
+  - 未知用途 → `xoff = w/2, yoff = h`（保守默认）
 - loose 单文件 → 由调用方显式传 `opts.xoff / opts.yoff`
 
-#### Scenario: PNG 帧有合理锚点
+#### Scenario: 头像 PNG 帧用中心锚点
 
-- **GIVEN** `hdgrp.grp` slot 60 的 PNG 帧（100×102）
+- **GIVEN** `hdgrp.grp` slot 60 的头像 PNG 帧（100×102）
+  （`hdgrp` = `CC.HeadPicFile`，由 `PicLoadFile(..., 1)` 装载为 archive 1）
 - **WHEN** 加载后查 `sprite.getMeta(handle)`
-- **THEN** `xoff = 50, yoff = 102`（不是 0, 0）
+- **THEN** `xoff = 50, yoff = 51`（**中心锚定**，不是 0,0 也不是 50,102）
+
+#### Scenario: 锚点改动不影响现有画面
+
+- **GIVEN** 现有头像绘制路径用 `flag=1`（`PicLoadCache(1, ..., 1)` = 忽略 xoff/yoff），
+  居中由 `headx = (width/2 - headw)/2` 自己算
+- **WHEN** 加载头像并绘制
+- **THEN** 画面与改动前完全一致（锚点只影响未来按锚点绘制的调用方）
 
 #### Scenario: RLE 帧锚点不变
 
