@@ -39,6 +39,20 @@ MouseMenu.DEFAULT = false
 --- 声明设置键（幂等）
 -- @return boolean ok
 function MouseMenu.define()
+    -- 先声明虚拟手柄的键（它和鼠标操作同属「输入方式」设置，一起声明便于
+    -- 设置文件一次成型）。放在这里而不是各处散落，避免漏声明。
+    pcall(function()
+        local VP = require("framework.virtual_pad")
+        if VP and VP.SETTINGS_KEY and Settings then
+            Settings.define(VP.SETTINGS_KEY, {
+                default = false,
+                type    = "bool",
+                label   = "虚拟手柄",
+                platformDefaults = VP.PLATFORM_DEFAULTS,
+            })
+        end
+    end)
+
     return Settings.define(MouseMenu.KEY, {
         default = MouseMenu.DEFAULT,
         type    = "bool",

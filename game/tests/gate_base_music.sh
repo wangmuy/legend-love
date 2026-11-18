@@ -33,7 +33,9 @@ have_ff() {
 # MIDI 母带**不入 git**（避免仓库膨胀）。母带的来源与 md5/时长记录在
 # tools/base-music-manifest.tsv，渲染时由脚本按清单现取。所以这里守的是：
 #   (a) 清单存在、25 行、字段齐全
-#   (b) game/sound 下**没有** .mid 残留（否则说明有人又把它提交了）
+#   (b) 已 git 跟踪的文件里**没有** game/sound/*.mid
+#       （.mid 是 render-base-music.sh 的正常工作文件，跑过渲染后必然在盘上；
+#        所以断言的是「不进 git」而不是「文件不存在」）
 log "=== STEP: 母带清单完整性 ==="
 MANIFEST=tools/base-music-manifest.tsv
 if [ -f "$MANIFEST" ]; then
@@ -59,13 +61,29 @@ else
     fail=$((fail + 1))
 fi
 
-# 母带不得留在 game/sound
-n_mid=$(find game/sound -maxdepth 1 -name 'game*.mid' -type f 2>/dev/null | wc -l | tr -dc '0-9')
-[ -n "$n_mid" ] || n_mid=0
-if [ "$n_mid" -eq 0 ]; then
-    log "  [PASS] game/sound 无 .mid 残留（母带入 git 属违反约定）"
+# 母带不得被 git 跟踪（注意：不是「不得存在」）
+#
+# game/sound/gameNN.mid 是 render-base-music.sh 的工作文件（ensure_master 的
+# 最高优先级来源）。跑过渲染脚本后必然存在 25 个，那是**正常**的。
+# 这里断言的是「git 没有跟踪它们」，靠 .gitignore 与 git ls-files 双重校验。
+n_tracked=$(git ls-files 'game/sound/*.mid' 2>/dev/null | wc -l | tr -dc '0-9')
+[ -n "$n_tracked" ] || n_tracked=0
+if [ "$n_tracked" -eq 0 ]; then
+    log "  [PASS] git 未跟踪任何 game/sound/*.mid"
 else
-    log "  [FAIL] game/sound 残留 $n_mid 个 .mid（母带不应入 git）"
+    log "  [FAIL] git 跟踪了 $n_tracked 个 game/sound/*.mid（母带不应入 git）"
+    fail=$((fail + 1))
+fi
+
+# .gitignore 必须真的挡住它们（用 git check-ignore 实测，而不是 grep 文件内容）
+#
+# 为什么不用 grep .gitignore：本机环境变量 GREP_OPTIONS 含 `--exclude=*.git*`，
+# 会让 `grep anything .gitignore` 永远不命中（文件名本身匹配排除模式）。
+# 这是实测踩到的坑，git check-ignore 直接问 git 更可靠，也跳过这个陷阱。
+if git check-ignore -q game/sound/__probe__.mid 2>/dev/null; then
+    log "  [PASS] .gitignore 生效：game/sound/*.mid 被忽略"
+else
+    log "  [FAIL] .gitignore 未挡住 game/sound/*.mid（母带会被误提交）"
     fail=$((fail + 1))
 fi
 

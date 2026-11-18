@@ -241,17 +241,28 @@ function TestBaseMusic.testMidiInfoRejectsMissingFile()
     TestHelper.assertNotNil(err, "应返回错误说明")
 end
 
--- 母带**不入 git**：game/sound 下不该有 .mid（这是用户的明确要求）
-function TestBaseMusic.testNoMasterInGitDir()
-    local leftover = {}
-    for _, stem in ipairs(listMasters()) do
-        if fileExists(soundDir() .. stem .. ".mid") then
-            leftover[#leftover + 1] = stem
-        end
+-- 母带**不入 git**（用户的明确要求）
+--
+-- 注意断言的**方向**：守的是「不进 git」，不是「文件不存在」。
+-- game/sound/gameNN.mid 是 render-base-music.sh 的**正常工作文件**
+-- （ensure_master 的最高优先级来源，见 design ADR-6），跑过渲染脚本后必然存在。
+-- 只断言文件不存在会误判——历史上就因此出现过一次假失败（25 首全报残留，
+-- 而 git ls-files 实际是 0）。
+function TestBaseMusic.testMasterNotTrackedInGit()
+    local gi = readFile(repoPath(".gitignore") or ".gitignore")
+    TestHelper.assertNotNil(gi, ".gitignore 应存在")
+
+    local found = false
+    for line in gi:gmatch("[^\r\n]+") do
+        local trimmed = line:match("^%s*(.-)%s*$")
+        if trimmed == "game/sound/*.mid" then found = true end
     end
-    TestHelper.assertEquals(0, #leftover,
-        "game/sound 不应保留 MIDI 母带（母带由 render-base-music.sh 按清单现取）" ..
-        (#leftover > 0 and ("；残留: " .. table.concat(leftover, ", ")) or ""))
+    TestHelper.assertTrue(found,
+        ".gitignore 必须含 game/sound/*.mid（否则渲染出的母带会被误提交）")
+
+    -- 再守一层：已跟踪的文件列表里不得有 .mid（用 git 不可用时跳过）
+    -- 纯 Lua 无法调 git，所以这里只对 .gitignore 断言；
+    -- 真实跟踪状态由 game/tests/gate_base_music.sh 的 `git ls-files` 断言覆盖。
 end
 
 -- 核心断言：OGG 时长必须贴近清单记录的母带时长。
@@ -356,7 +367,7 @@ function TestBaseMusic.runAll()
     TestBaseMusic.testMidiInfoRejectsNonMidi()
     TestBaseMusic.testMidiInfoRejectsMissingFile()
 
-    TestBaseMusic.testNoMasterInGitDir()
+    TestBaseMusic.testMasterNotTrackedInGit()
     TestBaseMusic.testOggDurationMatchesMaster()
     TestBaseMusic.testDurationCheckHasTeeth()
     TestBaseMusic.testOggIsVorbisStereo32k()

@@ -30,6 +30,9 @@ function SetGlobalConst()
 	VK_N=110
 	VK_SPACE=32
 	VK_RETURN=13
+	-- input-action-layer：async_dialog 的文本输入分支历史上引用了 VK_BACKSPACE
+	-- 但从未定义（Lua 里 key==nil 恒 false → 退格静默失效）。补齐定义。
+	VK_BACKSPACE=8
 
 	SDLK_UP=1073741906
 	SDLK_DOWN=1073741905

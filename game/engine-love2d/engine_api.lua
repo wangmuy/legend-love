@@ -193,6 +193,72 @@ function M.input.mousePosition() end
 -- @return boolean
 function M.input.mouseButton(button) end
 
+--- 读取一个物理轴（每帧状态查询，不是事件）
+--
+-- **轴名闭集（6 个，与 SDL / Godot / Unreal 一致）**：
+--   leftx  lefty  rightx  righty  triggerleft  triggerright
+--
+-- 返回 -1..1（扳机 0..1）。非法轴名或引擎无手柄时返回 0。
+--
+-- 为什么是「物理轴」而不是「移动/瞄准」：后两者是 Hades 类玩法的惯例，
+-- 不是输入语义。框架只提供物理量，玩法语义由游戏用 defineVector 自声明
+-- （见 openspec/changes/input-action-layer/design.md ADR-4）。
+--
+-- @param name string 轴名（6 个闭集之一）
+-- @return number -1..1（扳机 0..1）；非法名/无设备返回 0
+function M.input.getAxis(name) end
+
+--- 查询输入能力（哪些设备可用）
+--
+-- 返回表：{ pointer=bool, touch=bool, gamepad=bool, vr=bool }
+--
+-- 为什么需要它：调用方目前靠 `mousePosition()` 返回 -1,-1 来猜「没有鼠标」，
+-- 而「没有鼠标」与「鼠标在屏幕外」是两件事。设备种类变多后哨兵值会越来越脆。
+--
+-- vr 目前恒为 false —— 契约留槽不实现（design.md ADR-7）。
+--
+-- @return table { pointer, touch, gamepad, vr }
+function M.input.getCapabilities() end
+
+--- 指针位置（每帧状态查询，"位置"而非"位移"）
+--
+-- 与 mousePosition() 的差别：
+--   mousePosition() 是历史接口，语义绑定鼠标；
+--   getPointerPosition() 是设备无关的指针抽象（鼠标/触摸/VR 射线命中点）。
+--
+-- 为什么是轮询而不是事件：光标位置与「命中区」是两个独立变化的东西。
+-- 菜单滚动/换页后光标没动但命中区变了，事件驱动会漏（这是既有 pollHover
+-- 的实测结论）。用「位置」语义对鼠标/触摸/手柄选单光标/VR 射线都统一。
+--
+-- 无指针设备时返回 -1, -1（不是 nil，避免调用方做 nil 判断）。
+--
+-- @return number x, y
+function M.input.getPointerPosition() end
+
+--- 取出一个语义动作（非阻塞，事件通道）
+--
+-- 返回动作名（如 "ui.accept"）或 nil。
+--
+-- 与 getKey() 的关系：**并存**。getKey() 返回整数 VK（迁移期 36 处调用点仍用），
+-- pollAction() 返回语义动作字符串。两者读的是不同队列，互不挤占
+-- （design.md ADR-5 双通道 / ADR-8 迁移期两套并存）。
+--
+-- @return string|nil 动作名；队列空返回 nil
+function M.input.pollAction() end
+
+--- 读取当前所有触摸点
+--
+-- 返回 { {id=, x=, y=}, ... }，坐标是**逻辑像素**（与布局表同一坐标系）。
+--
+-- 注意实现必须用 LÖVE 11.5 的 API：
+--   love.touch.getTouches() + love.touch.getPosition(id)
+-- 而不是 0.10.x 的 getTouchCount() / getTouch(i)（11.5 上不存在）。
+--
+-- 无触摸能力的引擎返回空表（不是 nil，避免调用方做 nil 判断）。
+--
+-- @return table { {id=, x=, y=}, ... }
+function M.input.getTouches() end
+
 --------------------------------------------------------------------
 -- audio - 音频系统
 --------------------------------------------------------------------

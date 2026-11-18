@@ -156,6 +156,92 @@ EngineAPI.input.mouseButton = function(button)
     return ok and down == true
 end
 
+-- 轴名闭集（与 SDL / Godot / Unreal 一致），见 engine_api 的注释
+local VALID_AXES = {
+    leftx = true, lefty = true, rightx = true, righty = true,
+    triggerleft = true, triggerright = true,
+}
+
+--- 读一个物理轴（每帧状态查询）
+--
+-- 取第一个已连接手柄。没有手柄/轴名非法时返回 0 —— 宽容失败，
+-- 让上层无需区分「没设备」和「摇杆在中位」。
+EngineAPI.input.getAxis = function(name)
+    if type(name) ~= "string" or not VALID_AXES[name] then return 0 end
+    if not (love and love.joystick and love.joystick.getJoysticks) then return 0 end
+    local ok, sticks = pcall(love.joystick.getJoysticks)
+    if not ok or type(sticks) ~= "table" or #sticks == 0 then return 0 end
+    local j = sticks[1]
+    if not j or not j.getGamepadAxis then return 0 end
+    local ok2, v = pcall(j.getGamepadAxis, j, name)
+    if not ok2 or type(v) ~= "number" then return 0 end
+    -- 防御：某些驱动会给出略超出 [-1,1] 的值
+    if v < -1 then v = -1 elseif v > 1 then v = 1 end
+    return v
+end
+
+--- 查询输入能力
+--
+-- vr = false 是契约留槽（ADR-7）：事件结构允许 source="vr" 与 ray 字段，
+-- 但当前没有任何 VR 实现，所以能力如实报 false。
+EngineAPI.input.getCapabilities = function()
+    return {
+        pointer = (love and love.mouse and love.mouse.getPosition) ~= nil,
+        touch   = (love and love.touch and love.touch.getTouches) ~= nil,
+        gamepad = (love and love.joystick and love.joystick.getJoysticks) ~= nil,
+        vr      = false,
+    }
+end
+
+--- 指针位置（设备无关的「位置」语义）
+--
+-- 当前实现委托 mousePosition()：桌面与 Android 接鼠标时都走它。
+-- 将来接触摸/VR 射线时在本函数内合并优先级，契约不变。
+EngineAPI.input.getPointerPosition = function()
+    return EngineAPI.input.mousePosition()
+end
+
+--- 取一个语义动作（事件通道）
+--
+-- 委托 InputManager.getAction()。用 pcall 是因为 engine_love2d 也被
+-- 纯引擎测试加载（此时 framework 可能未初始化），不能因缺模块而崩。
+EngineAPI.input.pollAction = function()
+    local ok, IM = pcall(require, "framework.input_manager")
+    if not ok or not IM or not IM.getAction then return nil end
+    return IM.getAction()
+end
+
+--- 读取当前所有触摸点
+--
+-- **用 LÖVE 11.5 的正确 API**（实测确认）：
+--   love.touch.getTouches()     → 返回 id 列表
+--   love.touch.getPosition(id)  → 返回归一化坐标（0..1）
+--
+-- 不能用 0.10.x 的 getTouchCount() / getTouch(i)：实测在 11.5 上
+-- 它们是 nil，调用会报 "attempt to call field 'getTouchCount' (a nil value)"。
+-- （参考库 reference/MobileControlsLibrary 的 README 正是老 API，照抄会崩。）
+--
+-- 返回绝对像素坐标（乘屏幕尺寸），与布局表同一坐标系。
+--
+-- @return table { {id=, x=, y=}, ... }
+EngineAPI.input.getTouches = function()
+    local out = {}
+    if not (love and love.touch and love.touch.getTouches) then return out end
+    if not (love.graphics and love.graphics.getWidth) then return out end
+
+    local sw, sh = love.graphics.getWidth(), love.graphics.getHeight()
+    local ok, ids = pcall(love.touch.getTouches)
+    if not ok or type(ids) ~= "table" then return out end
+
+    for _, id in ipairs(ids) do
+        local ok2, nx, ny = pcall(love.touch.getPosition, id)
+        if ok2 and type(nx) == "number" and type(ny) == "number" then
+            out[#out + 1] = { id = id, x = nx * sw, y = ny * sh }
+        end
+    end
+    return out
+end
+
 -- audio 模块
 EngineAPI.audio.playMusic = function(filename)
     lib.PlayMIDI(filename)

@@ -67,7 +67,10 @@ function love.conf(t)
     t.modules.font = true
     t.modules.graphics = true
     t.modules.image = true
-    t.modules.joystick = false
+    -- input-action-layer：物理手柄需要 joystick 模块。
+    -- 打开它没有副作用（LÖVE 只在有设备时占资源），且 Android 上
+    -- "虚拟手柄"与"物理手柄"在玩家眼里是同一个功能。
+    t.modules.joystick = true
     t.modules.keyboard = true
     t.modules.math = true
     t.modules.mouse = true

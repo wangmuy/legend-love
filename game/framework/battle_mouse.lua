@@ -164,10 +164,14 @@ function BattleMouse.clickAt(mx, my)
     WAR.MoveCursorX = gx
     WAR.MoveCursorY = gy
 
-    -- 注入确认键（协程在 WaitKeyCoroutine 上等，消费一次即返回）
+    -- 注入确认动作（协程在 WaitKeyCoroutine 上等，消费一次即返回）
     local okIM, InputManager = pcall(require, "framework.input_manager")
     if okIM and InputManager and InputManager.enqueueKeyEvent then
         InputManager.enqueueKeyEvent(rawget(_G, "VK_SPACE") or 32)
+    end
+    -- 同时入动作队列（ADR-3）：新消费方按 source="mouse" 识别来源
+    if okIM and InputManager and InputManager.enqueueAction then
+        InputManager.enqueueAction({ action = "ui.accept", source = "mouse" })
     end
     return true
 end
@@ -181,6 +185,10 @@ function BattleMouse.cancel()
     local okIM, InputManager = pcall(require, "framework.input_manager")
     if okIM and InputManager and InputManager.enqueueKeyEvent then
         InputManager.enqueueKeyEvent(rawget(_G, "VK_ESCAPE") or 27)
+    end
+    -- 同时入动作队列（ADR-3）
+    if okIM and InputManager and InputManager.enqueueAction then
+        InputManager.enqueueAction({ action = "ui.cancel", source = "mouse" })
     end
     return true
 end

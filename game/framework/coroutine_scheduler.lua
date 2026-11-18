@@ -219,6 +219,7 @@ end
 function CoroutineScheduler:update(dt)
     local activeCoroutines = {}
     local keyWaitingCoroutines = {}
+    local actionWaitingCoroutines = {}
     
     -- 收集所有需要更新的协程
     for id, info in pairs(coroutines) do
@@ -226,6 +227,9 @@ function CoroutineScheduler:update(dt)
             if info.waitingFor == "key" then
                 -- 等待按键的协程单独处理
                 table.insert(keyWaitingCoroutines, id)
+            elseif info.waitingFor == "action" then
+                -- 等待语义动作的协程单独处理（input-action-layer）
+                table.insert(actionWaitingCoroutines, id)
             else
                 table.insert(activeCoroutines, id)
             end
@@ -255,6 +259,24 @@ function CoroutineScheduler:update(dt)
         end
     end
     
+    -- 恢复等待语义动作的协程（有动作才唤醒）
+    --
+    -- 与 keyWaiting 的区别：动作队列带 source，消费方可以判来源；
+    -- 且一个动作事件只唤醒一个协程（与键的行为一致）。
+    if #actionWaitingCoroutines > 0 then
+        local im = require("framework.input_manager").getInstance()
+        local actionName = im.getAction()
+        if actionName then
+            for _, id in ipairs(actionWaitingCoroutines) do
+                local info = coroutines[id]
+                if info and info.status == "suspended" and info.waitingFor == "action" then
+                    self:resume(id, actionName)
+                    break    -- 一个动作只唤醒一个等待者
+                end
+            end
+        end
+    end
+
     -- 恢复其他挂起的协程
     for _, id in ipairs(activeCoroutines) do
         local info = coroutines[id]

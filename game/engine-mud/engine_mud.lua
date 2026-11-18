@@ -161,6 +161,40 @@ EngineAPI.input.mouseButton = function(button)
     return false
 end
 
+-- 物理轴 / 能力 / 指针 / 动作（input-action-layer Task 2）
+--
+-- MUD 引擎是纯文本，四者如实降级：
+--   getAxis        恒 0（无摇杆）
+--   getCapabilities 全 false（不假装有能力）
+--   getPointerPosition 与 mousePosition 同语义
+--   pollAction     走预设队列（文本引擎里"按键"由脚本注入）
+
+EngineAPI.input.getAxis = function(name)
+    logCall("input.getAxis", name)
+    return 0
+end
+
+EngineAPI.input.getCapabilities = function()
+    logCall("input.getCapabilities")
+    return { pointer = false, touch = false, gamepad = false, vr = false }
+end
+
+EngineAPI.input.getPointerPosition = function()
+    logCall("input.getPointerPosition")
+    return -1, -1
+end
+
+EngineAPI.input.pollAction = function()
+    logCall("input.pollAction")
+    return nil
+end
+
+--- 触摸点：MUD 引擎无触摸
+EngineAPI.input.getTouches = function()
+    logCall("input.getTouches")
+    return {}
+end
+
 --------------------------------------------------------------------
 -- audio 模块 - 所有函数为空操作
 --------------------------------------------------------------------

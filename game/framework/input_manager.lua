@@ -39,6 +39,28 @@ local maxMouseQueueSize = 64
 -- 按键状态（用于判断是否按住）
 local keyStates = {}
 
+-- ---------------------------------------------------------------------------
+-- 动作事件队列（input-action-layer Task 1）
+-- ---------------------------------------------------------------------------
+-- 与键队列、鼠标队列**三队列并存**，互不干扰：
+--
+--   eventQueue  → getKey()         整数 VK（迁移期兼容，36 处调用点仍在用）
+--   mouseQueue  → getMouseEvent()  原始鼠标事件（pollMouse/pollHover 在用）
+--   actionQueue → getAction()      语义动作 + provenance（新契约）
+--
+-- 为什么单独一条队列而不是把动作塞进 eventQueue：
+--   ① getKey() 返回整数、getAction() 返回字符串，混在一起就得靠类型判断猜，
+--      这是「同一份数据两种形状」的老坑（synthetic 脏标记就是这么来的）。
+--   ② 动作事件带 source，而 getKey 的消费方（地图主循环等）必须能按 source
+--      过滤（ADR-3 的核心）。键队列没有这个字段，硬塞会污染 36 处调用点。
+--
+-- 事件结构（见 input_actions.lua 的 EVENT_KEYS）：
+--   { action, source, value, char, position, index, ray, time }
+local actionQueue = {}
+local actionHead = 1
+local actionTail = 1
+local maxActionQueueSize = 64
+
 -- 输入禁用标志
 InputManager.disableInput = false
 
@@ -54,6 +76,7 @@ local baseKeyMap = {
     [" "] = 32,
     ["space"] = 32,
     ["return"] = 13,
+    ["backspace"] = 8,
     ["up"] = 1073741906,
     ["down"] = 1073741905,
     ["left"] = 1073741904,
@@ -88,6 +111,9 @@ function InputManager:init()
     mouseQueue = {}
     mouseHead = 1
     mouseTail = 1
+    actionQueue = {}
+    actionHead = 1
+    actionTail = 1
 end
 
 -- 添加事件到队列
@@ -134,16 +160,39 @@ local function peekEvent()
 end
 
 -- 处理love.keypressed事件
+--
+-- 两条产出（input-action-layer）：
+--   ① 键队列：gameKey 在 baseKeyMap 里时入队（迁移期 36 处 getKey 调用点在用）
+--   ② 动作队列：经 InputBindings.resolveKey 映射成 ui.* 或游戏私有动作
+--
+-- 为什么②不能只对 baseKeyMap 内的键生效：
+--   baseKeyMap 只有 9 个键，字母全部落在白名单外。若只在白名单内产动作，
+--   输入框永远收不到 ui.text（这是历史缺陷的直接原因）。
+--   所以②对所有键都跑一次，映射失败（如 f12）才静默跳过。
 function InputManager:onKeyPressed(key, scancode, isrepeat)
-    local km = initKeyMap()
-    local gameKey = km[key]
-    
-    if not gameKey then
-        return
-    end
-    
     -- 忽略 love.keyboard 的 repeat 事件，使用自己的定时器
     if isrepeat then
+        return
+    end
+
+    -- ② 动作队列（对所有键生效，见上方注释）
+    local okIB, InputBindings = pcall(require, "framework.input_bindings")
+    if okIB and InputBindings and InputBindings.resolveKey then
+        local action, char = InputBindings.resolveKey(key)
+        if action then
+            InputManager.enqueueAction({
+                action = action,
+                source = "key",
+                char = char,
+            })
+        end
+    end
+
+    -- ① 键队列（仅 baseKeyMap 内的键）
+    local km = initKeyMap()
+    local gameKey = km[key]
+
+    if not gameKey then
         return
     end
     
@@ -231,35 +280,42 @@ function InputManager:update(dt)
 end
 
 -- 获取当前按键（消费队列中的事件）
+--
+-- **按来源过滤**（input-action-layer ADR-3，取代旧的 synthetic 脏标记）
+--
+-- 注入的键（enqueueKeyEvent）只服务于「协程等键」：
+--   对话推进 / 场景名关闭 / 物品选中 / 状态页翻页
+-- 它们消费键的路径是 scheduler 的 _peekKeyInternal（绕过 disableInput）。
+--
+-- **主循环的 getKey() 必须看不到它们**，否则会当成玩家真按了键：
+--   实测 bug（用户报告）：河洛客栈站在店小二旁，鼠标悬停物品格
+--   → 悬停注入 VK_SPACE 唤醒物品协程
+--   → 同一帧 GAME_SMAP.update 的 getKey() 也读到这个 SPACE
+--   → 走进 SPACE 分支「触发面向 tile 的事件」→ 冒出店小二对话
+--
+-- 为什么改成"按 source 过滤"而不是继续用 synthetic：
+--   synthetic 是「我不告诉你来源，只打个脏标记」，消费方没法据此决策。
+--   source 是明确契约：主循环拒绝 source=="mouse"/"pad"/"touch" 的事件，
+--   因为它们不是「玩家敲键盘」。
+--
+-- 兼容：enqueueKeyEvent 产生的 source="compat" 也在此被跳过（历史行为不变）。
 function InputManager:getKey()
     if InputManager.disableInput then
         return -1
     end
 
-    -- 跳过「注入的键」（synthetic）—— 这是本函数与 _peekKeyInternal 的**唯一**差别
-    --
-    -- 注入的键（enqueueKeyEvent）只服务于「协程等键」：
-    --   对话推进 / 场景名关闭 / 物品选中 / 状态页翻页
-    -- 它们消费键的路径是 scheduler 的 _peekKeyInternal（绕过 disableInput）。
-    --
-    -- **主循环的 getKey() 必须看不到它们**，否则会当成玩家真按了键：
-    --   实测 bug（用户报告）：河洛客栈站在店小二旁，鼠标悬停物品格
-    --   → 悬停注入 VK_SPACE 唤醒物品协程
-    --   → 同一帧 GAME_SMAP.update 的 getKey() 也读到这个 SPACE
-    --   → 走进 SPACE 分支「触发面向 tile 的事件」→ 冒出店小二对话
-    --
-    -- 丢弃 synthetic 事件是安全的：它们本就是为「唤醒某个协程」而生，
-    -- 协程已经通过 _peekKeyInternal 拿走同一位置的事件；
-    -- 若协程当时不在等键，留着它也只会被下一帧再次误读。
     while true do
         local event = dequeueEvent()
         if not event then
             return -1
         end
-        if not event.synthetic then
+        -- 只接受「玩家真按键盘」的键事件。
+        -- 无 source 字段的历史事件（测试直接 enqueueEvent 造的）视为键盘。
+        local src = event.source
+        if src == nil or src == "key" then
             return event.key
         end
-        -- synthetic：丢弃，继续取下一个
+        -- compat（enqueueKeyEvent 注入）/ mouse / pad / touch：跳过
     end
 end
 
@@ -346,6 +402,122 @@ function InputManager:getMouseEvent()
     return InputManager._dequeueMouseEvent()
 end
 
+--------------------------------------------------------------------
+-- 动作事件队列（input-action-layer Task 1）
+--
+-- 对外入口：
+--   enqueueAction(ev)    入队（带 source 的语义事件）
+--   getActionEvent()     取出完整事件（消费方需要 source/char/position 时用）
+--   getAction()          取出动作名（消费）
+--   peekActionEvent()    查看事件不消费
+--   peekAction()         查看动作名不消费
+--   clearActionQueue()   清空
+--
+-- 与 getKey() 的关系：**并存**。迁移期 36 处业务代码仍用 getKey()，
+-- 新代码用 getAction()，两者读不同队列，互不挤占。
+--------------------------------------------------------------------
+
+--- 入队一个动作事件
+--
+-- 最小校验：action 必须非空字符串、source 必须合法。
+-- 校验失败返回 false 而不抛错 —— 输入路径绝不因一个坏事件崩主循环。
+--
+-- @param event table { action, source, value?, char?, position?, index?, ray? }
+-- @return boolean
+function InputManager.enqueueAction(event)
+    if type(event) ~= "table" then return false end
+    if type(event.action) ~= "string" or event.action == "" then return false end
+
+    local okIA, InputActions = pcall(require, "framework.input_actions")
+    local source = event.source or "compat"
+    if okIA and InputActions and InputActions.isValidSource
+        and not InputActions.isValidSource(source) then
+        return false
+    end
+
+    local nextTail = actionTail + 1
+    if nextTail > maxActionQueueSize then
+        nextTail = 1
+    end
+    if nextTail == actionHead then
+        actionHead = actionHead + 1
+        if actionHead > maxActionQueueSize then
+            actionHead = 1
+        end
+    end
+
+    -- 只保留白名单字段：把调用方误传的脏字段（如历史遗留的 synthetic）剔掉，
+    -- 避免「动作事件里还藏着旧契约」这种隐性回归。
+    local clean = {
+        action = event.action,
+        source = source,
+        value = event.value,
+        char = event.char,
+        position = event.position,
+        index = event.index,
+        ray = event.ray,
+        time = event.time or getTimeSeconds(),
+    }
+    actionQueue[actionTail] = clean
+    actionTail = nextTail
+    return true
+end
+
+--- 取出一个完整的动作事件（消费）
+-- @return table|nil
+function InputManager.getActionEvent()
+    if actionHead == actionTail then
+        return nil
+    end
+    local event = actionQueue[actionHead]
+    actionQueue[actionHead] = nil
+    actionHead = actionHead + 1
+    if actionHead > maxActionQueueSize then
+        actionHead = 1
+    end
+    return event
+end
+
+--- 取出一个动作名（消费）
+-- @return string|nil
+function InputManager.getAction()
+    local event = InputManager.getActionEvent()
+    if event then return event.action end
+    return nil
+end
+
+--- 查看下一个事件（不消费）
+-- @return table|nil
+function InputManager.peekActionEvent()
+    if actionHead == actionTail then
+        return nil
+    end
+    return actionQueue[actionHead]
+end
+
+--- 查看下一个动作名（不消费）
+-- @return string|nil
+function InputManager.peekAction()
+    local event = InputManager.peekActionEvent()
+    if event then return event.action end
+    return nil
+end
+
+--- 清空动作队列
+function InputManager.clearActionQueue()
+    actionQueue = {}
+    actionHead = 1
+    actionTail = 1
+end
+
+--- 当前动作队列长度（测试用）
+function InputManager.getActionQueueSize()
+    if actionTail >= actionHead then
+        return actionTail - actionHead
+    end
+    return maxActionQueueSize - actionHead + actionTail
+end
+
 --- 往键队列注入一个按键事件（供鼠标等非键盘输入使用）
 --
 -- 用途（REQ-MS2-6）：对话期间鼠标点击要等价于空格/Enter。
@@ -370,8 +542,8 @@ function InputManager.enqueueKeyEvent(key)
     enqueueEvent({
         type = "pressed",
         key = key,
+        source = "compat",    -- ADR-3：用 provenance 取代 synthetic
         time = getTimeSeconds(),
-        synthetic = true,     -- 标记来源，便于调试
     })
     return true
 end

@@ -236,9 +236,19 @@ function AsyncDialog:handleInput()
     if not currentDialog or currentDialog.state ~= "open" then
         return
     end
-    
+
+    -- 文本输入分支要用动作队列（见下方 input 分支的注释）。
+    -- 这里按需取，避免在模块顶层缓存（会引入跨测试污染）。
+    local okIM, InputManager = pcall(require, "framework.input_manager")
+    if not okIM then InputManager = nil end
+
     local key = lib.GetKey()
-    if key == -1 then
+    -- 注意：**不再「没有键就直接 return」**
+    -- 字母现在走动作队列（ui.text），动作事件不产生 key。
+    -- 两个通道都空时才提前返回，否则会漏掉纯动作输入。
+    local hasAction = InputManager and InputManager.peekAction
+                              and InputManager.peekAction() ~= nil
+    if key == -1 and not hasAction then
         return
     end
     
@@ -255,17 +265,55 @@ function AsyncDialog:handleInput()
             currentDialog.selected = currentDialog.selected == 1 and 2 or 1
         end
     elseif currentDialog.type == "input" then
-        if key == VK_ESCAPE then
-            self:closeDialog(nil)
-        elseif key == VK_RETURN then
-            self:closeDialog(currentDialog.input)
-        elseif key == VK_BACKSPACE then
-            if #currentDialog.input > 0 then
-                currentDialog.input = string.sub(currentDialog.input, 1, -2)
+        -- 文本输入改走**动作队列**（input-action-layer REQ-IAL-3b）
+        --
+        -- 历史缺陷（实测）：原实现依赖 VK_BACKSPACE 与 `key >= 32 and key <= 126`，
+        -- 但 baseKeyMap 只映射 9 个键，字母在 onKeyPressed 里就被丢弃，
+        -- 且 VK_BACKSPACE 从未定义（比较恒 false）。结果输入框有三重失效：
+        -- 打不出字 / 退格无效 / 只能 RETURN 提交空串。
+        --
+        -- 现在：可打印字符由 InputBindings.resolveKey 降级成 ui.text 事件，
+        -- 走动作队列；动作队列不受 baseKeyMap 白名单限制。
+        local handled = false
+        if InputManager then
+            local ev = InputManager.getActionEvent()
+            while ev do
+                if ev.action == "ui.cancel" then
+                    self:closeDialog(nil)
+                    handled = true
+                    break
+                elseif ev.action == "ui.accept" then
+                    self:closeDialog(currentDialog.input)
+                    handled = true
+                    break
+                elseif ev.action == "ui.backspace" then
+                    if #currentDialog.input > 0 then
+                        currentDialog.input = string.sub(currentDialog.input, 1, -2)
+                    end
+                    handled = true
+                elseif ev.action == "ui.text" and ev.char then
+                    if #currentDialog.input < currentDialog.maxLength then
+                        currentDialog.input = currentDialog.input .. ev.char
+                    end
+                    handled = true
+                end
+                ev = InputManager.getActionEvent()
             end
-        elseif key >= 32 and key <= 126 then
-            if #currentDialog.input < currentDialog.maxLength then
-                currentDialog.input = currentDialog.input .. string.char(key)
+        end
+        -- 键盘旧路径保留为兜底（动作层没消费到时仍能工作）
+        if not handled then
+            if key == VK_ESCAPE then
+                self:closeDialog(nil)
+            elseif key == VK_RETURN then
+                self:closeDialog(currentDialog.input)
+            elseif VK_BACKSPACE and key == VK_BACKSPACE then
+                if #currentDialog.input > 0 then
+                    currentDialog.input = string.sub(currentDialog.input, 1, -2)
+                end
+            elseif key >= 32 and key <= 126 then
+                if #currentDialog.input < currentDialog.maxLength then
+                    currentDialog.input = currentDialog.input .. string.char(key)
+                end
             end
         end
     elseif currentDialog.type == "select" then

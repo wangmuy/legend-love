@@ -168,6 +168,48 @@ EngineAPI.input.mouseButton = function(button)
     return EngineAPI.input._mouseDown[tonumber(button) or 1] == true
 end
 
+-- 物理轴 / 能力 / 指针 / 动作（input-action-layer Task 2）
+--
+-- 测试桩需要**可注入**：测试里要能模拟"摇杆推到底"或"没有手柄"，
+-- 所以轴值与能力都放在可写字段上，而不是硬编码返回值。
+EngineAPI.input._axes = {}          -- name -> -1..1
+EngineAPI.input._capabilities = { pointer = true, touch = false, gamepad = false, vr = false }
+EngineAPI.input._actionQueue = {}    -- 预置动作队列（pollAction 从这里取）
+
+EngineAPI.input.getAxis = function(name)
+    logCall("input.getAxis", name)
+    local v = EngineAPI.input._axes[name]
+    if type(v) ~= "number" then return 0 end
+    if v < -1 then return -1 elseif v > 1 then return 1 end
+    return v
+end
+
+EngineAPI.input.getCapabilities = function()
+    logCall("input.getCapabilities")
+    local c = EngineAPI.input._capabilities
+    return { pointer = c.pointer, touch = c.touch, gamepad = c.gamepad, vr = c.vr }
+end
+
+EngineAPI.input.getPointerPosition = function()
+    logCall("input.getPointerPosition")
+    return EngineAPI.input.mousePosition()
+end
+
+EngineAPI.input.pollAction = function()
+    logCall("input.pollAction")
+    if #EngineAPI.input._actionQueue > 0 then
+        return table.remove(EngineAPI.input._actionQueue, 1)
+    end
+    return nil
+end
+
+-- 触摸点：可注入（测试虚拟手柄时用）
+EngineAPI.input._touches = {}
+EngineAPI.input.getTouches = function()
+    logCall("input.getTouches")
+    return EngineAPI.input._touches
+end
+
 --------------------------------------------------------------------
 -- audio 模块 - 所有函数为空操作
 --------------------------------------------------------------------

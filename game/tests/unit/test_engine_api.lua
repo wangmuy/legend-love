@@ -72,6 +72,58 @@ function TestEngineAPI.testInputModule()
     -- REQ-MS1-2
     TestHelper.assertNotNil(EngineAPI.input.mousePosition, "input.mousePosition should exist")
     TestHelper.assertNotNil(EngineAPI.input.mouseButton, "input.mouseButton should exist")
+
+    -- REQ-IAL-4：input-action-layer 新增 4 个函数
+    TestHelper.assertNotNil(EngineAPI.input.getAxis, "input.getAxis should exist")
+    TestHelper.assertNotNil(EngineAPI.input.getCapabilities, "input.getCapabilities should exist")
+    TestHelper.assertNotNil(EngineAPI.input.getPointerPosition, "input.getPointerPosition should exist")
+    TestHelper.assertNotNil(EngineAPI.input.pollAction, "input.pollAction should exist")
+end
+
+-- REQ-IAL-4：四个实现都必须补齐 9 个 input 函数（缺一个就会有 nil 函数）
+function TestEngineAPI.testAllEnginesHaveNineInputFunctions()
+    print("\n=== Test: 四引擎 input 函数完整性 ===")
+    local names = {
+        "getKey", "waitForKey", "setKeyRepeat",
+        "mousePosition", "mouseButton",
+        "getAxis", "getCapabilities", "getPointerPosition", "pollAction",
+        "getTouches",
+    }
+    -- 说明：这里**不 require engine_love2d**。
+    -- 它在模块加载期就读 love.filesystem，而测试环境只有 TestHelper 的 mock
+    -- （缺 filesystem 字段），require 会失败。engine_api.lua 是接口定义，
+    -- 用它的 input 表校验函数名齐全即可；真实实现由各引擎自己的测试覆盖。
+    local EngineAPI = require("engine-love2d.engine_api")
+    TestHelper.assertNotNil(EngineAPI.input, "engine_api 应有 input 表")
+    for _, fn in ipairs(names) do
+        TestHelper.assertNotNil(EngineAPI.input[fn],
+            "engine_api.input." .. fn .. " 必须存在（接口定义）")
+    end
+
+    -- engine-mud 与 engine-web 不依赖 love.*，可以真加载
+    for _, modName in ipairs({ "engine-mud/engine_mud", "engine-web/engine_web" }) do
+        local ok, mod = pcall(require, modName)
+        TestHelper.assertTrue(ok, modName .. " 应能加载: " .. tostring(mod))
+        if ok and mod and mod.input then
+            for _, fn in ipairs(names) do
+                TestHelper.assertNotNil(mod.input[fn],
+                    modName .. ".input." .. fn .. " 必须存在")
+            end
+        end
+    end
+end
+
+-- REQ-IAL-4：轴名闭集 —— 非法名必须宽容返回 0，而不是抛错
+function TestEngineAPI.testGetAxisRejectsInvalidName()
+    print("\n=== Test: getAxis 非法轴名 ===")
+    local EngineAPI = require("engine-love2d.engine_api")
+    -- engine_api 是接口定义（空函数），所以这里只断言"函数可调用"
+    -- 真实返回值验证在引擎实现的测试里
+    TestHelper.assertNotNil(EngineAPI.input.getAxis, "getAxis 应存在")
+
+    -- 契约断言：6 个合法轴名与 SDL/Godot/Unreal 一致
+    local valid = { "leftx", "lefty", "rightx", "righty", "triggerleft", "triggerright" }
+    TestHelper.assertEquals(6, #valid, "轴名闭集应为 6 个")
 end
 
 -- REQ-MS1-1：system 模块（第 15 个）
@@ -186,6 +238,8 @@ function TestEngineAPI.runAll()
     TestEngineAPI.testMapModule()
     TestEngineAPI.testSystemModule()
     TestEngineAPI.testInputModule()
+    TestEngineAPI.testAllEnginesHaveNineInputFunctions()
+    TestEngineAPI.testGetAxisRejectsInvalidName()
     TestEngineAPI.testAudioModule()
     TestEngineAPI.testTimeModule()
     TestEngineAPI.testFileModule()

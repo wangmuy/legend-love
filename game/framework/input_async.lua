@@ -106,6 +106,36 @@ function InputAsync.WaitKeyRelease(targetKey)
     end
 end
 
+--- 等待一个语义动作（协程版本，input-action-layer）
+--
+-- 与 WaitKey 的差别：返回**动作名**（"ui.accept"）而不是 VK 整数。
+-- 这是迁移期的新通道，旧调用点仍可用 WaitKey。
+--
+-- @return string 动作名（不会返回 nil）
+function InputAsync.WaitAction()
+    local scheduler = CoroutineScheduler.getInstance()
+    local InputManager = require("framework.input_manager")
+    while true do
+        local action = InputManager.getAction()
+        if action then return action end
+        scheduler:yield("action")
+    end
+end
+
+--- 非阻塞取一个语义动作
+-- @return string|nil
+function InputAsync.GetAction()
+    local InputManager = require("framework.input_manager")
+    return InputManager.getAction()
+end
+
+--- 非阻塞查看语义动作（不消费）
+-- @return string|nil
+function InputAsync.PeekAction()
+    local InputManager = require("framework.input_manager")
+    return InputManager.peekAction()
+end
+
 -- 获取按键状态（非阻塞）
 function InputAsync.GetKeyState(key)
     local InputManager = require("framework.input_manager")

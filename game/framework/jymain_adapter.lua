@@ -306,6 +306,10 @@ function JYMainAdapter.injectAnyKeyForModal()
         local okA, active = pcall(SceneNameAsync.isActive)
         if okA and active then
             InputManager.enqueueKeyEvent(vkSpace)
+            -- 同时入动作队列（ADR-3：带 source，消费方可判来源）
+            if InputManager.enqueueAction then
+                InputManager.enqueueAction({ action = "ui.accept", source = "mouse" })
+            end
             return true
         end
     end
@@ -556,6 +560,60 @@ function JYMainAdapter.injectAdvanceKeyForMouse(_, useEsc)
     return false
 end
 
+--- 每帧驱动虚拟手柄（input-action-layer Task 6）
+--
+-- 只在设置开着且引擎有触摸能力时工作。
+--
+-- 触摸点 → 按钮命中 → 产出**动作事件**（走 InputManager.enqueueAction）。
+-- 与鼠标走同一条动作通道，所以消费方不需要区分「虚拟手柄」和「鼠标」——
+-- 它们都带 source（"touch" vs "mouse"），需要区分时再判 source。
+--
+-- @return boolean 是否处理了触摸
+function JYMainAdapter.pollVirtualPad()
+    local okVP, VirtualPad = pcall(require, "framework.virtual_pad")
+    if not okVP or not VirtualPad then return false end
+    if not VirtualPad.isEnabled() then return false end
+
+    local EngineAPI = rawget(_G, "EngineAPI")
+    if not (EngineAPI and EngineAPI.input and EngineAPI.input.getTouches) then
+        return false
+    end
+
+    local okCap, caps = pcall(EngineAPI.input.getCapabilities)
+    if not okCap or not caps or not caps.touch then return false end
+
+    local okW, sw = pcall(EngineAPI.render.getWidth)
+    local okH, sh = pcall(EngineAPI.render.getHeight)
+    if not okW or not okH or type(sw) ~= "number" or type(sh) ~= "number" then
+        return false
+    end
+
+    local okT, touches = pcall(EngineAPI.input.getTouches)
+    if not okT or type(touches) ~= "table" then return false end
+
+    local okIM, InputManager = pcall(require, "framework.input_manager")
+    if not okIM or not InputManager or not InputManager.enqueueAction then
+        return false
+    end
+
+    local now = 0
+    pcall(function()
+        local okTime, t = pcall(EngineAPI.time.getTimeSeconds)
+        if okTime and type(t) == "number" then now = t end
+    end)
+
+    local fired = VirtualPad.update(touches, sw, sh, now, function(action, touchId)
+        InputManager.enqueueAction({
+            action = action, source = "touch", index = touchId,
+        })
+    end)
+
+    -- 绘制放在这里（与逻辑同帧，保证按钮显隐与命中区一致）
+    pcall(VirtualPad.draw, sw, sh)
+
+    return fired > 0 or #touches > 0
+end
+
 --- 消费一个鼠标事件（由 EventBridge 的 update 每帧调用，或在 update 内轮询）
 -- @return boolean 是否消费了事件
 function JYMainAdapter.pollMouse()
@@ -738,6 +796,11 @@ function JYMainAdapter.installMouseHandling()
     local ok = pcall(function()
         local EventBridge = require("framework.event_bridge")
         EventBridge.setMousePollHook(function()
+            -- 虚拟手柄先于鼠标：它在 Android 上是主输入通道
+            local okPad = pcall(JYMainAdapter.pollVirtualPad)
+            if not okPad then
+                lib.Debug("pollVirtualPad 抛错（不影响主循环）")
+            end
             -- 先消费点击（离散事件），再更新悬停（连续状态）
             local okPoll = pcall(JYMainAdapter.pollMouse)
             if not okPoll then

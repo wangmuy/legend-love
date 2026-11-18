@@ -181,13 +181,39 @@ end
 
 function EngineAPI.input.setKeyRepeat(delay, interval) end
 
--- 鼠标（REQ-MS1-2）：web 是 xterm 终端，无鼠标操作概念
+-- 鼠标（REQ-MS1-2）：web 引擎当前是 xterm 终端桥接，无指针操作概念
+--
+-- 注意：不要把 pointer 报成 true。终端的"点击"是键盘/命令，不是指针位置。
+-- 若将来接浏览器 canvas 渲染，再在 getCapabilities 里改 pointer=true 并实现
+-- getPointerPosition（契约不变）。
 function EngineAPI.input.mousePosition()
     return -1, -1
 end
 
 function EngineAPI.input.mouseButton(button)
     return false
+end
+
+-- 物理轴 / 能力 / 指针 / 动作（input-action-layer Task 2）
+function EngineAPI.input.getAxis(name)
+    return 0
+end
+
+function EngineAPI.input.getCapabilities()
+    return { pointer = false, touch = false, gamepad = false, vr = false }
+end
+
+function EngineAPI.input.getPointerPosition()
+    return -1, -1
+end
+
+function EngineAPI.input.pollAction()
+    return nil
+end
+
+--- 触摸点：web 引擎当前无触摸
+function EngineAPI.input.getTouches()
+    return {}
 end
 
 --------------------------------------------------------------------------------
