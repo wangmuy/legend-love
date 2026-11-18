@@ -657,7 +657,27 @@ function MenuStateMachine:_clickRow(menu, itemIndex)
     self:selectMenuItem()
 end
 
--- 点击值项的 ▲/▼：等价于上下键（只改 pending，不写设置）
+-- 点击值项的 ▲/▼：**立即生效**（与键盘的「待定 + 确认」不同）
+--
+-- 为什么鼠标要立即生效，而键盘不（用户实测反馈）：
+--
+--   键盘：按住方向键会连发，若每发都写设置，音量会一路冲到底且无法整体撤销，
+--         所以键盘维持 ADR-AS-002 的「▲/▼ 只改 pending，Enter 才提交」。
+--
+--   鼠标：一次点击是一个**离散且明确**的动作，玩家点一下就是要动一格。
+--         旧实现让 _clickValueArrow 只改 pending 不写设置，结果是
+--         数字在变、**声音不变** —— 用户反馈「点击没有响应」正是这个原因。
+--         （实测：点一次 ▲，pending 64→65，Settings 仍 64，音量不动。）
+--
+--   所以这里额外调用 Settings.set：
+--     * onChange → audio_settings → 引擎 setVolume，声音立即变
+--     * desc.pending 同步更新，保证 Enter 提交的是同一个值、显示也一致
+--
+--   副作用是「点完按 ESC 也无法撤销」（声音已经变了）。这是刻意的取舍：
+--   鼠标点击的可撤销性远不如键盘连发重要，且玩家点箭头时期望的就是立刻听到。
+--
+-- 严谨性：本函数**只被鼠标点击路径调用**（handleMouseClick 的两处），
+-- 键盘路径走 handleInput 里的独立分支，不受此处影响。
 function MenuStateMachine:_clickValueArrow(menu, itemIndex, direction)
     local item = menu.newMenu[itemIndex]
     if not item then return end
@@ -671,7 +691,17 @@ function MenuStateMachine:_clickValueArrow(menu, itemIndex, direction)
     local hi = desc.max or 100
     if v < lo then v = lo end
     if v > hi then v = hi end
+
+    -- 到达边界时值没变，就不必写设置（避免无意义的 onChange 与写盘）
+    local old = desc.pending
     desc.pending = v
+    if v ~= old and desc.key then
+        local ok, err = pcall(Settings.set, desc.key, v)
+        if not ok then
+            -- 设置写入失败不应让点击崩掉：pending 已更新，显示仍然正确
+            self:_debug("_clickValueArrow: Settings.set 失败: " .. tostring(err))
+        end
+    end
 end
 
 --- 逐层关闭菜单，直到菜单栈深度为 depth

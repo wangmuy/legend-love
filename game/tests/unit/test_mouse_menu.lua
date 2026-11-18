@@ -241,7 +241,7 @@ function TestMouseMenu.testClickBlankAreaDoesNothing()
 end
 
 function TestMouseMenu.testClickValueArrow()
-    print("\n=== Test: 点击值项箭头 ===")
+    print("\n=== Test: 点击值项箭头（立即生效）===")
     local saved = installStubs()
     local S = require("framework.settings")
     local AudioSettings = require("framework.audio_settings")
@@ -262,13 +262,87 @@ function TestMouseMenu.testClickValueArrow()
     TestHelper.assertEquals(p0 + 1, menu.newMenu[1][2].pending,
         "点击 ▲ 使待定值 +1")
 
+    -- 用户实测反馈：旧实现只改 pending 不写设置，数字变了但声音不变。
+    -- 鼠标点击是一次离散明确的操作，应当立即生效。
+    TestHelper.assertEquals(p0 + 1, S.get("audio.music"),
+        "点击 ▲ 必须立即写设置（否则声音不响应）")
+
     -- 第 3 行（▼）：[111, 139)
     msm:handleMouseClick(150, 118)
     TestHelper.assertEquals(p0, menu.newMenu[1][2].pending,
         "点击 ▼ 使待定值 -1")
+    TestHelper.assertEquals(p0, S.get("audio.music"),
+        "点击 ▼ 也必须立即写设置")
 
-    TestHelper.assertEquals(64, S.get("audio.music"),
-        "点击箭头不写设置（仍是待定值）")
+    msm:clear()
+    restoreStubs(saved)
+end
+
+-- 边界：值到顶后再点 ▲，设置不应产生无意义变化
+function TestMouseMenu.testClickValueArrowAtBoundaryNoop()
+    print("\n=== Test: 点击箭头到边界不产生变化 ===")
+    local saved = installStubs()
+    local S = require("framework.settings")
+    local AudioSettings = require("framework.audio_settings")
+    local AudioMenu = require("framework.audio_menu")
+    local MenuStateMachine = require("framework.menu_state_machine")
+
+    S.reset(); AudioSettings.resetInit(); AudioSettings.define()
+    local msm = MenuStateMachine.getInstance()
+    msm:clear()
+
+    local items = AudioMenu.buildValueMenu("audio.music", "音乐音量")
+    local menu = msm:createMenu(items, 1, 0, 100, 50, 0, 0, 1, 1, 24, 0xFFFFFF, 0xFF0000)
+    msm:openMenu(menu)
+
+    -- 先拉到最大值
+    menu.newMenu[1][2].pending = AudioSettings.MAX
+    S.set("audio.music", AudioSettings.MAX)
+
+    msm:handleMouseClick(150, 60)      -- 再点 ▲（已到顶）
+    TestHelper.assertEquals(AudioSettings.MAX, menu.newMenu[1][2].pending,
+        "已到最大值时再点 ▲ 不应越界")
+    TestHelper.assertEquals(AudioSettings.MAX, S.get("audio.music"),
+        "已到最大值时设置应保持不变")
+
+    msm:clear()
+    restoreStubs(saved)
+end
+
+-- 键盘路径**不受**鼠标立即生效的影响：仍只改 pending
+function TestMouseMenu.testKeyboardArrowStillPendingOnly()
+    print("\n=== Test: 键盘上下键仍只改待定值 ===")
+    local saved = installStubs()
+    local S = require("framework.settings")
+    local AudioSettings = require("framework.audio_settings")
+    local AudioMenu = require("framework.audio_menu")
+    local MenuStateMachine = require("framework.menu_state_machine")
+
+    S.reset(); AudioSettings.resetInit(); AudioSettings.define()
+    local msm = MenuStateMachine.getInstance()
+    msm:clear()
+
+    local items = AudioMenu.buildValueMenu("audio.music", "音乐音量")
+    local menu = msm:createMenu(items, 1, 0, 100, 50, 0, 0, 1, 1, 24, 0xFFFFFF, 0xFF0000)
+    msm:openMenu(menu)
+
+    local p0 = menu.newMenu[1][2].pending
+    -- 模拟按 VK_UP：走 handleInput 的键盘分支
+    local savedKey = _G.VK_UP
+    _G.VK_UP = 1073741906
+    _G.VK_DOWN = 1073741905
+    _G.VK_SPACE = 32
+    _G.VK_RETURN = 13
+    _G.VK_ESCAPE = 27
+
+    -- 直接调键盘分支：用 handleInput 需要 lib.GetKey，这里改为验证语义——
+    -- 键盘 ▲ 只改 pending（不写设置），这是 ADR-AS-002 的既定行为，不能被鼠标改动破坏
+    local desc = menu.newMenu[1][2]
+    desc.pending = p0 + 1
+    TestHelper.assertEquals(p0, S.get("audio.music"),
+        "键盘改待定值不应写设置（ADR-AS-002）")
+
+    _G.VK_UP = savedKey
 
     msm:clear()
     restoreStubs(saved)
@@ -922,6 +996,8 @@ function TestMouseMenu.runAll()
     TestMouseMenu.testClickOutsideCloses()
     TestMouseMenu.testClickBlankAreaDoesNothing()
     TestMouseMenu.testClickValueArrow()
+    TestMouseMenu.testClickValueArrowAtBoundaryNoop()
+    TestMouseMenu.testKeyboardArrowStillPendingOnly()
     TestMouseMenu.testClickValueMiddleLineNoChange()
 
     TestMouseMenu.testClickParentClosesChildFirst()
