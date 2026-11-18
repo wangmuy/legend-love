@@ -16,17 +16,25 @@
 2. `lib.Debug/GetKey/Delay/GetTime` → `EngineAPI.*`（191 处调用点）
 3. 补齐 3 个缺失契约：`render.getWidth` / `render.getHeight` / `font.measureText`
 4. 修复虚拟手柄接线 bug（`pollVirtualPad` 依赖不存在的 `render.getWidth`）
-5. 38 个 dead contract 决策留痕
-6. 4 引擎实现同步补齐
-7. 跨引擎契约一致性测试（行为断言，不 skip）
-8. 文档计数同步
+5. **新增 `framework/sprite_decoder.lua`**：RLE + 调色板解码从引擎搬到 framework
+   （ADR-PORT-013：`LoadPic` 124 行里只有 5 行碰引擎，其余 119 行是可移植的数据处理）
+6. **多格式支持**：格式标签 + 两条解码路径（ADR-PORT-014）
+   - RLE → framework 解码 → `EngineAPI.sprite.createFromRGBA(w, h, rgbaBytes)`
+   - PNG/JPG → 引擎解码 → `EngineAPI.sprite.createFromEncoded(bytes, "png")`
+7. **修复实测缺陷**：PNG 帧路径硬置 `xoff/yoff = 0`（RLE 路径保留真实锚点，
+   同容器内两种格式锚点语义不一致）
+8. 38 个 dead contract 决策留痕
+9. 4 引擎实现同步补齐
+10. 跨引擎契约一致性测试（行为断言，不 skip）
+11. 文档计数同步
 
 ## Out of Scope
 
-- script 全局函数解耦 → `port-scope2-script-decoupling`
-- sprite 动画 → `port-scope3-sprite-animation`
+- script 全局函数解耦 → `port-script-decoupling`
+- sprite 动画 → `port-sprite-animation`
 - resize / IME / audio 概念重设计 / 绘制原语扩展 → epic 的 TODO.md
-- 资产格式转换 → 独立 epic
+- 资产格式**转换工具链**（把磁盘资产批量转成 PNG 图集）→ 不做，
+  实测会从 40 MB 涨到 80–200 MB（见 design.md ADR-PORT-014 的方案 B）
 - 实际写 Godot/Unreal 引擎实现
 
 ## 关键度量（基线与目标）

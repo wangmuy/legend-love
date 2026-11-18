@@ -18,11 +18,19 @@ parent_epic: null
   2. `lib.Debug/GetKey/Delay/GetTime` → `EngineAPI.*`（191 处调用点）
   3. 补齐 3 个缺失契约：`render.getWidth` / `render.getHeight` / `font.measureText`
   4. **修复虚拟手柄接线 bug**（`pollVirtualPad` 依赖不存在的 `render.getWidth`）
-  5. 38 个 dead contract 决策留痕（`decisions.md`）
-  6. 4 引擎实现同步补齐
-  7. 新建 `test_engine_conformance.lua`（行为断言，MUD/Web 上真实执行）
-  8. 新建门禁 `gate_engine_contract.sh`
-  9. 文档计数同步（`AGENTS.md` / `ENGINE_API_DESIGN.md` / `SRC_FILES.md`）
+  5. **新建 `framework/sprite_decoder.lua`**：RLE + 调色板解码从引擎搬到 framework
+     （ADR-PORT-013：`LoadPic` 124 行里只有 5 行碰引擎）
+  6. **多格式支持**（ADR-PORT-014）：格式标签 + 两条解码路径
+     - RLE → framework 解码 → `sprite.createFromRGBA(w, h, rgbaBytes)`
+     - PNG/JPG → 引擎解码 → `sprite.createFromEncoded(bytes, formatHint)`
+     - 新增 `sprite.getMeta(handle)` → `{ w, h, xoff, yoff }`
+  7. **修复实测缺陷**：PNG 帧路径硬置 `xoff/yoff = 0`
+     （RLE 路径保留真实锚点，同容器内两种格式锚点语义不一致）
+  8. 38 个 dead contract 决策留痕（`decisions.md`）
+  9. 4 引擎实现同步补齐
+  10. 新建 `test_engine_conformance.lua`（行为断言，MUD/Web 上真实执行）
+  11. 新建门禁 `gate_engine_contract.sh`
+  12. 文档计数同步（`AGENTS.md` / `ENGINE_API_DESIGN.md` / `SRC_FILES.md`）
 - **Depends On**: —（无前置）
 - **Status**: [ ] Created
 
@@ -126,6 +134,29 @@ EngineAPI.debug.log(...)
 EngineAPI.sprite.draw(archiveId, frameId, x, y, flags, alpha)
 -- frameId 是**不透明整数**，语义由引擎的 loadArchive 定义
 ```
+
+### change 1 的资产解码契约（多格式核心）
+
+```lua
+-- framework 侧（纯数据，零引擎依赖）
+SpriteDecoder.decodeRLE(grpBytes, offsetA, offsetB)
+    --> { w=, h=, xoff=, yoff=, rgba = <w*h*4 字节，RGBA 顺序> }
+SpriteDecoder.loadPalette(colBytes)          --> paletteTable
+SpriteDecoder.sniffFormat(bytes)             --> "rle" | "png"   （按签名，不看扩展名）
+
+-- 引擎侧（只做上传，不解码 RLE）
+EngineAPI.sprite.createFromRGBA(w, h, rgbaBytes, opts)  --> handle
+EngineAPI.sprite.createFromEncoded(bytes, formatHint)   --> handle
+EngineAPI.sprite.getMeta(handle)                        --> { w, h, xoff, yoff }
+```
+
+**锚点约定**（解决实测缺陷）：
+
+| 容器 | 格式 | `xoff` / `yoff` 来源 |
+|------|------|---------------------|
+| packed `<name>.idx/.grp` | RLE | 帧头 8 字节（数据自带） |
+| packed 同上 | PNG | 无自带 → 约定 `w/2, h`（与同容器 RLE 的脚底中心锚定一致） |
+| loose 单文件 | 任意 | 调用方显式传 `opts.xoff / opts.yoff` |
 
 ### change 3 → change 2 的冲突点
 

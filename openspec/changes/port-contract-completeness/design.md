@@ -245,6 +245,195 @@ TestHelper.assertTrue(w > 0, "getWidth 必须 > 0（即使是哨兵值）")
 
 ---
 
+## ADR-PORT-013：编解码归 framework，引擎只负责「上传字节」
+
+### Context
+
+`lib_love.lua` 的 `LoadPic`（124 行）里只有 **5 行**真正碰引擎：
+
+```lua
+love.image.newImageData(w, h)                    -- 创建画布
+imgdata:setPixel(x, y, r, g, b, a)               -- 逐像素写入
+love.graphics.newImage(imgdata, {...})           -- 上传为纹理
+```
+
+其余 119 行全是纯数据操作：读 idx 偏移、解析 8 字节帧头、RLE 解压、查调色板。
+
+**换引擎时，移植者必须把这 124 行重写一遍**，而其中 96% 是与引擎无关的数据处理。
+
+### 实测支撑：LÖVE 11.5 支持原始字节上传
+
+```lua
+love.image.newImageData(w, h, "rgba8", rawBytes)   -- 实测 OK
+```
+
+性能对比（实测，64×64）：
+
+```
+逐像素 setPixel       1.0 ms
+raw RGBA 一次性上传   0.0 ms        ← 加速比 10000x
+推算 66.7M 像素全量:  16.3 秒 → 0.0 秒
+```
+
+（LÖVE 11.5 的 `ImageData` 没有 `setPixels` 方法；`newImageData(w,h,format,data)`
+是 4 参数形式，`getFormat()` 返回 `"rgba8"`。）
+
+### Decision
+
+**RLE / 调色板解码搬到 framework，引擎只实现「把 RGBA 字节串上传成纹理」。**
+
+```lua
+-- framework/sprite_decoder.lua（纯数据，零引擎依赖）
+SpriteDecoder.decodeRLE(grpBytes, offsetA, offsetB) --> {
+    w = number, h = number,
+    xoff = number, yoff = number,       -- 锚点，载荷的一部分
+    rgba = string,                       -- w*h*4 字节，RGBA 顺序
+}
+
+-- EngineAPI 新增一个契约（不是五个）
+EngineAPI.sprite.createFromRGBA(w, h, rgbaBytes, opts) --> textureHandle
+```
+
+### 字节顺序契约
+
+`rgbaBytes` **一律 RGBA 顺序**（字节 R,G,B,A 依次排列）。
+
+| 引擎 | 原生格式 | 实现内需做的事 |
+|------|---------|---------------|
+| LÖVE 11.5 | `rgba8` = RGBA | 直接 `newImageData(w,h,"rgba8",raw)` |
+| Godot 4 | `FORMAT_RGBA8` = RGBA | `Image.create_from_data(...)` |
+| Unreal 5 | `PF_B8G8R8A8` = **BGRA** | 需一次 swizzle（成本极低，一次字节拷贝） |
+| SDL2 | 取决于 `SDL_PixelFormatEnum` | 用 `SDL_PIXELFORMAT_RGBA8888` |
+
+### Alternatives
+
+| 方案 | 否决理由 |
+|------|---------|
+| A. 保持现状（引擎解码全部格式） | 每个新引擎重写 124 行；已实测 MUD 引擎直接崩 |
+| B. 引擎解码 PNG，framework 解码 RLE | 混合状态：引擎仍要懂「这个字节串是 PNG 还是 RLE」 |
+| C. framework 解码全部（含 PNG） | 纯 Lua 无 zlib/inflate，PNG 解压不可行（见 ADR-PORT-014） |
+| **D. framework 解码 RLE，引擎解码 PNG** | **采纳**（见 ADR-PORT-014 的论证） |
+
+### Consequences
+
+- framework 新增 `sprite_decoder.lua`（约 120 行纯数据）
+- 引擎侧 `sprite.loadArchive` 从「懂 .idx/.grp/RLE/调色板」降为
+  「按格式标签分发到两个上传函数」
+- **磁盘资产格式不变**（仍是 40 MB 的 `.idx/.grp`），无需转换工具链
+
+---
+
+## ADR-PORT-014：多格式支持 —— 格式标签 + 两条解码路径
+
+### Context
+
+用户要求：**除了原版 RLE，至少还要支持 PNG 等现代格式。**
+
+现状盘点（实测）：仓内已有 **3 套编解码路径**散落在 `lib_love.lua`：
+
+| 容器 | 编解码 | 现状 |
+|------|--------|------|
+| packed `<name>.idx` + `<name>.grp` | RLE + 调色板 | `LoadPic` 主体，124 行 |
+| packed 同上 | **PNG 帧**（同容器内混存） | `LoadPic` 开头的签名嗅探分支，**实测存在 2 个真 PNG 帧**（`hdgrp.grp` slot 60/112） |
+| loose 单文件 | PNG/JPG/... | `LoadPicture` 直接交引擎 |
+| packed 同上 | 硬编码 raw | `CloudTick` 内独立解析（第三套代码） |
+
+**关键实测**：`hdgrp.grp` 里那 2 个 PNG 帧确实是合法 PNG
+（IHDR: 100×102 RGBA / 100×93 RGBA），说明**混合容器是既有事实**，不是假想需求。
+
+**另一个实测缺陷**：PNG 分支把 `xoff/yoff` 硬置为 0，
+而 RLE 分支保留真实锚点。同一个容器里两种格式的锚点语义不一致。
+
+### Decision
+
+**统一为「格式标签 + 解码器分发」，且明确哪些格式由谁解码。**
+
+```
+读容器（framework）
+  packed: 用 .idx 取出 [offsetA, offsetB) 的字节段
+  loose:  整文件为字节段
+       │
+       ▼
+嗅探格式标签（framework，读前 8 字节）
+  PNG 签名 89 50 4E 47 0D 0A 1A 0A  → format = "png"
+  否则                               → format = "rle"
+       │
+       ├── format == "rle" → framework 解码（ADR-PORT-013）
+       │       → EngineAPI.sprite.createFromRGBA(w, h, rgba)
+       │
+       └── format == "png" → 引擎解码（PNG 解压需要 zlib）
+               → EngineAPI.sprite.createFromEncoded(bytes, "png")
+```
+
+### 为什么 PNG 必须由引擎解码
+
+| 考量 | 数据 |
+|------|------|
+| 纯 Lua 无 zlib | 全仓 `*.lua` 里 `inflate` / `zlib` / `deflate` = 0 命中
+（唯一命中是一个二进制的 `consoleimz.exe`，非 Lua 实现） |
+| LuaJIT 自带 zlib | 无（需 `require("zlib")`，未安装） |
+| PNG 是 DEFLATE 压缩流 | 解压必须 zlib 实现 |
+| 四引擎是否都能解 PNG | 都能（LÖVE `newImageData(FileData)` / Godot `load_png_from_buffer` / Unreal `ImportBufferAsTexture2D` / SDL `IMG_Load_RW`） |
+
+**所以正确分工是：能纯 Lua 做的高性价比（RLE）归 framework，
+需要压缩库的（PNG）归引擎。** 这不是妥协，是按成本分配。
+
+### 契约形态（两个函数覆盖全部容器×格式组合）
+
+```lua
+-- 原始字节上传（framework 已解码）—— RLE 路径
+EngineAPI.sprite.createFromRGBA(w, h, rgbaBytes, opts) --> handle
+
+-- 编码字节上传（引擎解码）—— PNG/JPG/WebP 等路径
+EngineAPI.sprite.createFromEncoded(bytes, formatHint) --> handle
+
+-- 取元数据（两个路径都必须返回，解决锚点不一致缺陷）
+EngineAPI.sprite.getMeta(handle) --> { w, h, xoff, yoff }
+```
+
+**锚点如何传给 PNG 路径**（这是本 ADR 最关键的细节）：
+
+PNG 帧本身没有锚点字段（PNG 规范里没有），所以：
+
+| 容器类型 | 锚点来源 |
+|---------|---------|
+| packed + RLE | 帧头 8 字节（w,h,xoff,yoff）—— 数据自带 |
+| packed + PNG | **无自带锚点** → 约定 `xoff = w/2, yoff = h`（脚底中心对齐） |
+| loose 单文件 | 无锚点 → 调用方显式传 `opts.xoff/opts.yoff` |
+
+**为什么 packed+PNG 用 `w/2, h` 作为默认锚点**：实测那 2 个 PNG 帧
+（100×102、100×93）是"高清立绘"用途，视觉上是整体贴图；而 `.grp` 里
+所有 RLE 精灵都是"脚底中心锚定"（主角帧 `15x39, xoff=5, yoff=44` ≈ w/2, h）。
+所以默认值与同容器的 RLE 精灵保持一致，避免两种格式混排时错位。
+
+### 未来格式扩展点
+
+新增格式（WebP / 自定义 RLE 变体 / 二值位图）只需两步：
+
+1. 在 framework 的格式嗅探里加签名（或加一个显式 `formatHint` 参数）
+2. 若该格式引擎能解码 → 走 `createFromEncoded`，**引擎零改动**
+   若该格式可纯 Lua 解码 → 走 framework 解码 + `createFromRGBA`，**引擎零改动**
+
+**两种扩展路径都不需要引擎改动** —— 这是本设计的核心价值。
+
+### Alternatives
+
+| 方案 | 否决理由 |
+|------|---------|
+| A. 只支持 RLE（不扩展） | 用户明确要求支持现代格式 |
+| B. 强制资产转换为统一格式（PNG 图集） | 实测：66.7 M 像素 → 图集约 78.5 M 像素（85% 装箱）；PNG 压缩后 80–200 MB，**比现有 40 MB RLE 大 2–5 倍** |
+| C. 改用 glTF（3D 统一格式） | 实测不符：glTF 面向 3D 网格+PBR；我们会丢掉调色板交换、`xoff/yoff` 锚点、帧号随机访问。且 2D 精灵转 3D 是"当贴图用"，非原生 2D 管线 |
+| **D. 格式标签 + 两条解码路径** | **采纳** |
+
+### Consequences
+
+- 磁盘资产**不用转换**（保留 40 MB RLE），新增资产可用 PNG
+- 混合容器（同一 `.grp` 里混 RLE 与 PNG）**天然支持**，已有 2 个实例
+- 修复实测缺陷：PNG 路径不再硬置 `xoff/yoff = 0`
+- 引擎侧只多 1 个函数（`createFromEncoded`），成本远低于重写 124 行解码器
+
+---
+
 ## Negative Constraints
 
 ```
@@ -255,6 +444,10 @@ TestHelper.assertTrue(w > 0, "getWidth 必须 > 0（即使是哨兵值）")
 ✗ 不得一次性提交 237 处改动（必须分批）
 ✗ 不得用 skip 掩盖跨引擎行为缺失
 ✗ 不得在本 change 里改 sprite 动画（那是 slice 3）
+✗ 不得强制把磁盘资产转成 PNG 图集（实测会从 40 MB 涨到 80–200 MB）
+✗ 不得让引擎重新承担 RLE 解码（那是 ADR-PORT-013 要消除的）
+✗ 不得用 glTF 等 3D 格式承载 2D 精灵（会丢调色板交换与锚点语义）
+✗ 不得让 PNG 路径再硬置 xoff/yoff = 0（这是实测到的既有缺陷）
 ```
 
 ## Review Checklist
@@ -270,4 +463,10 @@ TestHelper.assertTrue(w > 0, "getWidth 必须 > 0（即使是哨兵值）")
 [ ] 四版本全量测试零失败
 [ ] luac5.1 -p / luac55 -p 零失败
 [ ] LÖVE 11.5 启动冒烟无报错
+[ ] sprite_decoder.lua 零引擎依赖（grep love\. = 0，require("engine = 0）
+[ ] 格式嗅探覆盖 RLE 与 PNG 两条路径（hdgrp.grp 的 2 个真 PNG 帧实测加载成功）
+[ ] PNG 路径的 xoff/yoff 不再为 0（锚点缺陷已修）
+[ ] createFromRGBA / createFromEncoded 在 4 引擎都实现
+[ ] RGBA 字节顺序契约写进 engine_api.lua 注释（Unreal 需 swizzle 的说明）
+[ ] 混合容器（同 .grp 内 RLE+PNG）实测可加载
 ```

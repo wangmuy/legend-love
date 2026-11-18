@@ -57,6 +57,49 @@
 
 ---
 
+## Task 4b：新建 `sprite_decoder.lua`（RLE + 调色板解码搬到 framework）
+
+**Blast Radius**：`game/framework/sprite_decoder.lua`（新）、
+`game/framework/text_box_layout.lua`（不加，仅参考）
+
+**DoD**：
+- [ ] `SpriteDecoder.decodeRLE(grpBytes, offsetA, offsetB)` →
+      `{ w=, h=, xoff=, yoff=, rgba=<w*h*4 字节> }`
+      - 解析前 8 字节帧头（`w,h` 小端 u16；`xoff,yoff` 小端 i16）
+      - 逐行 RLE 解压（`count=u8`，`trans=u8`，`solid=u8`，索引 u8）
+      - 调色板 256×3 字节，值 0..63 → `*4`
+      - 输出 RGBA 顺序字节串（透明像素 = 0,0,0,0）
+- [ ] `SpriteDecoder.loadPalette(colBytes)` → 调色板表
+- [ ] `SpriteDecoder.sniffFormat(bytes)` → `"rle"` | `"png"`（按字节签名，
+      **不看扩展名**）
+- [ ] `SpriteDecoder.decodeAnchors(format, w, h, opts)` →
+      packed+RLE 用帧头；packed+PNG 用 `w/2, h`；loose 用 `opts`
+- [ ] 文件里 `love\.` = 0、`require("engine` = 0
+- [ ] **性能**：用 raw RGBA 一次性构造（不逐像素 setPixel）
+- [ ] 单元测试：解码一帧真实 RLE，断言 `w/h/xoff/yoff` 与 RGBA 前 4 字节
+- [ ] **负向对照**：把 `xoff/yoff` 硬置 0 → 测试必须 FAIL
+
+---
+
+## Task 4c：契约新增两个上传函数 + 锚点查询
+
+**Blast Radius**：`game/engine-love2d/engine_api.lua`
+
+**DoD**：
+- [ ] `sprite.createFromRGBA(w, h, rgbaBytes, opts)` →
+      `{ handle, w, h, xoff, yoff }`
+      - 契约注释写清：`rgbaBytes` **一律 RGBA 顺序**；
+        Unreal 的 BGRA 在实现内 swizzle
+- [ ] `sprite.createFromEncoded(bytes, formatHint)` → 同上
+      - 引擎用自身的图片解码能力（LÖVE `newImageData(FileData)` /
+        Godot `load_png_from_buffer` / Unreal `ImportBufferAsTexture2D` /
+        SDL `IMG_Load_RW`）
+- [ ] `sprite.getMeta(handle)` → `{ w, h, xoff, yoff }`
+- [ ] 4 引擎实现齐全
+- [ ] `luac5.1 -p` / `luac55 -p` 通过
+
+---
+
 ## Task 5：精灵契约改写（16 处）
 
 **Blast Radius**：`game/framework/*.lua`
@@ -67,6 +110,9 @@
 - [ ] 2 处 `lib.PicLoadCache` → `EngineAPI.sprite.draw`
 - [ ] 2 处 `lib.LoadPicture` → `EngineAPI.sprite.loadPicture`
 - [ ] 实机冒烟：物品图标、人物头像、地图精灵显示正确
+- [ ] **混合容器验证**：`hdgrp.grp` 的 2 个 PNG 帧（slot 60/112）能加载
+- [ ] **锚点回归验证**：主角帧 `xoff=5, yoff=44` 与改动前一致
+- [ ] **锚点缺陷验证**：PNG 帧的 `xoff/yoff` 不再是 0
 - [ ] 全量测试零失败
 
 ---
@@ -157,8 +203,11 @@
 - [ ] 新建 `gate_engine_contract.sh`：
       - `grep framework/ 的 lib.` = 0
       - `grep framework/ 的 love.` = 0
+      - `grep framework/sprite_decoder.lua 的 love.` = 0
       - 契约函数在 4 引擎齐全
-      - 负向对照实测（加回一处 `lib.DrawMMap` → FAIL）
+      - **引擎里不得出现 RLE 解码逻辑**（`grep 'palletteIdx\|paletteIdx' engine-*/` = 0）
+      - 负向对照实测（加回一处 `lib.DrawMMap` → FAIL；
+        在引擎里加回 RLE 解码 → FAIL）
 - [ ] 文档计数：`AGENTS.md` 的「59 个函数」→ 实际数（75 / 15 模块）
 - [ ] `ENGINE_API_DESIGN.md` 同步
 - [ ] `SRC_FILES.md` 同步

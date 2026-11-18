@@ -121,6 +121,98 @@ SHALL NOT 出现"契约为理想形态、实现却绕过它"的情况。
 - **When** 阅读该条目
 - **Then** 有明确的「删除理由」与「若有消费者该怎么办」
 
+### Requirement: REQ-PORT1-9 编解码归 framework，引擎只上传字节
+
+RLE 与调色板解码 SHALL 住在 framework（`framework/sprite_decoder.lua`），
+SHALL NOT 住在引擎实现。引擎 SHALL 只实现「把 RGBA 字节串上传成纹理」。
+
+`rgbaBytes` 的字节顺序 SHALL 一律为 RGBA（R,G,B,A 依次）。
+若引擎原生格式不同（如 Unreal 的 `PF_B8G8R8A8` 是 BGRA），
+SHALL 在引擎实现内部做一次 swizzle，调用方无需感知。
+
+#### Scenario: sprite_decoder 零引擎依赖
+
+- **GIVEN** `framework/sprite_decoder.lua`
+- **WHEN** 执行 `grep -c 'love\.' framework/sprite_decoder.lua`
+- **THEN** 命中数 = 0
+- **AND** `grep -c 'require("engine' framework/sprite_decoder.lua` = 0
+
+#### Scenario: 解码结果带锚点
+
+- **GIVEN** 一个 RLE 帧，帧头为 `w=15, h=39, xoff=5, yoff=44`
+- **WHEN** 调 `SpriteDecoder.decodeRLE(grpBytes, a, b)`
+- **THEN** 返回 `{ w=15, h=39, xoff=5, yoff=44, rgba=<15*39*4 字节> }`
+
+#### Scenario: RGBA 字节顺序可验证
+
+- **GIVEN** 一个 1×1 的 RLE 帧，调色板索引指向纯红 `(255,0,0)`
+- **WHEN** 解码并检查 `rgba` 的前 4 字节
+- **THEN** 依次为 `255, 0, 0, 255`（R,G,B,A）
+
+#### Scenario: Unreal 的 BGRA 差异在引擎内消化
+
+- **GIVEN** 契约要求 RGBA 顺序
+- **WHEN** 某引擎原生格式是 BGRA
+- **THEN** 该引擎的 `createFromRGBA` 实现内部完成 swizzle，
+  framework 传入的字节不变
+
+### Requirement: REQ-PORT1-10 多格式支持（格式标签 + 两条路径）
+
+资产加载 SHALL 支持至少两种编解码路径，由格式标签分发：
+
+- **可纯 Lua 解码的格式**（RLE）→ framework 解码 → `sprite.createFromRGBA`
+- **需外部压缩库的格式**（PNG/JPG/WebP）→ 引擎解码 → `sprite.createFromEncoded`
+
+格式嗅探 SHALL 基于字节签名（读前 8 字节），SHALL NOT 依赖文件扩展名。
+
+#### Scenario: PNG 帧走引擎解码路径
+
+- **GIVEN** 一个 `.grp` 容器内的 PNG 帧（实测 `hdgrp.grp` slot 60/112 是合法 PNG：
+  100×102 RGBA / 100×93 RGBA）
+- **WHEN** 加载该帧
+- **THEN** framework 嗅探出格式为 `"png"`，调 `sprite.createFromEncoded(bytes, "png")`
+
+#### Scenario: 混合容器可加载
+
+- **GIVEN** 同一个 `.grp` 里既有 RLE 帧又有 PNG 帧（实测存在）
+- **WHEN** 分别加载两种帧
+- **THEN** 两条路径都成功，且各自返回正确的 `w/h/xoff/yoff`
+
+#### Scenario: 扩展新格式不需要改引擎
+
+- **GIVEN** 将来要支持 WebP
+- **WHEN** 在 framework 的嗅探表里加 WebP 签名，走 `createFromEncoded`
+- **THEN** 引擎实现零改动
+
+#### Scenario: 不按扩展名判断格式
+
+- **GIVEN** 一个命名为 `foo.png` 的 RLE 字节段
+- **WHEN** 加载它
+- **THEN** 按字节签名判定为 RLE，走 framework 解码路径
+
+### Requirement: REQ-PORT1-11 PNG 路径的锚点不再是零
+
+历史缺陷：`lib_love.lua` 的 PNG 分支把 `cache.xoff/yoff` 硬置为 0，
+而 RLE 分支保留真实锚点 —— 同一容器内两种格式的锚点语义不一致。
+
+修复后 SHALL：
+- packed + RLE → 用帧头的 `xoff/yoff`
+- packed + PNG → 无自带锚点，SHALL 用约定默认值 `xoff = w/2, yoff = h`
+  （与同容器 RLE 精灵的「脚底中心锚定」约定一致）
+- loose 单文件 → 由调用方显式传 `opts.xoff / opts.yoff`
+
+#### Scenario: PNG 帧有合理锚点
+
+- **GIVEN** `hdgrp.grp` slot 60 的 PNG 帧（100×102）
+- **WHEN** 加载后查 `sprite.getMeta(handle)`
+- **THEN** `xoff = 50, yoff = 102`（不是 0, 0）
+
+#### Scenario: RLE 帧锚点不变
+
+- **GIVEN** 主角行走帧（`w=15, h=39, xoff=5, yoff=44`）
+- **WHEN** 加载后查 `sprite.getMeta(handle)`
+- **THEN** `xoff = 5, yoff = 44`（与改动前完全一致，零回归）
+
 ### Requirement: REQ-PORT1-8 零回归
 
 本 change SHALL NOT 引入任何既有功能的回归。

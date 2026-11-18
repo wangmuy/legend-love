@@ -130,7 +130,7 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 每个子 change 的 DoD 见其 `tasks.md`：
 
 ```
-port-contract-completeness   12 Task 组 / 65 checkbox   契约完整化 + 修虚拟手柄
+port-contract-completeness   14 Task 组 / 81 checkbox   契约完整化 + 解码搬家 + 多格式 + 修虚拟手柄
 port-script-decoupling       8 Task 组                  script 全局解耦
 port-sprite-animation        6 Task 组                  sprite 动画时间驱动
 ```

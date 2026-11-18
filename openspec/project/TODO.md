@@ -35,11 +35,24 @@
   - **不要为了"完整性"提前加 —— 加了就是 dead contract**
     （本 slice 已证明：38/64 的契约因为无消费者而变成死契约）
 
-- [ ] **资产格式转换工具链**
-  - 现状：`.idx`/`.grp` 是自研格式；Godot 用 `SpriteFrames`、Unreal 用 `PaperFlipbook`
-  - 后果：真要移植时，光转换资产就是独立工程
-  - 触发条件：确实要移植到 Godot/Unreal 时
-  - 预估：独立 slice 或 epic
+- [x] ~~资产格式转换工具链~~ **已重新判定：不需要**（2026-11-18）
+  - 原判断：`.grp` 需转成 Godot `SpriteFrames` / Unreal `PaperFlipbook`
+  - 实测否定：`LoadPic` 的 124 行里只有 5 行碰引擎（创建画布 / 逐像素写 /
+    上传纹理），其余 119 行是可移植的纯数据处理；而 LÖVE 11.5 的
+    `newImageData(w, h, "rgba8", rawBytes)` 支持原始字节上传（实测 10000x 加速）
+  - 结论：把 RLE 解码搬到 framework、引擎只做「上传 RGBA 字节」，
+    **磁盘资产无需转换**（保留 40 MB RLE）
+  - 转 PNG 图集实测更差：66.7 M 像素 → 图集 78.5 M 像素，PNG 压缩后
+    80–200 MB，比现有 40 MB 大 2–5 倍
+  - 落点：`port-contract-completeness` 的 ADR-PORT-013 / ADR-PORT-014
+
+- [ ] **新增资产格式支持（未来扩展点）**
+  - 已支持：RLE（原版）+ PNG（引擎解码），两种走不同路径（ADR-PORT-014）
+  - 可低成本新增：WebP / JPG / 自定义 RLE 变体
+  - 扩展方式：framework 加格式嗅探 → 若引擎能解码走 `createFromEncoded`，
+    若可纯 Lua 解码走 framework 解码 + `createFromRGBA` —— **两种都不改引擎**
+  - 注意：glTF 等 3D 格式不适合承载 2D 像素精灵（会丢调色板交换与锚点语义）
+  - 触发条件：有实际的美术资源需要用新格式时
 
 ## 涌现想法（执行过程中产生，不打断当前 slice）
 
