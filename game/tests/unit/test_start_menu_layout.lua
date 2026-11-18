@@ -186,6 +186,68 @@ function TestStartMenuLayout.testWiderMenuNeedsDifferentX()
             leftMargin, rightMargin, leftMargin - rightMargin))
 end
 
+-- 回归：centeredMenuX 与 createMenu 必须用**同一种**度量
+--
+-- 用户报告「设置菜单还是左对齐」。根因不是 centeredMenuX 算错，而是两套度量
+-- 打架：centeredMenuX 按显示宽度、createMenu 按 UTF-8 字节数。
+-- 设置菜单按显示宽度是 234px、按字节是 314px，相差 80px → 居中 X 偏 40px。
+--
+-- 本测试锁死两者一致。若将来有人把 createMenu 改回字节度量，这里会立刻失败。
+function TestStartMenuLayout.testCenteredXMatchesCreateMenuWidth()
+    print("\n=== Test: centeredMenuX 与 createMenu 用同一套度量 ===")
+    local TextBoxLayout = require("framework.text_box_layout")
+    local MenuStateMachine = require("framework.menu_state_machine")
+
+    local screenW = 1024
+    local border = 5
+    local size = 32
+
+    local savedCC = rawget(_G, "CC")
+    rawset(_G, "CC", {
+        ScreenW = screenW,
+        MenuBorderPixel = border,
+        RowPixel = 4,
+        DefaultFont = 24,
+    })
+
+    -- 设置菜单的 4 项（含鼠标开关项的实际文本）
+    local items = {
+        {"音乐音量", nil, 1},
+        {"音效音量", nil, 1},
+        {"鼠标操作    开", nil, 1},
+        {"返回", nil, 1},
+    }
+
+    -- 期望：createMenu 建出的宽度 == centeredMenuX 假设的宽度
+    local msm = MenuStateMachine.getInstance()
+    msm:clear()
+
+    -- centeredMenuX 侧的宽度口径
+    local maxW = 0
+    for _, it in ipairs(items) do
+        local w = TextBoxLayout.textWidth(it[1], size)
+        if w > maxW then maxW = w end
+    end
+    local expectedMenuW = maxW + 2 * border
+    local expectedX = math.floor((screenW - expectedMenuW) / 2)
+
+    -- createMenu 侧的宽度
+    local menu = msm:createMenu(items, 4, 0, expectedX, 10, 0, 0, 0, 0, size, 0, 0)
+    msm:clear()
+
+    TestHelper.assertEquals(expectedMenuW, menu.w,
+        string.format("createMenu 宽度(%d) 必须等于显示宽度口径(%d)",
+            menu.w, expectedMenuW))
+
+    -- 左右余量相等 = 真正居中
+    local left = menu.x1
+    local right = screenW - menu.x1 - menu.w
+    TestHelper.assertEquals(left, right,
+        string.format("左右余量必须相等（左 %d / 右 %d）", left, right))
+
+    rawset(_G, "CC", savedCC)
+end
+
 function TestStartMenuLayout.runAll()
     print("\n" .. string.rep("=", 60))
     print("开始菜单布局测试")
@@ -200,6 +262,7 @@ function TestStartMenuLayout.runAll()
     TestStartMenuLayout.testItemMaxMatchesActualMenu()
     TestStartMenuLayout.testCenteredMenuXFormula()
     TestStartMenuLayout.testWiderMenuNeedsDifferentX()
+    TestStartMenuLayout.testCenteredXMatchesCreateMenuWidth()
 
     return TestHelper.printSummary()
 end

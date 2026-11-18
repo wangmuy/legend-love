@@ -48,6 +48,7 @@ local TestBaseMusic = require("tests.unit.test_base_music")
 local TestInputActions = require("tests.unit.test_input_actions")
 local TestInputBindings = require("tests.unit.test_input_bindings")
 local TestVirtualPad = require("tests.unit.test_virtual_pad")
+local TestVolumeMenuEsc = require("tests.unit.test_volume_menu_esc")
 
 local TestRunner = {}
 
@@ -596,6 +597,14 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + vpStats.failed
     allPassed = allPassed and vpResult
 
+    TestHelper.resetCounts()
+    local vescResult = TestVolumeMenuEsc.runAll()
+    local vescStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + vescStats.total
+    totalStats.passed = totalStats.passed + vescStats.passed
+    totalStats.failed = totalStats.failed + vescStats.failed
+    allPassed = allPassed and vescResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -706,9 +715,11 @@ function TestRunner.runModule(moduleName)
         return TestInputBindings.runAll()
     elseif moduleName == "virtual_pad" then
         return TestVirtualPad.runAll()
+    elseif moduleName == "volume_menu_esc" then
+        return TestVolumeMenuEsc.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc")
         return false
     end
 end

@@ -870,8 +870,18 @@ function JYMainAdapter.showVolumeCoroutine(key, label, menux)
     local before = Settings.get(key)
     local items = AudioMenu.buildValueMenu(key, label)
 
+    -- 参数顺序：menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, ...
+    --
+    -- **isBox=1 / isEsc=1 是必须的**（用户实测：右键点不进、菜单关不掉）。
+    -- 之前这里传的是 0, 0，而 pollMouse 的右键分支判的是
+    --     if msm.activeMenu.isEsc == 1 then msm:closeMenu(0) end
+    -- isEsc=0 → 右键被吞但菜单不动，等于「右键无响应」。
+    -- 而 jymain_async.Menu_AudioVolume 的同名功能传的是 1, 1，
+    -- 两条路径行为不一致。
+    --
+    -- isBox=1 还有一层作用：值项菜单只有一项，画个框才看得出边界。
     MenuAsync.ShowMenuCoroutine(items, 1, 0, menux, CC.StartMenuY,
-        0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED)
+        0, 0, 1, 1, CC.StartMenuFontSize, C_STARTMENU, C_RED)
 
     if Settings.get(key) ~= before then
         local ok, err = Settings.save()

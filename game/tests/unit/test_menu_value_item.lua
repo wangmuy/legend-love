@@ -403,7 +403,13 @@ function TestMenuValueItem.testValueItemWidthUsesDisplayWidth()
     restoreStubs(saved)
 end
 
-function TestMenuValueItem.testExistingMenuWidthUnchanged()
+-- 既有菜单（非值项）也必须按**显示宽度**算
+--
+-- 历史：旧实现用 string.len（UTF-8 字节数）→ 「第一项」3 汉字 9 字节被算成
+-- 24*9/2 = 108px（真实 72px），框宽多出 50%，文字左对齐后右侧一大片空白。
+-- 用户报告「设置菜单还是左对齐」正是这个根因：centeredMenuX 按显示宽度算、
+-- createMenu 按字节算，两套度量打架，居中 X 偏了 40px。
+function TestMenuValueItem.testExistingMenuWidthUsesDisplayWidth()
     local saved = installStubs()
     local S = require("framework.settings")
     local MenuStateMachine = require("framework.menu_state_machine")
@@ -412,14 +418,37 @@ function TestMenuValueItem.testExistingMenuWidthUnchanged()
     local msm = MenuStateMachine.getInstance()
     msm:clear()
 
-    -- 既有菜单（非值项）：必须保持 string.len 语义
     local items = { {"第一项", nil, 1}, {"第二项", nil, 1} }
     local menuData = msm:createMenu(items, 2, 0, 10, 10, 0, 0, 1, 1,
         24, 0xFFFFFF, 0xFF0000)
 
-    -- 「第一项」= 9 字节 → w = 24*9/2 + 2*5 = 108+10 = 118
-    TestHelper.assertEquals(118, menuData.w,
-        "既有菜单框宽与改动前完全一致（string.len 语义）")
+    -- 「第一项」= 3 汉字 = 3*24 = 72px（显示宽度）+ 2*5 边框 = 82
+    TestHelper.assertEquals(82, menuData.w,
+        "既有菜单框宽按显示宽度算（汉字 1.0em），不再用 UTF-8 字节数")
+
+    msm:clear()
+    restoreStubs(saved)
+end
+
+-- 负向对照：若改回字节度量，框会明显偏宽
+function TestMenuValueItem.testByteWidthWouldBeTooWide()
+    local saved = installStubs()
+    local S = require("framework.settings")
+    local MenuStateMachine = require("framework.menu_state_machine")
+    S.reset()
+    local msm = MenuStateMachine.getInstance()
+    msm:clear()
+
+    local items = { {"第一项", nil, 1} }
+    local menuData = msm:createMenu(items, 1, 0, 10, 10, 0, 0, 1, 1,
+        24, 0xFFFFFF, 0xFF0000)
+
+    -- 字节度量会给 24*9/2 + 10 = 118，显示宽度给 82。
+    -- 断言实际值明显小于字节度量值，证明没有回退。
+    local byteWidth = 24 * #"第一项" / 2 + 2 * 5    -- 118
+    TestHelper.assertTrue(menuData.w < byteWidth,
+        string.format("框宽(%d) 必须小于字节度量(%d)，否则中文框又被算宽 50%%",
+            menuData.w, byteWidth))
 
     msm:clear()
     restoreStubs(saved)
@@ -449,7 +478,8 @@ function TestMenuValueItem.runAll()
     TestMenuValueItem.testNoHookMeansNoCrash()
 
     TestMenuValueItem.testValueItemWidthUsesDisplayWidth()
-    TestMenuValueItem.testExistingMenuWidthUnchanged()
+    TestMenuValueItem.testExistingMenuWidthUsesDisplayWidth()
+    TestMenuValueItem.testByteWidthWouldBeTooWide()
 
     return TestHelper.printSummary()
 end

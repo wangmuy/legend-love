@@ -126,50 +126,45 @@ function MenuStateMachine:createMenu(menuItem, numItem, numShow, x1, y1, x2, y2,
     
     -- 计算尺寸
     local w, h
-    local maxlength = 0
     if x2 == 0 and y2 == 0 then
-        -- 宽度分两条分支（ADR-AS-009）：
+        -- 宽度**统一按显示宽度**算（汉字 1.0em / ASCII 0.5em）
         --
-        --   值项      → 按**显示宽度**算（汉字 1.0em / ASCII 0.5em）
-        --   既有菜单  → 保持原来的 string.len 语义，**一个像素都不改**
+        -- 历史：原版 C 层的 JY_DrawStr 用 TTF_SizeUTF8 量真实像素宽，
+        -- 移植版早期把 `#str`（UTF-8 字节数）当成字符数，于是
+        -- `size * #str / 2` 成了错误公式：
+        --   汉字 3 字节 → 算成 1.5em（真实 1.0em）→ 框宽多出 50%
+        --   ASCII 1 字节 → 算成 0.5em（真实 0.5em）→ 正确
+        -- 所以纯中文菜单的框明显偏宽，文字左对齐后右侧一大片空白。
         --
-        -- 为什么不一并修：string.len 是 UTF-8 字节数，中文框会被算宽约 4.5 倍。
-        -- 但 ShowMenu 影响全游戏 20+ 个菜单，全局改会改变它们的所有视觉尺寸，
-        -- 超出本 change 边界。值项必然含中文（音乐音量 64/128），所以只给它
-        -- 用正确的度量。
+        -- ADR-AS-009 当初只修了值项（怕改动 20+ 个既有菜单的视觉尺寸），
+        -- 结果 `centeredMenuX`（按显示宽度算）与 `createMenu`（按字节算）
+        -- 两套度量打架：设置菜单按显示宽度算 234px、实际建出 314px，
+        -- 居中 X 偏了 40px —— 这正是「设置菜单还是左对齐」的直接原因。
+        --
+        -- 现在统一用一种度量。TextBoxLayout 的 em 估算已实测**精确**：
+        -- simsun.ttf 在 16/24/32 三个字号、19 个代表性文本（纯中文、
+        -- 中英混排、全角标点、三角箭头、纯 ASCII）上，
+        -- `font:getWidth` 与估算的**偏差全部为 0.00px**。
         local maxwidth = 0
         local hasValueItem = false
         for i = 1, newNumItem do
             local desc = newMenu[i][2]
             local isValue = type(desc) == "table" and desc.kind == "number"
             if isValue then hasValueItem = true end
-            if isValue then
-                -- 多行文本取最长行；format 需要 pending 才有意义
-                local text = newMenu[i][1] or ""
-                if type(desc.format) == "function" then
-                    local ok, rendered = pcall(desc.format, desc.pending)
-                    if ok and type(rendered) == "string" then text = rendered end
-                end
-                for line in (text .. "\n"):gmatch("(.-)\n") do
-                    local wLine = TextBoxLayout.textWidth(line, size)
-                    if wLine > maxwidth then maxwidth = wLine end
-                end
-            else
-                if string.len(newMenu[i][1]) > maxlength then
-                    maxlength = string.len(newMenu[i][1])
-                end
+
+            -- 取该项要显示的文本：值项用 format(pending) 的渲染结果，
+            -- 普通项直接用第 1 项文本。多行文本取最长行。
+            local text = newMenu[i][1] or ""
+            if isValue and type(desc.format) == "function" then
+                local ok, rendered = pcall(desc.format, desc.pending)
+                if ok and type(rendered) == "string" then text = rendered end
+            end
+            for line in (text .. "\n"):gmatch("(.-)\n") do
+                local wLine = TextBoxLayout.textWidth(line, size)
+                if wLine > maxwidth then maxwidth = wLine end
             end
         end
-        if hasValueItem then
-            local byteWidth = size * maxlength / 2
-            if maxwidth > byteWidth then
-                w = maxwidth + 2 * CC.MenuBorderPixel
-            else
-                w = byteWidth + 2 * CC.MenuBorderPixel
-            end
-        else
-            w = size * maxlength / 2 + 2 * CC.MenuBorderPixel
-        end
+        w = maxwidth + 2 * CC.MenuBorderPixel
         -- 值项是三行文本，高度按行数算
         local lineCount = 1
         if hasValueItem then lineCount = 3 end
