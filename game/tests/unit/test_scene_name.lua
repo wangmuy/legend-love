@@ -191,18 +191,22 @@ function TestSceneName.testDrawRendersBoxAndText()
     SceneNameAsync.clear()
     SceneNameAsync.Show("河洛客棧")
 
+    -- **接线已改**（port-script-decoupling）：script 的 DrawStrBox 现在是
+    -- RenderFacade.drawStrBox 的薄包装，所以拦截点从「全局 DrawBox/DrawString」
+    -- 变成了「RenderFacade.drawBox / RenderFacade.text」。
     local boxes, strs = {}, {}
-    local origBox, origStr = _G.DrawBox, _G.DrawString
-    _G.DrawBox = function(x1, y1, x2, y2, c)
+    local RF = require("framework.render_facade")
+    local origBox, origStr = RF.drawBox, RF.text
+    RF.drawBox = function(x1, y1, x2, y2, c)
         boxes[#boxes + 1] = { x1 = x1, y1 = y1, x2 = x2, y2 = y2 }
         if origBox then return origBox(x1, y1, x2, y2, c) end
     end
-    _G.DrawString = function(x, y, str, c, size)
+    RF.text = function(x, y, str, c, size, font)
         strs[#strs + 1] = { x = x, y = y, str = str, size = size }
-        if origStr then return origStr(x, y, str, c, size) end
+        if origStr then return origStr(x, y, str, c, size, font) end
     end
     SceneNameAsync.draw()
-    _G.DrawBox, _G.DrawString = origBox, origStr
+    RF.drawBox, RF.text = origBox, origStr
 
     TestHelper.assertEquals(#boxes, 1, "应画一个框")
     TestHelper.assertEquals(#strs, 1, "应画一段文字")

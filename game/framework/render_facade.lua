@@ -166,9 +166,11 @@ function RenderFacade.drawStrBox(x, y, str, color, size)
         y = (sh - h) / 2
     end
 
-    -- 边框（script 的 DrawBox 用 C_WHITE）
+    -- 边框：**必须是 drawBox 而不是 rectOutline** ——
+    -- script 的 DrawStrBox 原实现是 `DrawBox(x,y,x+w-1,y+h-1,C_WHITE)`，
+    -- 那是带阴影的双层边框；只画 rectOutline 会丢阴影层，视觉不一致。
     local white = rawget(_G, "C_WHITE") or 0xFFFFFF
-    RenderFacade.rectOutline(x, y, x + w - 1, y + h - 1, white)
+    RenderFacade.drawBox(x, y, x + w - 1, y + h - 1, white)
     -- 文字（内缩 pad）
     RenderFacade.text(x + pad, y + pad, str, color, size)
     RenderFacade.present()

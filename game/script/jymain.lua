@@ -7,6 +7,7 @@
 
 ---本代码由游泳的鱼编写
 
+local RenderFacade = require("framework.render_facade")
 local FileUtil = require "lib_file"
 local ScriptLoader = require "script_loader"
 -- 单行文本的框尺寸计算（引擎无关纯模块）。
@@ -2092,35 +2093,23 @@ end
 
 --绘制一个带背景的白色方框，四角凹进
 function DrawBox(x1,y1,x2,y2,color)         --绘制一个带背景的白色方框
-    local s=4;
-    lib.Background(x1,y1+s,x1+s,y2-s,128);    --阴影，四角空出
-    lib.Background(x1+s,y1,x2-s,y2,128);
-    lib.Background(x2-s,y1+s,x2,y2-s,128);
-    local r,g,b=GetRGB(color);
-    DrawBox_1(x1+1,y1+1,x2,y2,RGB(math.modf(r/2),math.modf(g/2),math.modf(b/2)));
-    DrawBox_1(x1,y1,x2-1,y2-1,color);
+    -- 薄包装：阴影 + 双层边框的完整实现搬到 framework/render_facade.drawBox
+    -- （注意：不能只调 drawBackground —— 那会丢掉白边框，实测踩过）
+    RenderFacade.drawBox(x1,y1,x2,y2,color);
 end
 
 --绘制四角凹进的方框
 function DrawBox_1(x1,y1,x2,y2,color)       --绘制四角凹进的方框
-    local s=4;
-    lib.DrawRect(x1+s,y1,x2-s,y1,color);
-    lib.DrawRect(x2-s,y1,x2-s,y1+s,color);
-    lib.DrawRect(x2-s,y1+s,x2,y1+s,color);
-    lib.DrawRect(x2,y1+s,x2,y2-s,color);
-    lib.DrawRect(x2,y2-s,x2-s,y2-s,color);
-    lib.DrawRect(x2-s,y2-s,x2-s,y2,color);
-    lib.DrawRect(x2-s,y2,x1+s,y2,color);
-    lib.DrawRect(x1+s,y2,x1+s,y2-s,color);
-    lib.DrawRect(x1+s,y2-s,x1,y2-s,color);
-    lib.DrawRect(x1,y2-s,x1,y1+s,color);
-    lib.DrawRect(x1,y1+s,x1+s,y1+s,color);
-    lib.DrawRect(x1+s,y1+s,x1+s,y1,color);
+    -- 薄包装：12 段折线搬到 framework/render_facade._drawBox1
+    RenderFacade._drawBox1(x1,y1,x2,y2,color);
 end
 
 --显示阴影字符串
 function DrawString(x,y,str,color,size)         --显示阴影字符串
-    lib.DrawStr(x,y,str,color,size,CC.FontName);
+    -- 薄包装：实现搬到 framework/render_facade（port-script-decoupling Task 5）
+    -- 保留这个全局是因为 script 层有 100+ 处调用点，签名必须不变。
+    -- facade 内部会自动补 CC.FontName（否则中文变方块）。
+    RenderFacade.text(x,y,str,color,size);
 end
 
 --显示带框的字符串
@@ -2146,19 +2135,8 @@ end
 -- 注意：ShowMenu 的自动定宽（jymain.lua:2333）里还有同一处 `string.len`
 -- 字节数公式，影响全游戏所有菜单框宽，改动面远大于本函数，暂未动。
 function DrawStrBox(x,y,str,color,size)         --显示带框的字符串
-    size = size or CC.DefaultFont;
-    local box = TextBoxLayout.measure(str, {size=size});
-    local w = box.width;
-    local h = box.height;
-    if x==-1 then
-        x=(CC.ScreenW-w)/2;
-    end
-    if y==-1 then
-        y=(CC.ScreenH-h)/2;
-    end
-
-    DrawBox(x,y,x+w-1,y+h-1,C_WHITE);
-    DrawString(x+box.pad,y+box.pad,str,color,size);
+    -- 薄包装：排版 + 画框 + 画字搬到 framework/render_facade.drawStrBox
+    RenderFacade.drawStrBox(x,y,str,color,size);
 end
 
 --显示并询问Y/N，如果点击Y，则返回true, N则返回false
