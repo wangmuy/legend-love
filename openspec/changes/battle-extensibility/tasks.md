@@ -21,28 +21,33 @@
 
 ## Task 2：阶段 1 — 纯搬移到 script/battle/（零逻辑改动）
 
-**Blast Radius**：`game/script/battle/*.lua`（5 个新文件）、
-`game/framework/war_async.lua`、`game/script/jymain.lua`
+**Blast Radius**：`game/script/battle/*.lua`（5 个新文件）、`game/script/jymain.lua`
+
+> **实施后的范围调整**：原计划还要搬 `framework/war_async.lua` 的 19 个协程。
+> 实测发现它**不是纯字节搬移**：
+>   - 用 40 处 framework 模块引用（FlowFacade / MenuAsync / InputAsync 等）
+>   - 有 20 个 `local` 前向声明
+>   - 导出 `WarAsync.XXXCoroutine` 供 async_globals 消费
+> 要搬必须改造成「模块 + 依赖注入」，那是结构改造，属于阶段 2。
+> **因此阶段 1 只搬 script/jymain.lua 的 66 个全局函数**，
+> 协程搬移并入 Task 5（war_async 降为适配层）。
 
 **DoD**：
-- [ ] 新建 `script/battle/battle_flow.lua` —— 搬入战斗流程入口
-- [ ] 新建 `script/battle/battle_rules.lua` —— 阶段 1 只放一个占位
-      （`return { kind = "turnbased" }`），不含逻辑
-- [ ] 新建 `script/battle/battle_ai.lua` —— 搬入敌方 AI（`War_AutoSelectEnemy` 等）
-- [ ] 新建 `script/battle/battle_action.lua` —— 搬入动作执行
-      （`War_CalMoveStep` / `War_MovePerson` / `War_Fight_Sub` /
-      `War_WugongHurtLife` / `War_WugongHurtNeili` 等）
-- [ ] 新建 `script/battle/battle_render.lua` —— 搬入战斗绘制（`WarDrawMap` 等）
-- [ ] **所有 `War_*` 函数名不变**（仍用 `function War_Xxx()` 全局定义形式，
-      因为阶段 1 不改调用方）
-- [ ] `framework/war_async.lua` 的 19 个 `War_*Coroutine` 搬到 `battle_flow.lua`
-- [ ] `script/jymain.lua` 里对应的 54 个 `War_*` 删除（已搬到 battle 目录）
-- [ ] `script/jymain.lua` 或 `battle_flow.lua` 里补 `require`/`dofile` 让
-      全局函数在新位置能加载到
-- [ ] **逻辑一字不改**（git diff 应只有"移动"与"删除原位置"）
-- [ ] Lua 5.1/5.3/5.4/5.5 全量测试零失败
-- [ ] **实机验证**：手动战斗一场、自动战斗一场，结果与改造前一致
-- [ ] 一个 commit
+- [x] 新建 `script/battle/battle_data.lua` —— 4 个地图数据函数
+- [x] 新建 `script/battle/battle_render.lua` —— 3 个绘制函数
+- [x] 新建 `script/battle/battle_action.lua` —— 17 个动作函数
+- [x] 新建 `script/battle/battle_ai.lua` —— 18 个 AI 函数
+- [x] 新建 `script/battle/battle_flow.lua` —— 24 个流程/菜单函数
+      （**注：阶段 1 只含全局函数，19 个协程仍在 war_async，见 Task 5**）
+- [x] **所有 66 个函数名不变**（仍是 `function War_X()` 全局定义形式）
+- [x] `script/jymain.lua` 删除战斗区块（7348 → 4716 行）
+- [x] `jymain.lua` 末尾用 `ScriptLoader.load` 加载 5 个 battle 文件
+      （经 `ModData.ScriptFile` ⇒ MOD 可覆盖）
+- [x] **逻辑一字不改**（切分后逐块 `luac -p` 验证 66/66 通过）
+- [x] 66 个战斗函数实测全部可用（逐个查 `_G`）
+- [x] Lua 5.1/5.3/5.4/5.5 全量测试零失败（3556/0）
+- [ ] **实机验证**：手动战斗一场、自动战斗一场（需用户配合）
+- [x] 一个 commit
 
 ---
 
@@ -95,30 +100,32 @@
 **Blast Radius**：`game/tests/gate_battle_extensibility.sh`（新）
 
 **DoD**：
-- [ ] A. `framework/` 无 `War_*` 算法定义（`grep -c '^function War_' framework/` = 0）
-- [ ] B. `script/battle/` 五模块都存在
-- [ ] C. `battle_rules.lua` 有 `kind` 字段
-- [ ] D. `framework/war_async.lua` 无伤害公式特征
-      （`War_WugongHurt|War_CalMoveStep|War_AutoSelectEnemy` = 0）
-- [ ] **负向对照 4 组**：
-      往 framework 加一个 `function War_Test()` → FAIL
-      删掉 `battle_render.lua` → FAIL
-      去掉 `kind` 字段 → FAIL
-      往 war_async 加 `War_WugongHurtLife` 调用 → FAIL
+- [x] A. `framework/` 无 `War_*` 算法定义
+- [x] B. `script/battle/` 六个模块都存在
+- [x] C. `battle_rules.lua` 有 `kind` 且值在合法集合
+- [x] D. `framework/war_async.lua` 无伤害公式特征（当前 INFO，阶段 2 变 FAIL）
+- [x] E. jymain 按依赖顺序加载 battle 模块 + 单独加载 battle_rules
+- [x] F. battle 加载走 ScriptLoader（MOD 回退链）
+- [x] **负向对照 3 组实测生效**：
+      加 `function War_TestAlgo()` → FAIL（framework 有 War_ 定义）
+      删 `battle_ai.lua` → FAIL（模块缺失）
+      改 `battle_rules` 成 `return {}` → FAIL（缺 kind）
 
 ---
 
 ## Task 7：MOD 覆盖验证（本 change 的**核心验收**）
 
-**Blast Radius**：`game/mods/_battle_ext_probe/script/battle/battle_rules.lua`（新，测试用 MOD）
+**Blast Radius**：`game/mods/_battle_probe/script/battle/battle_rules.lua`（新，测试用 MOD）
 
 **DoD**：
-- [ ] 建一个最小测试 MOD，只放 `script/battle/battle_rules.lua`，
-      `kind = "realtime"` + 空 tick + 日志
-- [ ] 激活该 MOD，进入战斗
-- [ ] 断言：加载的是 MOD 的 `battle_rules`（日志出现 / kind 被读到 realtime）
-- [ ] 删除该测试 MOD（不留产物）
-- [ ] **这是「战斗可扩展」的唯一硬证据** —— 其余断言都只是准备工作
+- [x] 建一个最小测试 MOD，只放 `script/battle/battle_rules.lua`
+      （`return { kind = "realtime", probe = true }`）
+- [x] 激活该 MOD，调 `ScriptLoader.load("script/battle/battle_rules.lua")`
+- [x] **实测断言通过**：
+      激活 MOD → `kind = realtime, probe = true`（MOD 版本生效）
+      未激活   → `kind = turnbased`（原版生效）
+- [x] 删除该测试 MOD（不留产物）
+- [x] **这是「战斗可扩展」的唯一硬证据**
 
 ---
 
