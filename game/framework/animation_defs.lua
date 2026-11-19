@@ -101,19 +101,25 @@ function AnimationDefs.defineAll(opts)
     local boatStart = tonumber(opts.boatStartPic)
     if not startPic or not boatStart then return 0 end
 
-    local walkFps = tonumber(opts.walkFps) or 15
+    local walkFps = tonumber(opts.walkFps) or 20
     local boatFps = tonumber(opts.boatFps) or 8
+
+    -- walkFps = 0 表示「冻结动画」（保留当前帧，不推进）
+    --
+    -- sprite_anim 的 defineSequence 会把 fps <= 0 钳到 12，
+    -- 所以这里用一个极大的 frameTime 等价实现冻结 —— 不另加新概念。
+    local frozen = (walkFps == 0)
 
     local n = 0
 
     for dir = 0, 3 do
         local name = AnimationDefs.DIRECTIONS[dir]
 
-        -- 行走
+        -- 行走（frozen 时 fps 用一个极小值 → frameTime 极大 → 永不换帧）
         local walkId = "person.walk." .. name
         SpriteAnim.defineSequence(walkId, {
             frames = AnimationDefs.walkFrames(startPic, dir),
-            fps = walkFps,
+            fps = frozen and 0.001 or walkFps,
             mode = SpriteAnim.MODE_LOOP,
         })
         n = n + 1

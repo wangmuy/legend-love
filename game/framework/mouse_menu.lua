@@ -53,6 +53,21 @@ function MouseMenu.define()
         end
     end)
 
+    -- 走路动画帧率（port-sprite-animation Task 5）
+    --
+    -- 为什么放这里：与虚拟手柄一样属于「输入/表现」设置，一起声明避免漏。
+    -- type = "number"，默认 20（与自动移动的 50ms/步精确对齐，见 ADR-PORT-018）。
+    -- 0 表示冻结动画（保留当前帧）。
+    pcall(function()
+        if Settings then
+            Settings.define("animation.walkFps", {
+                default = 20,
+                type    = "number",
+                label   = "走路帧率",
+            })
+        end
+    end)
+
     return Settings.define(MouseMenu.KEY, {
         default = MouseMenu.DEFAULT,
         type    = "bool",
