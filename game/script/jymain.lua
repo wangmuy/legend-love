@@ -4701,6 +4701,13 @@ do
         local chunk, err = BattleLoader.load(path)
         if chunk then
             local ok, e = pcall(chunk)
+            if ok then
+                -- 成功也记一条：这样 LÖVE 冒烟日志能证明"battle 模块真的加载了"，
+                -- 而不是只在失败时才留痕（失败留痕会让"没输出"两种含义混淆）。
+                if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+                    EngineAPI.debug.log("battle module loaded: " .. name)
+                end
+            end
             if not ok then
                 if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
                     EngineAPI.debug.log("battle module load failed: " .. name .. " : " .. tostring(e))
