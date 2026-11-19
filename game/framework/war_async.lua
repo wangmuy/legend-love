@@ -40,15 +40,15 @@ local War_GameOverCoroutine
 -- @param isexp: 输后是否有经验
 -- @return: true 战斗胜利, false 失败
 function WarAsync.WarMainCoroutine(warid, isexp)
-    lib.Debug(string.format("WarMainCoroutine: warid=%d, isexp=%d", warid, isexp or 1))
+    EngineAPI.debug.log(string.format("WarMainCoroutine: warid=%d, isexp=%d", warid, isexp or 1))
     
     -- 检查 CC 模块是否加载
     if not CC or not CC.WarData_S then
-        lib.Debug("WarMainCoroutine: ERROR - CC.WarData_S not loaded")
+        EngineAPI.debug.log("WarMainCoroutine: ERROR - CC.WarData_S not loaded")
         return false
     end
     
-    lib.Debug("WarMainCoroutine: CC.WarDataSize=" .. tostring(CC.WarDataSize))
+    EngineAPI.debug.log("WarMainCoroutine: CC.WarDataSize=" .. tostring(CC.WarDataSize))
     
     warState.warId = warid
     warState.isExp = isexp or 1
@@ -57,22 +57,22 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     warState.round = 0
     
     -- 初始化战斗
-    lib.Debug("WarMainCoroutine: calling WarLoad")
+    EngineAPI.debug.log("WarMainCoroutine: calling WarLoad")
     WarLoad(warid)
     
-    lib.Debug("WarMainCoroutine: calling WarSelectTeam")
+    EngineAPI.debug.log("WarMainCoroutine: calling WarSelectTeam")
     WarSelectTeam()
     
-    lib.Debug("WarMainCoroutine: calling WarSelectEnemy")
+    EngineAPI.debug.log("WarMainCoroutine: calling WarSelectEnemy")
     WarSelectEnemy()
     
-    lib.Debug("WarMainCoroutine: WarSelectEnemy done, WAR.PersonNum=" .. tostring(WAR.PersonNum))
+    EngineAPI.debug.log("WarMainCoroutine: WarSelectEnemy done, WAR.PersonNum=" .. tostring(WAR.PersonNum))
     
     CleanMemory()
     lib.PicInit()
     lib.ShowSlow(50, 1)
     
-    lib.Debug("WarMainCoroutine: calling WarLoadMap")
+    EngineAPI.debug.log("WarMainCoroutine: calling WarLoadMap")
     WarLoadMap(WAR.Data["地图"])
     
     -- 加载贴图文件
@@ -176,11 +176,11 @@ function WarAsync.WarMainCoroutine(warid, isexp)
             end
             
             p = p + 1
-            lib.Debug("battle: person " .. p .. " next, WAR.CurID=" .. WAR.CurID)
+            EngineAPI.debug.log("battle: person " .. p .. " next, WAR.CurID=" .. WAR.CurID)
             
             -- 每次人物行动后都让出控制权
             CoroutineScheduler.getInstance():yield("battle_person_done")
-            lib.Debug("battle: after yield, p=" .. p)
+            EngineAPI.debug.log("battle: after yield, p=" .. p)
         end
         
         -- 回合结束处理
@@ -473,14 +473,14 @@ War_AutoMoveCoroutine = function(wugongnum)
 
                 -- 没有进展 → 该格从起点不可达，放弃这次移动
                 if prevI ~= nil and i >= prevI then
-                    lib.Debug("War_AutoCoroutine: unreachable target ("
+                    EngineAPI.debug.log("War_AutoCoroutine: unreachable target ("
                         .. tostring(x) .. "," .. tostring(y) .. "), skip move")
                     return 0
                 end
                 prevI = i
                 -- 步数 255 = 不可达（War_CalMoveStep 的初值），直接放弃
                 if i >= 255 then
-                    lib.Debug("War_AutoCoroutine: target not in move range, skip move")
+                    EngineAPI.debug.log("War_AutoCoroutine: target not in move range, skip move")
                     return 0
                 end
 
@@ -494,7 +494,7 @@ War_AutoMoveCoroutine = function(wugongnum)
                     y = y + 1
                 else
                     -- 四个方向都退不了：彻底放弃
-                    lib.Debug("War_AutoCoroutine: cannot backtrack, skip move")
+                    EngineAPI.debug.log("War_AutoCoroutine: cannot backtrack, skip move")
                     return 0
                 end
             end
@@ -979,7 +979,7 @@ War_MoveCoroutine = function()
     local scheduler = CoroutineScheduler.getInstance()
     
     local move = WAR.Person[WAR.CurID]["移动步数"]
-    lib.Debug("War_MoveCoroutine: move=" .. tostring(move))
+    EngineAPI.debug.log("War_MoveCoroutine: move=" .. tostring(move))
     
     if move == nil or move <= 0 then
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "不能移动", C_WHITE, CC.DefaultFont)
@@ -1001,9 +1001,9 @@ War_MoveCoroutine = function()
     WAR.MoveCursorX = x
     WAR.MoveCursorY = y
     
-    lib.Debug("War_MoveCoroutine: set DrawMode=1, cursor=(" .. x .. "," .. y .. ")")
+    EngineAPI.debug.log("War_MoveCoroutine: set DrawMode=1, cursor=(" .. x .. "," .. y .. ")")
     
-    lib.Debug("War_MoveCoroutine: start at (" .. x .. "," .. y .. ")")
+    EngineAPI.debug.log("War_MoveCoroutine: start at (" .. x .. "," .. y .. ")")
     
     -- 循环等待用户选择移动位置
     while true do
@@ -1029,7 +1029,7 @@ War_MoveCoroutine = function()
             x, y = WAR.MoveCursorX, WAR.MoveCursorY
         end
         
-        lib.Debug("War_MoveCoroutine: key=" .. key .. " at (" .. x .. "," .. y .. ")")
+        EngineAPI.debug.log("War_MoveCoroutine: key=" .. key .. " at (" .. x .. "," .. y .. ")")
         
         local x2, y2 = x, y
         
@@ -1051,7 +1051,7 @@ War_MoveCoroutine = function()
                 return 7
             end
             
-            lib.Debug("War_MoveCoroutine: confirm move to (" .. x .. "," .. y .. ")")
+            EngineAPI.debug.log("War_MoveCoroutine: confirm move to (" .. x .. "," .. y .. ")")
             WAR.DrawMode = nil
             WAR.MoveCursorX = nil
             WAR.MoveCursorY = nil
@@ -1059,7 +1059,7 @@ War_MoveCoroutine = function()
             return 7
         elseif key == VK_ESCAPE then
             -- 取消
-            lib.Debug("War_MoveCoroutine: cancelled")
+            EngineAPI.debug.log("War_MoveCoroutine: cancelled")
             WAR.DrawMode = nil
             WAR.MoveCursorX = nil
             WAR.MoveCursorY = nil
@@ -1069,7 +1069,7 @@ War_MoveCoroutine = function()
         -- 检查新位置是否可移动（地图层3小于128表示可达）
         if GetWarMap(x2, y2, 3) < 128 then
             x, y = x2, y2
-            lib.Debug("War_MoveCoroutine: move cursor to (" .. x .. "," .. y .. ")")
+            EngineAPI.debug.log("War_MoveCoroutine: move cursor to (" .. x .. "," .. y .. ")")
         end
     end
 end
@@ -1137,27 +1137,27 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
     local wugongtype = wugongtype or 0
     
     if wugong and JY.Wugong[wugong] then
-        lib.Debug(string.format("War_ShowFightCoroutine: 武功名称='%s'", JY.Wugong[wugong]["名称"] or "未知"))
+        EngineAPI.debug.log(string.format("War_ShowFightCoroutine: 武功名称='%s'", JY.Wugong[wugong]["名称"] or "未知"))
     end
     
-    lib.Debug(string.format("War_ShowFightCoroutine: person name=%s, direction=%d", 
+    EngineAPI.debug.log(string.format("War_ShowFightCoroutine: person name=%s, direction=%d", 
         JY.Person[pid]["姓名"], WAR.Person[WAR.CurID]["人方向"]))
     
-    lib.Debug(string.format("War_ShowFightCoroutine: pid=%d, wugong=%s, 原始wugongtype=%d", 
+    EngineAPI.debug.log(string.format("War_ShowFightCoroutine: pid=%d, wugong=%s, 原始wugongtype=%d", 
         pid, tostring(wugong), wugongtype))
     
     local fightdelay, fightframe, sounddelay
     if wugongtype >= 0 then
-        lib.Debug(string.format("War_ShowFightCoroutine: checking frames for type %d", wugongtype + 1))
+        EngineAPI.debug.log(string.format("War_ShowFightCoroutine: checking frames for type %d", wugongtype + 1))
         for t = 1, 5 do
             local f = JY.Person[pid]["出招动画帧数" .. t]
-            lib.Debug(string.format("  出招动画帧数%d = %s", t, tostring(f)))
+            EngineAPI.debug.log(string.format("  出招动画帧数%d = %s", t, tostring(f)))
         end
         
         fightframe = JY.Person[pid]["出招动画帧数" .. wugongtype + 1] or 0
         
         if fightframe == 0 then
-            lib.Debug(string.format("War_ShowFightCoroutine: 类型 %d 无动画帧，尝试智能匹配", wugongtype))
+            EngineAPI.debug.log(string.format("War_ShowFightCoroutine: 类型 %d 无动画帧，尝试智能匹配", wugongtype))
             
             local name = wugong and JY.Wugong[wugong] and JY.Wugong[wugong]["名称"] or ""
             local preferredType = nil
@@ -1175,7 +1175,7 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
             if preferredType then
                 local preferredFrame = JY.Person[pid]["出招动画帧数" .. preferredType + 1] or 0
                 if preferredFrame > 0 then
-                    lib.Debug(string.format("War_ShowFightCoroutine: 根据武功名称 '%s' 匹配类型 %d，有 %d 帧", 
+                    EngineAPI.debug.log(string.format("War_ShowFightCoroutine: 根据武功名称 '%s' 匹配类型 %d，有 %d 帧", 
                         name, preferredType, preferredFrame))
                     wugongtype = preferredType
                 end
@@ -1185,7 +1185,7 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
                 for t = 0, 4 do
                     local f = JY.Person[pid]["出招动画帧数" .. t + 1] or 0
                     if f > 0 then
-                        lib.Debug(string.format("War_ShowFightCoroutine: 回退使用类型 %d，有 %d 帧", t, f))
+                        EngineAPI.debug.log(string.format("War_ShowFightCoroutine: 回退使用类型 %d，有 %d 帧", t, f))
                         wugongtype = t
                         break
                     end
@@ -1197,7 +1197,7 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
         fightframe = JY.Person[pid]["出招动画帧数" .. wugongtype + 1] or 0
         sounddelay = JY.Person[pid]["武功音效延迟" .. wugongtype + 1] or 0
         
-        lib.Debug(string.format("War_ShowFightCoroutine: 最终wugongtype=%d, fightdelay=%d, fightframe=%d", 
+        EngineAPI.debug.log(string.format("War_ShowFightCoroutine: 最终wugongtype=%d, fightdelay=%d, fightframe=%d", 
             wugongtype, fightdelay, fightframe))
     else
         fightdelay = 0
@@ -1205,7 +1205,7 @@ War_ShowFightCoroutine = function(pid, wugong, wugongtype, level, x, y, eft)
         sounddelay = -1
     end
     
-    lib.Debug(string.format("War_ShowFightCoroutine: fightdelay=%d, fightframe=%d, sounddelay=%d", 
+    EngineAPI.debug.log(string.format("War_ShowFightCoroutine: fightdelay=%d, fightframe=%d, sounddelay=%d", 
         fightdelay, fightframe, sounddelay))
     
     local framenum = fightdelay + (CC.Effect and CC.Effect[eft] or 10) or 10

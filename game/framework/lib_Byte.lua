@@ -160,8 +160,8 @@ function SaveFromTable16(t, filename, size, begIdx, seekPos, isLittleEndian)
     f:close()
     
     local elapsed = os.clock() - startTime
-    if lib and lib.Debug then
-        lib.Debug(string.format("SaveFromTable16: %d elements, %.3fs", s, elapsed))
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log(string.format("SaveFromTable16: %d elements, %.3fs", s, elapsed))
     end
 end
 

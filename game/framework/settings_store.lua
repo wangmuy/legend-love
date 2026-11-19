@@ -43,8 +43,9 @@ end
 
 local function debugLog(msg)
     local lib = rawget(_G, "lib")
-    if type(lib) == "table" and type(lib.Debug) == "function" then
-        pcall(lib.Debug, msg)
+    if type(EngineAPI) == "table" and EngineAPI.debug
+       and type(EngineAPI.debug.log) == "function" then
+        pcall(EngineAPI.debug.log, msg)
     end
 end
 

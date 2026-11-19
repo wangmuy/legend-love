@@ -190,7 +190,7 @@ function AsyncGlobals.install()
         -- 结束时才读 state（协程运行期间它会变，提前读会拿到 idle 快照）
         local warState = WarAsync.getState and WarAsync.getState() or nil
         if not alive and result == nil and warState and warState.status ~= "ended" then
-            lib.Debug("WarMain: battle coroutine died without result, recovering state")
+            EngineAPI.debug.log("WarMain: battle coroutine died without result, recovering state")
             if JY and (JY.Status == nil or JY.Status == GAME_WMAP) then
                 JY.Status = GAME_SMAP
             end

@@ -28,7 +28,7 @@ local MouseMenu = require("framework.mouse_menu")
 
 -- 主菜单（协程版本）
 function JyMainAsync.MMenuCoroutine()
-    if lib and lib.Debug then lib.Debug("MMenuCoroutine: started") end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("MMenuCoroutine: started") end
     
     local menu = {
         {"医疗", nil, 1},
@@ -46,7 +46,7 @@ function JyMainAsync.MMenuCoroutine()
     
     local r = MenuAsync.ShowMenuCoroutine(menu, 6, 0, CC.MainMenuX, CC.MainMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
     
-    if lib and lib.Debug then lib.Debug("MMenuCoroutine: selected r=" .. tostring(r)) end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("MMenuCoroutine: selected r=" .. tostring(r)) end
     
     -- 根据选择执行对应功能
     if r == 1 then
@@ -61,16 +61,16 @@ function JyMainAsync.MMenuCoroutine()
         JyMainAsync.Menu_PersonExit()
     elseif r == 6 then
         JyMainAsync.Menu_System()
-        if lib and lib.Debug then lib.Debug("MMenuCoroutine: Menu_System returned") end
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("MMenuCoroutine: Menu_System returned") end
     end
     -- r == 0 表示 ESC 退出，不执行任何操作
     
-    if lib and lib.Debug then lib.Debug("MMenuCoroutine: ended") end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("MMenuCoroutine: ended") end
 end
 
 -- 系统子菜单
 function JyMainAsync.Menu_System()
-    if lib and lib.Debug then lib.Debug("Menu_System: started") end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("Menu_System: started") end
     
     -- REQ-MENU-3：音量入口插在「保存进度」之后、「离开游戏」之前。
     -- 3 层结构，无中间的「音量设置」容器层：
@@ -86,7 +86,7 @@ function JyMainAsync.Menu_System()
     
     local r = MenuAsync.ShowMenuCoroutine(menu, 6, 0, CC.MainSubMenuX, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
     
-    if lib and lib.Debug then lib.Debug("Menu_System: selected r=" .. tostring(r)) end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("Menu_System: selected r=" .. tostring(r)) end
     
     if r == 0 then
         return 0
@@ -97,7 +97,7 @@ function JyMainAsync.Menu_System()
         return 1
     elseif r == 2 then
         JyMainAsync.Menu_SaveRecord()
-        if lib and lib.Debug then lib.Debug("Menu_System: Menu_SaveRecord returned") end
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("Menu_System: Menu_SaveRecord returned") end
         return 0
     elseif r == 3 then
         JyMainAsync.Menu_AudioVolume(AudioSettings.MUSIC_KEY, "音乐音量")
@@ -124,7 +124,7 @@ end
 -- 提交后立即写盘：音量是玩家最常调的设置，若只在退出游戏时保存，
 -- 崩溃/强杀会丢掉刚调的值。
 function JyMainAsync.Menu_AudioVolume(key, label)
-    if lib and lib.Debug then lib.Debug("Menu_AudioVolume: " .. tostring(key)) end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("Menu_AudioVolume: " .. tostring(key)) end
 
     local before = Settings.get(key)
     local items = AudioMenu.buildValueMenu(key, label)
@@ -136,8 +136,8 @@ function JyMainAsync.Menu_AudioVolume(key, label)
     -- 值真的变了才落盘（ESC 放弃时 before == after，不产生写盘）
     if Settings.get(key) ~= before then
         local ok, err = Settings.save()
-        if not ok and lib and lib.Debug then
-            lib.Debug("Menu_AudioVolume: Settings.save 失败: " .. tostring(err))
+        if not ok and EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("Menu_AudioVolume: Settings.save 失败: " .. tostring(err))
         end
     end
 end
@@ -153,7 +153,7 @@ end
 -- 保存进度
 function JyMainAsync.Menu_SaveRecord()
     local startTime = os.clock()
-    if lib and lib.Debug then lib.Debug("Menu_SaveRecord: started") end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("Menu_SaveRecord: started") end
     
     local menu = {
         {"进度一", nil, 1},
@@ -163,14 +163,14 @@ function JyMainAsync.Menu_SaveRecord()
     
     local r = MenuAsync.ShowMenuCoroutine(menu, 3, 0, CC.MainSubMenuX2, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
     
-    if lib and lib.Debug then lib.Debug("Menu_SaveRecord: selected r=" .. tostring(r)) end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("Menu_SaveRecord: selected r=" .. tostring(r)) end
     
     if r > 0 then
         -- 显示保存提示
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "保存中......", C_WHITE, CC.DefaultFont)
         ShowScreen()  -- 强制刷新画面
         
-        if lib and lib.Debug then lib.Debug("Menu_SaveRecord: calling SaveRecord") end
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("Menu_SaveRecord: calling SaveRecord") end
         SaveRecord(r)
         
         -- 显示完成提示
@@ -183,10 +183,10 @@ function JyMainAsync.Menu_SaveRecord()
         lib.Delay(500)
         Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
         
-        if lib and lib.Debug then lib.Debug(string.format("Menu_SaveRecord: SaveRecord done (%.2fs)", elapsed)) end
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log(string.format("Menu_SaveRecord: SaveRecord done (%.2fs)", elapsed)) end
     end
     
-    if lib and lib.Debug then lib.Debug(string.format("Menu_SaveRecord: ended (%.2fs total)", os.clock() - startTime)) end
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log(string.format("Menu_SaveRecord: ended (%.2fs total)", os.clock() - startTime)) end
 end
 
 -- 读取进度
@@ -215,36 +215,36 @@ end
 
 -- 状态子菜单
 function JyMainAsync.Menu_Status()
-    if lib and lib.Debug then
-        lib.Debug("JyMainAsync.Menu_Status: started")
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("JyMainAsync.Menu_Status: started")
     end
     
     DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
 
-    if lib and lib.Debug then
-        lib.Debug("JyMainAsync.Menu_Status: calling SelectTeamMenuAsync")
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("JyMainAsync.Menu_Status: calling SelectTeamMenuAsync")
     end
     local r = JyMainAsync.SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
-    if lib and lib.Debug then
-        lib.Debug("JyMainAsync.Menu_Status: SelectTeamMenuAsync returned r=" .. tostring(r))
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("JyMainAsync.Menu_Status: SelectTeamMenuAsync returned r=" .. tostring(r))
     end
     
     if r > 0 then
-        if lib and lib.Debug then
-            lib.Debug("JyMainAsync.Menu_Status: calling PersonStatusAsync.ShowStatusCoroutine")
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("JyMainAsync.Menu_Status: calling PersonStatusAsync.ShowStatusCoroutine")
         end
         -- 使用 PersonStatusAsync 显示状态
         PersonStatusAsync.ShowStatusCoroutine(r)
-        if lib and lib.Debug then
-            lib.Debug("JyMainAsync.Menu_Status: PersonStatusAsync.ShowStatusCoroutine returned")
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("JyMainAsync.Menu_Status: PersonStatusAsync.ShowStatusCoroutine returned")
         end
     else
         Cls()
     end
     
-    if lib and lib.Debug then
-        lib.Debug("JyMainAsync.Menu_Status: ended")
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("JyMainAsync.Menu_Status: ended")
     end
 end
 

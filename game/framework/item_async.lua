@@ -617,7 +617,7 @@ function ItemAsync.UseThingAsync(thingId)
         local ok, result = pcall(useFn, thingId)
         AsyncGlobals.uninstall()
         if not ok then
-            lib.Debug("ItemAsync.UseThingAsync: custom thing function error: " .. tostring(result))
+            EngineAPI.debug.log("ItemAsync.UseThingAsync: custom thing function error: " .. tostring(result))
             return false
         end
         return result == 1

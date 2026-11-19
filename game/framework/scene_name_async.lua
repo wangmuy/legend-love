@@ -34,7 +34,7 @@ function SceneNameAsync.ShowCoroutine(name)
         return
     end
 
-    lib.Debug("SceneNameAsync.ShowCoroutine: " .. tostring(name))
+    EngineAPI.debug.log("SceneNameAsync.ShowCoroutine: " .. tostring(name))
 
     -- 阻止游戏主循环处理按键（GAME_SMAP.update 的行走逻辑）
     local InputManager = require("framework.input_manager")
@@ -46,7 +46,7 @@ function SceneNameAsync.ShowCoroutine(name)
     local InputAsync = require("framework.input_async")
     local keypress = InputAsync.WaitKeyCoroutine()
 
-    lib.Debug("SceneNameAsync.ShowCoroutine: key=" .. tostring(keypress) .. " -> dismiss")
+    EngineAPI.debug.log("SceneNameAsync.ShowCoroutine: key=" .. tostring(keypress) .. " -> dismiss")
 
     currentName = nil
     InputManager.disableInput = false
@@ -72,7 +72,7 @@ function SceneNameAsync.Show(name)
     end, "scene_name")
     local ok, err = scheduler:start(co)
     if not ok then
-        lib.Debug("SceneNameAsync.Show: start failed: " .. tostring(err))
+        EngineAPI.debug.log("SceneNameAsync.Show: start failed: " .. tostring(err))
         return false
     end
     return true
@@ -118,7 +118,7 @@ function SceneNameAsync.dismissOnStateChange()
     if had then
         local InputManager = require("framework.input_manager")
         InputManager.disableInput = false
-        lib.Debug("SceneNameAsync: dismissed on state change")
+        EngineAPI.debug.log("SceneNameAsync: dismissed on state change")
     end
 end
 

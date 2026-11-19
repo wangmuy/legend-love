@@ -65,14 +65,14 @@ end
 -- 初始化协程
 function JYMainAdapter.initCoroutine()
     PerfLog.init()
-    lib.Debug("JYMainAdapter.initCoroutine started")
+    EngineAPI.debug.log("JYMainAdapter.initCoroutine started")
     
     -- 导入其他模块
     IncludeFile()
-    lib.Debug("IncludeFile done")
+    EngineAPI.debug.log("IncludeFile done")
     
     SetGlobalConst()
-    lib.Debug("SetGlobalConst done")
+    EngineAPI.debug.log("SetGlobalConst done")
 
     -- MOD ini 覆盖（REQ-DATA-4 / Contract A）：激活 MOD 时解析并 Apply kysmod.ini
     -- （分辨率、常量等）。映射表同时覆盖 CONFIG.* 与 CC.*，故无需重跑 SetGlobalConst。
@@ -103,7 +103,7 @@ function JYMainAdapter.initCoroutine()
             end)
             if okSys then
                 Settings.setPlatform(pName)
-                lib.Debug("Settings.setPlatform: " .. tostring(Settings.getPlatform()))
+                EngineAPI.debug.log("Settings.setPlatform: " .. tostring(Settings.getPlatform()))
             end
 
             Settings.define("audio.music", {
@@ -130,14 +130,14 @@ function JYMainAdapter.initCoroutine()
             Settings.load()
         end)
         if not okSet then
-            lib.Debug("Settings 初始化失败（不影响启动）")
+            EngineAPI.debug.log("Settings 初始化失败（不影响启动）")
         end
 
         local ok, ModData = pcall(require, "framework.mod_data")
         if ok and ModData and ModData.LoadIni then
             local parsed = ModData.LoadIni()
             if parsed then
-                lib.Debug("ModData.LoadIni applied: " .. tostring(ModData.Active()))
+                EngineAPI.debug.log("ModData.LoadIni applied: " .. tostring(ModData.Active()))
             end
         end
         -- REQ-LBIN-2：list/effect.bin → CC.Effect 惰性装载。
@@ -146,25 +146,25 @@ function JYMainAdapter.initCoroutine()
         if ok and ModData and ModData.LoadEffectTable then
             local loaded, n = ModData.LoadEffectTable(_G.CC)
             if loaded then
-                lib.Debug("ModData.LoadEffectTable: " .. tostring(n) .. " entries")
+                EngineAPI.debug.log("ModData.LoadEffectTable: " .. tostring(n) .. " entries")
             end
         end
 
         -- 引擎接线（注册 onChange + 推初值）
         local okAudio = pcall(AudioSettings.init)
         if not okAudio then
-            lib.Debug("AudioSettings.init 失败（音量不可调，但不影响启动）")
+            EngineAPI.debug.log("AudioSettings.init 失败（音量不可调，但不影响启动）")
         end
     end
     
     SetGlobal()
-    lib.Debug("SetGlobal done")
+    EngineAPI.debug.log("SetGlobal done")
     
     GenTalkIdx()
-    lib.Debug("GenTalkIdx done")
+    EngineAPI.debug.log("GenTalkIdx done")
     
     SetModify()
-    lib.Debug("SetModify done")
+    EngineAPI.debug.log("SetModify done")
     
     -- 禁止访问全程变量
     setmetatable(_G, {
@@ -176,7 +176,7 @@ function JYMainAdapter.initCoroutine()
         end,
     })
     
-    lib.Debug("JY_Main start.")
+    EngineAPI.debug.log("JY_Main start.")
     
     math.randomseed(os.time())
     
@@ -196,7 +196,7 @@ function JYMainAdapter.initCoroutine()
     JYMainAdapter.showStartMenuCoroutine()
     
     isInitialized = true
-    lib.Debug("JYMainAdapter.initCoroutine completed")
+    EngineAPI.debug.log("JYMainAdapter.initCoroutine completed")
 end
 
 --- 按菜单真实宽度求水平居中位置（REQ-MS2-13）
@@ -803,16 +803,16 @@ function JYMainAdapter.installMouseHandling()
             -- 虚拟手柄先于鼠标：它在 Android 上是主输入通道
             local okPad = pcall(JYMainAdapter.pollVirtualPad)
             if not okPad then
-                lib.Debug("pollVirtualPad 抛错（不影响主循环）")
+                EngineAPI.debug.log("pollVirtualPad 抛错（不影响主循环）")
             end
             -- 先消费点击（离散事件），再更新悬停（连续状态）
             local okPoll = pcall(JYMainAdapter.pollMouse)
             if not okPoll then
-                lib.Debug("pollMouse 抛错（不影响主循环）")
+                EngineAPI.debug.log("pollMouse 抛错（不影响主循环）")
             end
             local okHover = pcall(JYMainAdapter.pollHover)
             if not okHover then
-                lib.Debug("pollHover 抛错（不影响主循环）")
+                EngineAPI.debug.log("pollHover 抛错（不影响主循环）")
             end
         end)
         -- 悬停高亮（REQ-MS3-1）：位置 ①，StateMachine:draw() 之后
@@ -889,8 +889,8 @@ function JYMainAdapter.showVolumeCoroutine(key, label, menux)
 
     if Settings.get(key) ~= before then
         local ok, err = Settings.save()
-        if not ok and lib and lib.Debug then
-            lib.Debug("showVolumeCoroutine: Settings.save 失败: " .. tostring(err))
+        if not ok and EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("showVolumeCoroutine: Settings.save 失败: " .. tostring(err))
         end
     end
 end
@@ -1076,7 +1076,7 @@ function JYMainAdapter.startNewGame(menux)
             satisfied = true
         elseif ok == 0 then
             -- 按ESC键，返回到开始菜单
-            lib.Debug("startNewGame: ESC pressed, returning to start menu")
+            EngineAPI.debug.log("startNewGame: ESC pressed, returning to start menu")
             -- 切换回开始菜单状态
             EventBridge.getInstance():switchState(getStateId("GAME_START"))
             -- 重新显示开始菜单
@@ -1103,7 +1103,7 @@ function JYMainAdapter.startNewGame(menux)
     -- 设置主角初始贴图为躺着（6890/2=3445）
     -- 必须在 Init_SMap 之前设置，因为 Init_SMap 会调用 DrawSMap
     JY.MyPic = 3445  -- 躺着
-    lib.Debug("startNewGame: set initial MyPic to lying pose (3445)")
+    EngineAPI.debug.log("startNewGame: set initial MyPic to lying pose (3445)")
     -- 注意：不设置动画状态，让主角保持躺着姿势
     -- 动画将在事件脚本中的 instruct_27 中播放
     -- 设置 currentFrame=0 表示初始状态，GAME_SMAP.update 不会重置 JY.MyPic
@@ -1111,11 +1111,11 @@ function JYMainAdapter.startNewGame(menux)
     JY.AnimationState.currentFrame = 0
     
     -- 切换到场景状态（在事件执行前切换，确保对话期间能正确绘制场景）
-    lib.Debug("startNewGame: switching to GAME_SMAP state")
+    EngineAPI.debug.log("startNewGame: switching to GAME_SMAP state")
     local tSwitch = PerfLog.begin("startNewGame.switchState(GAME_SMAP)")
     EventBridge.getInstance():switchState(getStateId("GAME_SMAP"))
     PerfLog.finish(tSwitch)
-    lib.Debug("startNewGame: switched to GAME_SMAP state, JY.Status=" .. tostring(JY.Status))
+    EngineAPI.debug.log("startNewGame: switched to GAME_SMAP state, JY.Status=" .. tostring(JY.Status))
     
     if CC.NewGameEvent > 0 then
         -- 关键去重：出生格 (19,20) 自带路过事件——S层3=0，且 D70[0][4]=691（即开场事件本身）。
@@ -1127,7 +1127,7 @@ function JYMainAdapter.startNewGame(menux)
         -- 这里把 OldDPass 预设为出生格的路过值 0，复用游戏自带的路过事件去重机制
         -- （d_pass ~= OldDPass 才触发），让出生格的 691 不再二次触发——与原版单发一致。
         JY.OldDPass = 0
-        lib.Debug("startNewGame: OldDPass preset to 0 (suppress spawn-tile double-fire of NewGameEvent)")
+        EngineAPI.debug.log("startNewGame: OldDPass preset to 0 (suppress spawn-tile double-fire of NewGameEvent)")
 
         -- 在协程中执行新游戏事件
         -- 使用 event_executor 中的 oldCallEventCoroutine，避免 C-call boundary 问题
@@ -1142,7 +1142,7 @@ function JYMainAdapter.startNewGame(menux)
     -- 已把主角转为站立方向0）。不能恢复成 CC.NewPersonPic(3445,卧姿)——那会让刚起身的
     -- 主角多显示一帧卧姿；GetMyPic() 与下一帧 GAME_SMAP.update 的计算一致，无跳变。
     JY.MyPic = GetMyPic()
-    lib.Debug("startNewGame: updated MyPic to " .. tostring(JY.MyPic) .. " after NewGameEvent")
+    EngineAPI.debug.log("startNewGame: updated MyPic to " .. tostring(JY.MyPic) .. " after NewGameEvent")
     PerfLog.finish(tAll)
 end
 

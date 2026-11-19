@@ -84,7 +84,7 @@ function TalkAsync.clear()
     if dialog and dialog.clear then
         dialog.clear()
     end
-    lib.Debug("TalkAsync.clear: currentTalk cleared")
+    EngineAPI.debug.log("TalkAsync.clear: currentTalk cleared")
 end
 
 -- 对话显示（协程版本）
@@ -92,7 +92,7 @@ end
 -- @param headid: 头像ID，-1表示不显示
 -- @param flag: 对话框位置
 function TalkAsync.TalkExCoroutine(s, headid, flag)
-    lib.Debug(string.format("TalkExCoroutine: headid=%d, flag=%d", headid, flag))
+    EngineAPI.debug.log(string.format("TalkExCoroutine: headid=%d, flag=%d", headid, flag))
 
     local talkynum = talkConfig.talkynum
     local dialog = getDialog()
@@ -152,17 +152,17 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
                 showHead = layout.showHead,
             },
         }
-        lib.Debug(string.format("TalkExCoroutine: page %d/%d, lines=%d",
+        EngineAPI.debug.log(string.format("TalkExCoroutine: page %d/%d, lines=%d",
             pageIndex, #pages, #pages[pageIndex]))
 
         -- 清除当前按键，防止同一按键立即触发下一页/下一个对话
         InputManager.getInstance():clearCurrentKey()
         local key = InputAsync.WaitKeyCoroutine()
-        lib.Debug("TalkExCoroutine: key pressed=" .. tostring(key))
+        EngineAPI.debug.log("TalkExCoroutine: key pressed=" .. tostring(key))
     end
 
     currentTalk = nil
-    lib.Debug("TalkExCoroutine: finished")
+    EngineAPI.debug.log("TalkExCoroutine: finished")
 end
 
 -- 绘制对话（在draw函数中调用）

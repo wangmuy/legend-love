@@ -33,13 +33,13 @@ local getStateId
 local function startMenuCoroutine()
     local scheduler = CoroutineScheduler.getInstance()
     local co = scheduler:create(function()
-        lib.Debug("MMenuCoroutine: starting")
+        EngineAPI.debug.log("MMenuCoroutine: starting")
         JyMainAsync.MMenuCoroutine()
-        lib.Debug("MMenuCoroutine: ended, calling MenuAsync.clear()")
+        EngineAPI.debug.log("MMenuCoroutine: ended, calling MenuAsync.clear()")
         -- 菜单关闭后清理状态
         MenuAsync.clear()
         local InputManager = require("framework.input_manager")
-        lib.Debug("MMenuCoroutine: MenuAsync.clear() done, disableInput=" .. tostring(InputManager.disableInput))
+        EngineAPI.debug.log("MMenuCoroutine: MenuAsync.clear() done, disableInput=" .. tostring(InputManager.disableInput))
     end, "main_menu")
     scheduler:start(co)
 end
@@ -82,7 +82,7 @@ end
 -- @param subScene number 场景 id
 local function enterSubScene(subScene)
     PerfLog.mark("GAME_MMAP entering subscene", tostring(subScene))
-    lib.Debug("Entering subscene: " .. tostring(subScene))
+    EngineAPI.debug.log("Entering subscene: " .. tostring(subScene))
 
     local newState = getStateId("GAME_SMAP")
     JY.MmapMusic = -1
@@ -97,7 +97,7 @@ local function enterSubScene(subScene)
     PerfLog.mark("GAME_MMAP.switchState(GAME_SMAP, showname=1)")
     EventBridge.getInstance():switchState(newState, { showname = 1 })
 
-    lib.Debug("Subscene transition completed")
+    EngineAPI.debug.log("Subscene transition completed")
 end
 
 GameStates._enterSubScene = enterSubScene
@@ -180,7 +180,7 @@ local function handleMapClick(mx, my)
 
     if not path then
         MouseHover.flashDenied(gx, gy)
-        lib.Debug("handleMapClick: 寻路失败 err=" .. tostring(err))
+        EngineAPI.debug.log("handleMapClick: 寻路失败 err=" .. tostring(err))
         return true
     end
 
@@ -205,7 +205,7 @@ function runOnArrive(mapKind)
     end
     local ok, triggered = pcall(Interact.trigger, mapKind, action.tx, action.ty)
     if not ok then
-        lib.Debug("runOnArrive: 触发交互失败")
+        EngineAPI.debug.log("runOnArrive: 触发交互失败")
         return
     end
     if not triggered then
@@ -371,7 +371,7 @@ end
 handlers["GAME_MMAP"] = {
     -- 状态进入时调用
     enter = function()
-        lib.Debug("Enter GAME_MMAP state")
+        EngineAPI.debug.log("Enter GAME_MMAP state")
         -- REQ-MS3-5：进入地图状态时清空自动移动（避免跨状态残留路径）
         AutoMove.reset()
 
@@ -382,7 +382,7 @@ handlers["GAME_MMAP"] = {
     
     -- 状态退出时调用
     exit = function()
-        lib.Debug("Exit GAME_MMAP state")
+        EngineAPI.debug.log("Exit GAME_MMAP state")
         -- 清理大地图资源
         CleanMemory()
         lib.UnloadMMap()
@@ -517,7 +517,7 @@ handlers["GAME_MMAP"] = {
 -- GAME_SMAP 状态处理器
 handlers["GAME_SMAP"] = {
     enter = function(prevState, data)
-        lib.Debug("Enter GAME_SMAP state")
+        EngineAPI.debug.log("Enter GAME_SMAP state")
         -- showname=1 表示要提示场景名。原版两处调用带 1：
         --   Game_MMap 进子场景（jymain.lua:430）、场景内跳转（jymain.lua:1331）
         -- LÖVE 版把「主地图进子场景」改成 switchTo 传参，必须在这里接住，
@@ -539,7 +539,7 @@ handlers["GAME_SMAP"] = {
     end,
     
     exit = function()
-        lib.Debug("Exit GAME_SMAP state")
+        EngineAPI.debug.log("Exit GAME_SMAP state")
 
         -- 清掉场景名提示（用户实测：出场景后名字一直留在屏幕上）
         --
@@ -631,7 +631,7 @@ handlers["GAME_SMAP"] = {
                 local willRun = AutoMove.eventWouldRun(JY.SubScene, d_pass)
                 if AutoMove.isActive() then
                     if not willRun then
-                        lib.Debug("Game_SMAP: 路过事件已被清空，不中断自动移动 d="
+                        EngineAPI.debug.log("Game_SMAP: 路过事件已被清空，不中断自动移动 d="
                             .. tostring(d_pass))
                     else
                         -- 还有事件号，但脚本可能自己 no-op（一次性事件）。
@@ -639,7 +639,7 @@ handlers["GAME_SMAP"] = {
                         -- 真事件会 yield（对话/动画），CurrentD 保持 >= 0；
                         -- no-op 同帧跑完，CurrentD 已回 -1。
                         AutoMove.watchEvent(JY.SubScene, d_pass)
-                        lib.Debug("Game_SMAP: 登记路过事件待判定 d="
+                        EngineAPI.debug.log("Game_SMAP: 登记路过事件待判定 d="
                             .. tostring(d_pass))
                     end
                 end
@@ -761,23 +761,23 @@ handlers["GAME_SMAP"] = {
             elseif keypress == VK_RIGHT then
                 direct = 1
             elseif keypress == VK_SPACE or keypress == VK_RETURN then
-                lib.Debug("GAME_SMAP.update: SPACE/RETURN pressed")
+                EngineAPI.debug.log("GAME_SMAP.update: SPACE/RETURN pressed")
                 if JY.Base["人方向"] >= 0 then
                     local targetX = JY.Base["人X1"] + CC.DirectX[JY.Base["人方向"] + 1]
                     local targetY = JY.Base["人Y1"] + CC.DirectY[JY.Base["人方向"] + 1]
                     local d_num = GetS(JY.SubScene, targetX, targetY, 3)
-                    lib.Debug(string.format("GAME_SMAP.update: checking target (%d,%d), d_num=%d", targetX, targetY, d_num))
+                    EngineAPI.debug.log(string.format("GAME_SMAP.update: checking target (%d,%d), d_num=%d", targetX, targetY, d_num))
                     if d_num >= 0 then
-                        lib.Debug(string.format("GAME_SMAP.update: executing event d_num=%d", d_num))
+                        EngineAPI.debug.log(string.format("GAME_SMAP.update: executing event d_num=%d", d_num))
                         EventExecuteSync(d_num, 1)
                         JY.oldSMapX = -1
                         JY.oldSMapY = -1
                         JY.D_Valid = nil
                     else
-                        lib.Debug("GAME_SMAP.update: no event at target position")
+                        EngineAPI.debug.log("GAME_SMAP.update: no event at target position")
                     end
                 else
-                    lib.Debug("GAME_SMAP.update: no direction set")
+                    EngineAPI.debug.log("GAME_SMAP.update: no direction set")
                 end
             end
         end
@@ -847,11 +847,11 @@ handlers["GAME_SMAP"] = {
 -- GAME_START 状态处理器(开始菜单)
 handlers["GAME_START"] = {
     enter = function()
-        lib.Debug("Enter GAME_START state")
+        EngineAPI.debug.log("Enter GAME_START state")
     end,
     
     exit = function()
-        lib.Debug("Exit GAME_START state")
+        EngineAPI.debug.log("Exit GAME_START state")
     end,
     
     update = function(dt)
@@ -869,7 +869,7 @@ handlers["GAME_START"] = {
 -- GAME_FIRSTMMAP 状态处理器(首次进入主地图)
 handlers["GAME_FIRSTMMAP"] = {
     enter = function()
-        lib.Debug("Enter GAME_FIRSTMMAP state")
+        EngineAPI.debug.log("Enter GAME_FIRSTMMAP state")
         CleanMemory()
         lib.ShowSlow(50, 1)
         JY.MmapMusic = 16
@@ -881,13 +881,13 @@ handlers["GAME_FIRSTMMAP"] = {
     end,
     
     exit = function()
-        lib.Debug("Exit GAME_FIRSTMMAP state")
+        EngineAPI.debug.log("Exit GAME_FIRSTMMAP state")
     end,
     
     update = function(dt)
         -- 首次进入后立即切换到主地图状态
         local newState = getStateId("GAME_MMAP")
-        lib.Debug("GAME_FIRSTMMAP update: setting JY.Status=" .. tostring(newState))
+        EngineAPI.debug.log("GAME_FIRSTMMAP update: setting JY.Status=" .. tostring(newState))
         JY.Status = newState
     end,
     
@@ -903,7 +903,7 @@ handlers["GAME_FIRSTMMAP"] = {
 -- GAME_WMAP 状态处理器(战斗)
 handlers["GAME_WMAP"] = {
     enter = function()
-        lib.Debug("Enter GAME_WMAP state (battle)")
+        EngineAPI.debug.log("Enter GAME_WMAP state (battle)")
         -- REQ-MS3-5：进入战斗时清空自动移动与 drain
         --
         -- 不清空的后果：战斗结束后回到 MMAP，之前的路径会继续走 ——
@@ -916,7 +916,7 @@ handlers["GAME_WMAP"] = {
     end,
     
     exit = function()
-        lib.Debug("Exit GAME_WMAP state (battle)")
+        EngineAPI.debug.log("Exit GAME_WMAP state (battle)")
         -- 清理战斗资源
         if WAR then
             WAR.Person = {}
@@ -965,13 +965,13 @@ handlers["GAME_WMAP"] = {
 -- GAME_END 状态处理器(游戏结束)
 handlers["GAME_END"] = {
     enter = function()
-        lib.Debug("Enter GAME_END state")
+        EngineAPI.debug.log("Enter GAME_END state")
         -- 退出游戏
         EngineAPI.app.quit()
     end,
     
     exit = function()
-        lib.Debug("Exit GAME_END state")
+        EngineAPI.debug.log("Exit GAME_END state")
     end,
     
     update = function(dt)
@@ -986,7 +986,7 @@ handlers["GAME_END"] = {
 -- GAME_DEAD 状态处理器(死亡/游戏结束界面)
 handlers["GAME_DEAD"] = {
     enter = function()
-        lib.Debug("Enter GAME_DEAD state")
+        EngineAPI.debug.log("Enter GAME_DEAD state")
         PlayMIDI(0)
         JY.DeadScreen = {
             name = JY.Person[0]["姓名"],
@@ -995,7 +995,7 @@ handlers["GAME_DEAD"] = {
     end,
     
     exit = function()
-        lib.Debug("Exit GAME_DEAD state")
+        EngineAPI.debug.log("Exit GAME_DEAD state")
         JY.DeadScreen = nil
     end,
     

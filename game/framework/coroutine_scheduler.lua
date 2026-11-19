@@ -46,8 +46,8 @@ end
 
 -- 内部调试方法，便于测试时 mock
 function CoroutineScheduler:_debug(msg)
-    if lib and lib.Debug then
-        lib.Debug(msg)
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log(msg)
     end
 end
 

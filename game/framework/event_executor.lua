@@ -29,7 +29,7 @@ function EventExecuteCoroutine(id, flag)
     local scheduler = CoroutineScheduler.getInstance()
     
     JY.CurrentD = id
-    lib.Debug(string.format("EventExecuteCoroutine: id=%d, flag=%d", id, flag))
+    EngineAPI.debug.log(string.format("EventExecuteCoroutine: id=%d, flag=%d", id, flag))
     
     if JY.SceneNewEventFunction[JY.SubScene] == nil then
         EventExecutor.oldEventExecuteCoroutine(flag)
@@ -53,7 +53,7 @@ function EventExecutor.oldEventExecuteCoroutine(flag)
         eventnum = GetD(JY.SubScene, JY.CurrentD, 4)
     end
     
-    lib.Debug(string.format("oldEventExecuteCoroutine: flag=%d, CurrentD=%d, eventnum=%s",
+    EngineAPI.debug.log(string.format("oldEventExecuteCoroutine: flag=%d, CurrentD=%d, eventnum=%s",
         flag, JY.CurrentD, tostring(eventnum)))
     
     -- 与原版 oldEventExecute 一致：eventnum<=0 表示该触发方式为"无事件"，
@@ -69,7 +69,7 @@ end
 -- 协程版本的调用旧事件
 function EventExecutor.oldCallEventCoroutine(eventnum)
     local eventfilename = string.format("oldevent_%d.lua", eventnum)
-    lib.Debug(string.format("oldCallEventCoroutine: %s START", eventfilename))
+    EngineAPI.debug.log(string.format("oldCallEventCoroutine: %s START", eventfilename))
     -- 保存进入时的 JY.CurrentD（调用方可能已设置为触发事件的 tile 索引，
     -- 事件结束后恢复它，避免本事件内部嵌套执行其他事件时被覆盖污染）
     local savedCurrentD = JY and JY.CurrentD
@@ -100,7 +100,7 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
             fnAfter()
         end
     else
-        lib.Debug("oldCallEventCoroutine: failed to load " .. eventfilename .. ": " .. tostring(err))
+        EngineAPI.debug.log("oldCallEventCoroutine: failed to load " .. eventfilename .. ": " .. tostring(err))
         if JY_Error then
             JY_Error("oldCallEventCoroutine load failed: %s (%s)", tostring(eventfilename), tostring(err))
         end
@@ -117,7 +117,7 @@ function EventExecutor.oldCallEventCoroutine(eventnum)
     --   616 战后 tile5 仍 616，蓝凤凰已加入仍重复"是否加入"询问——P6 Step12/13 根因）。
     if JY then JY.CurrentD = savedCurrentD or -1 end
 
-    lib.Debug(string.format("oldCallEventCoroutine: %s FINISHED", eventfilename))
+    EngineAPI.debug.log(string.format("oldCallEventCoroutine: %s FINISHED", eventfilename))
 end
 
 -- 协程版本的新场景事件（newevent/scene_X_event_Y.lua）执行器。
@@ -139,7 +139,7 @@ end
 --
 -- @param eventfilename: 已拼好的脚本路径（含 newevent/ 前缀）
 function EventExecutor.newCallEventCoroutine(eventfilename)
-    lib.Debug(string.format("newCallEventCoroutine: %s START", tostring(eventfilename)))
+    EngineAPI.debug.log(string.format("newCallEventCoroutine: %s START", tostring(eventfilename)))
 
     -- 与 oldCallEventCoroutine 同样保存/恢复 JY.CurrentD：
     -- 脚本内部可能嵌套触发别的事件，内层结束会把 CurrentD 重置为 -1，
@@ -152,7 +152,7 @@ function EventExecutor.newCallEventCoroutine(eventfilename)
     if chunk then
         chunk()
     else
-        lib.Debug("newCallEventCoroutine: failed to load " .. tostring(eventfilename)
+        EngineAPI.debug.log("newCallEventCoroutine: failed to load " .. tostring(eventfilename)
             .. ": " .. tostring(err))
         if JY_Error then
             JY_Error("newCallEventCoroutine load failed: %s (%s)",
@@ -164,7 +164,7 @@ function EventExecutor.newCallEventCoroutine(eventfilename)
 
     if JY then JY.CurrentD = savedCurrentD or -1 end
 
-    lib.Debug(string.format("newCallEventCoroutine: %s FINISHED", tostring(eventfilename)))
+    EngineAPI.debug.log(string.format("newCallEventCoroutine: %s FINISHED", tostring(eventfilename)))
 end
 
 -- 启动事件协程
@@ -196,7 +196,7 @@ function EventExecuteSync(id, flag)
         for _, coId in ipairs(coroutines) do
             local info = scheduler:getInfo(coId)
             if info and info.status == "suspended" and info.name and string.find(info.name, "event_") then
-                lib.Debug("EventExecuteSync: event already running, ignoring new trigger")
+                EngineAPI.debug.log("EventExecuteSync: event already running, ignoring new trigger")
                 return
             end
         end

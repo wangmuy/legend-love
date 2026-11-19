@@ -26,8 +26,8 @@ PersonStatusAsync.PAGE_NUM = PAGE_NUM
 -- teamid: 队伍位置（1-6）
 -- 返回: 无（直接显示，ESC退出）
 function PersonStatusAsync.ShowStatusCoroutine(teamid)
-    if lib and lib.Debug then
-        lib.Debug("PersonStatusAsync.ShowStatusCoroutine: started with teamid=" .. tostring(teamid))
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: started with teamid=" .. tostring(teamid))
     end
     
     -- 设置标志，阻止游戏主循环处理按键
@@ -40,8 +40,8 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
     local scheduler = CoroutineScheduler.getInstance()
     local InputAsync = require("framework.input_async")
     
-    if lib and lib.Debug then
-        lib.Debug("PersonStatusAsync.ShowStatusCoroutine: modules loaded")
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: modules loaded")
     end
     
     -- 设置当前显示的状态数据（只在开始时设置一次）
@@ -52,8 +52,8 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
             page = page,
             teamid = teamid
         }
-        if lib and lib.Debug then
-            lib.Debug("PersonStatusAsync.ShowStatusCoroutine: set currentStatus, personId=" .. tostring(id))
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: set currentStatus, personId=" .. tostring(id))
         end
     end
     
@@ -66,22 +66,22 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
                 page = page,
                 teamid = teamid
             }
-            if lib and lib.Debug then
-                lib.Debug("PersonStatusAsync.ShowStatusCoroutine: updated currentStatus, personId=" .. tostring(newId) .. ", page=" .. tostring(page))
+            if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+                EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: updated currentStatus, personId=" .. tostring(newId) .. ", page=" .. tostring(page))
             end
         end
         
         -- 异步等待按键
-        if lib and lib.Debug then
-            lib.Debug("PersonStatusAsync.ShowStatusCoroutine: waiting for key")
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: waiting for key")
         end
         -- 周期性等待（同 item_async）：悬停需要「不按键也能醒一次」
         --
         -- 若用纯 WaitKey + 注入键唤醒，会和物品清单一样出现键积压，
         -- 表现为「悬停一会儿自己翻页」。
         local keypress = InputAsync.WaitKeyTimeoutBypass(0.05)
-        if lib and lib.Debug then
-            lib.Debug("PersonStatusAsync.ShowStatusCoroutine: key pressed=" .. tostring(keypress))
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: key pressed=" .. tostring(keypress))
         end
 
         -- **先消费鼠标意图**（REQ-MS2-10）
@@ -106,8 +106,8 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
         end
         
         if keypress == VK_ESCAPE then
-            if lib and lib.Debug then
-                lib.Debug("PersonStatusAsync.ShowStatusCoroutine: ESC pressed, exiting")
+            if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+                EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: ESC pressed, exiting")
             end
             -- 清除状态显示
             currentStatus = nil
@@ -132,8 +132,8 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
         scheduler:waitForTime(0.1)
     end
     
-    if lib and lib.Debug then
-        lib.Debug("PersonStatusAsync.ShowStatusCoroutine: ended")
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: ended")
     end
 end
 
@@ -205,8 +205,8 @@ function PersonStatusAsync.draw()
         return
     end
     
-    if lib and lib.Debug then
-        lib.Debug("PersonStatusAsync.draw: drawing status for personId=" .. tostring(currentStatus.personId))
+    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("PersonStatusAsync.draw: drawing status for personId=" .. tostring(currentStatus.personId))
     end
     
     local id = currentStatus.personId

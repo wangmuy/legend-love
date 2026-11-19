@@ -199,8 +199,8 @@ function StateMachine:update(dt)
         if states[JY.Status] then
             self:switchTo(JY.Status)
         else
-            if lib and lib.Debug then
-                lib.Debug("StateMachine:update state not registered: " .. tostring(JY.Status))
+            if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+                EngineAPI.debug.log("StateMachine:update state not registered: " .. tostring(JY.Status))
             end
         end
     end
@@ -236,8 +236,8 @@ function StateMachine:draw()
             end
         end
     else
-        if lib and lib.Debug then
-            lib.Debug("StateMachine:draw NO STATE! currentState=" .. tostring(currentState) .. ", JY.Status=" .. tostring(JY and JY.Status))
+        if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("StateMachine:draw NO STATE! currentState=" .. tostring(currentState) .. ", JY.Status=" .. tostring(JY and JY.Status))
         end
     end
 end

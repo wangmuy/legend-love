@@ -616,7 +616,7 @@ end
 
 -- 设置按键重复
 function InputManager:setKeyRepeat(enabled)
-    lib.Debug(string.format("InputManager:setKeyRepeat: enabled=%s", tostring(enabled)))
+    EngineAPI.debug.log(string.format("InputManager:setKeyRepeat: enabled=%s", tostring(enabled)))
     keyRepeatEnabled = enabled
     -- 不使用 love.keyboard 的重复，使用我们自己的定时器机制
 end
