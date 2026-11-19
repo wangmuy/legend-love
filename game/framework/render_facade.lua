@@ -35,17 +35,31 @@ end
 
 --- 绘制文字（带阴影的 DrawString 语义）
 --
--- 原版 jymain.lua:2122 的 DrawString 只是 `lib.DrawStr(x,y,str,color,size,CC.FontName)`。
--- CC.FontName 是游戏常量，所以这里由调用方传 fontname（或省略用引擎默认）。
+-- 原版 jymain.lua:2122 的 DrawString 是：
+--     lib.DrawStr(x, y, str, color, size, CC.FontName)
+--
+-- **fontName 必须回落到 CC.FontName**，否则中文全变方块：
+--   lib_love 的 getFont(nil, size) 会用 LÖVE 内置字体，那套字体**没有中文字形**。
+--   实测：所有菜单/对话/物品名的中文都会显示成 □□□。
+--
+-- 所以本函数在 fontName 为 nil 时自动读 CC.FontName —— 这是从 script 层
+-- 搬到 framework 时**必须一并搬过来**的隐含知识。
 --
 -- @param x, y number
 -- @param str string
 -- @param color number|table 打包 int 或 {r,g,b}
 -- @param size number|nil
--- @param fontName string|nil
+-- @param fontName string|nil 省略时用 CC.FontName
 function RenderFacade.text(x, y, str, color, size, fontName)
     local EA = api()
     if not (EA and EA.render and EA.render.text) then return end
+
+    if fontName == nil then
+        local CC = rawget(_G, "CC")
+        if CC and type(CC.FontName) == "string" then
+            fontName = CC.FontName
+        end
+    end
     pcall(EA.render.text, x, y, str, color, size, fontName)
 end
 

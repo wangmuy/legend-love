@@ -959,7 +959,7 @@ function MenuStateMachine:draw()
                 local tw = TextBoxLayout.textWidth(hText, menu.size)
                 colX = colX + math.floor((itemWidth - tw) / 2)
             end
-            DrawString(colX, y, hText, drawColor, menu.size)
+            RenderFacade.text(colX, y, hText, drawColor, menu.size)
         else
             -- 竖向布局：菜单项垂直排列（默认）
             local y = rowY(menu, i)
@@ -984,12 +984,12 @@ function MenuStateMachine:draw()
             if type(text) == "string" and text:find("\n", 1, true) then
                 local lineY = y
                 for line in (text .. "\n"):gmatch("(.-)\n") do
-                    DrawString(menu.x1 + CC.MenuBorderPixel, lineY,
+                    RenderFacade.text(menu.x1 + CC.MenuBorderPixel, lineY,
                         line, drawColor, menu.size)
                     lineY = lineY + menu.size + CC.RowPixel
                 end
             else
-                DrawString(MenuStateMachine.textX(menu, text), y, text,
+                RenderFacade.text(MenuStateMachine.textX(menu, text), y, text,
                     drawColor, menu.size)
             end
         end

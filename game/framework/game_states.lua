@@ -2,6 +2,7 @@
 -- 游戏状态处理器定义
 -- 将原有的Game_MMap和Game_SMap拆分为update和draw
 
+local RenderFacade = require("framework.render_facade")
 local GameStates = {}
 
 -- 导入必要的模块
@@ -500,7 +501,7 @@ handlers["GAME_MMAP"] = {
         EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], pic)
         
         if CC.ShowXY == 1 then
-            DrawString(10, CC.ScreenH - 20, string.format("%d %d", JY.Base["人X"], JY.Base["人Y"]), C_GOLD, 16)
+            RenderFacade.text(10, CC.ScreenH - 20, string.format("%d %d", JY.Base["人X"], JY.Base["人Y"]), C_GOLD, 16)
         end
         
         -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
@@ -835,7 +836,7 @@ handlers["GAME_SMAP"] = {
         -- 因此不会被全屏重绘覆盖。
         
         if CC.ShowXY == 1 then
-            DrawString(10, CC.ScreenH - 20, string.format("%s %d %d", JY.Scene[JY.SubScene]["名称"], JY.Base["人X1"], JY.Base["人Y1"]), C_GOLD, 16)
+            RenderFacade.text(10, CC.ScreenH - 20, string.format("%s %d %d", JY.Scene[JY.SubScene]["名称"], JY.Base["人X1"], JY.Base["人Y1"]), C_GOLD, 16)
         end
         
         -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
@@ -951,7 +952,7 @@ handlers["GAME_WMAP"] = {
                 local effectColor = WAR.EffectColor and WAR.EffectColor[WAR.HitEffect] or C_WHITE
                 for j = 0, WAR.HitNum - 1 do
                     if WAR.HitClips[j] then
-                        DrawString(WAR.HitClips[j].x1, WAR.HitClips[j].y1 - y_off, 
+                        RenderFacade.text(WAR.HitClips[j].x1, WAR.HitClips[j].y1 - y_off, 
                             WAR.HitNumbers[j][3], effectColor, CC.DefaultFont)
                     end
                 end
@@ -1007,13 +1008,13 @@ handlers["GAME_DEAD"] = {
         EngineAPI.sprite.drawPictureFile(CC.DeadFile, -1, -1)
         
         if JY.DeadScreen then
-            DrawString(CC.GameOverX, CC.GameOverY, JY.DeadScreen.name, RGB(216, 20, 24), CC.DefaultFont)
+            RenderFacade.text(CC.GameOverX, CC.GameOverY, JY.DeadScreen.name, RGB(216, 20, 24), CC.DefaultFont)
             
             local x = CC.ScreenW - 9 * CC.DefaultFont
-            DrawString(x, 10, JY.DeadScreen.datetime, RGB(216, 20, 24), CC.DefaultFont)
-            DrawString(x, 10 + CC.DefaultFont + CC.RowPixel, "在地球的某处", RGB(216, 20, 24), CC.DefaultFont)
-            DrawString(x, 10 + (CC.DefaultFont + CC.RowPixel) * 2, "当地人口的失踪数", RGB(216, 20, 24), CC.DefaultFont)
-            DrawString(x, 10 + (CC.DefaultFont + CC.RowPixel) * 3, "又多了一笔。。。", RGB(216, 20, 24), CC.DefaultFont)
+            RenderFacade.text(x, 10, JY.DeadScreen.datetime, RGB(216, 20, 24), CC.DefaultFont)
+            RenderFacade.text(x, 10 + CC.DefaultFont + CC.RowPixel, "在地球的某处", RGB(216, 20, 24), CC.DefaultFont)
+            RenderFacade.text(x, 10 + (CC.DefaultFont + CC.RowPixel) * 2, "当地人口的失踪数", RGB(216, 20, 24), CC.DefaultFont)
+            RenderFacade.text(x, 10 + (CC.DefaultFont + CC.RowPixel) * 3, "又多了一笔。。。", RGB(216, 20, 24), CC.DefaultFont)
         end
     end
 }

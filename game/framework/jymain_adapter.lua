@@ -1048,7 +1048,7 @@ local function showAttributeSelection()
     -- 绘制属性
     -- str1: 显示名称, str2: 属性键, str3: 用于判断最大值的键, i: 列索引, y: Y坐标
     local function DrawAttrib(str1, str2, str3, i, y)
-        DrawString(x1 + i * w, y, str1, C_RED, fontsize)
+        RenderFacade.text(x1 + i * w, y, str1, C_RED, fontsize)
         
         -- 判断是否为当前随机范围的最大值，最大值用黄色显示
         local value = JY.Person[0][str2]
@@ -1058,10 +1058,10 @@ local function showAttributeSelection()
         if maxRandomValue and value >= maxRandomValue then
             valueColor = C_GOLD  -- 黄色显示当前随机范围的最大值
         end
-        DrawString(x1 + i * w + fontsize * 2, y, string.format("%3d ", value), valueColor, fontsize)
+        RenderFacade.text(x1 + i * w + fontsize * 2, y, string.format("%3d ", value), valueColor, fontsize)
     end
     
-    DrawString(x1, y1, "这样的属性满意吗(Y/N)?", C_GOLD, fontsize)
+    RenderFacade.text(x1, y1, "这样的属性满意吗(Y/N)?", C_GOLD, fontsize)
     
     local i = 0
     y1 = y1 + h
@@ -1098,7 +1098,7 @@ function JYMainAdapter.startNewGame(menux)
     PerfLog.mark("startNewGame begin")
 
     RenderFacade.clearScreen()
-    DrawString(menux, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
+    RenderFacade.text(menux, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
     
     -- 载入新游戏数据
@@ -1228,7 +1228,7 @@ function JYMainAdapter.loadGame()
     local r = MenuAsync.ShowMenuCoroutine(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED, "center")
     
     RenderFacade.clearScreen()
-    DrawString(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
+    RenderFacade.text(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
     
     local ok = LoadRecord(r)

@@ -2,6 +2,7 @@
 -- 异步物品系统模块
 -- 提供非阻塞版本的物品选择和使用功能
 
+local RenderFacade = require("framework.render_facade")
 local SpriteAtlas = require("framework.sprite_atlas")
 local ItemAsync = {}
 
@@ -502,8 +503,8 @@ function ItemAsync.draw()
             displayName = displayName .. "(" .. JY.Person[selectedItem.user]["姓名"] .. ")"
         end
         displayName = string.format("%s X %d", displayName, selectedItem.count)
-        DrawString(dx + CC.ThingGapOut, y1_1 + CC.MenuBorderPixel, displayName, C_GOLD, CC.ThingFontSize)
-        DrawString(dx + CC.ThingGapOut, y2_1 + CC.MenuBorderPixel, selectedItem.desc, C_ORANGE, CC.ThingFontSize)
+        RenderFacade.text(dx + CC.ThingGapOut, y1_1 + CC.MenuBorderPixel, displayName, C_GOLD, CC.ThingFontSize)
+        RenderFacade.text(dx + CC.ThingGapOut, y2_1 + CC.MenuBorderPixel, selectedItem.desc, C_ORANGE, CC.ThingFontSize)
     end
     
     -- 绘制物品Grid
@@ -535,7 +536,7 @@ function ItemAsync.draw()
     
     -- 显示页码
     local pageStr = string.format("%d/%d", select.currentPage, select.totalPages)
-    DrawString(dx + w - 50, y3_2 + 5, pageStr, C_WHITE, CC.DefaultFont)
+    RenderFacade.text(dx + w - 50, y3_2 + 5, pageStr, C_WHITE, CC.DefaultFont)
 end
 
 -- 减少物品数量的辅助函数

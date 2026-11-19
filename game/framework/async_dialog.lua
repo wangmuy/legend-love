@@ -2,6 +2,7 @@
 -- 异步对话框管理器
 -- 支持非阻塞的对话框显示和交互
 
+local RenderFacade = require("framework.render_facade")
 local TextBoxLayout = require("framework.text_box_layout")
 
 local AsyncDialog = {}
@@ -388,7 +389,7 @@ function AsyncDialog:drawYesNo(dialog, x, y, w, h)
     local pad = dialog.pad or CC.MenuBorderPixel
     local lineH = dialog.lineHeight or CC.DefaultFont
     local msgY = y + pad
-    DrawString(x + pad, msgY, dialog.message, C_WHITE, CC.DefaultFont)
+    RenderFacade.text(x + pad, msgY, dialog.message, C_WHITE, CC.DefaultFont)
     
     -- 绘制选项（上下排列，配合上下方向键选择）
     -- 使用 C_RED（红色）作为选中颜色，与主菜单/属性页"是否"菜单（C_RED 底 C_WHITE 选中）
@@ -401,8 +402,8 @@ function AsyncDialog:drawYesNo(dialog, x, y, w, h)
     
     -- "是"在上，"否"在下，使用菜单样式居中显示
     local optionX = x + w/2 - CC.DefaultFont
-    DrawString(optionX, optionStartY, "是", yesColor, CC.DefaultFont)
-    DrawString(optionX, optionStartY + lineH + CC.RowPixel, "否", noColor, CC.DefaultFont)
+    RenderFacade.text(optionX, optionStartY, "是", yesColor, CC.DefaultFont)
+    RenderFacade.text(optionX, optionStartY + lineH + CC.RowPixel, "否", noColor, CC.DefaultFont)
 end
 
 -- 绘制消息对话框
@@ -419,33 +420,33 @@ end
 --   y +  5 -> 上  7 / 下  7   （居中）
 function AsyncDialog:drawMessage(dialog, x, y, w, h)
     local pad = dialog.pad or CC.MenuBorderPixel
-    DrawString(x + pad, y + pad, dialog.message, dialog.color, dialog.size)
+    RenderFacade.text(x + pad, y + pad, dialog.message, dialog.color, dialog.size)
 end
 
 -- 绘制输入对话框
 function AsyncDialog:drawInput(dialog, x, y, w, h)
     -- 绘制提示
-    DrawString(x + 10, y + 10, dialog.prompt, C_WHITE, CC.DefaultFont)
+    RenderFacade.text(x + 10, y + 10, dialog.prompt, C_WHITE, CC.DefaultFont)
     
     -- 绘制输入框
     DrawBox(x + 10, y + 40, x + w - 10, y + 70, C_WHITE)
-    DrawString(x + 15, y + 45, dialog.input, C_WHITE, CC.DefaultFont)
+    RenderFacade.text(x + 15, y + 45, dialog.input, C_WHITE, CC.DefaultFont)
     
     -- 绘制光标
     local cursorX = x + 15 + #dialog.input * CC.DefaultFont / 2
-    DrawString(cursorX, y + 45, "_", C_WHITE, CC.DefaultFont)
+    RenderFacade.text(cursorX, y + 45, "_", C_WHITE, CC.DefaultFont)
 end
 
 -- 绘制选择对话框
 function AsyncDialog:drawSelect(dialog, x, y, w, h)
     -- 绘制标题
-    DrawString(x + 10, y + 10, dialog.title, C_WHITE, CC.DefaultFont)
+    RenderFacade.text(x + 10, y + 10, dialog.title, C_WHITE, CC.DefaultFont)
     
     -- 绘制选项
     local startY = y + 40
     for i, item in ipairs(dialog.items) do
         local color = (i == dialog.selected) and C_RED or C_WHITE
-        DrawString(x + 20, startY + (i-1) * 30, item.text, color, CC.DefaultFont)
+        RenderFacade.text(x + 20, startY + (i-1) * 30, item.text, color, CC.DefaultFont)
     end
 end
 
