@@ -18,6 +18,7 @@ local keyQueue = {}
 local function installStubs()
     local saved = {
         lib = rawget(_G, "lib"),
+        EngineAPI = rawget(_G, "EngineAPI"),
         CC = rawget(_G, "CC"),
         DrawString = rawget(_G, "DrawString"),
         Cls = rawget(_G, "Cls"),
@@ -39,6 +40,17 @@ local function installStubs()
             return k or -1
         end,
         Debug = function() end,
+    })
+    -- framework 已改用 EngineAPI.input.getKey（port-contract-completeness Task 3），
+    -- 这里装桩让它读同一个 keyQueue，保持既有断言不变。
+    rawset(_G, "EngineAPI", {
+        input = {
+            getKey = function()
+                local k = table.remove(keyQueue, 1)
+                return k or -1
+            end,
+        },
+        debug = { log = function() end },
     })
     rawset(_G, "CC", { MenuBorderPixel = 5, RowPixel = 4 })
     rawset(_G, "DrawString", function() end)
@@ -71,6 +83,9 @@ end
 local function pressKeys(keys)
     keyQueue = {}
     for i = 1, #keys do keyQueue[i] = keys[i] end
+    -- framework 已改用 EngineAPI.input.getKey（Task 3），
+    -- 同步注入到共享队列，否则 lib 桩收不到键
+    TestHelper.setKeyQueue(keys)
 end
 
 -- 统计 Settings.set 被调用的次数

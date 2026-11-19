@@ -126,7 +126,7 @@ function TalkAsync.TalkExCoroutine(s, headid, flag)
 
     local pages = paginate(layout.lines, layout.linesPerPage or talkynum)
 
-    lib.GetKey()
+    EngineAPI.input.getKey()
 
     local InputManager = require("framework.input_manager")
 

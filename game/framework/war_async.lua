@@ -142,7 +142,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
             
             -- 处理自动战斗取消
             if WAR.AutoFight == 1 then
-                local keypress = lib.GetKey()
+                local keypress = EngineAPI.input.getKey()
                 if keypress == VK_SPACE or keypress == VK_RETURN then
                     WAR.AutoFight = 0
                 end

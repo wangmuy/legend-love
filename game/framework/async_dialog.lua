@@ -242,7 +242,7 @@ function AsyncDialog:handleInput()
     local okIM, InputManager = pcall(require, "framework.input_manager")
     if not okIM then InputManager = nil end
 
-    local key = lib.GetKey()
+    local key = EngineAPI.input.getKey()
     -- 注意：**不再「没有键就直接 return」**
     -- 字母现在走动作队列（ui.text），动作事件不产生 key。
     -- 两个通道都空时才提前返回，否则会漏掉纯动作输入。

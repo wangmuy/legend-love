@@ -406,7 +406,7 @@ handlers["GAME_MMAP"] = {
                 -- 冻结期间：暂停推进，但保留路径（对话结束后继续走完）
                 return
             end
-            local keypress = lib.GetKey()
+            local keypress = EngineAPI.input.getKey()
             if keypress ~= -1 then
                 -- 按键中断：吃掉这次按键与后续 repeat，不响应为方向移动
                 AutoMove.interruptByKey(keypress)
@@ -422,7 +422,7 @@ handlers["GAME_MMAP"] = {
             -- 路径走完或中断，落到下面的普通逻辑
         elseif AutoMove.isDraining() then
             -- drain 期间吞掉被中断的那个键的 repeat
-            local keypress = lib.GetKey()
+            local keypress = EngineAPI.input.getKey()
             if keypress ~= -1 and AutoMove.shouldDrainKey(keypress) then
                 return
             end
@@ -430,7 +430,7 @@ handlers["GAME_MMAP"] = {
         
         -- 原有的Game_MMap逻辑(除去渲染部分)
         local direct = -1
-        local keypress = lib.GetKey()
+        local keypress = EngineAPI.input.getKey()
         
         if keypress ~= -1 then
             JY.MyTick = 0
@@ -583,7 +583,7 @@ handlers["GAME_SMAP"] = {
         -- 处理动画（事件驱动架构）
         if JY.AnimationState.active then
             local anim = JY.AnimationState
-            local now = lib.GetTime()
+            local now = EngineAPI.time.getTime()
             local elapsed = now - anim.startTime
             local frameIndex = math.floor(elapsed / anim.frameDuration)
             local i = anim.startFrame + frameIndex * 2
@@ -706,7 +706,7 @@ handlers["GAME_SMAP"] = {
         
         -- 处理输入
         local x, y
-        local keypress = lib.GetKey()
+        local keypress = EngineAPI.input.getKey()
         local direct = -1
         
         -- 检查是否正在显示人物状态或物品选择，如果是则跳过按键处理

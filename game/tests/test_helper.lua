@@ -249,6 +249,27 @@ function TestHelper.mockWAR()
 end
 
 -- Mock lib 模块
+-- 共享按键队列（EngineAPI.input.getKey 的 mock 从这里取）
+--
+-- 为什么放在 TestHelper 上而不是各测试自己维护：
+-- framework 已改用 EngineAPI.input.getKey（Task 3 之后），
+-- 而每个测试原本都自己装 lib.GetKey 桩。若各装一份，
+-- 改契约后所有测试都要跟着改。统一放这里，测试只需 setKeyQueue。
+TestHelper._keyQueue = {}
+
+--- 注入按键序列（按顺序被 getKey 取走）
+function TestHelper.setKeyQueue(keys)
+    TestHelper._keyQueue = {}
+    for i = 1, #(keys or {}) do
+        TestHelper._keyQueue[i] = keys[i]
+    end
+end
+
+--- 清空按键队列
+function TestHelper.clearKeyQueue()
+    TestHelper._keyQueue = {}
+end
+
 function TestHelper.mockLib()
     _G.lib = {
         Debug = function() end,
@@ -343,6 +364,25 @@ function TestHelper.mockEngineAPI()
             listDirectory = function(p) return Fs.listDirectory(p) end,
         },
         debug = { log = function() end },
+        -- input 段：framework 已改用 EngineAPI.input.getKey（Task 3），
+        -- 不再是 lib.GetKey。读共享队列，测试用 TestHelper.setKeyQueue 注入。
+        input = {
+            getKey = function()
+                local k = table.remove(TestHelper._keyQueue, 1)
+                return k or -1
+            end,
+            waitForKey = function() return -1 end,
+            setKeyRepeat = function() end,
+            getAxis = function() return 0 end,
+            getCapabilities = function()
+                return { pointer = false, touch = false, gamepad = false, vr = false }
+            end,
+            getPointerPosition = function() return -1, -1 end,
+            pollAction = function() return nil end,
+            getTouches = function() return {} end,
+            mousePosition = function() return -1, -1 end,
+            mouseButton = function() return false end,
+        },
         coroutine = {
             isRunning = function() return false end,
             yieldPoint = function() end,

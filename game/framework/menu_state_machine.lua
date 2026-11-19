@@ -433,7 +433,7 @@ function MenuStateMachine:handleInput()
         return
     end
     
-    local key = lib.GetKey()
+    local key = EngineAPI.input.getKey()
     if key == -1 then
         return
     end

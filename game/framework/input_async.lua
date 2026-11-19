@@ -20,7 +20,7 @@ InputAsync.WaitKeyCoroutine = InputAsync.WaitKey
 --- 等待按键（带超时，**绕过 disableInput**，协程版本）
 --
 -- 与 WaitKeyTimeout 的差别只有一处：用 scheduler 的内部取键
--- （_peekKeyInternal / _getKeyInternal）而不是 lib.GetKey()。
+-- （_peekKeyInternal / _getKeyInternal）而不是 EngineAPI.input.getKey()。
 --
 -- 为什么需要它：物品清单/人物状态等模态 UI 会在自己运行期间设
 -- InputManager.disableInput = true（阻止地图主循环吃键）。
@@ -64,7 +64,7 @@ function InputAsync.WaitKeyTimeout(timeout)
     local startTime = EngineAPI.time.getTimeSeconds()
     
     while true do
-        local key = lib.GetKey()
+        local key = EngineAPI.input.getKey()
         if key ~= -1 then
             return key
         end
@@ -144,7 +144,7 @@ end
 
 -- 检查是否有按键按下（非阻塞）
 function InputAsync.IsAnyKeyPressed()
-    local key = lib.GetKey()
+    local key = EngineAPI.input.getKey()
     return key ~= -1, key
 end
 

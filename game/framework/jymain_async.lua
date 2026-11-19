@@ -180,7 +180,7 @@ function JyMainAsync.Menu_SaveRecord()
         ShowScreen()
         
         -- 短暂显示后清除
-        lib.Delay(500)
+        EngineAPI.time.sleep(500)
         Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
         
         if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log(string.format("Menu_SaveRecord: SaveRecord done (%.2fs)", elapsed)) end

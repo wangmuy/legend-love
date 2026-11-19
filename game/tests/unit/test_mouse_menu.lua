@@ -10,6 +10,7 @@ local keyQueue = {}
 local function installStubs()
     local saved = {
         lib = rawget(_G, "lib"),
+        EngineAPI = rawget(_G, "EngineAPI"),
         CC = rawget(_G, "CC"),
         DrawString = rawget(_G, "DrawString"),
         Cls = rawget(_G, "Cls"),
@@ -29,6 +30,17 @@ local function installStubs()
             return k or -1
         end,
         Debug = function() end,
+    })
+    -- framework 已改用 EngineAPI.input.getKey（port-contract-completeness Task 3），
+    -- 这里装桩让它读同一个 keyQueue，保持既有断言不变。
+    rawset(_G, "EngineAPI", {
+        input = {
+            getKey = function()
+                local k = table.remove(keyQueue, 1)
+                return k or -1
+            end,
+        },
+        debug = { log = function() end },
     })
     rawset(_G, "CC", { MenuBorderPixel = 5, RowPixel = 4 })
     rawset(_G, "DrawString", function() end)
@@ -116,6 +128,7 @@ function TestMouseMenu.testUpDownIsNavigationNotToggle()
 
     local before = M.isEnabled()
     keyQueue = { _G.VK_DOWN }
+    TestHelper.setKeyQueue(keyQueue)
     msm:handleInput()
 
     TestHelper.assertEquals(before, M.isEnabled(),
@@ -137,6 +150,7 @@ function TestMouseMenu.testEnterTogglesAndKeepsMenuOpen()
 
     local before = M.isEnabled()
     keyQueue = { _G.VK_RETURN }
+    TestHelper.setKeyQueue(keyQueue)
     msm:handleInput()
     msm:pollCallback()
 
@@ -441,6 +455,7 @@ local function setupDialog()
         VK_UP = rawget(_G, "VK_UP"),
         VK_DOWN = rawget(_G, "VK_DOWN"),
         lib = rawget(_G, "lib"),
+        EngineAPI = rawget(_G, "EngineAPI"),
         CC = rawget(_G, "CC"),
     }
     rawset(_G, "VK_ESCAPE", 27)
