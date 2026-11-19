@@ -139,6 +139,11 @@ function EngineAPI.sprite.createFromEncoded(bytes, formatHint, opts)
     return { w = 0, h = 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
 end
 
+--- 绘制独立图片：web 无图形概念
+function EngineAPI.sprite.drawPictureFile(filename, x, y, opts)
+    return false
+end
+
 --- 取元数据
 function EngineAPI.sprite.getMeta(handle)
     if type(handle) ~= "table" then return nil end

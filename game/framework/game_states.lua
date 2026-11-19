@@ -386,7 +386,7 @@ handlers["GAME_MMAP"] = {
         -- 清理大地图资源
         CleanMemory()
         lib.UnloadMMap()
-        lib.PicInit()
+        EngineAPI.sprite.initSprites()
         EngineAPI.render.presentAndWait(50)
     end,
     
@@ -861,7 +861,7 @@ handlers["GAME_START"] = {
     draw = function()
         -- 绘制开始界面背景
         if CC.FirstFile then
-            lib.LoadPicture(CC.FirstFile, -1, -1)
+            EngineAPI.sprite.drawPictureFile(CC.FirstFile, -1, -1)
         end
     end
 }
@@ -1004,7 +1004,7 @@ handlers["GAME_DEAD"] = {
     
     draw = function()
         EngineAPI.render.fillRect(0, 0, 0, 0, 0)
-        lib.LoadPicture(CC.DeadFile, -1, -1)
+        EngineAPI.sprite.drawPictureFile(CC.DeadFile, -1, -1)
         
         if JY.DeadScreen then
             DrawString(CC.GameOverX, CC.GameOverY, JY.DeadScreen.name, RGB(216, 20, 24), CC.DefaultFont)

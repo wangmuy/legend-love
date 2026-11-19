@@ -184,7 +184,7 @@ function JYMainAdapter.initCoroutine()
     
     JY.Status = getStateId("GAME_START")
     
-    lib.PicInit(CC.PaletteFile)
+    EngineAPI.sprite.initSprites(CC.PaletteFile)
     
     -- 注册游戏状态
     GameStates.registerAll()

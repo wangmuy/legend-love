@@ -123,6 +123,12 @@ EngineAPI.sprite.createFromEncoded = function(bytes, formatHint, opts)
     return { w = 0, h = 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
 end
 
+--- 绘制独立图片：MUD 无图形概念
+EngineAPI.sprite.drawPictureFile = function(filename, x, y, opts)
+    logCall("sprite.drawPictureFile", filename, x, y)
+    return false
+end
+
 --- 取元数据：MUD 返回创建时记录的哨兵值
 EngineAPI.sprite.getMeta = function(handle)
     if type(handle) ~= "table" then return nil end

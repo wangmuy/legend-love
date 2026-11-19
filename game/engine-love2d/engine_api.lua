@@ -71,7 +71,16 @@ function M.render.presentAndWait(delay) end
 M.sprite = {}
 
 --- 初始化精灵系统
-function M.sprite.initSprites() end
+--
+-- @param paletteFile string|nil 调色板文件路径（如 CC.PaletteFile = "data/mmap.col"）
+--
+-- 为什么带参数：原版 `lib.PicInit(PaletteFilename)` 的**唯一作用**就是加载
+-- 调色板（lib_love.lua:254 `PicInit` → `LoadPallette`）。RLE 精灵的像素值是
+-- 调色板索引，不加载调色板就全黑。
+--
+-- 支持 RGBA 字节上传的新引擎可以忽略这个参数（它们不需要调色板概念）；
+-- 但实现**不得**在收到 paletteFile 时静默丢弃 —— 兼容旧资产的引擎必须加载。
+function M.sprite.initSprites(paletteFile) end
 
 --- 加载精灵档案（idx/grp 文件对）
 -- @param idxFile string 索引文件路径
@@ -156,6 +165,19 @@ function M.sprite.createFromRGBA(w, h, rgbaBytes, opts) end
 -- @param opts table|nil { xoff=, yoff= }
 -- @return table|nil handle { w=, h=, xoff=, yoff= }
 function M.sprite.createFromEncoded(bytes, formatHint, opts) end
+
+--- 绘制一张独立图片文件（非 .grp 档案）
+--
+-- 与 sprite.draw 的区别：这个直接读磁盘图片（PNG/JPG 等），不经过 .idx/.grp。
+-- 用于开场图、结局图这类整屏图片。
+--
+-- x/y 传 -1 表示**屏幕居中**（既有调用方约定，实测 jymain.lua 的
+-- LoadPicture(CC.DeadFile, -1, -1) 就是这个语义）。
+--
+-- @param filename string 图片路径
+-- @param x, y number 绘制位置；-1 表示该轴居中
+-- @param opts table|nil { cache=true }（默认 true，按文件名缓存）
+function M.sprite.drawPictureFile(filename, x, y, opts) end
 
 --- 取纹理的元数据（尺寸 + 锚点）
 --

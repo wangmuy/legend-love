@@ -84,9 +84,12 @@ EngineAPI.render.getHeight = function()
 end
 
 -- sprite 模块
-EngineAPI.sprite.initSprites = function()
-    -- 原 lib_love 中 PicInit 加载调色板
-    -- 新引擎不需要调色板概念，保留空实现
+EngineAPI.sprite.initSprites = function(paletteFile)
+    -- 原版 PicInit 的唯一作用是加载调色板（RLE 精灵的像素值是调色板索引，
+    -- 不加载就全黑）。带参数时必须真的加载，不能静默丢弃。
+    if paletteFile ~= nil then
+        lib.PicInit(paletteFile)
+    end
 end
 
 EngineAPI.sprite.loadArchive = function(idxFile, grpFile, archiveId)
@@ -166,6 +169,37 @@ EngineAPI.sprite.createFromEncoded = function(bytes, formatHint, opts)
         xoff = opts.xoff or 0,
         yoff = opts.yoff or 0,
     }
+end
+
+--- 绘制独立图片文件（非 .grp 档案）
+--
+-- x/y 传 -1 表示屏幕居中（既有调用方约定）。
+EngineAPI.sprite.drawPictureFile = function(filename, x, y, opts)
+    if type(filename) ~= "string" or filename == "" then return false end
+    if not (love and love.graphics and love.graphics.newImage) then return false end
+
+    -- 按文件名缓存（既有 LoadPicture 的行为）
+    local cache = EngineAPI.sprite._picCache
+    if not cache then
+        cache = {}
+        EngineAPI.sprite._picCache = cache
+    end
+    if opts ~= nil and opts.cache == false then cache[filename] = nil end
+
+    local pic = cache[filename]
+    if not pic then
+        local ok, img = pcall(love.graphics.newImage, filename)
+        if not ok or not img then return false end
+        pic = img
+        cache[filename] = pic
+    end
+
+    local w = EngineAPI.render.getWidth()
+    local h = EngineAPI.render.getHeight()
+    if x == -1 then x = math.floor((w - pic:getWidth()) / 2) end
+    if y == -1 then y = math.floor((h - pic:getHeight()) / 2) end
+    love.graphics.draw(pic, x, y)
+    return true
 end
 
 EngineAPI.sprite.getMeta = function(handle)

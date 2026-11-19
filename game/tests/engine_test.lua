@@ -138,6 +138,14 @@ EngineAPI.sprite.createFromEncoded = function(bytes, formatHint, opts)
              format = formatHint }
 end
 
+--- 绘制独立图片：测试桩记录调用
+EngineAPI.sprite._pictureCalls = {}
+EngineAPI.sprite.drawPictureFile = function(filename, x, y, opts)
+    logCall("sprite.drawPictureFile", filename, x, y)
+    table.insert(EngineAPI.sprite._pictureCalls, { filename, x, y })
+    return true
+end
+
 EngineAPI.sprite.getMeta = function(handle)
     if type(handle) ~= "table" then return nil end
     return { w = handle.w or 0, h = handle.h or 0,

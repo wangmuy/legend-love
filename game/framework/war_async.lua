@@ -69,19 +69,19 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     EngineAPI.debug.log("WarMainCoroutine: WarSelectEnemy done, WAR.PersonNum=" .. tostring(WAR.PersonNum))
     
     CleanMemory()
-    lib.PicInit()
+    EngineAPI.sprite.initSprites()
     EngineAPI.render.presentAndWait(50)
     
     EngineAPI.debug.log("WarMainCoroutine: calling WarLoadMap")
     WarLoadMap(WAR.Data["地图"])
     
     -- 加载贴图文件
-    lib.PicLoadFile(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0)
-    lib.PicLoadFile(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
+    EngineAPI.sprite.loadArchive(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0)
+    EngineAPI.sprite.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
     if CC.LoadThingPic == 1 then
-        lib.PicLoadFile(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
+        EngineAPI.sprite.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
     end
-    lib.PicLoadFile(CC.EffectFile[1], CC.EffectFile[2], 3)
+    EngineAPI.sprite.loadArchive(CC.EffectFile[1], CC.EffectFile[2], 3)
     
     PlayMIDI(WAR.Data["音乐"])
     
@@ -90,9 +90,10 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     -- 加载战斗人物贴图
     for i = 0, WAR.PersonNum - 1 do
         local pid = WAR.Person[i]["人物编号"]
-        lib.PicLoadFile(string.format(CC.FightPicFile[1], JY.Person[pid]["头像代号"]),
-                        string.format(CC.FightPicFile[2], JY.Person[pid]["头像代号"]),
-                        4 + i)
+        EngineAPI.sprite.loadArchive(
+            string.format(CC.FightPicFile[1], JY.Person[pid]["头像代号"]),
+            string.format(CC.FightPicFile[2], JY.Person[pid]["头像代号"]),
+            4 + i)
     end
     
     -- 设置状态为战斗（在初始化完成后）
@@ -213,11 +214,11 @@ function WarAsync.WarMainCoroutine(warid, isexp)
         PlayMIDI(0)
     end
     CleanMemory()
-    lib.PicInit()
-    lib.PicLoadFile(CC.SMAPPicFile[1], CC.SMAPPicFile[2], 0)
-    lib.PicLoadFile(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
+    EngineAPI.sprite.initSprites()
+    EngineAPI.sprite.loadArchive(CC.SMAPPicFile[1], CC.SMAPPicFile[2], 0)
+    EngineAPI.sprite.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
     if CC.LoadThingPic == 1 then
-        lib.PicLoadFile(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
+        EngineAPI.sprite.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
     end
     
     -- 恢复状态

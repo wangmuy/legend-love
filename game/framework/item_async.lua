@@ -525,9 +525,9 @@ function ItemAsync.draw()
         local item = items[i]
         if item then
             if CC.LoadThingPic == 1 then
-                lib.PicLoadCache(2, item.id * 2, boxx + 1, boxy + 1, 1)
+                EngineAPI.sprite.draw(2, item.id * 2, boxx + 1, boxy + 1, 1)
             else
-                lib.PicLoadCache(0, (item.id + CC.StartThingPic) * 2, boxx + 1, boxy + 1, 1)
+                EngineAPI.sprite.draw(0, (item.id + CC.StartThingPic) * 2, boxx + 1, boxy + 1, 1)
             end
         end
     end
