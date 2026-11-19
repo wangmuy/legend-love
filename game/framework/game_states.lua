@@ -247,7 +247,7 @@ function stepAutoMoveMMap()
     -- 走路动画每 20 帧会「闪一下站立姿势」，看起来一顿一顿的。
     JY.MyTick = 0
 
-    GameHooks.addMyCurrentPic()
+    GameHooks.advanceWalkAnim()
     JY.Base["人方向"] = direct
     JY.Base["人X"] = nextPt.x
     JY.Base["人Y"] = nextPt.y
@@ -299,7 +299,7 @@ function stepAutoMoveSMAP()
 
     JY.MyTick = 0    -- 与键盘路径一致，保持走路动画连续（见 MMAP 分支注释）
 
-    GameHooks.addMyCurrentPic()
+    GameHooks.advanceWalkAnim()
     JY.Base["人方向"] = direct
     JY.Base["人X1"] = nextPt.x
     JY.Base["人Y1"] = nextPt.y
@@ -456,7 +456,7 @@ handlers["GAME_MMAP"] = {
         
         local x, y
         if direct ~= -1 then
-            GameHooks.addMyCurrentPic()
+            GameHooks.advanceWalkAnim()
             x = JY.Base["人X"] + CC.DirectX[direct + 1]
             y = JY.Base["人Y"] + CC.DirectY[direct + 1]
             JY.Base["人方向"] = direct
@@ -789,7 +789,7 @@ handlers["GAME_SMAP"] = {
         end
         
         if direct ~= -1 then
-            GameHooks.addMyCurrentPic()
+            GameHooks.advanceWalkAnim()
             x = JY.Base["人X1"] + CC.DirectX[direct + 1]
             y = JY.Base["人Y1"] + CC.DirectY[direct + 1]
             JY.Base["人方向"] = direct

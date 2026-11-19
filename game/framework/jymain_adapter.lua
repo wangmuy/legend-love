@@ -188,6 +188,30 @@ function JYMainAdapter.initCoroutine()
     
     EngineAPI.sprite.initSprites(CC.PaletteFile)
 
+    -- 定义走路动画序列（port-sprite-animation）
+    --
+    -- 必须在 CC 就绪后调（animation_defs 不在模块加载期读 CC）。
+    -- 帧号公式与 script/GetMyPic 完全一致（实测断言锁死）。
+    do
+        local okSA, SpriteAnim = pcall(require, "framework.sprite_anim")
+        local okAD, AnimationDefs = pcall(require, "framework.animation_defs")
+        if okSA and okAD and SpriteAnim and AnimationDefs then
+            SpriteAnim.clearSequences()
+            local walkFps = 20   -- 与自动移动 50ms/步对齐（原版实测等效 20fps）
+            local okS, S = pcall(require, "framework.settings")
+            if okS and S and S.get then
+                local v = S.get("animation.walkFps")
+                if type(v) == "number" and v > 0 then walkFps = v end
+            end
+            AnimationDefs.defineAll({
+                myStartPic   = CC.MyStartPic,
+                boatStartPic = CC.BoatStartPic,
+                walkFps      = walkFps,
+                boatFps      = 8,
+            })
+        end
+    end
+
     -- 注册游戏逻辑钩子（port-script-decoupling）
     --
     -- framework 不硬依赖 script 层的 GetMyPic / AddMyCurrentPic /
@@ -203,6 +227,85 @@ function JYMainAdapter.initCoroutine()
                 addMyCurrentPic = rawget(_G, "AddMyCurrentPic"),
                 sceneCanPass    = rawget(_G, "SceneCanPass"),
                 playMIDI        = rawget(_G, "PlayMIDI"),
+
+                -- advanceWalkAnim：走路动画的"开始/停止"判定，走注入
+                --
+                -- port-sprite-animation 把「帧号推进」搬到 framework/sprite_anim
+                -- （时间驱动），但「什么时候算在行走」仍是游戏逻辑
+                -- （读 JY.Base["人方向"] / 是否乘船）。
+                --
+                -- 所以这里做两件事：
+                --   ① 切换当前播放的序列（站立 ↔ 行走，或乘船）
+                --   ② 让 sprite_anim 按 fps 推进，不再"走一格加一帧"
+                advanceWalkAnim = function()
+                    local okSA, SpriteAnim = pcall(require, "framework.sprite_anim")
+                    local okAD, AnimationDefs = pcall(require, "framework.animation_defs")
+                    if not okSA or not okAD or not SpriteAnim or not AnimationDefs then
+                        return false
+                    end
+                    local JY = rawget(_G, "JY")
+                    if not JY or not JY.Base then return false end
+
+                    local dir = JY.Base["人方向"] or 0
+                    local onBoat = (JY.Base["乘船"] == 1)
+                    local seqId = AnimationDefs.sequenceId(dir, onBoat, true)
+                    if not seqId then return false end
+
+                    local h = rawget(_G, "__walkAnimHandle")
+                    if h == nil then
+                        h = SpriteAnim.createHandle()
+                        rawset(_G, "__walkAnimHandle", h)
+                    end
+                    -- 只在序列变化时重播（否则每步都重播会永远停在第一帧）
+                    local playingSeq = rawget(_G, "__walkAnimSeqId")
+                    if playingSeq ~= seqId then
+                        SpriteAnim.play(h, seqId)
+                        rawset(_G, "__walkAnimSeqId", seqId)
+                    end
+                    return true
+                end,
+
+                -- preferredFrameId：优先用 sprite_anim 的当前帧（Task 4）
+                --
+                -- 返回 nil 时 framework/script 会走 GetMyPic 的 legacy 公式，
+                -- 所以这是**加法而非替换** —— 零回归。
+                preferredFrameId = function()
+                    local okSA, SpriteAnim = pcall(require, "framework.sprite_anim")
+                    if not okSA or not SpriteAnim then return nil end
+                    local h = rawget(_G, "__walkAnimHandle")
+                    if h == nil then return nil end
+                    return SpriteAnim.getFrameId(h)
+                end,
+
+                -- stopWalkAnim：回到站立序列
+                --
+                -- 对应原版 `MyTick == 20 → MyCurrentPic = 0`（无输入 333ms 后站定）。
+                stopWalkAnim = function()
+                    local okSA, SpriteAnim = pcall(require, "framework.sprite_anim")
+                    local okAD, AnimationDefs = pcall(require, "framework.animation_defs")
+                    if not okSA or not okAD or not SpriteAnim or not AnimationDefs then
+                        return false
+                    end
+                    local JY = rawget(_G, "JY")
+                    if not JY or not JY.Base then return false end
+
+                    local dir = JY.Base["人方向"] or 0
+                    local onBoat = (JY.Base["乘船"] == 1)
+                    local seqId = AnimationDefs.sequenceId(dir, onBoat, false)
+                    if not seqId then return false end
+
+                    local h = rawget(_G, "__walkAnimHandle")
+                    if h == nil then
+                        h = SpriteAnim.createHandle()
+                        rawset(_G, "__walkAnimHandle", h)
+                    end
+                    local playingSeq = rawget(_G, "__walkAnimSeqId")
+                    if playingSeq ~= seqId then
+                        SpriteAnim.play(h, seqId)
+                        rawset(_G, "__walkAnimSeqId", seqId)
+                    end
+                    return true
+                end,
                 -- clearBackground：复刻 script 层 Cls 的「按状态重绘」那一半
                 --
                 -- script 的 Cls 不只清屏：它按 JY.Status 决定重绘什么。
@@ -1257,10 +1360,36 @@ function JYMainAdapter.update(dt)
     -- 更新节拍计数器
     JY.MyTick = JY.MyTick + 1
     JY.MyTick2 = JY.MyTick2 + 1
-    
-    if JY.MyTick == 20 then
-        JY.MyCurrentPic = 0
-        JY.MyTick = 0
+
+    -- 走路动画：时间驱动（port-sprite-animation，ADR-PORT-017）
+    --
+    -- 原版逻辑：MyTick 累加到 20（60fps 下 ≈333ms 无输入）→ MyCurrentPic 复位站立。
+    -- 改造后：sprite_anim 每帧按 fps 推进；20 帧无输入时切回 stand 序列。
+    --
+    -- **注意**：advanceWalkAnim 由移动路径调用（"开始走"），
+    -- 这里只负责"时间推进"与"停走回站立"。
+    do
+        local okSA, SpriteAnim = pcall(require, "framework.sprite_anim")
+        if okSA and SpriteAnim then
+            local walkFps = 20
+            local okS, S = pcall(require, "framework.settings")
+            if okS and S and S.get then
+                local v = S.get("animation.walkFps")
+                if type(v) == "number" and v > 0 then walkFps = v end
+            end
+            -- 序列的 fps 在 defineAll 时固定，这里用 update(dt) 推进；
+            -- 若设置改了 fps，需要重定义序列（见 defineAll 调用处）
+            SpriteAnim.update(dt)
+        end
+
+        if JY.MyTick == 20 then
+            local okHooks, GameHooks = pcall(require, "framework.game_hooks")
+            if okHooks and GameHooks and GameHooks.stopWalkAnim then
+                GameHooks.stopWalkAnim()
+            end
+            JY.MyCurrentPic = 0
+            JY.MyTick = 0
+        end
     end
     
     if JY.MyTick2 == 1000 then

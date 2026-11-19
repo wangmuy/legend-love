@@ -40,6 +40,21 @@ local impl = {
     -- script 的 PlayMIDI(id) 不只是播：它写 JY.CurrentMIDI、判 JY.EnableMusic、
     -- 再用 CC.MIDIFile 模板拼文件名。这些是游戏逻辑，走注入。
     playMIDI = nil,
+    -- 动画推进（替代 AddMyCurrentPic 的"走一格加一帧"语义）
+    --
+    -- port-sprite-animation：动画改由 framework/sprite_anim 时间驱动。
+    -- 但 "什么时候算在行走" 是游戏逻辑（读 JY.Base/按键），所以走注入。
+    advanceWalkAnim = nil,
+    -- 停止走路动画（回到站立帧）
+    --
+    -- 原版语义：MyTick 累加到 20（≈333ms 无输入）时把 MyCurrentPic 复位成站立帧。
+    -- 改造后由这个 hook 让 sprite_anim 切到 stand 序列。
+    stopWalkAnim = nil,
+    -- 优先帧号（port-sprite-animation Task 4）
+    --
+    -- GetMyPic 的 script 实现仍保留（零回归兜底），但 framework 可以优先问
+    -- sprite_anim 要帧号。返回 nil 表示"用 script 的实现"。
+    preferredFrameId = nil,
 }
 
 --- 注册一组实现
@@ -57,7 +72,8 @@ function GameHooks.register(spec)
     for k, v in pairs(spec) do
         if impl[k] ~= nil or k == "getMyPic" or k == "addMyCurrentPic"
            or k == "sceneCanPass" or k == "clearBackground"
-           or k == "playMIDI" then
+           or k == "playMIDI" or k == "advanceWalkAnim"
+           or k == "stopWalkAnim" or k == "preferredFrameId" then
             if type(v) == "function" then
                 impl[k] = v
             elseif v == nil then
@@ -75,6 +91,9 @@ function GameHooks.clear()
     impl.sceneCanPass = nil
     impl.clearBackground = nil
     impl.playMIDI = nil
+    impl.advanceWalkAnim = nil
+    impl.stopWalkAnim = nil
+    impl.preferredFrameId = nil
 end
 
 --- 是否已注册某个 hook
@@ -87,8 +106,19 @@ end
 -- ---------------------------------------------------------------------------
 
 --- 主角当前贴图编号
+--
+-- **优先走 sprite_anim（时间驱动），拿不到时退回 script 的 GetMyPic。**
+-- 这个顺序保证零回归：sprite_anim 未激活（handle 尚未创建）时，
+-- 行为与改造前完全一致。
+--
 -- @return number|nil 未注册时返回 nil
 function GameHooks.getMyPic()
+    -- ① 优先：sprite_anim 的当前帧（port-sprite-animation Task 4）
+    if impl.preferredFrameId then
+        local ok1, v1 = pcall(impl.preferredFrameId)
+        if ok1 and type(v1) == "number" then return v1 end
+    end
+    -- ② 兜底：script 的 GetMyPic（legacy 公式，零回归）
     if not impl.getMyPic then return nil end
     local ok, v = pcall(impl.getMyPic)
     if ok and type(v) == "number" then return v end
@@ -118,6 +148,31 @@ function GameHooks.playMIDI(id)
     if not impl.playMIDI then return false end
     local ok = pcall(impl.playMIDI, id)
     return ok
+end
+
+--- 推进走路动画
+-- @return boolean 是否走了注入实现
+function GameHooks.advanceWalkAnim()
+    if not impl.advanceWalkAnim then return false end
+    local ok = pcall(impl.advanceWalkAnim)
+    return ok
+end
+
+--- 停止走路动画（回到站立帧）
+-- @return boolean 是否走了注入实现
+function GameHooks.stopWalkAnim()
+    if not impl.stopWalkAnim then return false end
+    local ok = pcall(impl.stopWalkAnim)
+    return ok
+end
+
+--- 优先帧号（sprite_anim 路径）
+-- @return number|nil nil = 用 script 的 GetMyPic
+function GameHooks.preferredFrameId()
+    if not impl.preferredFrameId then return nil end
+    local ok, v = pcall(impl.preferredFrameId)
+    if ok and type(v) == "number" then return v end
+    return nil
 end
 
 --- 场景某格是否可通行
