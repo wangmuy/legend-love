@@ -2,6 +2,7 @@
 -- 战斗系统异步模块
 -- 提供战斗系统的协程版本函数
 
+local RenderFacade = require("framework.render_facade")
 local SpriteAtlas = require("framework.sprite_atlas")
 local WarAsync = {}
 
@@ -1539,7 +1540,7 @@ War_ThingMenuCoroutine = function()
     -- 使用Grid形式选择物品
     local r = ItemAsync.SelectThingByArrayAsync(thing, thingnum, num)
     
-    Cls()
+    RenderFacade.clearScreen()
     
     if r < 0 then
         WAR.ShowHead = 1
@@ -1565,7 +1566,7 @@ War_ThingMenuCoroutine = function()
     end
     
     WAR.ShowHead = 1
-    Cls()
+    RenderFacade.clearScreen()
     
     if useResult == 1 then
         return 0  -- 使用成功，结束回合
@@ -1604,7 +1605,7 @@ War_StatusMenuCoroutine = function()
     end
     
     WAR.ShowHead = 1
-    Cls()
+    RenderFacade.clearScreen()
 end
 
 --- 取当前战斗状态表（供 WarMain 包装器判断「是否异常结束」）

@@ -2,6 +2,7 @@
 -- JY_Main适配器，连接新旧架构
 -- 完全事件驱动版本
 
+local RenderFacade = require("framework.render_facade")
 local JYMainAdapter = {}
 
 -- 导入模块
@@ -185,7 +186,72 @@ function JYMainAdapter.initCoroutine()
     JY.Status = getStateId("GAME_START")
     
     EngineAPI.sprite.initSprites(CC.PaletteFile)
-    
+
+    -- 注册游戏逻辑钩子（port-script-decoupling）
+    --
+    -- framework 不硬依赖 script 层的 GetMyPic / AddMyCurrentPic /
+    -- SceneCanPass / Cls 的"按状态重绘"部分。这里在启动时把 script 实现的
+    -- 真实函数注入进去 —— 这是**唯一**知道 script 层存在的地方。
+    --
+    -- 注意：本处必须在 jymain.lua 已 require 之后执行（全局函数才存在）。
+    do
+        local okHooks, GameHooks = pcall(require, "framework.game_hooks")
+        if okHooks and GameHooks then
+            GameHooks.register({
+                getMyPic        = rawget(_G, "GetMyPic"),
+                addMyCurrentPic = rawget(_G, "AddMyCurrentPic"),
+                sceneCanPass    = rawget(_G, "SceneCanPass"),
+                -- clearBackground：复刻 script 层 Cls 的「按状态重绘」那一半
+                --
+                -- script 的 Cls 不只清屏：它按 JY.Status 决定重绘什么。
+                -- 这段逻辑读 JY.Status（游戏状态）与 JY.Base（玩家坐标），
+                -- 属于游戏逻辑，所以放这里注入而不是搬进 framework。
+                clearBackground = function()
+                    local EA = rawget(_G, "EngineAPI")
+                    local st = rawget(_G, "JY") and rawget(_G, "JY").Status
+                    local GAME_START = getStateId("GAME_START")
+                    local GAME_MMAP  = getStateId("GAME_MMAP")
+                    local GAME_SMAP  = getStateId("GAME_SMAP")
+                    local GAME_WMAP  = getStateId("GAME_WMAP")
+                    local GAME_DEAD  = rawget(_G, "GAME_DEAD") or 6
+
+                    if st == GAME_START then
+                        if EA and EA.render then
+                            pcall(EA.render.fillRect, 0, 0, 0, 0, 0)
+                        end
+                        if EA and EA.sprite then
+                            pcall(EA.sprite.drawPictureFile, CC.FirstFile, -1, -1)
+                        end
+                    elseif st == GAME_MMAP then
+                        if EA and EA.map then
+                            local gp = rawget(_G, "GameHooks")
+                            local pic = gp and gp.getMyPic() or nil
+                            if pic == nil then
+                                local okG, g = pcall(require, "framework.game_hooks")
+                                if okG and g then pic = g.getMyPic() end
+                            end
+                            pcall(EA.map.drawMain, JY.Base["人X"], JY.Base["人Y"], pic or 0)
+                        end
+                    elseif st == GAME_SMAP then
+                        -- 场景地图的重绘在 script 层（DrawSMap），暂不注入，
+                        -- 返回 false 让 facade 走退化路径（黑屏 + 不崩）
+                        return false
+                    elseif st == GAME_WMAP then
+                        return false
+                    elseif st == GAME_DEAD then
+                        if EA and EA.render then
+                            pcall(EA.render.fillRect, 0, 0, 0, 0, 0)
+                        end
+                        if EA and EA.sprite then
+                            pcall(EA.sprite.drawPictureFile, CC.DeadFile, -1, -1)
+                        end
+                    end
+                    return true
+                end,
+            })
+        end
+    end
+
     -- 注册游戏状态
     GameStates.registerAll()
     
@@ -231,7 +297,7 @@ function JYMainAdapter.showStartMenuCoroutine()
     
     EngineAPI.audio.playVideo(CONFIG.DataPath .. "start.mpg", VK_ESCAPE)
     
-    Cls()
+    RenderFacade.clearScreen()
     
     PlayMIDI(16)
     EngineAPI.render.present()
@@ -1031,7 +1097,7 @@ function JYMainAdapter.startNewGame(menux)
     local tAll = PerfLog.begin("startNewGame total")
     PerfLog.mark("startNewGame begin")
 
-    Cls()
+    RenderFacade.clearScreen()
     DrawString(menux, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
     
@@ -1054,7 +1120,7 @@ function JYMainAdapter.startNewGame(menux)
         generateRandomAttributes()
         
         -- 清屏并设置绘制回调
-        Cls()
+        RenderFacade.clearScreen()
         EventBridge.setGlobalDrawCallback(createAttributeDrawCallback())
         
         -- 异步菜单询问是否满意
@@ -1148,7 +1214,7 @@ end
 
 -- 载入游戏
 function JYMainAdapter.loadGame()
-    Cls()
+    RenderFacade.clearScreen()
     local loadMenu = {
         {"进度一", nil, 1},
         {"进度二", nil, 1},
@@ -1161,13 +1227,13 @@ function JYMainAdapter.loadGame()
     -- 载入进度菜单同理：档号/名字长度差异大，居中更整齐
     local r = MenuAsync.ShowMenuCoroutine(loadMenu, 3, 0, menux2, CC.StartMenuY, 0, 0, 0, 0, CC.StartMenuFontSize, C_STARTMENU, C_RED, "center")
     
-    Cls()
+    RenderFacade.clearScreen()
     DrawString(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
     ShowScreen()
     
     local ok = LoadRecord(r)
     
-    Cls()
+    RenderFacade.clearScreen()
     ShowScreen()
     
     if ok then

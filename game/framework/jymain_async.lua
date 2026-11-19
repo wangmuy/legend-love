@@ -4,6 +4,7 @@
 -- 更新日期: 2026-03-18
 -- 变更: 添加异步物品系统支持
 
+local RenderFacade = require("framework.render_facade")
 local JyMainAsync = {}
 
 local CoroutineScheduler = require("framework.coroutine_scheduler")
@@ -144,7 +145,7 @@ end
 
 -- 离开菜单
 function JyMainAsync.Menu_Exit()
-    Cls()
+    RenderFacade.clearScreen()
     if AsyncMessageBox.ShowYesNoCoroutine(-1, -1, "是否真的要离开游戏？", C_WHITE, CC.DefaultFont) == true then
         JY.Status = GAME_END
     end
@@ -174,14 +175,14 @@ function JyMainAsync.Menu_SaveRecord()
         SaveRecord(r)
         
         -- 显示完成提示
-        Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+        RenderFacade.clearScreen(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
         local elapsed = os.clock() - startTime
         DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, string.format("保存完成 (%.1f秒)", elapsed), C_WHITE, CC.DefaultFont)
         ShowScreen()
         
         -- 短暂显示后清除
         EngineAPI.time.sleep(500)
-        Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+        RenderFacade.clearScreen(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
         
         if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log(string.format("Menu_SaveRecord: SaveRecord done (%.2fs)", elapsed)) end
     end
@@ -207,7 +208,7 @@ function JyMainAsync.Menu_ReadRecord()
         if ok then
             JY.Status = GAME_FIRSTMMAP
         else
-            Cls(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+            RenderFacade.clearScreen(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
             AsyncMessageBox.ShowMessageCoroutine(-1, -1, "该存档不存在或已损坏", C_WHITE, CC.DefaultFont)
         end
     end
@@ -240,7 +241,7 @@ function JyMainAsync.Menu_Status()
             EngineAPI.debug.log("JyMainAsync.Menu_Status: PersonStatusAsync.ShowStatusCoroutine returned")
         end
     else
-        Cls()
+        RenderFacade.clearScreen()
     end
     
     if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
@@ -271,7 +272,7 @@ function JyMainAsync.Menu_PersonExit()
             instruct_21(personid)
         end
     end
-    Cls()
+    RenderFacade.clearScreen()
 end
 
 -- 异步版本的选择队友菜单（简单版本，只显示人名）
@@ -413,7 +414,7 @@ function JyMainAsync.Menu_Doctor()
     -- 第一级：选择使用医术的人（显示医疗能力，只显示医疗能力>=20的人）
     local r1 = JyMainAsync.SelectTeamMemberWithAbilityAsync("谁要使用医术", "医疗能力", 20)
     if r1 <= 0 then
-        Cls()
+        RenderFacade.clearScreen()
         return
     end
     
@@ -422,17 +423,17 @@ function JyMainAsync.Menu_Doctor()
     -- 检查体力
     if JY.Person[id1]["体力"] < 50 then
         AsyncMessageBox.ShowMessageCoroutine(-1, -1, "体力不足，不能医疗", C_WHITE, CC.DefaultFont)
-        Cls()
+        RenderFacade.clearScreen()
         return
     end
     
     -- 清除屏幕区域
-    Cls(CC.MainSubMenuX, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+    RenderFacade.clearScreen(CC.MainSubMenuX, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
     
     -- 第二级：选择要医治的人（显示生命值）
     local r2 = JyMainAsync.SelectTeamMemberWithLifeAsync("要医治谁")
     if r2 <= 0 then
-        Cls()
+        RenderFacade.clearScreen()
         return
     end
     
@@ -446,7 +447,7 @@ function JyMainAsync.Menu_Doctor()
     AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 生命 %d -> %d (增加 %d)", 
         JY.Person[id2]["姓名"], oldLife, newLife, num), C_ORANGE, CC.DefaultFont)
     
-    Cls()
+    RenderFacade.clearScreen()
 end
 
 -- 异步版本的选择队友菜单（显示生命值）
@@ -575,19 +576,19 @@ function JyMainAsync.Menu_DecPoison()
     -- 第一级：选择帮人解毒的人（显示解毒能力，只显示解毒能力>=20的人）
     local r1 = JyMainAsync.SelectTeamMemberWithAbilityAsync("谁要帮人解毒", "解毒能力", 20)
     if r1 <= 0 then
-        Cls()
+        RenderFacade.clearScreen()
         return
     end
     
     local id1 = JY.Base["队伍" .. r1]
     
     -- 清除屏幕区域
-    Cls(CC.MainSubMenuX, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
+    RenderFacade.clearScreen(CC.MainSubMenuX, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
     
     -- 第二级：选择要解毒的人（显示中毒程度）
     local r2 = JyMainAsync.SelectTeamMemberWithPoisonAsync("替谁解毒")
     if r2 <= 0 then
-        Cls()
+        RenderFacade.clearScreen()
         return
     end
     
@@ -601,7 +602,7 @@ function JyMainAsync.Menu_DecPoison()
     AsyncMessageBox.ShowMessageCoroutine(-1, -1, string.format("%s 中毒 %d -> %d (减少 %d)", 
         JY.Person[id2]["姓名"], oldPoison, newPoison, num), C_ORANGE, CC.DefaultFont)
     
-    Cls()
+    RenderFacade.clearScreen()
 end
 
 -- 异步版本的选择队友菜单（显示中毒程度）
@@ -700,7 +701,7 @@ function JyMainAsync.Menu_Thing()
         end
     end
     
-    Cls()
+    RenderFacade.clearScreen()
 end
 
 return JyMainAsync

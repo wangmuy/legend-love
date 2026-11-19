@@ -30,6 +30,11 @@ local impl = {
     getMyPic        = nil,
     addMyCurrentPic = nil,
     sceneCanPass    = nil,
+    -- 背景重绘（替代 script 层 Cls 的"按状态重绘"那一半）
+    --
+    -- script 的 Cls 不只是清屏：它按 JY.Status 决定重绘主地图/场景/战斗/开场图。
+    -- 这是**游戏逻辑**（读 JY.Status），所以走注入。
+    clearBackground = nil,
 }
 
 --- 注册一组实现
@@ -46,7 +51,7 @@ function GameHooks.register(spec)
     if type(spec) ~= "table" then return false end
     for k, v in pairs(spec) do
         if impl[k] ~= nil or k == "getMyPic" or k == "addMyCurrentPic"
-           or k == "sceneCanPass" then
+           or k == "sceneCanPass" or k == "clearBackground" then
             if type(v) == "function" then
                 impl[k] = v
             elseif v == nil then
@@ -62,6 +67,7 @@ function GameHooks.clear()
     impl.getMyPic = nil
     impl.addMyCurrentPic = nil
     impl.sceneCanPass = nil
+    impl.clearBackground = nil
 end
 
 --- 是否已注册某个 hook
@@ -87,6 +93,14 @@ end
 function GameHooks.addMyCurrentPic()
     if not impl.addMyCurrentPic then return false end
     local ok = pcall(impl.addMyCurrentPic)
+    return ok
+end
+
+--- 重绘当前状态的背景（未注册时退化为"填充黑屏"）
+-- @return boolean 是否走了注入实现
+function GameHooks.clearBackground()
+    if not impl.clearBackground then return false end
+    local ok = pcall(impl.clearBackground)
     return ok
 end
 

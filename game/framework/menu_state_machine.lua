@@ -2,6 +2,7 @@
 -- 菜单状态机模块
 -- 管理菜单的状态和交互
 
+local RenderFacade = require("framework.render_facade")
 local MenuStateMachine = {}
 MenuStateMachine.__index = MenuStateMachine
 
@@ -635,7 +636,7 @@ function MenuStateMachine:pollCallback()
     end
 
     -- 子菜单关闭，重绘当前菜单
-    Cls(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h)
+    RenderFacade.clearScreen(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h)
     if menu.isBox == 1 then
         DrawBox(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
     end
@@ -873,7 +874,7 @@ function MenuStateMachine:doCloseMenu()
     local returnValue = self.activeMenu.returnValue
     
     -- 清理当前菜单区域
-    Cls(self.activeMenu.x1, self.activeMenu.y1, 
+    RenderFacade.clearScreen(self.activeMenu.x1, self.activeMenu.y1, 
         self.activeMenu.x1 + self.activeMenu.w + 1, 
         self.activeMenu.y1 + self.activeMenu.h + 1, 0, 1)
     

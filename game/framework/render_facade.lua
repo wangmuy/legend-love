@@ -62,6 +62,41 @@ function RenderFacade.setClip(x1, y1, x2, y2)
     pcall(EA.render.setClip, x1 or 0, y1 or 0, x2 or 0, y2 or 0)
 end
 
+--- 清屏（替代 script 层的 `Cls`）
+--
+-- **注意：script 的 `Cls` 不只是清屏** —— 它按 `JY.Status` 决定重绘什么
+-- （主地图 / 场景 / 战斗地图 / 开场图）。那是游戏逻辑，读 JY.Status。
+--
+-- 所以本函数做三步：
+--   1. 设置裁剪区
+--   2. 调 GameHooks.clearBackground()（由游戏层注入的"按状态重绘"）
+--   3. 重置裁剪区
+--
+-- 未注册 clearBackground 时退化为「填充黑屏」—— 保证单元测试环境不崩。
+--
+-- @param x1, y1, x2, y2 number|nil 全 nil 或全 0 = 整屏
+function RenderFacade.clearScreen(x1, y1, x2, y2)
+    x1, y1, x2, y2 = x1 or 0, y1 or 0, x2 or 0, y2 or 0
+
+    RenderFacade.setClip(x1, y1, x2, y2)
+
+    local okHooks, GameHooks = pcall(require, "framework.game_hooks")
+    local didRedraw = false
+    if okHooks and GameHooks and GameHooks.clearBackground then
+        didRedraw = GameHooks.clearBackground()
+    end
+    if not didRedraw then
+        -- 未注入：退化为黑屏（单元测试环境）
+        local w, h = RenderFacade.size()
+        if w > 0 and h > 0 then
+            RenderFacade.fillRect(0, 0, w, h, 0)
+        end
+    end
+
+    RenderFacade.setClip(0, 0, 0, 0)
+    RenderFacade.present()
+end
+
 --- 填充矩形（替代 Cls 的「清屏」那一半 + lib.FillColor）
 -- @param x1, y1, x2, y2 number
 -- @param color number|table
