@@ -481,7 +481,8 @@ end
 
 function TestNewEvent.testWarAutoMoveGuardsNilEnemy()
     print("\n=== Test: 敌人全灭后 War_AutoMoveCoroutine 不得索引 nil 敌人 ===")
-    local src = readSource("framework/war_async.lua")
+    -- battle-extensibility 阶段 2C：协程已搬到 script/battle/
+    local src = readSource("script/battle/battle_flow_coroutines.lua")
     local noComments = stripComments(src)
 
     -- 原缺陷：War_AutoSelectEnemy_near() 找不到存活敌人时返回 -1，

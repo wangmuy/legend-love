@@ -338,9 +338,9 @@ function TestBattleMouse.testMoveLoopSyncsBeforeWorkingCopy()
     -- 源码级断言：sync 必须出现在 `WAR.MoveCursorX = x` 之后、判断之前。
     -- 放在循环顶部（赋全局之前）会失效 —— 协程从 yield 点恢复后
     -- 不会重新执行循环顶部，本轮判断仍用旧的 x,y。
-    local f = io.open("framework/war_async.lua", "r")
+    local f = io.open("script/battle/battle_flow_coroutines.lua", "r")
     if not f then
-        TestHelper.assertTrue(false, "无法打开 war_async.lua")
+        TestHelper.assertTrue(false, "无法打开 battle_flow_coroutines.lua")
         return
     end
     local src = f:read("*a")

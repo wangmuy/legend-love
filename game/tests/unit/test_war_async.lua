@@ -784,9 +784,16 @@ function TestWarAsync.testWarAutoBacktrackHasProgressGuard()
     print("\n=== Test: 源码里必须有回溯进度守卫 ===")
     -- 行为测试复刻的是「修复后的写法」，无法证明源文件也改了。
     -- 这里直接检查源文件：`while true` 回溯段必须包含进度判定。
-    local f = io.open("framework/war_async.lua", "r")
+    --
+    -- **源文件已变**（battle-extensibility 阶段 2C）：19 个战斗协程从
+    -- framework/war_async.lua 搬到 script/battle/battle_flow_coroutines.lua。
+    -- 所以这个源码断言要查新位置 —— 否则会在重构后假失败。
+    local f = io.open("script/battle/battle_flow_coroutines.lua", "r")
     if not f then
-        TestHelper.assertTrue(false, "无法打开 war_async.lua")
+        f = io.open("../game/script/battle/battle_flow_coroutines.lua", "r")
+    end
+    if not f then
+        TestHelper.assertTrue(false, "无法打开 battle_flow_coroutines.lua")
         return
     end
     local src = f:read("*a")
