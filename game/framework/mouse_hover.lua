@@ -18,6 +18,9 @@ MouseHover.FLASH_DURATION_MS = 150   -- 单次红闪持续时长
 
 -- 悬停/红闪用的精灵与颜色
 MouseHover.HOVER_SPRITE_ID = 0        -- 三张地图文件的 picid 0 都是菱形
+-- 菱形来自哪张地图的档案：MMAP=0 / SMAP=1（战斗地图也用 0）
+-- 当前 hover 只在 MMAP/SMAP 生效，camera() 会返回地图类型
+MouseHover.HOVER_ATLAS_ID = 0
 MouseHover.HOVER_COLOR = { r = 0, g = 0, b = 0 }
 MouseHover.HOVER_ALPHA = 64
 MouseHover.DENIED_COLOR = { r = 1, g = 0, b = 0 }
@@ -313,15 +316,24 @@ function MouseHover.currentTile(mapKind)
 end
 
 local function drawTint(gx, gy, color, alpha)
+    -- 不再检查 EngineAPI.sprite.drawTinted —— 已改走 SpriteAtlas.drawTinted，
+    -- 引擎侧只需要 drawHandleTinted（SpriteAtlas 内部检查）。
     local EngineAPI = rawget(_G, "EngineAPI")
-    if not (EngineAPI and EngineAPI.sprite and EngineAPI.sprite.drawTinted) then
+    if not (EngineAPI and EngineAPI.sprite and EngineAPI.sprite.drawHandleTinted) then
         return
     end
     -- 必须用与 screenToTile 相同的相机，否则菱形画在别处
     local camX, camY = MouseHover.camera()
     local sx, sy = MouseHover.tileToScreen(gx, gy, camX, camY)
-    pcall(EngineAPI.sprite.drawTinted,
-        MouseHover.HOVER_SPRITE_ID, MouseHover.HOVER_SPRITE_ID,
+    -- 改走 SpriteAtlas.drawTinted：容器解析与锚点全在 framework，
+    -- 引擎只认 handle（ADR-PORT-013 的接线层）
+    local okSA, SpriteAtlas = pcall(require, "framework.sprite_atlas")
+    if not okSA or not SpriteAtlas then return end
+
+    -- 菱形来自**当前显示的那张地图**的档案（MMAP=0 / SMAP=0 各自加载，
+    -- 战斗地图也用 0）。war_async 加载时都用 atlasId=0，所以统一取 0。
+    pcall(SpriteAtlas.drawTinted,
+        MouseHover.HOVER_ATLAS_ID, MouseHover.HOVER_SPRITE_ID,
         sx, sy, color, alpha)
 end
 

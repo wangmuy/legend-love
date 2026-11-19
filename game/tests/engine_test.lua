@@ -146,6 +146,19 @@ EngineAPI.sprite.drawPictureFile = function(filename, x, y, opts)
     return true
 end
 
+--- 绘制句柄：测试桩记录调用
+EngineAPI.sprite._handleDraws = {}
+EngineAPI.sprite.drawHandle = function(handle, x, y, flags, alpha)
+    logCall("sprite.drawHandle", x, y)
+    table.insert(EngineAPI.sprite._handleDraws, { handle = handle, x = x, y = y })
+    return type(handle) == "table"
+end
+
+EngineAPI.sprite.drawHandleTinted = function(handle, x, y, color, alpha)
+    logCall("sprite.drawHandleTinted", x, y)
+    return type(handle) == "table"
+end
+
 EngineAPI.sprite.getMeta = function(handle)
     if type(handle) ~= "table" then return nil end
     return { w = handle.w or 0, h = handle.h or 0,

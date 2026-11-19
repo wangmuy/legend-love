@@ -133,6 +133,17 @@ EngineAPI.sprite.drawPictureFile = function(filename, x, y, opts)
     return false
 end
 
+--- 绘制句柄：MUD 无图形，返回 false
+EngineAPI.sprite.drawHandle = function(handle, x, y, flags, alpha)
+    logCall("sprite.drawHandle")
+    return false
+end
+
+EngineAPI.sprite.drawHandleTinted = function(handle, x, y, color, alpha)
+    logCall("sprite.drawHandleTinted")
+    return false
+end
+
 --- 取元数据：MUD 返回创建时记录的哨兵值
 EngineAPI.sprite.getMeta = function(handle)
     if type(handle) ~= "table" then return nil end

@@ -219,14 +219,31 @@ function TestMouseHover.testDrawUsesDrawTinted()
     local saved = installGlobals()
     local H = freshHover()
 
+    -- **接线已改**：mouse_hover 不再直接调 EngineAPI.sprite.drawTinted，
+    -- 而是走 framework/sprite_atlas.lua → EngineAPI.sprite.drawHandleTinted
+    -- （ADR-PORT-013 的接线层：容器解析归 framework，引擎只认 handle）
     local recorded = nil
     rawset(_G, "EngineAPI", {
         time = { getTime = function() return os.clock() * 1000 end },
         input = { mousePosition = function() return 512, 384 end },
+        file = {
+            read = function(p)
+                local f = io.open(p, "rb")
+                if not f then return nil end
+                local d = f:read("*a"); f:close(); return d
+            end,
+        },
         sprite = {
-            drawTinted = function(aid, sid, x, y, color, alpha)
-                recorded = { aid = aid, sid = sid, x = x, y = y,
-                             color = color, alpha = alpha }
+            createFromRGBA = function(w, h, rgba, o)
+                o = o or {}
+                return { w = w, h = h, xoff = o.xoff or 0, yoff = o.yoff or 0 }
+            end,
+            createFromEncoded = function(b, fmt, o)
+                o = o or {}
+                return { w = 0, h = 0, xoff = o.xoff or 0, yoff = o.yoff or 0 }
+            end,
+            drawHandleTinted = function(handle, x, y, color, alpha)
+                recorded = { handle = handle, x = x, y = y, color = color, alpha = alpha }
             end,
         },
     })
@@ -234,11 +251,17 @@ function TestMouseHover.testDrawUsesDrawTinted()
     Settings.reset()
     Settings.define("input.mouse", { default = true, type = "bool" })
 
+    -- 需要真实的 smap 档案已加载（菱形 spriteId=0 来自 atlas 0）
+    local SpriteAtlas = require("framework.sprite_atlas")
+    SpriteAtlas.clear()
+    SpriteAtlas.loadArchive("data/smap.idx", "data/smap.grp", 0,
+        { paletteFile = "data/mmap.col" })
+
     H.draw()
-    TestHelper.assertNotNil(recorded, "drawTinted 被调用")
-    TestHelper.assertEquals(0, recorded.sid, "用 spriteId 0（菱形）")
+    TestHelper.assertNotNil(recorded, "drawHandleTinted 被调用")
     TestHelper.assertNotNil(recorded.color, "传了颜色表")
 
+    SpriteAtlas.clear()
     restoreGlobals(saved)
 end
 

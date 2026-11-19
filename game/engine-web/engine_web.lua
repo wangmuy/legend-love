@@ -148,6 +148,15 @@ function EngineAPI.sprite.drawPictureFile(filename, x, y, opts)
     return false
 end
 
+--- 绘制句柄：web 无图形
+function EngineAPI.sprite.drawHandle(handle, x, y, flags, alpha)
+    return false
+end
+
+function EngineAPI.sprite.drawHandleTinted(handle, x, y, color, alpha)
+    return false
+end
+
 --- 取元数据
 function EngineAPI.sprite.getMeta(handle)
     if type(handle) ~= "table" then return nil end

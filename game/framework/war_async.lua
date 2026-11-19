@@ -2,6 +2,7 @@
 -- 战斗系统异步模块
 -- 提供战斗系统的协程版本函数
 
+local SpriteAtlas = require("framework.sprite_atlas")
 local WarAsync = {}
 
 local CoroutineScheduler = require("framework.coroutine_scheduler")
@@ -76,12 +77,12 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     WarLoadMap(WAR.Data["地图"])
     
     -- 加载贴图文件
-    EngineAPI.sprite.loadArchive(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0)
-    EngineAPI.sprite.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
+    SpriteAtlas.loadArchive(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0, { paletteFile = CC.PaletteFile })
+    SpriteAtlas.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1, { paletteFile = CC.PaletteFile, usage = "avatar" })
     if CC.LoadThingPic == 1 then
-        EngineAPI.sprite.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
+        SpriteAtlas.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2, { paletteFile = CC.PaletteFile })
     end
-    EngineAPI.sprite.loadArchive(CC.EffectFile[1], CC.EffectFile[2], 3)
+    SpriteAtlas.loadArchive(CC.EffectFile[1], CC.EffectFile[2], 3, { paletteFile = CC.PaletteFile })
     
     PlayMIDI(WAR.Data["音乐"])
     
@@ -90,10 +91,10 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     -- 加载战斗人物贴图
     for i = 0, WAR.PersonNum - 1 do
         local pid = WAR.Person[i]["人物编号"]
-        EngineAPI.sprite.loadArchive(
+        SpriteAtlas.loadArchive(
             string.format(CC.FightPicFile[1], JY.Person[pid]["头像代号"]),
             string.format(CC.FightPicFile[2], JY.Person[pid]["头像代号"]),
-            4 + i)
+            4 + i, { paletteFile = CC.PaletteFile })
     end
     
     -- 设置状态为战斗（在初始化完成后）
@@ -215,10 +216,10 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     end
     CleanMemory()
     EngineAPI.sprite.initSprites()
-    EngineAPI.sprite.loadArchive(CC.SMAPPicFile[1], CC.SMAPPicFile[2], 0)
-    EngineAPI.sprite.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
+    SpriteAtlas.loadArchive(CC.SMAPPicFile[1], CC.SMAPPicFile[2], 0, { paletteFile = CC.PaletteFile })
+    SpriteAtlas.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1, { paletteFile = CC.PaletteFile, usage = "avatar" })
     if CC.LoadThingPic == 1 then
-        EngineAPI.sprite.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
+        SpriteAtlas.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2, { paletteFile = CC.PaletteFile })
     end
     
     -- 恢复状态

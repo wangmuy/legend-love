@@ -2,6 +2,7 @@
 -- 异步物品系统模块
 -- 提供非阻塞版本的物品选择和使用功能
 
+local SpriteAtlas = require("framework.sprite_atlas")
 local ItemAsync = {}
 
 -- 导入必要的依赖模块
@@ -525,9 +526,9 @@ function ItemAsync.draw()
         local item = items[i]
         if item then
             if CC.LoadThingPic == 1 then
-                EngineAPI.sprite.draw(2, item.id * 2, boxx + 1, boxy + 1, 1)
+                SpriteAtlas.draw(2, item.id * 2, boxx + 1, boxy + 1, 1)
             else
-                EngineAPI.sprite.draw(0, (item.id + CC.StartThingPic) * 2, boxx + 1, boxy + 1, 1)
+                SpriteAtlas.draw(0, (item.id + CC.StartThingPic) * 2, boxx + 1, boxy + 1, 1)
             end
         end
     end

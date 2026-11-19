@@ -179,6 +179,35 @@ function M.sprite.createFromEncoded(bytes, formatHint, opts) end
 -- @param opts table|nil { cache=true }（默认 true，按文件名缓存）
 function M.sprite.drawPictureFile(filename, x, y, opts) end
 
+--- 绘制一个纹理句柄（**格式透明**的新 API）
+--
+-- 这是 ADR-PORT-013 的最终形态：句柄由 createFromRGBA/createFromEncoded
+-- 返回，引擎**不知道**它来自 .idx/.grp、PNG 图集还是别的容器格式。
+--
+-- 与 sprite.draw(archiveId, spriteId, ...) 的区别：
+--   sprite.draw 的第一参数是**引擎侧注册表的下标**，
+--   隐含"引擎维护 archive 表"这个结构 → 换容器格式时引擎要改。
+--   drawHandle 只认句柄 → 换任何格式引擎零改动。
+--
+-- flags 语义沿用既有位域（引擎侧能实现就实现，实现不了可只做 0/0x1）：
+--   0x1 忽略锚点  /  0x2 alpha 混合（用 alpha 参数）  /  0x4 全黑  /  0x8 全白
+--
+-- @param handle table createFromRGBA/createFromEncoded 的返回值
+-- @param x, y number 绘制位置
+-- @param flags number|nil
+-- @param alpha number|nil 0-255
+-- @return boolean 是否真的绘制了
+function M.sprite.drawHandle(handle, x, y, flags, alpha) end
+
+--- 绘制一个纹理句柄（染色版）
+--
+-- @param handle table
+-- @param x, y number
+-- @param color table {r=, g=, b=} 0-1 浮点
+-- @param alpha number|nil 0-255
+-- @return boolean
+function M.sprite.drawHandleTinted(handle, x, y, color, alpha) end
+
 --- 取纹理的元数据（尺寸 + 锚点）
 --
 -- 两条创建路径（createFromRGBA / createFromEncoded）的返回值都 SHALL

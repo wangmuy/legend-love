@@ -202,6 +202,55 @@ EngineAPI.sprite.drawPictureFile = function(filename, x, y, opts)
     return true
 end
 
+--- 绘制纹理句柄（格式透明）
+--
+-- handle 结构由 createFromRGBA/createFromEncoded 产生：
+--   { img=löve Image, w=, h=, xoff=, yoff= }
+-- 引擎不需要知道这个纹理来自 .idx/.grp 还是 PNG 图集。
+EngineAPI.sprite.drawHandle = function(handle, x, y, flags, alpha)
+    if type(handle) ~= "table" or not handle.img then return false end
+    flags = flags or 0
+
+    local xnew, ynew = x, y
+    -- 0x1 位为 0 时应用锚点（与原版 PicLoadCache 一致：flag=1 = 忽略锚点）
+    if bit32 and bit32.band(flags, 0x1) == 0 then
+        xnew = x - (handle.xoff or 0)
+        ynew = y - (handle.yoff or 0)
+    end
+
+    local r, g, b, a = 1, 1, 1, 1
+    if bit32 then
+        if bit32.band(flags, 0x4) ~= 0 then r, g, b = 0, 0, 0
+        elseif bit32.band(flags, 0x8) ~= 0 then r, g, b = 1, 1, 1
+        elseif bit32.band(flags, 0x2) ~= 0 then a = (alpha or 128) / 255 end
+    else
+        if math.floor(flags / 4) % 2 == 1 then r, g, b = 0, 0, 0
+        elseif math.floor(flags / 8) % 2 == 1 then r, g, b = 1, 1, 1
+        elseif math.floor(flags / 2) % 2 == 1 then a = (alpha or 128) / 255 end
+    end
+
+    love.graphics.setColor(r, g, b, a)
+    love.graphics.draw(handle.img, xnew, ynew)
+    love.graphics.setColor(1, 1, 1, 1)
+    return true
+end
+
+--- 绘制纹理句柄（染色）
+EngineAPI.sprite.drawHandleTinted = function(handle, x, y, color, alpha)
+    if type(handle) ~= "table" or not handle.img then return false end
+    local xnew = x - (handle.xoff or 0)
+    local ynew = y - (handle.yoff or 0)
+    local r, g, b = 1, 1, 1
+    if type(color) == "table" then
+        r, g, b = color.r or 1, color.g or 1, color.b or 1
+    end
+    local a = (alpha ~= nil) and (alpha / 255) or 1
+    love.graphics.setColor(r, g, b, a)
+    love.graphics.draw(handle.img, xnew, ynew)
+    love.graphics.setColor(1, 1, 1, 1)
+    return true
+end
+
 EngineAPI.sprite.getMeta = function(handle)
     if type(handle) ~= "table" then return nil end
     return {
