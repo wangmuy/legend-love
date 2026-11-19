@@ -9,11 +9,13 @@
 **Blast Radius**：`openspec/changes/battle-extensibility/deps.md`（新）
 
 **DoD**：
-- [ ] 列出 54 个 `War_*` 函数的定义位置与调用者
-- [ ] 列出 19 个 `War_*Coroutine` 的定义位置与调用者
-- [ ] 标出互相引用的环（若有）
-- [ ] 标出 `Rnd` / `GetWarMap` / `SetWarMap` / `WarDrawMap` 的调用分布
-- [ ] 确认哪些 `War_*` 读 `JY` / `WAR` 全局（这些必须保留全局访问方式）
+- [x] 列出 54 个 `War_*` 函数的定义位置与调用者
+- [x] 列出 19 个 `War_*Coroutine` 的定义位置与调用者
+- [x] 标出互相引用（30 个函数有交叉调用，必须整体搬）
+- [x] 标出 `Rnd` / `GetWarMap` / `SetWarMap` / `WarDrawMap` 的调用分布
+- [x] 确认哪些 `War_*` 读 `JY` / `WAR` 全局（全部通过全局访问，保留原形式）
+- [x] 实测体积：战斗代码约 2560 行（jymain 1501 + war_async 1651 中的战斗部分）
+- [x] 发现 7 个「零调用」函数其实是**菜单回调引用**（无括号），不是死代码
 
 ---
 
