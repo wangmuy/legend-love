@@ -387,7 +387,7 @@ handlers["GAME_MMAP"] = {
         CleanMemory()
         lib.UnloadMMap()
         lib.PicInit()
-        lib.ShowSlow(50, 1)
+        EngineAPI.render.presentAndWait(50)
     end,
     
     -- 每帧更新逻辑
@@ -496,7 +496,7 @@ handlers["GAME_MMAP"] = {
         -- 在 Love2D 中，每一帧都需要重新绘制整个屏幕
         -- 原来的 FastShowScreen 优化在 SDL 中有效，但在 Love2D 中会导致黑屏
         -- 因此简化绘制逻辑，始终全屏重绘
-        lib.SetClip(0, 0, CC.ScreenW, CC.ScreenH)
+        EngineAPI.render.setClip(0, 0, CC.ScreenW, CC.ScreenH)
         lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
         
         if CC.ShowXY == 1 then
@@ -506,7 +506,7 @@ handlers["GAME_MMAP"] = {
         -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
         -- 不需要手动调用 ShowScreen，否则可能导致抖动
         -- ShowScreen(CONFIG.FastShowScreen)
-        lib.SetClip(0, 0, 0, 0)
+        EngineAPI.render.setClip(0, 0, 0, 0)
         
         JY.oldMMapX = JY.Base["人X"]
         JY.oldMMapY = JY.Base["人Y"]
@@ -686,7 +686,7 @@ handlers["GAME_SMAP"] = {
         if JY.Scene[JY.SubScene]["跳转场景"] >= 0 then
             if JY.Base["人X1"] == JY.Scene[JY.SubScene]["跳转口X1"] and JY.Base["人Y1"] == JY.Scene[JY.SubScene]["跳转口Y1"] then
                 JY.SubScene = JY.Scene[JY.SubScene]["跳转场景"]
-                lib.ShowSlow(50, 1)
+                EngineAPI.render.presentAndWait(50)
                 PerfLog.mark("GAME_SMAP jump scene", tostring(JY.SubScene))
                 
                 if JY.Scene[JY.SubScene]["外景入口X1"] == 0 and JY.Scene[JY.SubScene]["外景入口Y1"] == 0 then
@@ -840,7 +840,7 @@ handlers["GAME_SMAP"] = {
         
         -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
         -- ShowScreen(0)
-        lib.SetClip(0, 0, 0, 0)
+        EngineAPI.render.setClip(0, 0, 0, 0)
     end
 }
 
@@ -871,13 +871,13 @@ handlers["GAME_FIRSTMMAP"] = {
     enter = function()
         EngineAPI.debug.log("Enter GAME_FIRSTMMAP state")
         CleanMemory()
-        lib.ShowSlow(50, 1)
+        EngineAPI.render.presentAndWait(50)
         JY.MmapMusic = 16
         
         Init_MMap()
         
         lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], GetMyPic())
-        lib.ShowSlow(50, 0)
+        EngineAPI.render.present()
     end,
     
     exit = function()
@@ -1003,7 +1003,7 @@ handlers["GAME_DEAD"] = {
     end,
     
     draw = function()
-        lib.FillColor(0, 0, 0, 0, 0)
+        EngineAPI.render.fillRect(0, 0, 0, 0, 0)
         lib.LoadPicture(CC.DeadFile, -1, -1)
         
         if JY.DeadScreen then

@@ -519,7 +519,7 @@ function ItemAsync.draw()
         local boxcolor = isSelected and C_WHITE or C_BLACK
         
         -- 绘制物品框
-        lib.DrawRect(boxx, boxy, boxx + CC.ThingPicWidth + 1, boxy + CC.ThingPicHeight + 1, boxcolor)
+        EngineAPI.render.rectOutline(boxx, boxy, boxx + CC.ThingPicWidth + 1, boxy + CC.ThingPicHeight + 1, boxcolor)
         
         -- 绘制物品图片
         local item = items[i]

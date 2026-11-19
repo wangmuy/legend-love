@@ -70,7 +70,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     
     CleanMemory()
     lib.PicInit()
-    lib.ShowSlow(50, 1)
+    EngineAPI.render.presentAndWait(50)
     
     EngineAPI.debug.log("WarMainCoroutine: calling WarLoadMap")
     WarLoadMap(WAR.Data["地图"])
@@ -153,7 +153,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
                 
                 if first == 0 then
                     WarDrawMap(0)
-                    lib.ShowSlow(50, 0)
+                    EngineAPI.render.present()
                     first = 1
                 end
                 
@@ -206,7 +206,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     
     -- 恢复场景贴图与音乐（对齐原版 WarMain 收尾：ShowSlow/进门音乐/贴图重载。
     -- 战斗期间 PicInit 清空了 SMAP 贴图（槽0=WMAP），不重载则回场景后渲染缺图）
-    lib.ShowSlow(50, 1)
+    EngineAPI.render.presentAndWait(50)
     if JY.Scene and JY.Scene[JY.SubScene] and JY.Scene[JY.SubScene]["进门音乐"] >= 0 then
         PlayMIDI(JY.Scene[JY.SubScene]["进门音乐"])
     else

@@ -21,13 +21,16 @@ M.render = {}
 function M.render.text(x, y, str, color, size) end
 
 --- 填充矩形
--- @param x1, y1, x2, y2 number 矩形区域
--- @param color table {r, g, b} 0-1 浮点数
+-- @param x1, y1, x2, y2 number 矩形区域（角点，非宽高）
+-- @param color number|table 接受两种形态：
+--        number = 打包 RGB int（如 C_WHITE = RGB(236,236,236)），既有调用方全用这种
+--        table  = {r=, g=, b=} 0-1 浮点，新代码推荐
+--        引擎实现必须两种都能处理（内部归一化）
 function M.render.fillRect(x1, y1, x2, y2, color) end
 
 --- 矩形边框
--- @param x1, y1, x2, y2 number 矩形区域
--- @param color table {r, g, b} 0-1 浮点数
+-- @param x1, y1, x2, y2 number 矩形区域（角点，非宽高）
+-- @param color number|table 同 fillRect（int 或 {r,g,b} 都接受）
 function M.render.rectOutline(x1, y1, x2, y2, color) end
 
 --- 背景框（带阴影效果）

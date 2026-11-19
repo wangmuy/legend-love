@@ -234,7 +234,7 @@ function JYMainAdapter.showStartMenuCoroutine()
     Cls()
     
     PlayMIDI(16)
-    lib.ShowSlow(50, 0)
+    EngineAPI.render.present()
     
     local menu = {
         {"重新开始", nil, 1},
@@ -1094,7 +1094,7 @@ function JYMainAdapter.startNewGame(menux)
     -- 注意：不设置 JY.MyPic，让动画从第一帧开始
     -- JY.MyPic 将在动画开始时由 GAME_SMAP.update 设置
     
-    lib.ShowSlow(50, 1)
+    EngineAPI.render.presentAndWait(50)
     
     JY.MmapMusic = -1
     

@@ -363,6 +363,44 @@ function TestHelper.mockEngineAPI()
             directoryExists = function(p) return Fs.directoryExists(p) end,
             listDirectory = function(p) return Fs.listDirectory(p) end,
         },
+        render = {
+            -- framework 已改用 EngineAPI.render.setClip/present/presentAndWait
+            -- /fillRect/rectOutline（Task 4）。全部空桩，不影响断言。
+            setClip = function() end,
+            present = function() end,
+            presentAndWait = function() end,
+            fillRect = function() end,
+            rectOutline = function() end,
+            drawBackground = function() end,
+            text = function() end,
+            getWidth = function() return 1024 end,
+            getHeight = function() return 768 end,
+        },
+        -- sprite 段：Task 4b/4c 之后 framework 会用到
+        sprite = {
+            initSprites = function() end,
+            loadArchive = function() end,
+            getSize = function() end,
+            draw = function() end,
+            drawTinted = function() end,
+            createFromRGBA = function(_, _, _, o)
+                o = o or {}
+                return { w = 0, h = 0, xoff = o.xoff or 0, yoff = o.yoff or 0 }
+            end,
+            createFromEncoded = function(_, _, o)
+                o = o or {}
+                return { w = 0, h = 0, xoff = o.xoff or 0, yoff = o.yoff or 0 }
+            end,
+            getMeta = function(hd)
+                if type(hd) ~= "table" then return nil end
+                return { w = hd.w or 0, h = hd.h or 0, xoff = hd.xoff or 0, yoff = hd.yoff or 0 }
+            end,
+        },
+        -- font 段
+        font = {
+            get = function() return nil end,
+            measureText = function() return nil end,
+        },
         debug = { log = function() end },
         -- input 段：framework 已改用 EngineAPI.input.getKey（Task 3），
         -- 不再是 lib.GetKey。读共享队列，测试用 TestHelper.setKeyQueue 注入。
