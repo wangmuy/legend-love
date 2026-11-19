@@ -140,6 +140,75 @@ EventBridge:update(dt)
 | `War_*` 之间有隐式全局依赖 | 搬移前先 grep 所有交叉引用，画出依赖图 |
 | ATB / realtime 接口设计过早 | 只为 turnbased 提供完整实现，另两个只留接口 |
 
+## 实施结果（全部自动化项已完成）
+
+### 交付物
+
+```
+script/battle/
+├── battle_data.lua               4 个函数（31 行）    地图数据读写
+├── battle_render.lua             3 个函数（109 行）   战斗绘制
+├── battle_action.lua            17 个函数（667 行）   移动/攻击/武功/伤害
+├── battle_ai.lua                18 个函数（877 行）   敌方 AI / 自动战斗
+├── battle_flow.lua              24 个函数（1025 行）  流程/结算/菜单
+├── battle_rules.lua             策略接口（六字段）
+└── battle_flow_coroutines.lua   20 个协程（1429 行）  战斗流程协程
+```
+
+`framework/war_async.lua`：**1711 行 → 325 行**，只剩适配层
+（warState + WarMainCoroutine + tick + 20 个惰性转发）。
+
+### 三个核心成果
+
+**1. MOD 可覆盖（唯一硬证据）**
+
+实测：
+```
+激活 MOD（mods/_battle_probe/script/battle/battle_rules.lua，kind="realtime"）
+  → 加载到 kind = realtime, probe = true
+未激活
+  → kind = turnbased
+```
+
+**2. 搬移是无损的（机器可验证）**
+
+`game/tests/verify_battle_move_fidelity.py`：
+```
+66 个战斗函数  逐字节一致
+20 个协程      逐字节一致
+```
+负向对照：改一个字符 → FAIL。
+
+**3. dt 已传播到战斗**
+
+`EventBridge:update(dt)` → `WarAsync.tick(dt)` → `strategy.tick(ctx, dt)`。
+turnbased 下 tick 是空实现（零开销）；realtime 下累加 `ctx.realtime.elapsed`。
+
+### 门禁
+
+`gate_battle_extensibility.sh` 七组断言 + 4 组负向对照：
+```
+A. framework 零 War_* 定义         ✓
+B. script/battle/ 六模块齐全       ✓
+C. battle_rules 有 kind + 三值     ✓
+D. war_async 无战斗算法调用        ✓（已从 INFO 硬化）
+E. jymain 按依赖顺序加载           ✓
+F. 加载走 ScriptLoader（MOD 链）   ✓
+G. 搬移字节保真                    ✓
+```
+
+### 未完成（唯一一项，需人工）
+
+- [ ] **实机完整走查**：手动战斗（移动/攻击/武功/道具/中毒/结束）、
+      自动战斗、战斗结算（经验/升级/掉落）
+
+**为什么这项不能用测试代替**：字节保真证明了「函数体没变」，
+`test_battle_wiring.lua` 证明了「零件都在位」，
+但**加载顺序/作用域在真实运行时是否正确**，只有真跑一场战斗才能确认
+（LÖVE 无控制台，冒烟日志拿不到 stdout，试过三种方式都失败）。
+
+风险等级：低（因为前两项已机器验证），但**不能声称零回归**。
+
 ## Tracking
 
 | REQ ID | 需求 | 落点 |
