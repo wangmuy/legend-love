@@ -112,13 +112,17 @@ end
 --- 从 RGBA 字节创建纹理：MUD 无纹理概念，返回哨兵 handle
 EngineAPI.sprite.createFromRGBA = function(w, h, rgbaBytes, opts)
     logCall("sprite.createFromRGBA", w, h)
+    -- 参数校验必须与 LOVE 实现一致（契约行为一致性，ADR-PORT-007）
+    if type(w) ~= "number" or type(h) ~= "number" or w <= 0 or h <= 0 then return nil end
+    if type(rgbaBytes) ~= "string" or #rgbaBytes < w * h * 4 then return nil end
     opts = opts or {}
-    return { w = w or 0, h = h or 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
+    return { w = w, h = h, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
 end
 
 --- 从编码字节创建纹理：MUD 无解码能力
 EngineAPI.sprite.createFromEncoded = function(bytes, formatHint, opts)
     logCall("sprite.createFromEncoded", formatHint)
+    if type(bytes) ~= "string" or bytes == "" then return nil end
     opts = opts or {}
     return { w = 0, h = 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
 end

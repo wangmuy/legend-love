@@ -129,12 +129,16 @@ function EngineAPI.sprite.drawTinted(archiveId, spriteId, x, y, color, alpha) en
 
 --- 从 RGBA 字节创建纹理：web 无纹理概念，返回哨兵 handle
 function EngineAPI.sprite.createFromRGBA(w, h, rgbaBytes, opts)
+    -- 参数校验与 LOVE/MUD 一致（契约行为一致性）
+    if type(w) ~= "number" or type(h) ~= "number" or w <= 0 or h <= 0 then return nil end
+    if type(rgbaBytes) ~= "string" or #rgbaBytes < w * h * 4 then return nil end
     opts = opts or {}
-    return { w = w or 0, h = h or 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
+    return { w = w, h = h, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
 end
 
 --- 从编码字节创建纹理：web 无解码能力
 function EngineAPI.sprite.createFromEncoded(bytes, formatHint, opts)
+    if type(bytes) ~= "string" or bytes == "" then return nil end
     opts = opts or {}
     return { w = 0, h = 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
 end
