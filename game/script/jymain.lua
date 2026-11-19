@@ -4712,4 +4712,17 @@ do
             end
         end
     end
+
+    -- 战斗规则策略：这是**模块**（返回 table），不是全局函数集
+    --
+    -- MOD 可以覆盖 mods/<mod>/script/battle/battle_rules.lua 实现新玩法。
+    -- 阶段 1 只读 kind（= "turnbased"），不改变任何行为。
+    local rulesPath = CONFIG.ScriptPath .. "battle/battle_rules.lua"
+    local rulesChunk = BattleLoader.load(rulesPath)
+    if rulesChunk then
+        local okR, rules = pcall(rulesChunk)
+        if okR and type(rules) == "table" then
+            BattleRules = rules
+        end
+    end
 end
