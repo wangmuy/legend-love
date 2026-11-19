@@ -110,12 +110,54 @@ fi
 
 # ---------------------------- F. framework 不调 script 定义的全局
 log "=== STEP: F. framework 不调 script 全局 ==="
-# 注：Task 5 后半（script 解耦）未完成，本步先**记录现状**，
-# 不作为失败项（否则门禁长期红）。等 port-script-decoupling 完成后再变硬。
-script_globals='DrawString|DrawBox|DrawStrBox|DrawStrBoxYesNo|DrawStrBoxWaitKey|Cls|ShowScreen|ShowMenu|ShowMenu2|WaitKey|TalkEx|GetMyPic|AddMyCurrentPic|SceneCanPass'
-n_f=$(grep -rhoE "\b($script_globals)\(" game/framework/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
+# 判据（用 grep -P 的 lookbehind，实测可用）：
+#   ① 不是注释行
+#   ② 不是函数定义行
+#   ③ 调用前不能是 . 或 : —— 排除 framework 模块自调用 X.ShowMenu 形式
+#
+# 为什么必须用 lookbehind：`local _z = Cls()` 这种形态里 Cls 前面是空格，
+# 用「前面不能是某些字符」的黑名单必然漏（实测漏判过）。
+script_globals='DrawString|DrawBox|DrawStrBox|DrawStrBoxYesNo|DrawStrBoxWaitKey|Cls|ShowScreen|ShowMenu|ShowMenu2|WaitKey|TalkEx|GetMyPic|AddMyCurrentPic|SceneCanPass|PlayMIDI|PlayMPEG|FillColor|DrawRect'
+F_CHECK=$(grep -rPn "(?<![.:])\b($script_globals)\(" game/framework/*.lua 2>/dev/null \
+      | grep -vP ':(?!.*\bCls\b)[0-9]+:\s*(local )?function ' \
+      | grep -vP '(^|:)[0-9]+:\s*--' \
+      | grep -vP '(?<![.:])function ' || true)
+n_f=$(printf '%s' "$F_CHECK" | grep -c . || true)
 [ -n "$n_f" ] || n_f=0
-log "  [INFO] framework 仍调用 script 全局 $n_f 处（Task 5 后半待做，不计失败）"
+if [ "$n_f" -eq 0 ]; then
+    log "  [PASS] framework 零 script 全局调用（8 组目标函数全部走 facade）"
+else
+    log "  [FAIL] framework 仍调用 script 全局 $n_f 处："
+    printf '%s\n' "$F_CHECK" | head -6 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
+# ---------------------------- G. facade 层纯度
+log "=== STEP: G. facade 层不得读写游戏状态 ==="
+for f in render_facade flow_facade game_hooks; do
+    bad_g=$(grep -rPn "JY[.[]|WAR[.[]" "game/framework/$f.lua" 2>/dev/null \
+            | grep -vP '(^|:)[0-9]+:\s*--' | wc -l | tr -dc '0-9')
+    [ -n "$bad_g" ] || bad_g=0
+    if [ "$bad_g" -eq 0 ]; then
+        log "  [PASS] $f.lua 无游戏状态读写"
+    else
+        log "  [FAIL] $f.lua 有 $bad_g 处游戏状态读写（facade 必须纯转发）"
+        grep -rPn "JY[.[]|WAR[.[]" "game/framework/$f.lua" \
+            | grep -vP '(^|:)[0-9]+:\s*--' | head -3 | tee -a "$LOG"
+        fail=$((fail + 1))
+    fi
+done
+
+# ---------------------------- H. facade 模块必须存在
+log "=== STEP: H. 三个 facade 模块存在 ==="
+for f in render_facade flow_facade game_hooks; do
+    if [ -f "game/framework/$f.lua" ]; then
+        log "  [PASS] framework/$f.lua 存在"
+    else
+        log "  [FAIL] 缺 framework/$f.lua"
+        fail=$((fail + 1))
+    fi
+done
 
 # --------------------------------------------------------------- 汇总
 log "============================================"
