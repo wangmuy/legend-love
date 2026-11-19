@@ -49,6 +49,10 @@ game/
 │
 ├── script/            ← 游戏脚本（纯游戏逻辑）
 │   ├── jymain.lua / jyconst.lua / jymodify.lua
+│   ├── battle/        ← 战斗模块（66 函数 + 20 协程，MOD 可覆盖）
+│   │   ├── battle_data / battle_render / battle_action
+│   │   ├── battle_ai / battle_flow / battle_rules
+│   │   └── battle_flow_coroutines
 │   ├── oldevent/ (1018个)
 │   └── newevent/
 │
@@ -59,7 +63,7 @@ game/
 
 ### 换引擎方式
 
-1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 77 个函数
+1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 79 个函数
    （契约定义见 `engine-love2d/engine_api.lua`；本仓现有 4 个实现：LÖVE / MUD / Web / 测试桩）
 2. 实现对应的 `main.lua` 入口（Love2D 用 `love.*` 回调，MUD 用 `main()`）
 3. `framework/` 和 `script/` 完全不变
@@ -114,7 +118,7 @@ game/
 │   ├── menu_state_machine.lua  # 菜单状态机
 │   ├── talk_async.lua          # 异步对话（节奏与分页；排版在 EngineAPI.dialog）
 │   ├── dialog_layout.lua       # 对话框排版纯算法（换行/框宽/裁剪，引擎无关）
-│   ├── war_async.lua           # 战斗系统
+│   ├── war_async.lua           # 战斗适配层（协程实现在 script/battle/）
 │   ├── jymain_async.lua        # 主菜单异步
 │   ├── jymain_adapter.lua      # 游戏适配器
 │   ├── person_status_async.lua # 人物状态
@@ -137,6 +141,14 @@ game/
 │   ├── jymain.lua              # 主游戏逻辑
 │   ├── jyconst.lua             # 常量和游戏数据
 │   ├── jymodify.lua            # 游戏修改扩展
+│   ├── battle/                 # 战斗模块（MOD 可覆盖）
+│   │   ├── battle_data.lua     #   地图数据（GetWarMap/SetWarMap/...）
+│   │   ├── battle_render.lua   #   战斗绘制（WarDrawMap/WarShowHead）
+│   │   ├── battle_action.lua   #   移动/攻击/武功/伤害
+│   │   ├── battle_ai.lua       #   敌方 AI / 自动战斗
+│   │   ├── battle_flow.lua     #   流程/结算/菜单
+│   │   ├── battle_rules.lua    #   规则策略（turnbased/atb/realtime）
+│   │   └── battle_flow_coroutines.lua  # 20 个战斗协程
 │   ├── oldevent/               # 事件脚本 (1018个)
 │   └── newevent/               # 新增事件
 │
@@ -195,9 +207,14 @@ game/debug.txt
 - 使用 4 个空格缩进
 - 行长度保持合理 (<120 字符)
 
-### 协程开发注意事项 (war_async.lua)
+### 协程开发注意事项 (script/battle/battle_flow_coroutines.lua)
 
-`war_async.lua` 使用 local 函数定义协程，必须在文件开头添加前向声明：
+**注意**：19 个战斗协程已从 `framework/war_async.lua` 搬到
+`script/battle/battle_flow_coroutines.lua`（battle-extensibility 阶段 2C）。
+`framework/war_async.lua` 只剩适配层（warState + WarMainCoroutine + tick + 转发）。
+
+新增战斗协程时改 `battle_flow_coroutines.lua`，它使用 local 函数定义协程，
+必须在文件开头添加前向声明：
 
 ```lua
 -- 前向声明（只声明一次，避免重复）
@@ -206,10 +223,15 @@ local War_AttackCoroutine, War_MoveCoroutine, SelectTargetCoroutine
 -- ... 其他协程函数名
 ```
 
-**添加新协程函数时**：
+**添加新协程函数时**（在 `battle_flow_coroutines.lua`）：
 1. 先在前向声明行添加函数名
 2. 再使用 `FunctionName = function()` 语法定义
 3. 切勿使用 `local function FunctionName()` 语法（会导致声明顺序问题）
+4. 最后在文件末尾的 `return { ... }` 表里登记（否则 `war_async` 转发拿不到）
+
+**为什么协程住 script/ 而不是 framework/**：MOD 只能覆盖 `script/`
+（`mods/<mod>/script/<rel>` → `script/<rel>`），framework 不在回退链。
+战斗流程是本游戏的玩法，MOD 应该能改。
 
 **错误示例**：
 ```lua

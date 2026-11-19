@@ -32,7 +32,7 @@ parent_epic: null
   11. 新建门禁 `gate_engine_contract.sh`
   12. 文档计数同步（`AGENTS.md` / `ENGINE_API_DESIGN.md` / `SRC_FILES.md`）
 - **Depends On**: —（无前置）
-- **Status**: [ ] Created
+- **Status**: [x] Archived / Complete（port-contract-completeness）
 
 ### Change: port-script-decoupling
 
@@ -53,7 +53,7 @@ parent_epic: null
   7. 全部既有测试零回归 + 实机冒烟
 - **Depends On**: `port-contract-completeness`（需要完整契约；`render.getWidth`
   等是 facade 的基础）
-- **Status**: [ ] Created
+- **Status**: [x] Archived / Complete（port-script-decoupling）
 
 ### Change: port-sprite-animation
 
@@ -76,7 +76,7 @@ parent_epic: null
   **但建议排在 `port-script-decoupling` 之后**：两者都要改
   `game_states.lua`（前者改 16 处绘制调用，后者改 4 处动画推进点），
   同文件冲突风险
-- **Status**: [ ] Created
+- **Status**: [x] Archived / Complete（port-sprite-animation）
 
 ### Change: battle-extensibility
 
@@ -91,7 +91,7 @@ parent_epic: null
   5. 实机验证：原版回合制战斗**零回归**（手动/自动/武功/中毒/结算/升级/掉落）
   6. 更新门禁：战斗代码位置断言
 - **Depends On**: `port-script-decoupling`（战斗现在调用了大量 framework facade）
-- **Status**: [ ] Created
+- **Status**: [x] Implemented（battle-extensibility：67/72，仅剩实机画面走查）
 
 ---
 
