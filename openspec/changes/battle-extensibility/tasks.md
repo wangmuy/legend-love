@@ -136,10 +136,11 @@
 ## Task 8：全量验证
 
 **DoD**：
-- [ ] Lua 5.1/5.3/5.4/5.5 全量测试全绿（记录断言数）
-- [ ] `luac5.1 -p` / `luac55 -p` 全仓零失败
-- [ ] LÖVE 11.5 启动冒烟无报错
-- [ ] 四组门禁全 PASS（`gate_engine_contract` / `gate_battle_extensibility` /
+- [x] Lua 5.1/5.3/5.4 **3619/0**；Lua 5.5 **3618/0**（历史基线：5.5 少 1 条）
+- [x] `luac5.1 -p` / `luac55 -p` 全仓零失败（gam/ 下 0 个失败）
+- [x] LÖVE 11.5 启动冒烟无报错
+- [x] 五组门禁全 PASS（`gate_engine_contract` / `gate_battle_extensibility` /
       `gate_input_actions` / `gate_base_music` / `gate_ascii`）
 - [ ] **实机完整走查**：手动战斗（移动/攻击/武功/道具/中毒/结束）、
       自动战斗、战斗结算（经验/升级/掉落）
+      —— **唯一剩余项**：这部分自动化测试替代不了，需人工实机跑
