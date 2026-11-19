@@ -98,6 +98,7 @@ local function setupBattle(opts)
         ["生命最大值"] = 100, ["内力最大值"] = 100, ["体力最大值"] = 100,
         ["攻击力"] = 30, ["防御力"] = 20, ["攻击带毒"] = 0,
         ["武器"] = -1, ["防具"] = -1,
+        ["人方向"] = 0, ["贴图"] = 0,
     }
     WAR.Person[1] = {
         ["人物编号"] = 2, ["坐标X"] = 10, ["坐标Y"] = 10,
@@ -107,6 +108,7 @@ local function setupBattle(opts)
         ["生命最大值"] = 100, ["内力最大值"] = 100, ["体力最大值"] = 100,
         ["攻击力"] = 20, ["防御力"] = 10, ["攻击带毒"] = 0,
         ["武器"] = -1, ["防具"] = -1,
+        ["人方向"] = 0, ["贴图"] = 0,
     }
 
     -- **用 TestHelper.createTestPerson 建人物**：战斗算法要读几十个字段
@@ -166,6 +168,10 @@ local function setupBattle(opts)
     -- 武功表：战斗算法按**等级**读 `攻击力<level>`（如 攻击力1、攻击力2…），
     -- 所以必须逐级填。用工厂函数建表更稳（它会填满 CC.Wugong 的全字段）。
     JY.Thing = JY.Thing or {}
+    JY.Base = JY.Base or {}
+    JY.Base["人方向"] = 0
+    JY.Base["乘船"] = 0
+    WAR.ShowHead = 0
     JY.Wugong[1] = TestHelper.createTestWugong({ ID = 1 })
     JY.Wugong[1]["名称"] = "太祖长拳"
     JY.Wugong[1]["攻击范围"] = 0
@@ -424,6 +430,55 @@ function TestBattleFlowHeadless.testRulesKindDrivesTick()
     rawset(_G, "BattleRules", { kind = "turnbased" })
 end
 
+-- ------------------------------------------------------------ 渲染调用链不崩
+
+function TestBattleFlowHeadless.testWarDrawMapCallChainNoCrash()
+    print("\n=== Test: WarDrawMap 调用链不崩（stub lib.DrawWarMap）===")
+    -- **注意范围**：这里验证的是「调用链不炸」，不是「画面正确」。
+    -- 画面正确性必须实机看 —— 但可以机器验证的这部分不该留空。
+    setupBattle()
+    local L = rawget(_G, "lib")
+    local calls = {}
+    L.DrawWarMap = function(flag, x, y, v1, v2, v3)
+        calls[#calls + 1] = { flag = flag, x = x, y = y }
+    end
+    rawset(_G, "WAR", WAR)
+    WAR.ShowHead = 0
+
+    for f = 0, 4 do
+        if f ~= 3 then   -- flag=3 不是合法值（原版只处理 0/1/2/4）
+            local ok, err = pcall(WarDrawMap, f, 5, 5, 1)
+            TestHelper.assertTrue(ok, "WarDrawMap(flag=" .. f .. ") 应不崩，实测: " .. tostring(err))
+        end
+    end
+    TestHelper.assertEquals(4, #calls, "4 个合法 flag 各应调用一次 DrawWarMap（实测 " .. #calls .. "）")
+end
+
+function TestBattleFlowHeadless.testWarCalPersonPicReturnsFrame()
+    print("\n=== Test: WarCalPersonPic 算出人物贴图号 ===")
+    setupBattle()
+    local pic = WarCalPersonPic(0)
+    TestHelper.assertNotNil(pic, "应返回贴图号")
+    TestHelper.assertTrue(type(pic) == "number", "贴图号应是数字")
+end
+
+function TestBattleFlowHeadless.testWarShowHeadNoCrash()
+    print("\n=== Test: WarShowHead 调用链不崩 ===")
+    setupBattle()
+    local L = rawget(_G, "lib")
+    -- WarShowHead 需要贴图查询 + 绘制两条链。stub 它们的**返回值语义**
+    -- （PicGetXY 返回 w,h,xoff,yoff），不是简单空实现。
+    L.PicGetXY     = function() return 100, 100, 0, 0 end
+    L.PicLoadCache = function() end
+    L.DrawPic      = function() end
+    L.DrawStr      = function() end
+    L.SetClip      = function() end
+    L.DrawRect     = function() end
+    L.FillColor    = function() end
+    local ok, err = pcall(WarShowHead)
+    TestHelper.assertTrue(ok, "WarShowHead 应不崩，实测: " .. tostring(err))
+end
+
 -- ------------------------------------------------------------ 套件入口
 
 function TestBattleFlowHeadless.runAll()
@@ -515,6 +570,10 @@ function TestBattleFlowHeadless.runAll()
     TestBattleFlowHeadless.testEndPersonDataNoExpWhenLoseAndIsexpZero()
 
     TestBattleFlowHeadless.testRulesKindDrivesTick()
+
+    TestBattleFlowHeadless.testWarDrawMapCallChainNoCrash()
+    TestBattleFlowHeadless.testWarCalPersonPicReturnsFrame()
+    TestBattleFlowHeadless.testWarShowHeadNoCrash()
 
     return TestHelper.printSummary()
 end
