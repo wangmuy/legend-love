@@ -86,13 +86,16 @@
 **Blast Radius**：`game/framework/war_async.lua`
 
 **DoD**：
-- [ ] `war_async.lua` 不再定义战斗算法（只有协程调度 + tick 转发）
-- [ ] `grep -c 'function War_' game/framework/war_async.lua` = 0
-- [ ] `grep -cE 'War_(CalMoveStep|MovePerson|WugongHurt|AutoSelectEnemy)'`
-      `game/framework/war_async.lua` = 0
-- [ ] 全量测试零失败
-- [ ] 实机验证：回合制战斗零回归
-- [ ] 一个 commit
+- [x] `war_async.lua` 不再定义战斗算法（只有协程调度 + tick 转发）
+- [x] `grep -c 'function War_' game/framework/war_async.lua` = **0**（实测）
+- [x] `War_(CalMoveStep|MovePerson|WugongHurt|AutoSelectEnemy)` 调用 = **0**（实测）
+- [x] 19 个协程 + SelectTargetCoroutine 搬到
+      `script/battle/battle_flow_coroutines.lua`（1429 行）
+- [x] war_async 保留 20 个**惰性转发**（`WarAsync.XXXCoroutine`）
+- [x] 门禁 STEP D 从 INFO 改为**硬断言**（负向对照实测生效）
+- [x] 全量测试零失败（3619/0）
+- [ ] 实机验证：回合制战斗零回归（需用户配合）
+- [x] 一个 commit
 
 ---
 

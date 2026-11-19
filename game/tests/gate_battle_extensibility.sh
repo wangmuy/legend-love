@@ -65,9 +65,11 @@ bad_d=$(grep -P '(?<![.:\w])(War_WugongHurtLife|War_CalMoveStep|War_AutoSelectEn
         | grep -vP ':[0-9]+:\s*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_d" ] || bad_d=0
 if [ "$bad_d" -eq 0 ]; then
-    log "  [PASS] war_async.lua 不直接调伤害/移动/AI 算法"
+    log "  [PASS] war_async.lua 不直接调伤害/移动/AI 算法（阶段 2C 已完成）"
 else
-    log "  [INFO] war_async.lua 仍调 $bad_d 处算法（阶段 2 待迁，暂不计失败）"
+    log "  [FAIL] war_async.lua 仍调 $bad_d 处战斗算法（应住在 script/battle/）"
+    grep -P '(?<![.:\w])(War_WugongHurtLife|War_CalMoveStep|War_AutoSelectEnemy|War_AnqiHurt)\s*\('         game/framework/war_async.lua 2>/dev/null | grep -vP ':[0-9]+:\s*--' | head -5 | tee -a "$LOG"
+    fail=$((fail + 1))
 fi
 
 # ------------------------------- E. jymain 必须加载 battle 模块
