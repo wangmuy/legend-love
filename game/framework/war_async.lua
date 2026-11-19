@@ -2,6 +2,7 @@
 -- 战斗系统异步模块
 -- 提供战斗系统的协程版本函数
 
+local GameHooks = require("framework.game_hooks")
 local FlowFacade = require("framework.flow_facade")
 local RenderFacade = require("framework.render_facade")
 local SpriteAtlas = require("framework.sprite_atlas")
@@ -86,7 +87,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     end
     SpriteAtlas.loadArchive(CC.EffectFile[1], CC.EffectFile[2], 3, { paletteFile = CC.PaletteFile })
     
-    PlayMIDI(WAR.Data["音乐"])
+    GameHooks.playMIDI(WAR.Data["音乐"])
     
     WarPersonSort()
     
@@ -212,9 +213,9 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     -- 战斗期间 PicInit 清空了 SMAP 贴图（槽0=WMAP），不重载则回场景后渲染缺图）
     EngineAPI.render.presentAndWait(50)
     if JY.Scene and JY.Scene[JY.SubScene] and JY.Scene[JY.SubScene]["进门音乐"] >= 0 then
-        PlayMIDI(JY.Scene[JY.SubScene]["进门音乐"])
+        GameHooks.playMIDI(JY.Scene[JY.SubScene]["进门音乐"])
     else
-        PlayMIDI(0)
+        GameHooks.playMIDI(0)
     end
     CleanMemory()
     EngineAPI.sprite.initSprites()

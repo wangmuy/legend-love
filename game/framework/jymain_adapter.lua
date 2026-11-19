@@ -2,6 +2,7 @@
 -- JY_Main适配器，连接新旧架构
 -- 完全事件驱动版本
 
+local GameHooks = require("framework.game_hooks")
 local RenderFacade = require("framework.render_facade")
 local JYMainAdapter = {}
 
@@ -201,6 +202,7 @@ function JYMainAdapter.initCoroutine()
                 getMyPic        = rawget(_G, "GetMyPic"),
                 addMyCurrentPic = rawget(_G, "AddMyCurrentPic"),
                 sceneCanPass    = rawget(_G, "SceneCanPass"),
+                playMIDI        = rawget(_G, "PlayMIDI"),
                 -- clearBackground：复刻 script 层 Cls 的「按状态重绘」那一半
                 --
                 -- script 的 Cls 不只清屏：它按 JY.Status 决定重绘什么。
@@ -299,7 +301,7 @@ function JYMainAdapter.showStartMenuCoroutine()
     
     RenderFacade.clearScreen()
     
-    PlayMIDI(16)
+    GameHooks.playMIDI(16)
     EngineAPI.render.present()
     
     local menu = {
@@ -1207,7 +1209,7 @@ function JYMainAdapter.startNewGame(menux)
     -- 原版语义：阻塞式事件结束后 MyPic 保持事件最后设置的状态（691 末尾 instruct_40(0)
     -- 已把主角转为站立方向0）。不能恢复成 CC.NewPersonPic(3445,卧姿)——那会让刚起身的
     -- 主角多显示一帧卧姿；GetMyPic() 与下一帧 GAME_SMAP.update 的计算一致，无跳变。
-    JY.MyPic = GetMyPic()
+    JY.MyPic = GameHooks.getMyPic()
     EngineAPI.debug.log("startNewGame: updated MyPic to " .. tostring(JY.MyPic) .. " after NewGameEvent")
     PerfLog.finish(tAll)
 end

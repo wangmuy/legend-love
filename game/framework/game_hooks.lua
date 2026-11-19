@@ -35,6 +35,11 @@ local impl = {
     -- script 的 Cls 不只是清屏：它按 JY.Status 决定重绘主地图/场景/战斗/开场图。
     -- 这是**游戏逻辑**（读 JY.Status），所以走注入。
     clearBackground = nil,
+    -- 播放音乐（替代 script 层 PlayMIDI）
+    --
+    -- script 的 PlayMIDI(id) 不只是播：它写 JY.CurrentMIDI、判 JY.EnableMusic、
+    -- 再用 CC.MIDIFile 模板拼文件名。这些是游戏逻辑，走注入。
+    playMIDI = nil,
 }
 
 --- 注册一组实现
@@ -51,7 +56,8 @@ function GameHooks.register(spec)
     if type(spec) ~= "table" then return false end
     for k, v in pairs(spec) do
         if impl[k] ~= nil or k == "getMyPic" or k == "addMyCurrentPic"
-           or k == "sceneCanPass" or k == "clearBackground" then
+           or k == "sceneCanPass" or k == "clearBackground"
+           or k == "playMIDI" then
             if type(v) == "function" then
                 impl[k] = v
             elseif v == nil then
@@ -68,6 +74,7 @@ function GameHooks.clear()
     impl.addMyCurrentPic = nil
     impl.sceneCanPass = nil
     impl.clearBackground = nil
+    impl.playMIDI = nil
 end
 
 --- 是否已注册某个 hook
@@ -101,6 +108,15 @@ end
 function GameHooks.clearBackground()
     if not impl.clearBackground then return false end
     local ok = pcall(impl.clearBackground)
+    return ok
+end
+
+--- 播放音乐
+-- @param id number 曲目编号（负数 = 停）
+-- @return boolean 是否走了注入实现
+function GameHooks.playMIDI(id)
+    if not impl.playMIDI then return false end
+    local ok = pcall(impl.playMIDI, id)
     return ok
 end
 

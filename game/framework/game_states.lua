@@ -2,6 +2,7 @@
 -- 游戏状态处理器定义
 -- 将原有的Game_MMap和Game_SMap拆分为update和draw
 
+local GameHooks = require("framework.game_hooks")
 local RenderFacade = require("framework.render_facade")
 local GameStates = {}
 
@@ -66,7 +67,7 @@ local function smapWalkable(x, y)
     if x < 1 or y < 1 or x > CC.SWidth - 2 or y > CC.SHeight - 2 then
         return false
     end
-    return SceneCanPass(x, y) == true
+    return GameHooks.sceneCanPass(x, y) == true
 end
 
 --- 进入子场景（**键盘与自动移动共用**）
@@ -88,7 +89,7 @@ local function enterSubScene(subScene)
     local newState = getStateId("GAME_SMAP")
     JY.MmapMusic = -1
 
-    JY.MyPic = GetMyPic()
+    JY.MyPic = GameHooks.getMyPic()
     JY.Base["人X1"] = JY.Scene[subScene]["入口X"]
     JY.Base["人Y1"] = JY.Scene[subScene]["入口Y"]
 
@@ -246,7 +247,7 @@ function stepAutoMoveMMap()
     -- 走路动画每 20 帧会「闪一下站立姿势」，看起来一顿一顿的。
     JY.MyTick = 0
 
-    AddMyCurrentPic()
+    GameHooks.addMyCurrentPic()
     JY.Base["人方向"] = direct
     JY.Base["人X"] = nextPt.x
     JY.Base["人Y"] = nextPt.y
@@ -298,7 +299,7 @@ function stepAutoMoveSMAP()
 
     JY.MyTick = 0    -- 与键盘路径一致，保持走路动画连续（见 MMAP 分支注释）
 
-    AddMyCurrentPic()
+    GameHooks.addMyCurrentPic()
     JY.Base["人方向"] = direct
     JY.Base["人X1"] = nextPt.x
     JY.Base["人Y1"] = nextPt.y
@@ -326,7 +327,7 @@ function stepAutoMoveSMAP()
     local _eventRunning = JY.CurrentD ~= nil and JY.CurrentD >= 0
     if not JY.AnimationState.active and not _talkActive
         and not _eventRunning then
-        JY.MyPic = GetMyPic()
+        JY.MyPic = GameHooks.getMyPic()
     end
     DtoSMap()
 
@@ -455,7 +456,7 @@ handlers["GAME_MMAP"] = {
         
         local x, y
         if direct ~= -1 then
-            AddMyCurrentPic()
+            GameHooks.addMyCurrentPic()
             x = JY.Base["人X"] + CC.DirectX[direct + 1]
             y = JY.Base["人Y"] + CC.DirectY[direct + 1]
             JY.Base["人方向"] = direct
@@ -492,7 +493,7 @@ handlers["GAME_MMAP"] = {
     
     -- 每帧渲染
     draw = function()
-        local pic = GetMyPic()
+        local pic = GameHooks.getMyPic()
         
         -- 在 Love2D 中，每一帧都需要重新绘制整个屏幕
         -- 原来的 FastShowScreen 优化在 SDL 中有效，但在 Love2D 中会导致黑屏
@@ -788,7 +789,7 @@ handlers["GAME_SMAP"] = {
         end
         
         if direct ~= -1 then
-            AddMyCurrentPic()
+            GameHooks.addMyCurrentPic()
             x = JY.Base["人X1"] + CC.DirectX[direct + 1]
             y = JY.Base["人Y1"] + CC.DirectY[direct + 1]
             JY.Base["人方向"] = direct
@@ -813,11 +814,11 @@ handlers["GAME_SMAP"] = {
         --      currentTalk 为第二道闸。
         local _talkActive = TalkAsync.getCurrentTalk() ~= nil
         if not JY.AnimationState.active and not _talkActive and not (JY and JY.CurrentD >= 0) then
-            JY.MyPic = GetMyPic()
+            JY.MyPic = GameHooks.getMyPic()
         end
         DtoSMap()
         
-        if SceneCanPass(x, y) == true then
+        if GameHooks.sceneCanPass(x, y) == true then
             JY.Base["人X1"] = x
             JY.Base["人Y1"] = y
         end
@@ -877,7 +878,7 @@ handlers["GAME_FIRSTMMAP"] = {
         
         Init_MMap()
         
-        EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], GetMyPic())
+        EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], GameHooks.getMyPic())
         EngineAPI.render.present()
     end,
     
@@ -894,7 +895,7 @@ handlers["GAME_FIRSTMMAP"] = {
     
     draw = function()
         -- 绘制主地图
-        local pic = GetMyPic()
+        local pic = GameHooks.getMyPic()
         EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], pic)
         -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
         -- ShowScreen(0)
@@ -988,7 +989,7 @@ handlers["GAME_END"] = {
 handlers["GAME_DEAD"] = {
     enter = function()
         EngineAPI.debug.log("Enter GAME_DEAD state")
-        PlayMIDI(0)
+        GameHooks.playMIDI(0)
         JY.DeadScreen = {
             name = JY.Person[0]["姓名"],
             datetime = os.date("%Y-%m-%d %H:%M")

@@ -167,8 +167,10 @@ function Interact.trigger(mapKind, tx, ty)
     local kind, payload = Interact.probe(mapKind, tx, ty)
     if kind == "scene" then
         -- 与键盘路径一致：先重算贴图，再进场景
-        local okPic, pic = pcall(GetMyPic)
-        if okPic and pic then JY.MyPic = pic end
+        -- 改走 GameHooks（原先 pcall(GetMyPic) 直接依赖 script 全局）
+        local GameHooks = require("framework.game_hooks")
+        local pic = GameHooks.getMyPic()
+        if pic ~= nil then JY.MyPic = pic end
         JY.MmapMusic = -1
         JY.SubScene = payload
 
