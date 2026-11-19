@@ -29,15 +29,19 @@ local function getScheduler()
     return CoroutineScheduler.getInstance()
 end
 
--- 前向声明（只声明一次，避免重复）
-local War_ManualCoroutine, War_AutoCoroutine, War_SettlementCoroutine
-local War_AttackCoroutine, War_MoveCoroutine, SelectTargetCoroutine
-local War_Manual_SubCoroutine, War_ShowFightCoroutine
-local War_Fight_SubCoroutine, War_MovePersonCoroutine, War_AutoMoveCoroutine
-local War_PoisonCoroutine, War_DecPoisonCoroutine, War_DoctorCoroutine
-local War_ExecuteMenuCoroutine, War_Fight_ExecuteCoroutine, SelectTargetCoroutine
-local War_ExecuteMenu_SubCoroutine, War_ThingMenuCoroutine, War_StatusMenuCoroutine
-local War_GameOverCoroutine
+-- **协程已搬到 script/battle/battle_flow_coroutines.lua**（阶段 2C）。
+-- 原先这里是 20 个 local 前向声明，现在全部取消 —— 改为调用本模块自己的
+-- `WarAsync.XXXCoroutine` 转发（文件末尾生成）。
+--
+-- **踩过的实机 bug（自动化测试没抓到）**：搬走协程后，这 20 个 local
+-- 变成了 nil upvalue，而 `WarMainCoroutine` 的战斗主循环里还在调用
+-- `War_ManualCoroutine()` / `War_AutoCoroutine()` / `War_SettlementCoroutine()`。
+-- 症状：战斗一开始就抛 "attempt to call upvalue 'War_ManualCoroutine'
+-- (a nil value)"，玩家看到的是黑屏回主菜单。
+--
+-- 为什么测试没抓到：所有测试都直接调 `War_ManualCoroutine` 等函数，
+-- 没有一个真的跑 `WarMainCoroutine`（那需要完整贴图档案 + 协程调度 + 按键）。
+-- → 这就是「字节保真不等于行为正确」的具体案例。
 
 -- 战斗主函数（协程版本）
 -- @param warid: 战斗编号
@@ -80,12 +84,44 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     WarLoadMap(WAR.Data["地图"])
     
     -- 加载贴图文件
+    --
+    -- **必须同时走两套系统**（历史遗留的双轨制，不是设计选择）：
+    --   ① SpriteAtlas（新）：framework 侧的战斗绘制（war_hover / item 等）
+    --   ② lib.PicLoadFile（旧）：script 侧的战斗绘制
+    --      —— battle_render.lua 的 WarDrawMap / WarShowHead / WarCalPersonPic
+    --      至今仍读 `picFileCache`（`lib.PicGetXY` / `lib.PicLoadCache`）。
+    --      SpriteAtlas 不写 picFileCache，只走 ① 会让 battle_render 崩：
+    --      `PicGetXY: attempt to index a nil value`（picFileCache[2] == nil）。
+    --
+    -- 这是**实机才能发现的 bug**：单测里这些函数都是被 stub 的，
+    -- 或者 lib 桩返回假数据，不会暴露两套系统不互通。
+    --
+    -- 彻底修法是把 battle_render 的 lib.Pic* 迁到 SpriteAtlas
+    -- （openspec/project/TODO.md 已记录，属独立 change）。
+
     SpriteAtlas.loadArchive(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0, { paletteFile = CC.PaletteFile })
     SpriteAtlas.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1, { paletteFile = CC.PaletteFile, usage = "avatar" })
     if CC.LoadThingPic == 1 then
         SpriteAtlas.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2, { paletteFile = CC.PaletteFile })
     end
     SpriteAtlas.loadArchive(CC.EffectFile[1], CC.EffectFile[2], 3, { paletteFile = CC.PaletteFile })
+
+    -- 旧系统的档案（供 script/battle/battle_render.lua 的 lib.Pic* 使用）
+    --
+    -- `EngineAPI.sprite.loadArchive` 在各引擎里就是 `lib.PicLoadFile`
+    -- （LÖVE 实现见 engine_love2d.lua:95-97），会把档案写进引擎的
+    -- `picFileCache`。而 `SpriteAtlas.loadArchive` 走的是新解码链
+    -- （framework/sprite_decoder），**不写 picFileCache**。
+    --
+    -- 两套都要调 —— 见上方注释的"双轨制"说明。
+    if EngineAPI and EngineAPI.sprite and EngineAPI.sprite.loadArchive then
+        EngineAPI.sprite.loadArchive(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0)
+        EngineAPI.sprite.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
+        if CC.LoadThingPic == 1 then
+            EngineAPI.sprite.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
+        end
+        EngineAPI.sprite.loadArchive(CC.EffectFile[1], CC.EffectFile[2], 3)
+    end
     
     GameHooks.playMIDI(WAR.Data["音乐"])
     
@@ -165,12 +201,12 @@ function WarAsync.WarMainCoroutine(warid, isexp)
                 local r
                 if WAR.Person[p]["我方"] == true then
                     if WAR.AutoFight == 0 then
-                        r = War_ManualCoroutine()
+                        r = WarAsync.War_ManualCoroutine()
                     else
-                        r = War_AutoCoroutine()
+                        r = WarAsync.War_AutoCoroutine()
                     end
                 else
-                    r = War_AutoCoroutine()
+                    r = WarAsync.War_AutoCoroutine()
                 end
                 
                 warStatus = War_isEnd()
@@ -195,7 +231,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     end
     
     -- 战斗结束
-    War_SettlementCoroutine(warStatus)
+    WarAsync.War_SettlementCoroutine(warStatus)
     
     War_EndPersonData(warState.isExp, warStatus)
 

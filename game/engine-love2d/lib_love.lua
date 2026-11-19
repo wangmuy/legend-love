@@ -522,7 +522,11 @@ function PicLoadCache(fileid, picid, x, y, flag, value)
     picid = math.floor(picid/2)
     fileid = fileid+1 -- lua starts with 1
     picid = picid+1 -- lua starts with 1
-    picfile = picFileCache[fileid]
+    -- **必须是 local**：写成全局时，若 picFileCache[fileid] 为 nil，
+    -- 下一行读 picfile 会命中 _G 的严格 metatable（__index 抛
+    -- "attempt read read to undeclared variable"），而不是走进 nil 分支。
+    -- 正常游戏里档案都加载过所以不爆发；战斗头像 / 缺档案时会炸。
+    local picfile = picFileCache[fileid]
     if picfile == nil or fileid < 1 or picid < 1 or picid > #(picfile.idx) then
         Debug("PicLoadCache: invalid picfile or picid out of range")
         return

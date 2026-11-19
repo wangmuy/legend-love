@@ -46,7 +46,62 @@ function love.mousereleased(x, y, button, istouch, presses)
     })
 end
 
+
+-- ---------------------------------------------------------------------------
+-- 截图 / 错误捕获（仅调试用）
+-- ---------------------------------------------------------------------------
+--
+-- **为什么需要这一段**：`lovec.exe` 无控制台，`print` 全丢。
+-- 想验证真实游戏画面，唯一方式是 `love.graphics.captureScreenshot` 存 PNG。
+--
+-- **为什么用文件级 local 而不是 `_G.xxx`**：
+--   `JYMainAdapter.initCoroutine` 会 `setmetatable(_G, {__newindex=error})`，
+--   之后往 _G 写任何新名字都抛 "attempt read write to undeclared variable"。
+--   上一轮截图钩子写了 `_G.__shotFrames` → draw 抛错 → 进错误屏 →
+--   **love.draw 再没被调用过**，我据此错误地判断"draw 从未执行"。
+--
+-- 用法：`lovec game --shot=boot --frame=180`
+--   --shot=<名字>  截图文件名（不含 .png）
+--   --frame=<N>    第 N 帧截图（默认 120）
+local _SHOT_MODE, _SHOT_NAME, _SHOT_FRAME = false, "shot", 120
+local _shotFrameCount = 0
+-- 自动进战斗（--battle=<warid>）：截图模式用来验证战斗画面。
+-- 走 LoadRecord(0) + WarMainCoroutine，跳过"新游戏"的属性选择菜单
+-- （那个菜单要玩家按键，无头环境过不去）。
+local _AUTO_BATTLE = nil
+-- 自动按键脚本（--keys=13,13,13,...）：截图模式用来推进战斗流程。
+-- 值是 LÖVE 的 keycode（13=Enter, 32=Space, 27=Esc, 276/277/278/279=方向键）
+local _AUTO_KEYS = nil
+local _autoKeyTick = 0
+
+-- 错误捕获：把真实错误写进文件（否则只剩一个看不见的错误屏）
+function love.errorhandler(msg)
+    local trace = debug.traceback(tostring(msg), 2)
+    pcall(function()
+        love.filesystem.write("__crash.txt", trace)
+    end)
+    return function() end
+end
+
 function love.load()
+    for _, a in ipairs(rawget(_G, "arg") or {}) do
+        if type(a) == "string" then
+            local shot = a:match("^%-%-shot=(%w+)")
+            if shot then _SHOT_MODE = true; _SHOT_NAME = shot end
+            local fr = a:match("^%-%-frame=(%d+)")
+            if fr then _SHOT_FRAME = tonumber(fr) end
+            local bat = a:match("^%-%-battle=(%d+)")
+            if bat then _AUTO_BATTLE = tonumber(bat) end
+            local ks = a:match("^%-%-keys=([%d,]+)")
+            if ks then
+                _AUTO_KEYS = {}
+                for piece in ks:gmatch("%d+") do
+                    _AUTO_KEYS[#_AUTO_KEYS + 1] = tonumber(piece)
+                end
+            end
+        end
+    end
+
     -- 加载配置
     require "framework.config"
     Byte = require "framework.lib_Byte"
@@ -62,9 +117,66 @@ function love.load()
     
     -- 初始化游戏（事件驱动版本）
     JYMainAdapter.init()
+
+    -- 自动进战斗（--battle=<warid>，仅调试用）
+    if _AUTO_BATTLE then
+        local scheduler = require("framework.coroutine_scheduler").getInstance()
+        local wa = require("framework.war_async")
+
+        scheduler:create(function()
+            -- LoadRecord(0) 是 setNewGame 用的基础存档，提供 JY.Person/CC 数据
+            local okLoad = rawget(_G, "LoadRecord") and LoadRecord(0)
+            if not okLoad then
+                pcall(function()
+                    love.filesystem.write("__battle_fail.txt", "LoadRecord(0) failed")
+                end)
+                return
+            end
+            local prog = {"LoadRecord ok"}
+            pcall(function()
+                love.filesystem.write("__battle_start.txt",
+                    "battle=" .. tostring(_AUTO_BATTLE) .. " load=" .. tostring(okLoad))
+            end)
+            -- 分段推进，每步写进度（否则不知道卡在哪）
+            local function step(name, fn)
+                pcall(function()
+                    love.filesystem.write("__battle_progress.txt", table.concat(prog, " > "))
+                end)
+                local ok, err = pcall(fn)
+                prog[#prog + 1] = name .. (ok and " ok" or (" FAIL:" .. tostring(err)))
+                return ok
+            end
+            step("WarLoad",    function() WarLoad(_AUTO_BATTLE) end)
+            step("WarSelectTeam",  function() WarSelectTeam() end)
+            step("WarSelectEnemy", function() WarSelectEnemy() end)
+            pcall(function()
+                love.filesystem.write("__battle_steps.txt", table.concat(prog, "\n"))
+            end)
+            local okB, errB = pcall(wa.WarMainCoroutine, _AUTO_BATTLE, 1)
+            pcall(function()
+                love.filesystem.write("__battle_end.txt",
+                    "ok=" .. tostring(okB) .. " err=" .. tostring(errB))
+            end)
+        end, "auto_battle")
+    end
 end
 
 function love.update(dt)
+    -- 自动按键（--keys=...，仅调试用）：每 20 帧注入一个按键事件，
+    -- 用来推进"等键"的战斗流程（否则协程一直挂在 waitKey 上）。
+    if _AUTO_KEYS and #_AUTO_KEYS > 0 then
+        _autoKeyTick = _autoKeyTick + 1
+        if _autoKeyTick >= 20 then
+            _autoKeyTick = 0
+            local k = table.remove(_AUTO_KEYS, 1)
+            pcall(function()
+                local IM = require("framework.input_manager").getInstance()
+                IM:onKeyPressed(k, nil, false)
+                IM:onKeyReleased(k, nil)
+            end)
+        end
+    end
+
     -- 更新游戏适配器
     JYMainAdapter.update(dt)
     
@@ -90,6 +202,21 @@ function love.draw()
     -- 清除标志
     if lib and lib.SetDrawLoopFlag then
         lib.SetDrawLoopFlag(false)
+    end
+
+    -- 截图（调试用）
+    if _SHOT_MODE then
+        _shotFrameCount = _shotFrameCount + 1
+        if _shotFrameCount == _SHOT_FRAME then
+            love.graphics.captureScreenshot(function(imgdata)
+                imgdata:encode("png", _SHOT_NAME .. ".png")
+                pcall(function()
+                    love.filesystem.write("__shot_done.txt",
+                        "saved " .. _SHOT_NAME .. ".png @ frame " .. tostring(_SHOT_FRAME))
+                end)
+                love.event.quit()
+            end)
+        end
     end
 end
 
