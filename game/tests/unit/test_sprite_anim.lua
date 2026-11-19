@@ -376,6 +376,99 @@ end
 
 -- ------------------------------------------------------------ 套件入口
 
+-- ------------------------------------------------------------ walkFps 冻结
+
+function TestSpriteAnim.testWalkFpsZeroFreezes()
+    print("\n=== Test: walkFps=0 冻结动画 ===")
+    local SA, AD = fresh()
+    AD.defineAll({ myStartPic = 100, boatStartPic = 200, walkFps = 0 })
+
+    local seq = SA.getSequence("person.walk.down")
+    TestHelper.assertNotNil(seq, "序列应存在")
+    -- defineAll 把 walkFps=0 翻译成极小 fps（等价冻结）
+    TestHelper.assertTrue(seq.fps < 0.01,
+        "walkFps=0 应翻译成极小 fps，实测 " .. tostring(seq.fps))
+
+    local h = SA.createHandle()
+    SA.play(h, "person.walk.down")
+    SA.update(1.0)
+    TestHelper.assertEquals(101, SA.getFrameId(h),
+        "冻结时推进 1 秒帧号不变（应仍为 101）")
+end
+
+function TestSpriteAnim.testWalkFpsConfigurable()
+    print("\n=== Test: walkFps 可配置 ===")
+    local SA, AD = fresh()
+    AD.defineAll({ myStartPic = 100, boatStartPic = 200, walkFps = 30 })
+
+    local seq = SA.getSequence("person.walk.down")
+    TestHelper.assertEquals(30, seq.fps, "fps 应等于传入的 30")
+end
+
+-- ------------------------------------------------------------ game_hooks 动画路径
+
+function TestSpriteAnim.testGameHooksAnimationPath()
+    print("\n=== Test: GameHooks 的动画路径 ===")
+    local SA, AD = fresh()
+    AD.defineAll({ myStartPic = 100, boatStartPic = 200, walkFps = 20 })
+
+    local GH = require("framework.game_hooks")
+    GH.clear()
+
+    -- 未注册任何 hook → getMyPic 返回 nil
+    TestHelper.assertEquals(nil, GH.getMyPic(), "未注册时 getMyPic 为 nil")
+
+    -- 只注册 legacy getMyPic → 走 legacy
+    local legacyCalled = 0
+    GH.register({
+        getMyPic = function() legacyCalled = legacyCalled + 1 return 555 end,
+    })
+    TestHelper.assertEquals(555, GH.getMyPic(), "只有 legacy 时应走 legacy")
+
+    -- 加上 preferredFrameId → 优先走它
+    local h = SA.createHandle()
+    SA.play(h, "person.walk.down")
+    GH.register({
+        preferredFrameId = function() return SA.getFrameId(h) end,
+    })
+    TestHelper.assertEquals(101, GH.getMyPic(),
+        "有 preferredFrameId 时应优先用它（sprite_anim 的当前帧）")
+    TestHelper.assertEquals(1, legacyCalled,
+        "优先路径生效时不应再调 legacy（实测调用 " .. legacyCalled .. " 次）")
+
+    -- preferredFrameId 返回 nil（handle 未创建）→ 回落 legacy
+    SA.destroyHandle(h)
+    GH.register({ preferredFrameId = function() return nil end })
+    TestHelper.assertEquals(555, GH.getMyPic(),
+        "preferredFrameId 返回 nil 时应回落 legacy（零回归机制）")
+
+    GH.clear()
+end
+
+function TestSpriteAnim.testGameHooksAdvanceAndStop()
+    print("\n=== Test: advanceWalkAnim / stopWalkAnim 切换序列 ===")
+    local SA, AD = fresh()
+    AD.defineAll({ myStartPic = 100, boatStartPic = 200, walkFps = 20 })
+
+    local GH = require("framework.game_hooks")
+    GH.clear()
+
+    local curSeq = nil
+    GH.register({
+        advanceWalkAnim = function() curSeq = "person.walk.down" return true end,
+        stopWalkAnim    = function() curSeq = "person.stand.down" return true end,
+    })
+    TestHelper.assertTrue(GH.advanceWalkAnim(), "advance 应返回 true")
+    TestHelper.assertEquals("person.walk.down", curSeq, "advance 切到 walk 序列")
+    TestHelper.assertTrue(GH.stopWalkAnim(), "stop 应返回 true")
+    TestHelper.assertEquals("person.stand.down", curSeq, "stop 切到 stand 序列")
+
+    -- 未注册时返回哨兵
+    GH.clear()
+    TestHelper.assertEquals(false, GH.advanceWalkAnim(), "未注册 advance 返回 false")
+    TestHelper.assertEquals(false, GH.stopWalkAnim(), "未注册 stop 返回 false")
+end
+
 function TestSpriteAnim.runAll()
     print("\n" .. string.rep("=", 60))
     print("精灵动画播放器测试（ADR-PORT-013..018）")
@@ -416,6 +509,11 @@ function TestSpriteAnim.runAll()
     TestSpriteAnim.testDefineAllRejectsMissingConst()
     TestSpriteAnim.testSequenceIdSelection()
     TestSpriteAnim.testEndToEndPlayback()
+
+    TestSpriteAnim.testWalkFpsZeroFreezes()
+    TestSpriteAnim.testWalkFpsConfigurable()
+    TestSpriteAnim.testGameHooksAnimationPath()
+    TestSpriteAnim.testGameHooksAdvanceAndStop()
 
     return TestHelper.printSummary()
 end
