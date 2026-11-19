@@ -425,6 +425,16 @@ end
 
 function EngineAPI.file.createDirectory(dirpath) end
 
+--- 目录是否存在：web 端无文件系统，返回 false（哨兵）
+function EngineAPI.file.directoryExists(dirpath)
+    return false
+end
+
+--- 列目录：web 端无文件系统，返回空表（哨兵，不是 nil）
+function EngineAPI.file.listDirectory(dirpath)
+    return {}
+end
+
 --------------------------------------------------------------------------------
 -- script - load Lua code from initDataSource
 --------------------------------------------------------------------------------
