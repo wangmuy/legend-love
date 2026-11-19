@@ -495,7 +495,16 @@ function PicGetXY(fileid, picid)
     picid = picid+1 -- lua starts with 1
     fileid = fileid+1 -- lua starts with 1
     Debug("PicGetXY: fileid=%d, original_picid=%d, calculated_picid=%d", fileid, original_picid, picid)
-    local pcache = picFileCache[fileid]:getPic(picid)
+    -- **必须判两次空**：`picFileCache[fileid]` 本身可能是 nil
+    -- （该档案没被 PicLoadFile 加载过，比如战斗结算后重载的档案不同）。
+    -- 原写法 `picFileCache[fileid]:getPic(...)` 会直接抛
+    -- "attempt to index a nil value"。
+    local picf = picFileCache[fileid]
+    if picf == nil then
+        Debug("PicGetXY: picfile is nil (fileid=%d)", fileid)
+        return 0,0,0,0
+    end
+    local pcache = picf:getPic(picid)
     if pcache == nil then
         Debug("PicGetXY: pcache is nil!")
         return 0,0,0,0

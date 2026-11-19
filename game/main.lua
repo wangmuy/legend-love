@@ -69,8 +69,15 @@ local _shotFrameCount = 0
 -- 走 LoadRecord(0) + WarMainCoroutine，跳过"新游戏"的属性选择菜单
 -- （那个菜单要玩家按键，无头环境过不去）。
 local _AUTO_BATTLE = nil
--- 自动按键脚本（--keys=13,13,13,...）：截图模式用来推进战斗流程。
--- 值是 LÖVE 的 keycode（13=Enter, 32=Space, 27=Esc, 276/277/278/279=方向键）
+-- 自动按键脚本（--keys=return,return,down,down,...）：截图模式推进战斗流程。
+--
+-- **值必须是按键名字（字符串），不是 keycode**：
+--   `InputManager:onKeyPressed(key, ...)` 用 `baseKeyMap[key]` 查表，
+--   而 baseKeyMap 的键是 "return" / "space" / "escape" / "up" / "down" /
+--   "left" / "right" 这些**字符串**。传数字 13 会查不到 → 直接 return，
+--   **事件根本不进队列**（我第一版就踩了这个，所有注入都是空操作）。
+--
+-- 可用的名字：return / space / escape / up / down / left / right
 local _AUTO_KEYS = nil
 local _autoKeyTick = 0
 
@@ -92,11 +99,11 @@ function love.load()
             if fr then _SHOT_FRAME = tonumber(fr) end
             local bat = a:match("^%-%-battle=(%d+)")
             if bat then _AUTO_BATTLE = tonumber(bat) end
-            local ks = a:match("^%-%-keys=([%d,]+)")
+            local ks = a:match("^%-%-keys=([%w_,]+)")
             if ks then
                 _AUTO_KEYS = {}
-                for piece in ks:gmatch("%d+") do
-                    _AUTO_KEYS[#_AUTO_KEYS + 1] = tonumber(piece)
+                for piece in ks:gmatch("[%w_]+") do
+                    _AUTO_KEYS[#_AUTO_KEYS + 1] = piece
                 end
             end
         end
