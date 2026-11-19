@@ -32,9 +32,39 @@ PlayMPEG      1 处    FillColor     1 处    DrawRect    1 处
 6. 游戏逻辑回调注入接线
 7. 全部既有测试零回归 + 实机冒烟
 
+## 实施后的重大发现（必须记录）
+
+完成 Task 1-5 后，用 `jymain.lua` 全部 155 个全局函数定义反查 framework，
+发现实际调用量**远超原估**：
+
+```
+原估 140 处（8 组绘制/流程函数）
+实际 190 处 / 56 个函数（含战斗全部）
+
+  war_async.lua        108    ← 绝大部分
+  jymain_adapter.lua    40
+  game_states.lua       24
+  其余 8 文件           18
+```
+
+按类别：
+
+| 类别 | 函数 | 次数 | 本 change 是否覆盖 |
+|------|------|------|-------------------|
+| 绘制 | DrawString/Cls/DrawBox/DrawStrBox/ShowScreen/DrawSMap/WarDrawMap | 87 | ✅ 全部 |
+| 流程 | ShowMenu/ShowMenu2/WaitKey/TalkEx/PlayMIDI | 25 | ✅ 全部 |
+| 游戏逻辑 | GetMyPic/AddMyCurrentPic/SceneCanPass | 19 | ✅ 全部 |
+| **战斗模拟** | `War_*` 约 40 个 + `GetWarMap`/`SetWarMap` + `Rnd` | **~130** | ❌ **不在范围** |
+
+**116 处是战斗系统**（`War_CalMoveStep`、`War_WugongHurtLife`、
+`War_AutoSelectEnemy`、`GetWarMap`、`SetWarMap`、`Rnd` 等）。
+
 ## Out of Scope
 
 - EngineAPI 契约补齐 → `port-contract-completeness`（前置）
+- **战斗系统改造（116 处 War_* 调用）→ 独立的 `battle-extensibility` change**
+  理由：那是逻辑重构（非机械替换），需要实机验证战斗全过程，
+  且「半即时/即时/Hades 式」是三种不同架构，不是参数开关
 - sprite 动画 → `port-sprite-animation`
 - 删除 script 层的全局函数（游戏脚本仍要用，1000+ 调用点）
 - 绘制性能优化（facade 是纯转发，无逻辑）

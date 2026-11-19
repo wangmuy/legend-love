@@ -78,6 +78,21 @@ parent_epic: null
   同文件冲突风险
 - **Status**: [ ] Created
 
+### Change: battle-extensibility
+
+- **Repository**: this repo
+- **Scope**: fullstack（战斗流程重构 + 策略接口 + dt 传播 + 实机验证）
+- **Responsibility**:
+  1. 抽出 `script/battle/` 五模块骨架（先搬不改逻辑）：
+     `battle_flow` / `battle_rules` / `battle_ai` / `battle_action` / `battle_render`
+  2. `battle_rules` 策略接口定义（`turnbased` / `realtime` / 未来扩展）
+  3. `battle_flow` 改调策略，`war_async.lua` 降为「适配层」
+  4. `dt` 传播到战斗（`battle_flow.tick(ctx, dt)`）
+  5. 实机验证：原版回合制战斗**零回归**（手动/自动/武功/中毒/结算/升级/掉落）
+  6. 更新门禁：战斗代码位置断言
+- **Depends On**: `port-script-decoupling`（战斗现在调用了大量 framework facade）
+- **Status**: [ ] Created
+
 ---
 
 ## 依赖图
@@ -99,6 +114,14 @@ parent_epic: null
   │ port-sprite-animation                 │
   │  动画时间驱动（引擎侧零改动）          │
   └──────────────────────────────────────┘
+
+  ┌──────────────────────────────────────┐
+  │ battle-extensibility                  │
+  │  战斗流程抽成可覆盖策略模块            │
+  │  （支持半即时/即时/Hades 式）          │
+  └──────────────────────────────────────┘
+       ▲
+       │ 依赖 port-script-decoupling（战斗已走 facade）
        ▲
        │ 无硬依赖，但建议排在上者之后（同文件冲突）
 ```
