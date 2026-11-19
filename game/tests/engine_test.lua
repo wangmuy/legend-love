@@ -55,6 +55,18 @@ EngineAPI.render.present = function()
     logCall("render.present")
 end
 
+--- 可注入的渲染尺寸（虚拟手柄等需要）
+EngineAPI.render._width = 1024
+EngineAPI.render._height = 768
+
+EngineAPI.render.getWidth = function()
+    return EngineAPI.render._width
+end
+
+EngineAPI.render.getHeight = function()
+    return EngineAPI.render._height
+end
+
 EngineAPI.render.presentAndWait = function(delay)
     logCall("render.presentAndWait", delay)
 end
@@ -101,6 +113,35 @@ EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
         x = x, y = y, color = color, alpha = alpha,
     }
     logCall("sprite.drawTinted", archiveId, spriteId, x, y, color, alpha)
+end
+
+-- 可注入的纹理创建（测试多格式路径用）
+EngineAPI.sprite._failCreate = false
+
+EngineAPI.sprite.createFromRGBA = function(w, h, rgbaBytes, opts)
+    logCall("sprite.createFromRGBA", w, h)
+    if EngineAPI.sprite._failCreate then return nil end
+    if type(w) ~= "number" or type(h) ~= "number" or w <= 0 or h <= 0 then return nil end
+    if type(rgbaBytes) ~= "string" or #rgbaBytes < w * h * 4 then return nil end
+    opts = opts or {}
+    return { w = w, h = h, xoff = opts.xoff or 0, yoff = opts.yoff or 0,
+             rgbaLen = #rgbaBytes }
+end
+
+EngineAPI.sprite.createFromEncoded = function(bytes, formatHint, opts)
+    logCall("sprite.createFromEncoded", formatHint)
+    if EngineAPI.sprite._failCreate then return nil end
+    if type(bytes) ~= "string" or bytes == "" then return nil end
+    opts = opts or {}
+    -- 测试桩不做真实解码，返回一个标记格式的 handle
+    return { w = 10, h = 10, xoff = opts.xoff or 0, yoff = opts.yoff or 0,
+             format = formatHint }
+end
+
+EngineAPI.sprite.getMeta = function(handle)
+    if type(handle) ~= "table" then return nil end
+    return { w = handle.w or 0, h = handle.h or 0,
+             xoff = handle.xoff or 0, yoff = handle.yoff or 0 }
 end
 
 --------------------------------------------------------------------
@@ -387,6 +428,24 @@ end
 --------------------------------------------------------------------
 -- font 模块 - 返回存根对象
 --------------------------------------------------------------------
+--- 可注入的字体度量
+--
+-- **默认返回 nil（不是从 love stub 量）**：
+-- 测试环境的 love stub 里 newFont 返回的 getWidth 恒为 1
+-- （test_mod_boot 的 installLoveStub），若这里去量真实宽度，
+-- 会让 TextBoxLayout.textWidth 返回垃圾值 1，进而把全量测试里
+-- 所有菜单框宽算成 1+边框 —— 实测真的踩到了（6 条断言连锁失败）。
+--
+-- 需要真实度量的测试显式注入 _measureWidth；不需要的一律拿 nil 走 em 估算。
+EngineAPI.font._measureWidth = nil
+
+EngineAPI.font.measureText = function(str, size, fontName)
+    if type(EngineAPI.font._measureWidth) == "function" then
+        return EngineAPI.font._measureWidth(str, size, fontName)
+    end
+    return nil
+end
+
 EngineAPI.font.get = function(fontName, size)
     logCall("font.get", fontName, size)
     return { name = fontName, size = size }

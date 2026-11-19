@@ -80,6 +80,76 @@ function TestEngineAPI.testInputModule()
     TestHelper.assertNotNil(EngineAPI.input.pollAction, "input.pollAction should exist")
 end
 
+-- REQ-PORT1-3 / REQ-PORT1-5：尺寸查询契约（port-contract-completeness）
+function TestEngineAPI.testRenderSizeContracts()
+    print("\n=== Test: render.getWidth/getHeight 契约 ===")
+    setup()
+    local EngineAPI = require("engine-love2d.engine_api")
+    TestHelper.assertNotNil(EngineAPI.render.getWidth, "render.getWidth 必须存在")
+    TestHelper.assertNotNil(EngineAPI.render.getHeight, "render.getHeight 必须存在")
+end
+
+-- REQ-PORT1-6：字体度量契约
+function TestEngineAPI.testFontMeasureContract()
+    print("\n=== Test: font.measureText 契约 ===")
+    setup()
+    local EngineAPI = require("engine-love2d.engine_api")
+    TestHelper.assertNotNil(EngineAPI.font.measureText, "font.measureText 必须存在")
+end
+
+-- REQ-PORT1-9 / REQ-PORT1-10：纹理创建契约（多格式核心）
+function TestEngineAPI.testSpriteCreateContracts()
+    print("\n=== Test: sprite 纹理创建契约 ===")
+    setup()
+    local EngineAPI = require("engine-love2d.engine_api")
+    TestHelper.assertNotNil(EngineAPI.sprite.createFromRGBA,
+        "sprite.createFromRGBA 必须存在（ADR-PORT-013）")
+    TestHelper.assertNotNil(EngineAPI.sprite.createFromEncoded,
+        "sprite.createFromEncoded 必须存在（ADR-PORT-014）")
+    TestHelper.assertNotNil(EngineAPI.sprite.getMeta,
+        "sprite.getMeta 必须存在")
+end
+
+-- 契约完整性：19 个新函数在 4 引擎都必须有**显式实现**
+-- （不能只靠 engine_api 的空桩继承 —— 那是"看起来有，实际没实现"）
+function TestEngineAPI.testNewContractsExplicitlyImplemented()
+    print("\n=== Test: 新契约在 4 引擎显式实现 ===")
+    local newFns = {
+        "render.getWidth", "render.getHeight", "font.measureText",
+        "sprite.createFromRGBA", "sprite.createFromEncoded", "sprite.getMeta",
+    }
+    -- **不 require engine_love2d**：它在模块加载期就读 love.filesystem，
+    -- 而测试环境只有 TestHelper 的 mock（无 filesystem 字段）。
+    -- 改为源码级断言：4 个引擎文件里都必须有显式赋值。
+    local sources = {
+        { name = "LOVE", path = "engine-love2d/engine_love2d.lua" },
+        { name = "MUD",  path = "engine-mud/engine_mud.lua" },
+        { name = "Web",  path = "engine-web/engine_web.lua" },
+        { name = "Test", path = "tests/engine_test.lua" },
+    }
+    local function readSrc(rel)
+        for _, p in ipairs({ rel, "game/" .. rel }) do
+            local f = io.open(p, "rb")
+            if f then local c = f:read("*a"); f:close(); return c end
+        end
+        return nil
+    end
+
+    for _, e in ipairs(sources) do
+        local src = readSrc(e.path)
+        TestHelper.assertNotNil(src, e.name .. " 源码应可读: " .. e.path)
+        for _, fn in ipairs(newFns) do
+            local m, f = fn:match("([^.]+)%.(.+)")
+            -- 两种赋值形态都算实现
+            local pat1 = "EngineAPI%." .. m .. "%." .. f .. " = function"
+            local pat2 = "function EngineAPI%." .. m .. "%." .. f .. "%("
+            local found = src:find(pat1) or src:find(pat2)
+            TestHelper.assertNotNil(found,
+                e.name .. " 缺显式实现: " .. fn .. "（不能只靠 engine_api 空桩继承）")
+        end
+    end
+end
+
 -- REQ-IAL-4：四个实现都必须补齐 9 个 input 函数（缺一个就会有 nil 函数）
 function TestEngineAPI.testAllEnginesHaveNineInputFunctions()
     print("\n=== Test: 四引擎 input 函数完整性 ===")
@@ -240,6 +310,10 @@ function TestEngineAPI.runAll()
     TestEngineAPI.testInputModule()
     TestEngineAPI.testAllEnginesHaveNineInputFunctions()
     TestEngineAPI.testGetAxisRejectsInvalidName()
+    TestEngineAPI.testRenderSizeContracts()
+    TestEngineAPI.testFontMeasureContract()
+    TestEngineAPI.testSpriteCreateContracts()
+    TestEngineAPI.testNewContractsExplicitlyImplemented()
     TestEngineAPI.testAudioModule()
     TestEngineAPI.testTimeModule()
     TestEngineAPI.testFileModule()

@@ -55,6 +55,17 @@ EngineAPI.render.present = function()
     logCall("render.present")
 end
 
+--- 取渲染尺寸：MUD 引擎无真实图形，返回哨兵值（ADR-PORT-007）
+EngineAPI.render.getWidth = function()
+    logCall("render.getWidth")
+    return 1024
+end
+
+EngineAPI.render.getHeight = function()
+    logCall("render.getHeight")
+    return 768
+end
+
 EngineAPI.render.presentAndWait = function(delay)
     logCall("render.presentAndWait", delay)
 end
@@ -96,6 +107,27 @@ end
 -- 染色绘制（REQ-MS1-3）：MUD 引擎无渲染，记录调用即可
 EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
     logCall("sprite.drawTinted", archiveId, spriteId, x, y, color, alpha)
+end
+
+--- 从 RGBA 字节创建纹理：MUD 无纹理概念，返回哨兵 handle
+EngineAPI.sprite.createFromRGBA = function(w, h, rgbaBytes, opts)
+    logCall("sprite.createFromRGBA", w, h)
+    opts = opts or {}
+    return { w = w or 0, h = h or 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
+end
+
+--- 从编码字节创建纹理：MUD 无解码能力
+EngineAPI.sprite.createFromEncoded = function(bytes, formatHint, opts)
+    logCall("sprite.createFromEncoded", formatHint)
+    opts = opts or {}
+    return { w = 0, h = 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
+end
+
+--- 取元数据：MUD 返回创建时记录的哨兵值
+EngineAPI.sprite.getMeta = function(handle)
+    if type(handle) ~= "table" then return nil end
+    return { w = handle.w or 0, h = handle.h or 0,
+             xoff = handle.xoff or 0, yoff = handle.yoff or 0 }
 end
 
 --------------------------------------------------------------------
@@ -323,6 +355,12 @@ end
 --------------------------------------------------------------------
 -- font 模块 - 返回存根对象
 --------------------------------------------------------------------
+--- MUD 无字体度量能力，返回 nil 让 TextBoxLayout 退回 em 估算
+EngineAPI.font.measureText = function(str, size, fontName)
+    logCall("font.measureText")
+    return nil
+end
+
 EngineAPI.font.get = function(fontName, size)
     logCall("font.get", fontName, size)
     return { name = fontName, size = size }

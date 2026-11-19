@@ -57,6 +57,32 @@ EngineAPI.render.presentAndWait = function(delay)
     lib.ShowSlow(delay)
 end
 
+--- 取渲染目标尺寸（逻辑像素）
+--
+-- 实测（Windows 150% 缩放下）：love.graphics.getDimensions() 返回 1024×768，
+-- 与 DrawString/DrawRect 同一坐标空间，无需 DPI 换算。
+-- 但 Godot/Android 会变，所以契约必须走查询而非编译期常量。
+EngineAPI.render.getWidth = function()
+    if love and love.graphics and love.graphics.getWidth then
+        local w = love.graphics.getWidth()
+        if type(w) == "number" and w > 0 then return w end
+    end
+    -- 兜底：引擎异常时给哨兵值而不是 nil（调用方无需做 nil 判断）
+    local CC = rawget(_G, "CC")
+    if CC and type(CC.ScreenW) == "number" and CC.ScreenW > 0 then return CC.ScreenW end
+    return 1024
+end
+
+EngineAPI.render.getHeight = function()
+    if love and love.graphics and love.graphics.getHeight then
+        local h = love.graphics.getHeight()
+        if type(h) == "number" and h > 0 then return h end
+    end
+    local CC = rawget(_G, "CC")
+    if CC and type(CC.ScreenH) == "number" and CC.ScreenH > 0 then return CC.ScreenH end
+    return 768
+end
+
 -- sprite 模块
 EngineAPI.sprite.initSprites = function()
     -- 原 lib_love 中 PicInit 加载调色板
@@ -78,6 +104,78 @@ end
 -- 染色绘制（REQ-MS1-3）：颜色来自 {r,g,b}，不是位域 flag
 EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
     lib.DrawPicTinted(archiveId, spriteId, x, y, color, alpha)
+end
+
+-- ADR-PORT-013：从原始 RGBA 字节创建纹理
+--
+-- 实测（LÖVE 11.5）：
+--   love.image.newImageData(w, h, "rgba8", rawBytes)   可用（4 参数形式）
+--   性能：逐像素 setPixel 1.0ms / raw 一次性 0.0ms（64x64，加速比 10000x）
+--   注意：ImageData 没有 setPixels 方法；只有 setPixel / getPixel / paste / mapPixel
+EngineAPI.sprite.createFromRGBA = function(w, h, rgbaBytes, opts)
+    if type(w) ~= "number" or type(h) ~= "number" or w <= 0 or h <= 0 then return nil end
+    if type(rgbaBytes) ~= "string" then return nil end
+    if #rgbaBytes < w * h * 4 then return nil end   -- 数据不足，拒绝而不是崩
+
+    local ok, imgdata = pcall(love.image.newImageData, w, h, "rgba8", rgbaBytes)
+    if not ok or not imgdata then return nil end
+
+    local ok2, img = pcall(love.graphics.newImage, imgdata,
+        { mipmaps = false, linear = false, dpiscale = 1 })
+    if not ok2 or not img then return nil end
+
+    opts = opts or {}
+    return {
+        img   = img,
+        w     = w,
+        h     = h,
+        xoff  = opts.xoff or 0,
+        yoff  = opts.yoff or 0,
+    }
+end
+
+-- ADR-PORT-014：从编码后的图片字节创建纹理（引擎负责解码）
+--
+-- LÖVE 11.5 的 love.image.newImageData 支持 PNG/JPG/BMP/TGA（实测 PNG/JPG 均 OK）。
+-- 不支持 WebP（需要额外库），所以若 formatHint 是 webp 会被 pcall 拦住并返回 nil。
+EngineAPI.sprite.createFromEncoded = function(bytes, formatHint, opts)
+    if type(bytes) ~= "string" or bytes == "" then return nil end
+    if not (love and love.filesystem and love.filesystem.newFileData) then return nil end
+
+    -- 用 formatHint 生成文件名：多数解码器靠字节嗅探，但给个扩展名更稳
+    local ext = type(formatHint) == "string" and formatHint ~= "" and formatHint or "png"
+    local ok, fd = pcall(love.filesystem.newFileData, bytes, "encoded." .. ext)
+    if not ok or not fd then return nil end
+
+    local ok2, imgdata = pcall(love.image.newImageData, fd)
+    if not ok2 or not imgdata then return nil end
+
+    local w = imgdata:getWidth()
+    local h = imgdata:getHeight()
+    if not w or not h or w <= 0 or h <= 0 then return nil end
+
+    local ok3, img = pcall(love.graphics.newImage, imgdata,
+        { mipmaps = false, linear = false, dpiscale = 1 })
+    if not ok3 or not img then return nil end
+
+    opts = opts or {}
+    return {
+        img  = img,
+        w    = w,
+        h    = h,
+        xoff = opts.xoff or 0,
+        yoff = opts.yoff or 0,
+    }
+end
+
+EngineAPI.sprite.getMeta = function(handle)
+    if type(handle) ~= "table" then return nil end
+    return {
+        w    = handle.w or 0,
+        h    = handle.h or 0,
+        xoff = handle.xoff or 0,
+        yoff = handle.yoff or 0,
+    }
 end
 
 -- map 模块
@@ -440,6 +538,32 @@ EngineAPI.script.load = function(path)
 end
 
 -- font 模块
+--- 量文本真实像素宽度
+--
+-- TextBoxLayout.textWidth 会优先用它；本函数返回 nil 时那边退回 em 估算。
+--
+-- **返回值合理性校验是必须的**：测试环境里的 love stub（
+-- test_mod_boot 的 installLoveStub / tests.mod_boot_harness）把
+-- `newFont()` 的 `getWidth` 桩成恒返回 1。若这里照单全收，
+-- TextBoxLayout.textWidth 就返回 1，全量测试里所有菜单框宽会塌成
+-- 1 + 边框（实测连砸 6 条断言）。
+--
+-- 判据：宽度必须 > 0 且 >= 字号的 0.4 倍（任何真实字体最窄字形也不会低于此）。
+-- 不满足就返回 nil，让调用方走 em 估算 —— 宁可略粗也不给垃圾值。
+EngineAPI.font.measureText = function(str, size, fontName)
+    if type(str) ~= "string" or str == "" then return 0 end
+    if type(size) ~= "number" or size <= 0 then return nil end
+    local okFont, font = pcall(EngineAPI.font.get, fontName, size)
+    if not okFont or not font then return nil end
+    local okW, w = pcall(font.getWidth, font, str)
+    if not okW or type(w) ~= "number" then return nil end
+    -- 合理性下限：一号字最窄也有约 0.4em（simsun 全角 1em、半角 0.5em；
+    -- 即使换非等宽字体，任何单字符也不会窄于 0.4em）
+    local minExpected = #str * size * 0.4
+    if w < minExpected then return nil end
+    return w
+end
+
 EngineAPI.font.get = function(fontName, size)
     -- lib_love 内部有 getFont 函数，但未导出
     -- 使用 love.graphics.newFont 直接实现

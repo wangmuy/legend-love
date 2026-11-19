@@ -68,6 +68,15 @@ function EngineAPI.render.present()
     renderBuffer = {}
 end
 
+--- 取渲染尺寸：web 是 xterm 终端，返回固定哨兵值
+function EngineAPI.render.getWidth()
+    return 1024
+end
+
+function EngineAPI.render.getHeight()
+    return 768
+end
+
 function EngineAPI.render.presentAndWait(delay)
     EngineAPI.render.present()
     pcall(coroutine.yield)
@@ -117,6 +126,25 @@ function EngineAPI.sprite.draw(archiveId, spriteId, x, y, flags, alpha) end
 
 -- 染色绘制（REQ-MS1-3）：web 终端无图形渲染
 function EngineAPI.sprite.drawTinted(archiveId, spriteId, x, y, color, alpha) end
+
+--- 从 RGBA 字节创建纹理：web 无纹理概念，返回哨兵 handle
+function EngineAPI.sprite.createFromRGBA(w, h, rgbaBytes, opts)
+    opts = opts or {}
+    return { w = w or 0, h = h or 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
+end
+
+--- 从编码字节创建纹理：web 无解码能力
+function EngineAPI.sprite.createFromEncoded(bytes, formatHint, opts)
+    opts = opts or {}
+    return { w = 0, h = 0, xoff = opts.xoff or 0, yoff = opts.yoff or 0 }
+end
+
+--- 取元数据
+function EngineAPI.sprite.getMeta(handle)
+    if type(handle) ~= "table" then return nil end
+    return { w = handle.w or 0, h = handle.h or 0,
+             xoff = handle.xoff or 0, yoff = handle.yoff or 0 }
+end
 
 --------------------------------------------------------------------------------
 -- map - no-op
@@ -397,6 +425,11 @@ end
 -- font - stub
 --------------------------------------------------------------------------------
 EngineAPI.font = {}
+
+--- web 无字体度量，返回 nil 让 TextBoxLayout 退回 em 估算
+function EngineAPI.font.measureText(str, size, fontName)
+    return nil
+end
 
 function EngineAPI.font.get(fontName, size)
     return { name = fontName or "monospace", size = size or 14 }

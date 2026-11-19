@@ -39,6 +39,21 @@ function M.render.drawBackground(x1, y1, x2, y2, brightness) end
 -- @param x1, y1, x2, y2 number 裁剪区域
 function M.render.setClip(x1, y1, x2, y2) end
 
+--- 取当前渲染目标的宽（逻辑像素）
+--
+-- 为什么必须有它：调用方目前靠全局 CC.ScreenW（**编译期常量**）拿屏幕宽。
+-- 但 Godot 的窗口可在运行时缩放、Android 会旋转、多显示器会变 DPI ——
+-- 编译期常量无法适配。
+--
+-- 无图形能力的引擎（如 MUD）SHALL 返回哨兵值（1024），SHALL NOT 返回 nil。
+--
+-- @return number 宽度（逻辑像素，> 0）
+function M.render.getWidth() end
+
+--- 取当前渲染目标的高（逻辑像素）
+-- @return number 高度（逻辑像素，> 0）
+function M.render.getHeight() end
+
 --- 提交渲染帧
 function M.render.present() end
 
@@ -97,6 +112,56 @@ function M.sprite.draw(archiveId, spriteId, x, y, flags, alpha) end
 -- @param color table {r=, g=, b=} 0-1 浮点；nil 或分量缺失时按原色绘制
 -- @param alpha number|nil 透明度 0-255（默认 255）
 function M.sprite.drawTinted(archiveId, spriteId, x, y, color, alpha) end
+
+--- 从原始 RGBA 字节创建纹理
+--
+-- **这是 ADR-PORT-013 的核心**：RLE 与调色板解码住在 framework
+-- （`framework/sprite_decoder.lua`），引擎只负责把字节串上传成纹理。
+--
+-- 为什么这样分工：`lib_love.lua` 的 LoadPic 有 124 行，其中只有 5 行
+-- 真正碰引擎（创建画布 / 逐像素写 / 上传纹理），其余 119 行
+-- （读 idx 偏移、解析帧头、RLE 解压、查调色板）全是可移植的纯数据操作。
+-- 让引擎承担那 119 行，等于每个新引擎都要重写一遍。
+--
+-- **字节顺序契约：rgbaBytes 一律 RGBA 顺序**（R,G,B,A 依次排列）。
+--   LÖVE    rgba8 原生即 RGBA     → newImageData(w, h, "rgba8", raw)
+--   Godot   FORMAT_RGBA8 即 RGBA  → Image.create_from_data(...)
+--   Unreal  PF_B8G8R8A8 是 BGRA   → **实现内需 swizzle**
+--   SDL2    SDL_PIXELFORMAT_RGBA8888
+-- 若引擎原生格式不同，SHALL 在实现内部转换，调用方无需感知。
+--
+-- @param w, h number 尺寸
+-- @param rgbaBytes string w*h*4 字节，RGBA 顺序
+-- @param opts table|nil { xoff=, yoff=（锚点，默认 0） }
+-- @return table|nil handle { w=, h=, xoff=, yoff= }
+function M.sprite.createFromRGBA(w, h, rgbaBytes, opts) end
+
+--- 从编码后的图片字节创建纹理（引擎负责解码）
+--
+-- 用于 framework **无法纯 Lua 解码**的格式（PNG/JPG/WebP 等需要解压库）。
+-- framework 只做字节签名嗅探（ADR-PORT-014），解码交给引擎：
+--   LÖVE    love.image.newImageData(FileData)
+--   Godot   Image.load_png_from_buffer / load_jpg_from_buffer
+--   Unreal  FImageUtils::ImportBufferAsTexture2D
+--   SDL2    IMG_Load_RW
+--
+-- formatHint 是**提示**（framework 嗅探的结论），引擎可以忽略它
+-- （多数引擎的解码器自己会嗅探）。它存在是为了让引擎能走更快的分支。
+--
+-- @param bytes string 完整图片文件字节
+-- @param formatHint string|nil "png" | "jpg" | "webp" | ...
+-- @param opts table|nil { xoff=, yoff= }
+-- @return table|nil handle { w=, h=, xoff=, yoff= }
+function M.sprite.createFromEncoded(bytes, formatHint, opts) end
+
+--- 取纹理的元数据（尺寸 + 锚点）
+--
+-- 两条创建路径（createFromRGBA / createFromEncoded）的返回值都 SHALL
+-- 能被本函数查询，保证「锚点语义与创建路径无关」。
+--
+-- @param handle table createFromRGBA/createFromEncoded 的返回值
+-- @return table { w=, h=, xoff=, yoff= }
+function M.sprite.getMeta(handle) end
 
 --------------------------------------------------------------------
 -- map - 等距地图系统
@@ -404,6 +469,22 @@ M.font = {}
 -- @param size number 字体大小
 -- @return table 字体对象
 function M.font.get(fontName, size) end
+
+--- 量一段文本的真实像素宽度
+--
+-- **为什么需要它**：TextBoxLayout.textWidth 目前用 em 估算
+-- （汉字 1.0em / ASCII 0.5em）。这个估算在 simsun.ttf 上实测**精确**
+-- （16/24/32 三个字号 × 19 个代表性文本，偏差全部 0.00px），
+-- 但换到非等宽字体（Godot 默认字体、Unreal 默认字体）必然偏差。
+--
+-- 因此 textWidth 会**优先**用本函数；本函数不存在时退回 em 估算。
+-- 实现必须返回 number；无法度量时返回 nil（调用方会 fallback），不得抛错。
+--
+-- @param str string 文本
+-- @param size number 字号
+-- @param fontName string|nil 字体名
+-- @return number|nil 像素宽度
+function M.font.measureText(str, size, fontName) end
 
 --------------------------------------------------------------------
 -- dialog - 对话框（语义级）

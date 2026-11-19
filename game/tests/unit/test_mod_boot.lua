@@ -564,6 +564,12 @@ function TestModBoot.runAll()
     print(string.rep("=", 60))
     TestHelper.resetCounts()
 
+    -- 记下入口时的 _G 元表：JYMainAdapter.init() 会给 _G 装 strict 元表
+    -- （__newindex 报 "attempt read write to undeclared variable"），
+    -- 末尾清理若不先还原它，TestHelper.setup() 一写 _G.love 就抛错。
+    -- 实测踩到：test_helper.lua:198 attempt read write to undeclared variable love
+    local entryGlobalMT = getmetatable(_G)
+
     TestModBoot.testFullBootChainWithMingdong()
     TestModBoot.testRuntimeTalkReadWithMingdong()
     TestModBoot.testWarLoadWithMingdong()
@@ -572,6 +578,18 @@ function TestModBoot.runAll()
     TestModBoot.testLovingNegativeBeginSceneDoesNotCrash()
     TestModBoot.testFullBootChainForProblematicMods()
     TestModBoot.testProductSavesNotDestroyedByTests()
+
+    -- 只还原 _G 元表，**不擦 package.loaded**。
+    --
+    -- 为什么不能擦：本套件为了跑完整启动链路导入了真实 engine_love2d，
+    -- 它会往 4 引擎**共享**的 engine_api 表上写实现。若在这里清模块缓存，
+    -- 后续套件（如 test_new_event）会拿到新的模块实例，而它自己的
+    -- booted/menuBooted 守卫仍是 true → 跳过重新初始化 → 拿不到菜单实例。
+    -- 实测踩到：test_new_event.lua:417 attempt to index a nil value。
+    --
+    -- 污染由**各套件自己**在 runAll 开头调 TestHelper.setup() 解决
+    -- （setup 会把 _G.EngineAPI 换成干净 mock，不依赖共享表）。
+    setmetatable(_G, entryGlobalMT)
 
     TestHelper.printSummary()
     return TestHelper.getStats().allPassed
