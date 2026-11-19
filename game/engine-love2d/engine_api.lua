@@ -218,6 +218,34 @@ function M.map.saveScene(sFile, dFile) end
 -- @param width, height number 地图尺寸
 function M.map.loadBattle(idxFile, grpFile, mapId, num, width, height) end
 
+--- 读取地图瓦片数据
+--
+-- layer 语义（与原版 lib.GetMMap 的 flag 完全一致，**不自造编号**）：
+--   0 = earth   地面层
+--   1 = surface 表层
+--   2 = building 建筑层
+--   3 = buildx  建筑遮罩 X
+--   4 = buildy  建筑遮罩 Y
+--
+-- 为什么保留这 5 个编号而不是抽象成"地形/障碍"：
+--   这 5 层是**数据格式的一部分**（.grp 里就是这 5 个数组），
+--   抽象成语义层反而要每个引擎自己定义映射，是多引擎分歧的源头。
+--
+-- @param x, y number 地图坐标
+-- @param layer number 0..4
+-- @return number 瓦片编号（-1 = 越界）
+function M.map.getTile(x, y, layer) end
+
+--- 卸载主地图数据（释放内存）
+function M.map.unload() end
+
+--- 推进云层动画（纯时间驱动的位置更新）
+--
+-- 云的位置纯粹是**游戏逻辑**（每 40ms 按 Speedx/Speedy 移动），
+-- 与引擎无关；引擎只需提供当前时间（EngineAPI.time.getTime）。
+-- 但绘制云的像素仍归引擎（sprite.draw）。
+function M.map.tickClouds() end
+
 --- 绘制主地图
 -- @param playerX, playerY number 玩家坐标
 -- @param playerPic number 玩家贴图编号

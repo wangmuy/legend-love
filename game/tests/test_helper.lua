@@ -396,6 +396,19 @@ function TestHelper.mockEngineAPI()
                 return { w = hd.w or 0, h = hd.h or 0, xoff = hd.xoff or 0, yoff = hd.yoff or 0 }
             end,
         },
+        -- map 段：Task 6 之后 framework 用 map.getTile/unload/tickClouds
+        map = {
+            getTile = function() return -1 end,
+            unload = function() end,
+            tickClouds = function() end,
+            loadMain = function() end,
+            loadScene = function() end,
+            loadBattle = function() end,
+            drawMain = function() end,
+            drawScene = function() end,
+            drawBattle = function() end,
+            saveScene = function() end,
+        },
         -- font 段
         font = {
             get = function() return nil end,

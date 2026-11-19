@@ -166,6 +166,15 @@ function EngineAPI.map.loadBattle(idxFile, grpFile, mapId, num, width, height) e
 
 function EngineAPI.map.drawMain(playerX, playerY, playerPic) end
 
+--- 地图瓦片：web 无地图数据，返回越界哨兵 -1
+function EngineAPI.map.getTile(x, y, layer)
+    return -1
+end
+
+function EngineAPI.map.unload() end
+
+function EngineAPI.map.tickClouds() end
+
 function EngineAPI.map.drawScene(sceneId, x, y, offX, offY, playerPic) end
 
 function EngineAPI.map.drawBattle(flag, x, y, v1, v2, v3) end

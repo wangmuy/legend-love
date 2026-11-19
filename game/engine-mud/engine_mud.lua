@@ -159,6 +159,20 @@ EngineAPI.map.drawMain = function(playerX, playerY, playerPic)
     logCall("map.drawMain", playerX, playerY, playerPic)
 end
 
+--- 地图瓦片：MUD 无地图数据，返回越界哨兵 -1
+EngineAPI.map.getTile = function(x, y, layer)
+    logCall("map.getTile", x, y, layer)
+    return -1
+end
+
+EngineAPI.map.unload = function()
+    logCall("map.unload")
+end
+
+EngineAPI.map.tickClouds = function()
+    logCall("map.tickClouds")
+end
+
 EngineAPI.map.drawScene = function(sceneId, x, y, offX, offY, playerPic)
     logCall("map.drawScene", sceneId, x, y, offX, offY, playerPic)
 end

@@ -175,6 +175,24 @@ EngineAPI.map.drawMain = function(playerX, playerY, playerPic)
     logCall("map.drawMain", playerX, playerY, playerPic)
 end
 
+--- 可注入的地图瓦片（测试用）
+EngineAPI.map._tiles = {}
+EngineAPI.map.getTile = function(x, y, layer)
+    logCall("map.getTile", x, y, layer)
+    local key = tostring(x) .. "," .. tostring(y) .. "," .. tostring(layer)
+    local v = EngineAPI.map._tiles[key]
+    if v == nil then return -1 end
+    return v
+end
+
+EngineAPI.map.unload = function()
+    logCall("map.unload")
+end
+
+EngineAPI.map.tickClouds = function()
+    logCall("map.tickClouds")
+end
+
 EngineAPI.map.drawScene = function(sceneId, x, y, offX, offY, playerPic)
     logCall("map.drawScene", sceneId, x, y, offX, offY, playerPic)
 end

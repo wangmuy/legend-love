@@ -229,6 +229,19 @@ EngineAPI.map.loadBattle = function(idxFile, grpFile, mapId, num, width, height)
     lib.LoadWarMap(idxFile, grpFile, mapId, num, width, height)
 end
 
+--- 读取地图瓦片（layer 编号与原版 GetMMap 的 flag 完全一致）
+EngineAPI.map.getTile = function(x, y, layer)
+    return lib.GetMMap(x, y, layer)
+end
+
+EngineAPI.map.unload = function()
+    lib.UnloadMMap()
+end
+
+EngineAPI.map.tickClouds = function()
+    lib.CloudTick()
+end
+
 EngineAPI.map.drawMain = function(playerX, playerY, playerPic)
     lib.DrawMMap(playerX, playerY, playerPic)
 end

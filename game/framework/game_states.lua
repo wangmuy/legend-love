@@ -55,7 +55,7 @@ local function mmapWalkable(x, y)
     if x < 10 or y < 10 or x > CC.MWidth - 10 or y > CC.MHeight - 10 then
         return false
     end
-    return lib.GetMMap(x, y, 3) == 0 and lib.GetMMap(x, y, 4) == 0
+    return EngineAPI.map.getTile(x, y, 3) == 0 and EngineAPI.map.getTile(x, y, 4) == 0
 end
 
 -- 子场景可走性：**直接复用 SceneCanPass**，不得重写
@@ -385,7 +385,7 @@ handlers["GAME_MMAP"] = {
         EngineAPI.debug.log("Exit GAME_MMAP state")
         -- 清理大地图资源
         CleanMemory()
-        lib.UnloadMMap()
+        EngineAPI.map.unload()
         EngineAPI.sprite.initSprites()
         EngineAPI.render.presentAndWait(50)
     end,
@@ -465,7 +465,7 @@ handlers["GAME_MMAP"] = {
         
         JY.SubScene = CanEnterScene(x, y)
         
-        if lib.GetMMap(x, y, 3) == 0 and lib.GetMMap(x, y, 4) == 0 then
+        if EngineAPI.map.getTile(x, y, 3) == 0 and EngineAPI.map.getTile(x, y, 4) == 0 then
             JY.Base["人X"] = x
             JY.Base["人Y"] = y
         end
@@ -473,7 +473,7 @@ handlers["GAME_MMAP"] = {
         JY.Base["人X"] = limitX(JY.Base["人X"], 10, CC.MWidth - 10)
         JY.Base["人Y"] = limitX(JY.Base["人Y"], 10, CC.MHeight - 10)
         
-        if CC.MMapBoat[lib.GetMMap(JY.Base["人X"], JY.Base["人Y"], 0)] == 1 then
+        if CC.MMapBoat[EngineAPI.map.getTile(JY.Base["人X"], JY.Base["人Y"], 0)] == 1 then
             JY.Base["乘船"] = 1
         else
             JY.Base["乘船"] = 0
@@ -486,7 +486,7 @@ handlers["GAME_MMAP"] = {
 
         -- 云朵漂移：原版 kys_main.cpp 主循环每 40ms 移动一次（MMAPAMI>0 门控
         -- 在 CloudTick 内部），与主角移动解耦，每帧调用即可。
-        lib.CloudTick()
+        EngineAPI.map.tickClouds()
     end,
     
     -- 每帧渲染
@@ -497,7 +497,7 @@ handlers["GAME_MMAP"] = {
         -- 原来的 FastShowScreen 优化在 SDL 中有效，但在 Love2D 中会导致黑屏
         -- 因此简化绘制逻辑，始终全屏重绘
         EngineAPI.render.setClip(0, 0, CC.ScreenW, CC.ScreenH)
-        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
+        EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], pic)
         
         if CC.ShowXY == 1 then
             DrawString(10, CC.ScreenH - 20, string.format("%d %d", JY.Base["人X"], JY.Base["人Y"]), C_GOLD, 16)
@@ -876,7 +876,7 @@ handlers["GAME_FIRSTMMAP"] = {
         
         Init_MMap()
         
-        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], GetMyPic())
+        EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], GetMyPic())
         EngineAPI.render.present()
     end,
     
@@ -894,7 +894,7 @@ handlers["GAME_FIRSTMMAP"] = {
     draw = function()
         -- 绘制主地图
         local pic = GetMyPic()
-        lib.DrawMMap(JY.Base["人X"], JY.Base["人Y"], pic)
+        EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], pic)
         -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
         -- ShowScreen(0)
     end
