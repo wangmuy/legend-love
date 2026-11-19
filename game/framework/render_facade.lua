@@ -174,7 +174,67 @@ function RenderFacade.drawStrBox(x, y, str, color, size)
     RenderFacade.present()
 end
 
---- 带阴影的背景框（替代 DrawBox / lib.Background）
+--- 带阴影 + 白色双边框的方框（替代 script 层 `DrawBox`）
+--
+-- **必须有这个函数，不能用 drawBackground 代替**：
+--   script 的 DrawBox(x1,y1,x2,y2,color) 做两件事：
+--     ① 4 个 lib.Background 画阴影（四角空出 s=4 像素）
+--     ② 2 个 DrawBox_1 画白色边框（每个 12 段 lib.DrawRect）
+--   而 EngineAPI.render.drawBackground 只做 ①。
+--   若把 DrawBox 换成 drawBackground，**所有菜单框/对话框/物品框
+--   就只剩半透明阴影，白边框消失** —— 实测确认过这个替换是错的。
+--
+-- 本函数的 DrawBox_1 部分用 rectOutline 逐段复刻（12 段），
+-- 保证与原版视觉一致。
+--
+-- @param x1, y1, x2, y2 number 角点
+-- @param color number|table 边框主色
+function RenderFacade.drawBox(x1, y1, x2, y2, color)
+    local s = 4
+
+    -- ① 阴影（四角空出）
+    RenderFacade.drawBackground(x1, y1 + s, x1 + s, y2 - s, 128)
+    RenderFacade.drawBackground(x1 + s, y1, x2 - s, y2, 128)
+    RenderFacade.drawBackground(x2 - s, y1 + s, x2, y2 - s, 128)
+
+    -- ② 内层暗色边框（原版是 RGB(r/2,g/2,b/2)）
+    local r, g, b = 0.5, 0.5, 0.5
+    if type(color) == "number" then
+        local v = color % 0x1000000
+        r = (math.floor(v / 65536) % 256) / 255 / 2
+        g = (math.floor(v / 256) % 256) / 255 / 2
+        b = (v % 256) / 255 / 2
+    end
+    RenderFacade._drawBox1(x1 + 1, y1 + 1, x2, y2, { r = r, g = g, b = b })
+
+    -- ③ 外层主色边框
+    RenderFacade._drawBox1(x1, y1, x2 - 1, y2 - 1, color)
+end
+
+--- 四角凹进的方框（原版 DrawBox_1，12 段折线）
+-- @private
+function RenderFacade._drawBox1(x1, y1, x2, y2, color)
+    local s = 4
+    local segs = {
+        { x1 + s, y1,     x2 - s, y1     },
+        { x2 - s, y1,     x2 - s, y1 + s },
+        { x2 - s, y1 + s, x2,     y1 + s },
+        { x2,     y1 + s, x2,     y2 - s },
+        { x2,     y2 - s, x2 - s, y2 - s },
+        { x2 - s, y2 - s, x2 - s, y2     },
+        { x2 - s, y2,     x1 + s, y2     },
+        { x1 + s, y2,     x1 + s, y2 - s },
+        { x1 + s, y2 - s, x1,     y2 - s },
+        { x1,     y2 - s, x1,     y1 + s },
+        { x1,     y1 + s, x1 + s, y1 + s },
+        { x1 + s, y1 + s, x1 + s, y1     },
+    }
+    for _, t in ipairs(segs) do
+        RenderFacade.rectOutline(t[1], t[2], t[3], t[4], color)
+    end
+end
+
+--- 带阴影的背景框（替代 lib.Background 的单一调用）
 function RenderFacade.drawBackground(x1, y1, x2, y2, brightness)
     local EA = api()
     if not (EA and EA.render and EA.render.drawBackground) then return end

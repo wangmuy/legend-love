@@ -492,9 +492,9 @@ function ItemAsync.draw()
     local y3_2 = y3_1 + h
     
     -- 绘制信息框（名称和说明）
-    RenderFacade.drawBackground(dx, y1_1, dx + w, y1_2, C_WHITE)
-    RenderFacade.drawBackground(dx, y2_1, dx + w, y2_2, C_WHITE)
-    RenderFacade.drawBackground(dx, y3_1, dx + w, y3_2, C_WHITE)
+    RenderFacade.drawBox(dx, y1_1, dx + w, y1_2, C_WHITE)
+    RenderFacade.drawBox(dx, y2_1, dx + w, y2_2, C_WHITE)
+    RenderFacade.drawBox(dx, y3_1, dx + w, y3_2, C_WHITE)
     
     -- 显示选中物品的信息
     if selectedItem then
