@@ -97,6 +97,20 @@ else
     fail=$((fail + 1))
 fi
 
+# ------------------------------- G. 搬移保真性（字节级）
+log "=== STEP: G. 搬移是纯字节搬移（零逻辑改动）==="
+if command -v python3 >/dev/null 2>&1; then
+    if python3 game/tests/verify_battle_move_fidelity.py >/dev/null 2>&1; then
+        log "  [PASS] 66 个战斗函数 + 20 个协程逐字节一致"
+    else
+        log "  [FAIL] 搬移内容有改动（应只有位置变化，无逻辑改动）"
+        python3 game/tests/verify_battle_move_fidelity.py 2>&1 | grep 'FAIL' | head -3 | tee -a "$LOG"
+        fail=$((fail + 1))
+    fi
+else
+    log "  [SKIP] 无 python3（无法做字节级校验）"
+fi
+
 # --------------------------------------------------------------- 汇总
 log "============================================"
 if [ "$fail" -eq 0 ]; then
