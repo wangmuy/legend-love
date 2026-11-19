@@ -492,9 +492,9 @@ function ItemAsync.draw()
     local y3_2 = y3_1 + h
     
     -- 绘制信息框（名称和说明）
-    DrawBox(dx, y1_1, dx + w, y1_2, C_WHITE)
-    DrawBox(dx, y2_1, dx + w, y2_2, C_WHITE)
-    DrawBox(dx, y3_1, dx + w, y3_2, C_WHITE)
+    RenderFacade.drawBackground(dx, y1_1, dx + w, y1_2, C_WHITE)
+    RenderFacade.drawBackground(dx, y2_1, dx + w, y2_2, C_WHITE)
+    RenderFacade.drawBackground(dx, y3_1, dx + w, y3_2, C_WHITE)
     
     -- 显示选中物品的信息
     if selectedItem then
@@ -585,7 +585,7 @@ local function SelectTeamMemberAsync(title)
     end
     
     if title then
-        DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, title, C_WHITE, CC.DefaultFont)
+        RenderFacade.drawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, title, C_WHITE, CC.DefaultFont)
     end
     
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight

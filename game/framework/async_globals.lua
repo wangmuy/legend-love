@@ -3,6 +3,7 @@
 -- 基于 EngineAPI yieldable 函数的事件驱动适配层
 -- 在事件脚本执行前安装，将阻塞函数替换为异步版本
 
+local FlowFacade = require("framework.flow_facade")
 local AsyncGlobals = {}
 
 local AsyncMessageBox = require("framework.async_message_box")
@@ -25,7 +26,7 @@ function AsyncGlobals.DrawStrBoxWaitKey_Async(s, color, size)
     if EngineAPI.coroutine.isRunning() then
         return AsyncMessageBox.ShowMessageCoroutine(-1, -1, s, color or C_WHITE, size or CC.DefaultFont)
     else
-        return _DrawStrBoxWaitKey(s, color, size)
+        return _FlowFacade.drawStrBoxFlowFacade.waitKey(s, color, size)
     end
 end
 
@@ -34,7 +35,7 @@ function AsyncGlobals.DrawStrBoxYesNo_Async(x, y, str, color, size)
     if EngineAPI.coroutine.isRunning() then
         return AsyncMessageBox.ShowYesNoCoroutine(-1, -1, str, color or C_WHITE, size or CC.DefaultFont)
     else
-        return _DrawStrBoxYesNo(x, y, str, color, size)
+        return _FlowFacade.drawStrBoxYesNo(x, y, str, color, size)
     end
 end
 
@@ -43,7 +44,7 @@ function AsyncGlobals.WaitKey_Async()
     if EngineAPI.coroutine.isRunning() then
         return EngineAPI.input.waitForKey()
     else
-        return _WaitKey()
+        return _FlowFacade.waitKey()
     end
 end
 
@@ -52,7 +53,7 @@ function AsyncGlobals.ShowMenu_Async(menuItem, numItem, numShow, x1, y1, x2, y2,
     if EngineAPI.coroutine.isRunning() then
         return MenuAsync.ShowMenuCoroutine(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
     else
-        return _ShowMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
+        return _FlowFacade.showMenu(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
     end
 end
 
@@ -61,7 +62,7 @@ function AsyncGlobals.ShowMenu2_Async(menuItem, numItem, numShow, x1, y1, x2, y2
     if EngineAPI.coroutine.isRunning() then
         return MenuAsync.ShowMenu2Coroutine(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
     else
-        return _ShowMenu2(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
+        return _FlowFacade.showMenu2(menuItem, numItem, numShow, x1, y1, x2, y2, isBox, isEsc, size, color, selectColor)
     end
 end
 
@@ -70,7 +71,7 @@ function AsyncGlobals.TalkEx_Async(s, headid, flag)
     if EngineAPI.coroutine.isRunning() then
         return TalkAsync.TalkExCoroutine(s, headid, flag)
     else
-        return _TalkEx(s, headid, flag)
+        return _FlowFacade.talkEx(s, headid, flag)
     end
 end
 

@@ -366,7 +366,7 @@ function AsyncDialog:drawDialog(dialog)
     local h = dialog.height
     
     -- 绘制背景
-    DrawBox(x, y, x + w, y + h, C_WHITE)
+    RenderFacade.drawBackground(x, y, x + w, y + h, C_WHITE)
     
     -- 绘制内容
     if dialog.type == "message" then
@@ -383,7 +383,7 @@ end
 -- 绘制确认对话框
 function AsyncDialog:drawYesNo(dialog, x, y, w, h)
     -- 绘制消息（使用菜单边框样式）
-    DrawBox(x, y, x + w, y + h, C_WHITE)
+    RenderFacade.drawBackground(x, y, x + w, y + h, C_WHITE)
     
     -- 绘制提示文本
     local pad = dialog.pad or CC.MenuBorderPixel
@@ -429,7 +429,7 @@ function AsyncDialog:drawInput(dialog, x, y, w, h)
     RenderFacade.text(x + 10, y + 10, dialog.prompt, C_WHITE, CC.DefaultFont)
     
     -- 绘制输入框
-    DrawBox(x + 10, y + 40, x + w - 10, y + 70, C_WHITE)
+    RenderFacade.drawBackground(x + 10, y + 40, x + w - 10, y + 70, C_WHITE)
     RenderFacade.text(x + 15, y + 45, dialog.input, C_WHITE, CC.DefaultFont)
     
     -- 绘制光标

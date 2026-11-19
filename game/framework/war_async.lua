@@ -2,6 +2,7 @@
 -- 战斗系统异步模块
 -- 提供战斗系统的协程版本函数
 
+local FlowFacade = require("framework.flow_facade")
 local RenderFacade = require("framework.render_facade")
 local SpriteAtlas = require("framework.sprite_atlas")
 local WarAsync = {}
@@ -1558,7 +1559,7 @@ War_ThingMenuCoroutine = function()
         if UseThingEffect(r, pid) == 1 then
             instruct_32(r, -1)  -- 减少物品数量
             useResult = 1
-            WaitKey()
+            FlowFacade.waitKey()
         end
     elseif thingType == 4 then
         -- 暗器：调用战斗暗器协程
@@ -1582,7 +1583,7 @@ War_StatusMenuCoroutine = function()
     WAR.ShowHead = 0
     
     -- 显示提示
-    DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
+    RenderFacade.drawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
     
     -- 构建队友菜单

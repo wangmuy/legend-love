@@ -2,6 +2,7 @@
 -- 异步菜单函数
 -- 提供非阻塞版本的ShowMenu和ShowMenu2
 
+local FlowFacade = require("framework.flow_facade")
 local MenuAsync = {}
 
 -- 导入菜单状态机

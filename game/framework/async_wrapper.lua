@@ -3,6 +3,7 @@
 -- 提供全局可用的异步函数，用于替换阻塞调用
 -- 在事件脚本中可以直接使用这些函数
 
+local FlowFacade = require("framework.flow_facade")
 local AsyncWrapper = {}
 
 local CoroutineScheduler = require("framework.coroutine_scheduler")
@@ -97,7 +98,7 @@ function AsyncWrapper.DrawStrBoxWaitKey_Compat(s, color, size)
         return AsyncWrapper.ShowMessage(s, color, size)
     else
         -- 不在协程中，使用原版
-        return DrawStrBoxWaitKey(s, color, size)
+        return FlowFacade.drawStrBoxFlowFacade.waitKey(s, color, size)
     end
 end
 
@@ -106,7 +107,7 @@ function AsyncWrapper.DrawStrBoxYesNo_Compat(x, y, str, color, size)
     if AsyncWrapper.IsInCoroutine() then
         return AsyncWrapper.ShowYesNo(str, color, size)
     else
-        return DrawStrBoxYesNo(x, y, str, color, size)
+        return FlowFacade.drawStrBoxYesNo(x, y, str, color, size)
     end
 end
 
@@ -115,7 +116,7 @@ function AsyncWrapper.WaitKey_Compat()
     if AsyncWrapper.IsInCoroutine() then
         return AsyncWrapper.WaitKey()
     else
-        return WaitKey()
+        return FlowFacade.waitKey()
     end
 end
 

@@ -4,6 +4,7 @@
 -- 更新日期: 2026-03-18
 -- 变更: 添加异步物品系统支持
 
+local FlowFacade = require("framework.flow_facade")
 local RenderFacade = require("framework.render_facade")
 local JyMainAsync = {}
 
@@ -168,8 +169,8 @@ function JyMainAsync.Menu_SaveRecord()
     
     if r > 0 then
         -- 显示保存提示
-        DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "保存中......", C_WHITE, CC.DefaultFont)
-        ShowScreen()  -- 强制刷新画面
+        RenderFacade.drawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "保存中......", C_WHITE, CC.DefaultFont)
+        RenderFacade.present()  -- 强制刷新画面
         
         if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then EngineAPI.debug.log("Menu_SaveRecord: calling SaveRecord") end
         SaveRecord(r)
@@ -177,8 +178,8 @@ function JyMainAsync.Menu_SaveRecord()
         -- 显示完成提示
         RenderFacade.clearScreen(CC.MainSubMenuX2, CC.MainSubMenuY, CC.ScreenW, CC.ScreenH)
         local elapsed = os.clock() - startTime
-        DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, string.format("保存完成 (%.1f秒)", elapsed), C_WHITE, CC.DefaultFont)
-        ShowScreen()
+        RenderFacade.drawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, string.format("保存完成 (%.1f秒)", elapsed), C_WHITE, CC.DefaultFont)
+        RenderFacade.present()
         
         -- 短暂显示后清除
         EngineAPI.time.sleep(500)
@@ -201,7 +202,7 @@ function JyMainAsync.Menu_ReadRecord()
     local r = MenuAsync.ShowMenuCoroutine(menu, 3, 0, CC.MainSubMenuX2, CC.MainSubMenuY, 0, 0, 1, 1, CC.DefaultFont, C_ORANGE, C_WHITE)
     
     if r > 0 then
-        DrawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
+        RenderFacade.drawStrBox(CC.MainSubMenuX2, CC.MainSubMenuY, "请稍候......", C_WHITE, CC.DefaultFont)
         -- 在 Love2D 中，不需要手动调用 ShowScreen，让 love.draw() 自动处理
         -- ShowScreen()
         local ok = LoadRecord(r)
@@ -220,7 +221,7 @@ function JyMainAsync.Menu_Status()
         EngineAPI.debug.log("JyMainAsync.Menu_Status: started")
     end
     
-    DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
+    RenderFacade.drawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要查阅谁的状态", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
 
     if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
@@ -251,7 +252,7 @@ end
 
 -- 离队菜单
 function JyMainAsync.Menu_PersonExit()
-    DrawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要求谁离队", C_WHITE, CC.DefaultFont)
+    RenderFacade.drawStrBox(CC.MainSubMenuX, CC.MainSubMenuY, "要求谁离队", C_WHITE, CC.DefaultFont)
     local nexty = CC.MainSubMenuY + CC.SingleLineHeight
 
     local r = JyMainAsync.SelectTeamMenuAsync(CC.MainSubMenuX, nexty)
@@ -399,12 +400,12 @@ end
 function JyMainAsync.drawMenuTitle()
     if currentMenuTitle then
         -- 绘制主标题
-        DrawStrBox(currentMenuTitle.x, currentMenuTitle.y, currentMenuTitle.title, C_WHITE, CC.DefaultFont)
+        RenderFacade.drawStrBox(currentMenuTitle.x, currentMenuTitle.y, currentMenuTitle.title, C_WHITE, CC.DefaultFont)
         
         -- 如果有能力标题，绘制它
         if currentMenuTitle.abilityKey then
             local nexty = currentMenuTitle.y + CC.SingleLineHeight
-            DrawStrBox(currentMenuTitle.x, nexty, currentMenuTitle.abilityKey, C_ORANGE, CC.DefaultFont)
+            RenderFacade.drawStrBox(currentMenuTitle.x, nexty, currentMenuTitle.abilityKey, C_ORANGE, CC.DefaultFont)
         end
     end
 end

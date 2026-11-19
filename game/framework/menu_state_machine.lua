@@ -638,7 +638,7 @@ function MenuStateMachine:pollCallback()
     -- 子菜单关闭，重绘当前菜单
     RenderFacade.clearScreen(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h)
     if menu.isBox == 1 then
-        DrawBox(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
+        RenderFacade.drawBackground(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
     end
 end
 
@@ -933,7 +933,7 @@ function MenuStateMachine:draw()
     
     -- 绘制边框
     if menu.isBox == 1 then
-        DrawBox(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
+        RenderFacade.drawBackground(menu.x1, menu.y1, menu.x1 + menu.w, menu.y1 + menu.h, C_WHITE)
     end
     
     -- 绘制菜单项

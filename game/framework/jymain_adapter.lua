@@ -1099,7 +1099,7 @@ function JYMainAdapter.startNewGame(menux)
 
     RenderFacade.clearScreen()
     RenderFacade.text(menux, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
-    ShowScreen()
+    RenderFacade.present()
     
     -- 载入新游戏数据
     local tLoad = PerfLog.begin("startNewGame.LoadRecord(0)")
@@ -1229,12 +1229,12 @@ function JYMainAdapter.loadGame()
     
     RenderFacade.clearScreen()
     RenderFacade.text(menux2, CC.StartMenuY, "请稍候...", C_RED, CC.StartMenuFontSize)
-    ShowScreen()
+    RenderFacade.present()
     
     local ok = LoadRecord(r)
     
     RenderFacade.clearScreen()
-    ShowScreen()
+    RenderFacade.present()
     
     if ok then
         -- 切换到首次主地图状态

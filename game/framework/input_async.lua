@@ -2,6 +2,7 @@
 -- 异步输入函数
 -- 提供非阻塞版本的WaitKey和其他输入函数
 
+local FlowFacade = require("framework.flow_facade")
 local InputAsync = {}
 
 -- 导入协程调度器

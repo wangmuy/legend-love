@@ -127,6 +127,53 @@ function RenderFacade.rectOutline(x1, y1, x2, y2, color)
     pcall(EA.render.rectOutline, x1, y1, x2, y2, color)
 end
 
+--- 带框的字符串（替代 script 层 `DrawStrBox`）
+--
+-- 复刻 script 语义（jymain.lua:2148）：
+--   size 默认 CC.DefaultFont
+--   框宽按**真实像素宽**算（TextBoxLayout.measure，不是 string.len）
+--   x/y 传 -1 表示该轴居中
+--   先画框（DrawBox 的白色边框）再画字（内缩 pad）
+--
+-- @param x, y number|nil -1 = 居中
+-- @param str string
+-- @param color number|table
+-- @param size number|nil
+function RenderFacade.drawStrBox(x, y, str, color, size)
+    local CC = rawget(_G, "CC")
+    size = size or (CC and CC.DefaultFont) or 20
+
+    local ok, TextBoxLayout = pcall(require, "framework.text_box_layout")
+    local w, h, pad = 0, 0, 0
+    if ok and TextBoxLayout then
+        local box = TextBoxLayout.measure(str, { size = size })
+        w, h, pad = box.width, box.height, box.pad
+    else
+        -- 兜底：极简估算（不应走到这里）
+        w = (CC and CC.ScreenW) or 100
+        h = size
+        pad = 5
+    end
+
+    if x == -1 or x == nil then
+        local sw = (CC and CC.ScreenW) or RenderFacade.size()
+        if type(sw) == "table" then sw = sw[1] end
+        x = (sw - w) / 2
+    end
+    if y == -1 or y == nil then
+        local _, sh = RenderFacade.size()
+        if sh == 0 then sh = (CC and CC.ScreenH) or 100 end
+        y = (sh - h) / 2
+    end
+
+    -- 边框（script 的 DrawBox 用 C_WHITE）
+    local white = rawget(_G, "C_WHITE") or 0xFFFFFF
+    RenderFacade.rectOutline(x, y, x + w - 1, y + h - 1, white)
+    -- 文字（内缩 pad）
+    RenderFacade.text(x + pad, y + pad, str, color, size)
+    RenderFacade.present()
+end
+
 --- 带阴影的背景框（替代 DrawBox / lib.Background）
 function RenderFacade.drawBackground(x1, y1, x2, y2, brightness)
     local EA = api()
