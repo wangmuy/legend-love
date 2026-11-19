@@ -77,9 +77,10 @@ else
     log "  [FAIL] 引擎里出现 RLE 解码特征 $bad_d 处（违反 ADR-PORT-013）"
     fail=$((fail + 1))
 fi
-# LOVE 引擎暂时豁免：Task 5 后半（sprite_decoder 接线）未完成，
-# lib_love.lua 的 LoadPic 仍在引擎侧解码。接线完成后此豁免可删。
-log "  [INFO] engine-love2d 暂时豁免（sprite_decoder 接线未完成，见 decisions.md 类别 D）"
+# LOVE 引擎豁免：sprite_decoder + sprite_atlas 接线已完成（framework 侧
+# 不再把文件名交给引擎），但 script/jymain.lua 仍有 33 处 lib.Pic* 调用，
+# 所以 lib_love 的 LoadPic 119 行删不掉。见 decisions.md「真实边界」一节。
+log "  [INFO] engine-love2d 豁免理由已变更：script 层 33 处 lib.Pic* 未迁移"
 
 # ---------------------------------------- E. sprite_decoder 零引擎依赖
 log "=== STEP: E. sprite_decoder 零引擎依赖 ==="

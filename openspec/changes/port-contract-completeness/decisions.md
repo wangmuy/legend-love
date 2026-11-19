@@ -140,6 +140,36 @@
 
 ---
 
+## 关于「引擎不再看见 .idx/.grp」的真实边界（重要）
+
+Task 5 后半（`sprite_atlas.lua` 接线）完成后，**framework 侧已经完全不把
+文件名交给引擎**。但仍有两条残留通道，必须如实记录：
+
+### 通道 1：引擎的 `sprite.loadArchive(idxFile, grpFile, archiveId)` 契约仍在
+
+它是为**兼容 script 层**保留的。实测 `game/script/jymain.lua` 有 **33 处**
+`lib.PicInit` / `lib.PicLoadFile` / `lib.PicGetXY` / `lib.PicLoadCache` 调用
+（存档界面、头像绘制、战斗贴图等）。
+
+这些是**游戏脚本层**的调用，不在 port-contract-completeness 的范围
+（本 change 只管 framework）。script 层的迁移属于独立的、更大的工作
+（jymain.lua 2000 行）。
+
+**后果**：新引擎若想完整支持本游戏，仍需实现 `lib.PicLoadFile` 或
+等 script 层迁移。所以「换引擎零改动」目前只对 **framework 驱动的那部分
+画面**（地图、物品图标、悬停高亮）成立，不对 script 层驱动的那部分成立。
+
+### 通道 2：`lib_love.lua` 的 `LoadPic` 119 行解码仍在
+
+因为通道 1 的存在，删不掉。门禁 D 项对 `engine-love2d` 的豁免因此**保留**，
+但已从「接线未完成」改为「script 层未迁移」。
+
+### 结论
+
+「图集格式对引擎透明」在 **framework 范围内已达成**；
+**全仓范围内未达成**，卡在 script 层的 33 处调用。
+这条记入 `openspec/project/TODO.md` 作为后续工作。
+
 ## 为什么不在这轮就删掉 8 个
 
 删除契约需要**同步删除 4 引擎的实现**，而其中：

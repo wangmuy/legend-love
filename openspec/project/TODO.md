@@ -66,6 +66,19 @@
   - 注意：glTF 等 3D 格式不适合承载 2D 像素精灵（会丢调色板交换与锚点语义）
   - 触发条件：有实际的美术资源需要用新格式时
 
+## 引擎可移植性：剩下的最后一块（TOD 已在 port-contract-completeness 之后产生）
+
+- [ ] **script 层 33 处 lib.Pic\* 迁移**
+  - 现状：`game/script/jymain.lua` 有 33 处 `lib.PicInit` / `lib.PicLoadFile` /
+    `lib.PicGetXY` / `lib.PicLoadCache`（存档界面、头像绘制、战斗贴图）
+  - 后果：**「图集格式对引擎透明」只在 framework 范围内成立**，
+    script 层仍需引擎提供 lib 级别的 .idx/.grp 解析
+  - 这是 `lib_love.lua` 的 `LoadPic` 那 119 行解码删不掉的唯一原因
+  - 触发条件：要宣称「换引擎零改动」时
+  - 预估：1 个 change（jymain.lua 的 33 处改走 `EngineAPI.sprite.*` 或
+    `SpriteAtlas`，需实机验证存档/头像/战斗全部画面）
+  - 注意：jymain.lua 是 2000 行的游戏脚本，改动风险高于 framework
+
 ## 涌现想法（执行过程中产生，不打断当前 slice）
 
 - [ ] **契约粒度设计原则文档化**
