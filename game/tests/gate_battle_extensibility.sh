@@ -47,13 +47,16 @@ else
     log "  [FAIL] battle_rules.lua 缺 kind 字段（策略接口失效）"
     fail=$((fail + 1))
 fi
-# kind 必须是三种之一
-if grep -qE 'kind *= *"(turnbased|atb|realtime)"' game/script/battle/battle_rules.lua 2>/dev/null; then
-    log "  [PASS] kind 值是合法集合（turnbased/atb/realtime）"
-else
-    log "  [FAIL] kind 值不在合法集合内"
-    fail=$((fail + 1))
-fi
+# kind 的三个合法值必须都出现（不限定书写形式：
+#   `kind = "turnbased"` 或 `KIND_TURNBASED = "turnbased"` 都算）
+for k in turnbased atb realtime; do
+    if grep -qE "\"$k\"" game/script/battle/battle_rules.lua 2>/dev/null; then
+        log "  [PASS] 合法 kind 值存在: $k"
+    else
+        log "  [FAIL] 缺合法 kind 值: $k"
+        fail=$((fail + 1))
+    fi
+done
 
 # ------------------------------- D. war_async 不含伤害公式特征
 log "=== STEP: D. war_async.lua 无伤害公式特征 ==="

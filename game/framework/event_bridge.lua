@@ -148,6 +148,20 @@ function EventBridge:update(dt)
         mousePollHook()
     end
 
+    -- 战斗规则推进（battle-extensibility Task 4）
+    --
+    -- **必须排在协程调度器之前**：即时战斗的 tick 要能看到本帧的最新 dt，
+    -- 而回合制的协程推进（waitKey 恢复）在 scheduler:update 里。
+    --
+    -- turnbased 下 war_async.tick 是空实现（strategy.tick 什么都不做），
+    -- 所以这里对现有行为零影响。
+    do
+        local okWA, WarAsync = pcall(require, "framework.war_async")
+        if okWA and WarAsync and WarAsync.tick then
+            pcall(WarAsync.tick, dt)
+        end
+    end
+
     -- 更新输入管理器（处理按键重复）
     InputManager.getInstance():update(dt)
     

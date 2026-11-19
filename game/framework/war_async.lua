@@ -1632,6 +1632,63 @@ WarAsync.War_ThingMenuCoroutine = War_ThingMenuCoroutine
 WarAsync.War_StatusMenuCoroutine = War_StatusMenuCoroutine
 WarAsync.War_GameOverCoroutine = War_GameOverCoroutine
 
+--- 每帧推进战斗规则（battle-extensibility Task 4）
+--
+-- **这是「即时战斗」的前提**：现有回合制战斗是「等键驱动」的
+-- （协程挂在 FlowFacade.waitKey 上），收不到 dt。
+-- 本函数由 EventBridge:update(dt) 每帧调用，把 dt 传给策略层。
+--
+-- turnbased 下叫 tick 是**空实现**（零开销，零回归）：
+-- 回合制的推进仍在 battle_flow 的协程里。
+--
+-- @param dt number 帧间隔（秒）
+-- @return boolean 是否真的调了策略
+function WarAsync.tick(dt)
+    if type(dt) ~= "number" or dt <= 0 then return false end
+    if warState.status ~= "running" then return false end
+
+    local ok, BattleRules = pcall(require, "script.battle.battle_rules")
+    if not ok or type(BattleRules) ~= "table" then return false end
+
+    -- 战斗上下文：策略层需要的东西放这里
+    warState.ctx = warState.ctx or {
+        warId = warState.warId,
+        round = 0,
+        turn = 0,
+    }
+    warState.ctx.warId = warState.warId
+
+    local strategy = nil
+    if BattleRules.current then
+        local okC, s2 = pcall(BattleRules.current)
+        if okC and type(s2) == "table" then strategy = s2 end
+    end
+    if not strategy then return false end
+
+    -- 首次 tick 前调一次 init（懒初始化）
+    --
+    -- 为什么不在 WarMainCoroutine 里调：那条路径有多个 return 分支，
+    -- 漏一个就会让 ctx 半初始化。懒初始化只需一个入口，
+    -- 且 init 幂等（策略自己判 ctx.xxx 是否存在）。
+    if not warState.ctxInited then
+        warState.ctxInited = true
+        if type(strategy.init) == "function" then
+            pcall(strategy.init, warState.ctx)
+        end
+    end
+
+    if type(strategy.tick) == "function" then
+        -- **返回策略的真实结果**，不是 pcall 的成功与否
+        --
+        -- 实测踩到：只返回 pcall 结果会让「策略说 false（我不处理）」
+        -- 被误报成 true，调用方无法区分「推进了」与「策略拒绝」。
+        local okT, r = pcall(strategy.tick, warState.ctx, dt)
+        if okT then return r == true end
+        return false
+    end
+    return false
+end
+
 -- 获取战斗状态
 function WarAsync.getWarState()
     return warState
@@ -1646,6 +1703,8 @@ function WarAsync.reset()
         result = nil,
         round = 0,
         currentPerson = 0,
+        ctx = nil,
+        ctxInited = false,
     }
 end
 

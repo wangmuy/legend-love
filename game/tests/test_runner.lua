@@ -54,6 +54,7 @@ local TestSpriteDecoder = require("tests.unit.test_sprite_decoder")
 local TestVirtualPadWiring = require("tests.unit.test_virtual_pad_wiring")
 local TestEngineConformance = require("tests.unit.test_engine_conformance")
 local TestSpriteAnim = require("tests.unit.test_sprite_anim")
+local TestBattleRules = require("tests.unit.test_battle_rules")
 
 local TestRunner = {}
 
@@ -650,6 +651,14 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + sanStats.failed
     allPassed = allPassed and sanResult
 
+    TestHelper.resetCounts()
+    local brResult = TestBattleRules.runAll()
+    local brStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + brStats.total
+    totalStats.passed = totalStats.passed + brStats.passed
+    totalStats.failed = totalStats.failed + brStats.failed
+    allPassed = allPassed and brResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -772,9 +781,11 @@ function TestRunner.runModule(moduleName)
         return TestEngineConformance.runAll()
     elseif moduleName == "sprite_anim" then
         return TestSpriteAnim.runAll()
+    elseif moduleName == "battle_rules" then
+        return TestBattleRules.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc, menu_align, sprite_decoder, virtual_pad_wiring, engine_conformance, sprite_anim")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc, menu_align, sprite_decoder, virtual_pad_wiring, engine_conformance, sprite_anim, battle_rules")
         return false
     end
 end
