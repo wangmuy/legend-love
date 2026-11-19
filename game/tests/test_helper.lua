@@ -409,6 +409,19 @@ function TestHelper.mockEngineAPI()
             drawBattle = function() end,
             saveScene = function() end,
         },
+        -- audio 段：Task 7 之后 framework 用 audio.playVideo/playSequence
+        audio = {
+            playMusic = function() end,
+            playSFX = function() end,
+            stopMusic = function() end,
+            playSequence = function() return true end,
+            playVideo = function() return true end,
+            setMusicVolume = function() end,
+            getMusicVolume = function() return 0 end,
+            setSFXVolume = function() end,
+            getSFXVolume = function() return 0 end,
+        },
+        -- input.enableKeyRepeat 已在上面 input 段（此处补）
         -- font 段
         font = {
             get = function() return nil end,
@@ -431,6 +444,7 @@ function TestHelper.mockEngineAPI()
             getPointerPosition = function() return -1, -1 end,
             pollAction = function() return nil end,
             getTouches = function() return {} end,
+            enableKeyRepeat = function() end,
             mousePosition = function() return -1, -1 end,
             mouseButton = function() return false end,
         },

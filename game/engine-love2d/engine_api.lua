@@ -393,6 +393,32 @@ function M.audio.playSFX(filename) end
 --- 停止音乐
 function M.audio.stopMusic() end
 
+--- 播放序列音频（按索引，不是文件名）
+--
+-- 与 playMusic(filename) 的区别：原版 `lib.PlayMIDI(CC.MIDIFile, id+1)`
+-- 是按**索引**在资源清单里选，不是按文件名。两者语义不同，
+-- 所以拆成两个函数而不是强行合一个。
+--
+-- @param id number 序列编号（负数表示停止）
+-- @param opts table|nil { loop=true }（默认循环）
+function M.audio.playSequence(id, opts) end
+
+--- 播放视频（MPEG 等）
+--
+-- 中断键语义：原版 `lib.PlayMPEG(path, VK_ESCAPE)` 的第二个参数是
+-- 「按这个键可跳过」。引擎实现必须支持跳过，否则玩家会被卡住。
+--
+-- @param filename string 视频路径
+-- @param skipKey number|nil 跳过键的 VK 码
+-- @return boolean 是否完整播放（false = 被跳过）
+function M.audio.playVideo(filename, skipKey) end
+
+--- 开关键盘重复
+--
+-- @param delay number 首次重复延迟（毫秒）
+-- @param interval number 重复间隔（毫秒）
+function M.input.enableKeyRepeat(delay, interval) end
+
 --- 设置音乐音量
 --
 -- 量程 **0-128**，与原版 SDL_mixer 的 `Mix_Volume` 一致。

@@ -236,6 +236,10 @@ EngineAPI.input.getPointerPosition = function()
     return -1, -1
 end
 
+EngineAPI.input.enableKeyRepeat = function(delay, interval)
+    logCall("input.enableKeyRepeat", delay, interval)
+end
+
 EngineAPI.input.pollAction = function()
     logCall("input.pollAction")
     return nil
@@ -260,6 +264,16 @@ end
 
 EngineAPI.audio.stopMusic = function()
     logCall("audio.stopMusic")
+end
+
+EngineAPI.audio.playSequence = function(filenameOrId, opts)
+    logCall("audio.playSequence")
+    return true
+end
+
+EngineAPI.audio.playVideo = function(filename, skipKey)
+    logCall("audio.playVideo", filename)
+    return true
 end
 
 -- 音量（REQ-VOL-1）：MUD 引擎无音频，4 个函数为 no-op 但保留状态，

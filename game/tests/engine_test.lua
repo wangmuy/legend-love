@@ -262,6 +262,10 @@ EngineAPI.input.getPointerPosition = function()
     return EngineAPI.input.mousePosition()
 end
 
+EngineAPI.input.enableKeyRepeat = function(delay, interval)
+    logCall("input.enableKeyRepeat", delay, interval)
+end
+
 EngineAPI.input.pollAction = function()
     logCall("input.pollAction")
     if #EngineAPI.input._actionQueue > 0 then
@@ -290,6 +294,16 @@ end
 
 EngineAPI.audio.stopMusic = function()
     logCall("audio.stopMusic")
+end
+
+EngineAPI.audio.playSequence = function(filenameOrId, opts)
+    logCall("audio.playSequence")
+    return true
+end
+
+EngineAPI.audio.playVideo = function(filename, skipKey)
+    logCall("audio.playVideo", filename)
+    return true
 end
 
 -- 音量（REQ-VOL-1）：测试引擎记录调用并保存状态，

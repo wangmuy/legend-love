@@ -180,7 +180,7 @@ function JYMainAdapter.initCoroutine()
     
     math.randomseed(os.time())
     
-    lib.EnableKeyRepeat(CONFIG.KeyRepeatDelay, CONFIG.KeyRepeatInterval)
+    EngineAPI.input.enableKeyRepeat(CONFIG.KeyRepeatDelay, CONFIG.KeyRepeatInterval)
     
     JY.Status = getStateId("GAME_START")
     
@@ -229,7 +229,7 @@ end
 function JYMainAdapter.showStartMenuCoroutine()
     local scheduler = CoroutineScheduler.getInstance()
     
-    lib.PlayMPEG(CONFIG.DataPath .. "start.mpg", VK_ESCAPE)
+    EngineAPI.audio.playVideo(CONFIG.DataPath .. "start.mpg", VK_ESCAPE)
     
     Cls()
     

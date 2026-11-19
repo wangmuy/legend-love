@@ -249,6 +249,8 @@ function EngineAPI.input.getPointerPosition()
     return -1, -1
 end
 
+function EngineAPI.input.enableKeyRepeat(delay, interval) end
+
 function EngineAPI.input.pollAction()
     return nil
 end
@@ -276,6 +278,14 @@ local webSFXVolume = 90
 
 function EngineAPI.audio.setMusicVolume(value)
     webMusicVolume = tonumber(value) or webMusicVolume
+end
+
+function EngineAPI.audio.playSequence(filenameOrId, opts)
+    return true
+end
+
+function EngineAPI.audio.playVideo(filename, skipKey)
+    return true
 end
 
 function EngineAPI.audio.getMusicVolume()

@@ -350,6 +350,10 @@ end
 --
 -- 委托 InputManager.getAction()。用 pcall 是因为 engine_love2d 也被
 -- 纯引擎测试加载（此时 framework 可能未初始化），不能因缺模块而崩。
+EngineAPI.input.enableKeyRepeat = function(delay, interval)
+    lib.EnableKeyRepeat(delay, interval)
+end
+
 EngineAPI.input.pollAction = function()
     local ok, IM = pcall(require, "framework.input_manager")
     if not ok or not IM or not IM.getAction then return nil end
@@ -398,6 +402,32 @@ end
 
 EngineAPI.audio.stopMusic = function()
     lib.PlayMIDI("")
+end
+
+--- 播放序列音频（按索引 → 文件名由引擎按 CC.MIDIFile 模板生成）
+--
+-- 注意：这里不做 CC.MIDIFile 的拼接 —— 那是**游戏层知道的事**
+-- （CC 是游戏常量）。调用方传**已拼好的文件名**或 id 都合法，
+-- 但契约要求传文件名（见下方实现选择）。
+--
+-- 实现选择：与 playMusic(filename) 同一条路径。
+-- 原版 lib.PlayMIDI 收的就是文件名（jymain.lua:2250 已拼好）。
+EngineAPI.audio.playSequence = function(filenameOrId, opts)
+    if type(filenameOrId) == "string" then
+        lib.PlayMIDI(filenameOrId)
+        return true
+    end
+    return false
+end
+
+--- 播放视频（原版 PlayMPEG 只是 PlayMIDI 的别名，无真实视频渲染）
+--
+-- 实测：lib_love.lua:879 `function PlayMPEG(filename) PlayMIDI(filename) end`
+-- 即整个项目从没真正播过 MPEG —— 它只是把 .mpg 当音频载入。
+-- 所以契约照实实现：走音频路径，返回 true。
+EngineAPI.audio.playVideo = function(filename, skipKey)
+    lib.PlayMPEG(filename)
+    return true
 end
 
 -- 音量（REQ-VOL-1 / REQ-VOL-2）：量程 0-128，增益线性 value/128。
