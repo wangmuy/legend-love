@@ -56,13 +56,13 @@
 **Blast Radius**：`game/script/battle/battle_rules.lua`、`game/script/battle/battle_flow.lua`
 
 **DoD**：
-- [ ] `battle_rules.lua` 实现 ADR-BE-002 的六字段契约
-      （`kind` / `init` / `tick` / `requestAction` / `onKey` / `isOver`）
-- [ ] `kind = "turnbased"` 的完整实现（复刻现有回合制行为）
-- [ ] `kind = "atb"` 与 `kind = "realtime"` 只留**接口骨架**（返回 true，无实际逻辑）
-- [ ] `battle_flow.lua` 在战斗开始时读 `battle_rules.kind`，按 kind 选路径
-- [ ] 全量测试零失败
-- [ ] 实机验证：回合制战斗零回归
+- [x] `battle_rules.lua` 实现 ADR-BE-002 的六字段契约
+- [x] `kind = "turnbased"` 的完整实现（tick 空实现，复刻现有行为）
+- [x] `kind = "atb"` 与 `kind = "realtime"` 只留骨架（atb 不填计时条；
+      realtime 累加 elapsed 作为最小可验证实现）
+- [x] `BattleRules.current()` 读全局 `BattleRules.kind` 选策略
+- [x] 全量测试零失败（3619/0，新增 63 条断言）
+- [ ] 实机验证：回合制战斗零回归（需用户配合）
 
 ---
 
@@ -71,12 +71,13 @@
 **Blast Radius**：`game/framework/war_async.lua`、`game/framework/event_bridge.lua`
 
 **DoD**：
-- [ ] `war_async.tick(dt)` 新增：战斗进行中时调 `battle_rules.tick(ctx, dt)`
-- [ ] `EventBridge:update(dt)` 里加一行 `pcall(WarAsync.tick, dt)`
-- [ ] turnbased 下 tick 为空实现（零开销）
-- [ ] 单元测试：注入 dt 后 `battle_rules.tick` 被调用且收到正确值
-- [ ] 全量测试零失败
-- [ ] 实机验证：回合制战斗零回归
+- [x] `war_async.tick(dt)` 新增：running 状态时调 `strategy.tick(ctx, dt)`
+- [x] `EventBridge:update(dt)` 里加 `pcall(WarAsync.tick, dt)`（排在 scheduler 之前）
+- [x] turnbased 下 tick 空实现（零开销）
+- [x] 单元测试：dt 传播、非 running 拒绝、非法 dt 拒绝、tick 返回真实结果、
+      init 只调一次
+- [x] 全量测试零失败
+- [ ] 实机验证：回合制战斗零回归（需用户配合）
 
 ---
 
