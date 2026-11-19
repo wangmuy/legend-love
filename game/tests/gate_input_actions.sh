@@ -27,10 +27,10 @@ log() { echo "$*" | tee -a "$LOG"; }
 # -------------------------------------- A. framework 通用层不得有游戏词汇
 log "=== STEP: A. framework 通用层零游戏词汇 ==="
 # 注意：-rn 输出是 "文件:行号:内容"，注释行形态是 "文件:行号:--..."。
-# 所以判定注释必须匹配 ':[0-9]+:\s*--' —— 用 '^\s*--' 是抓不到的（实测踩过）。
+# 所以判定注释必须匹配 ':[0-9]+:[[:space:]]*--' —— 用 '^[[:space:]]*--' 是抓不到的（实测踩过）。
 bad_a=$(grep -rn 'jy\.' game/framework/*.lua 2>/dev/null \
         | grep -v 'jyconst' \
-        | grep -vE ':[0-9]+:\s*--' \
+        | grep -vE ':[0-9]+:[[:space:]]*--' \
         | wc -l | tr -dc '0-9')
 [ -n "$bad_a" ] || bad_a=0
 if [ "$bad_a" -eq 0 ]; then
@@ -38,7 +38,7 @@ if [ "$bad_a" -eq 0 ]; then
 else
     log "  [FAIL] framework/ 有 $bad_a 处游戏词汇引用："
     grep -rn 'jy\.' game/framework/*.lua 2>/dev/null \
-        | grep -v 'jyconst' | grep -vE ':[0-9]+:\s*--' | head -3 | tee -a "$LOG"
+        | grep -v 'jyconst' | grep -vE ':[0-9]+:[[:space:]]*--' | head -3 | tee -a "$LOG"
     fail=$((fail + 1))
 fi
 
@@ -77,7 +77,7 @@ fi
 # -------------------------------------------- C. synthetic 脏标记已清除
 log "=== STEP: C. synthetic 已清除 ==="
 # 只统计"实际使用"（赋值/读取），排除注释说明
-bad_c=$(grep -n 'synthetic *=' game/framework/*.lua 2>/dev/null | grep -v '^\s*--' | wc -l | tr -dc '0-9')
+bad_c=$(grep -n 'synthetic *=' game/framework/*.lua 2>/dev/null | grep -v '^[[:space:]]*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_c" ] || bad_c=0
 if [ "$bad_c" -eq 0 ]; then
     log "  [PASS] 无 synthetic 字段赋值"
@@ -95,13 +95,13 @@ fi
 # ---------------------------- D. 虚拟手柄不得直连 love.*（排除注释行）
 log "=== STEP: D. virtual_pad 不直连 love.* ==="
 bad_d=$(grep -n 'love\.' game/framework/virtual_pad.lua 2>/dev/null \
-        | sed 's/^[0-9]*://' | grep -v '^\s*--' | grep -v '：' | wc -l | tr -dc '0-9')
+        | sed 's/^[0-9]*://' | grep -v '^[[:space:]]*--' | grep -v '：' | wc -l | tr -dc '0-9')
 [ -n "$bad_d" ] || bad_d=0
 if [ "$bad_d" -eq 0 ]; then
     log "  [PASS] virtual_pad 逻辑层不直连 love.*"
 else
     log "  [FAIL] virtual_pad 有 $bad_d 处 love.* 调用（绘制必须经 EngineAPI）"
-    grep -n 'love\.' game/framework/virtual_pad.lua | sed 's/^[0-9]*://' | grep -v '^\s*--' | head -3 | tee -a "$LOG"
+    grep -n 'love\.' game/framework/virtual_pad.lua | sed 's/^[0-9]*://' | grep -v '^[[:space:]]*--' | head -3 | tee -a "$LOG"
     fail=$((fail + 1))
 fi
 
@@ -114,7 +114,7 @@ else
     fail=$((fail + 1))
 fi
 bad_e=$(grep -n 'getTouchCount\|love.touch.getTouch(' game/engine-love2d/engine_love2d.lua 2>/dev/null \
-        | grep -vE '^[0-9]+:\s*--' | wc -l | tr -dc '0-9')
+        | grep -vE '^[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_e" ] || bad_e=0
 if [ "$bad_e" -eq 0 ]; then
     log "  [PASS] 未用 0.10.x 的 getTouchCount/getTouch(i)（11.5 上是 nil）"

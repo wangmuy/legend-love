@@ -59,7 +59,8 @@ game/
 
 ### 换引擎方式
 
-1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 59 个函数
+1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 77 个函数
+   （契约定义见 `engine-love2d/engine_api.lua`；本仓现有 4 个实现：LÖVE / MUD / Web / 测试桩）
 2. 实现对应的 `main.lua` 入口（Love2D 用 `love.*` 回调，MUD 用 `main()`）
 3. `framework/` 和 `script/` 完全不变
 
