@@ -56,6 +56,7 @@ local TestEngineConformance = require("tests.unit.test_engine_conformance")
 local TestSpriteAnim = require("tests.unit.test_sprite_anim")
 local TestBattleRules = require("tests.unit.test_battle_rules")
 local TestBattleWiring = require("tests.unit.test_battle_wiring")
+local TestBattleFlowHeadless = require("tests.unit.test_battle_flow_headless")
 
 local TestRunner = {}
 
@@ -668,6 +669,14 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + bwStats.failed
     allPassed = allPassed and bwResult
 
+    TestHelper.resetCounts()
+    local bhResult = TestBattleFlowHeadless.runAll()
+    local bhStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + bhStats.total
+    totalStats.passed = totalStats.passed + bhStats.passed
+    totalStats.failed = totalStats.failed + bhStats.failed
+    allPassed = allPassed and bhResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -794,9 +803,11 @@ function TestRunner.runModule(moduleName)
         return TestBattleRules.runAll()
     elseif moduleName == "battle_wiring" then
         return TestBattleWiring.runAll()
+    elseif moduleName == "battle_flow_headless" then
+        return TestBattleFlowHeadless.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc, menu_align, sprite_decoder, virtual_pad_wiring, engine_conformance, sprite_anim, battle_rules, battle_wiring")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc, menu_align, sprite_decoder, virtual_pad_wiring, engine_conformance, sprite_anim, battle_rules, battle_wiring, battle_flow_headless")
         return false
     end
 end

@@ -205,6 +205,7 @@ function TestBattleRules.testTickReturnsStrategyResult()
     package.loaded["script.battle.battle_rules"] = nil
     BR = require("script.battle.battle_rules")
     local savedGet = BR.get
+    local savedCurrent = BR.current   -- **必须一起保存/恢复**
     BR.get = function(kind)
         return {
             kind = "turnbased",
@@ -221,6 +222,7 @@ function TestBattleRules.testTickReturnsStrategyResult()
         "策略返回 false 时 tick 必须返回 false（不能误报 true）")
 
     BR.get = savedGet
+    BR.current = savedCurrent
     WA.reset()
 end
 
@@ -237,6 +239,7 @@ function TestBattleRules.testInitCalledOnceOnly()
 
     local initCalls = 0
     local savedGet = BR.get
+    local savedCurrent = BR.current   -- **必须一起保存/恢复**
     BR.get = function()
         return {
             kind = "turnbased",
@@ -256,6 +259,7 @@ function TestBattleRules.testInitCalledOnceOnly()
         "init 应只调 1 次，实测 " .. initCalls .. " 次")
 
     BR.get = savedGet
+    BR.current = savedCurrent
     WA.reset()
 end
 
