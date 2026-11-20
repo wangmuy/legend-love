@@ -106,7 +106,7 @@ parent_epic: null
   4. 移除 `war_async.lua` 的双轨加载补丁（`ebf81af` 的临时妥协）
   5. gate STEP D 取消 `engine-love2d` 豁免
 - **Depends On**: `port-contract-completeness`（SpriteAtlas 已就绪）
-- **Status**: [ ] Created
+- **Status**: [x] Archived / Complete（port-sprite-native-migration）
 
 ### Change: port-battle-robustness
 

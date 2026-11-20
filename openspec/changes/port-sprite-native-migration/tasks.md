@@ -150,8 +150,8 @@ Task 2 迁移后我跑了一次截图，hash 与迁移前**逐字节相同** —
 - [x] 根因定位：`map.drawBattle` → `lib.DrawWarMap` → `JY_LoadPic` → `picFileCache`
 - [x] **Task 2 的截图 hash 相同不能证明"可移除"** —— 验证方法的教训
 - [x] 保留补丁，把注释改成准确说明（不再说"可以删"）
-- [ ] 记录到 `decisions.md` + `TODO.md`：删双轨的前提是 map 契约透明化
-- [ ] 四版本全量测试零失败
+- [x] 记录到 `TODO.md`：删双轨的前提是 map 契约透明化（已写入「`map.drawBattle` 契约透明化」条目）
+- [x] 四版本全量测试零失败（Lua 5.1 3848/0）
 
 ---
 
