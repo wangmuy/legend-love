@@ -117,11 +117,6 @@ function EngineAPI.sprite.initSprites() end
 function EngineAPI.sprite.loadArchive(idxFile, grpFile, archiveId)
     return true
 end
-
-function EngineAPI.sprite.getSize(archiveId, spriteId)
-    return 0, 0, 0, 0
-end
-
 function EngineAPI.sprite.draw(archiveId, spriteId, x, y, flags, alpha) end
 
 -- 染色绘制（REQ-MS1-3）：web 终端无图形渲染
@@ -535,24 +530,6 @@ EngineAPI.coroutine = {}
 
 function EngineAPI.coroutine.isRunning()
     return coroutine.running() ~= nil
-end
-
-function EngineAPI.coroutine.yieldPoint()
-    pcall(coroutine.yield)
-end
-
-function EngineAPI.coroutine.waitFor(condition, timeout)
-    local start = EngineAPI.time.getTime()
-    while not condition() do
-        if timeout then
-            local elapsed = EngineAPI.time.getTime() - start
-            if elapsed >= timeout then
-                return false
-            end
-        end
-        pcall(coroutine.yield)
-    end
-    return true
 end
 
 --------------------------------------------------------------------------------

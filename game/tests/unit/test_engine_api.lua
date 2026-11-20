@@ -34,7 +34,6 @@ function TestEngineAPI.testSpriteModule()
     TestHelper.assertNotNil(EngineAPI.sprite, "sprite module should exist")
     TestHelper.assertNotNil(EngineAPI.sprite.initSprites, "sprite.initSprites should exist")
     TestHelper.assertNotNil(EngineAPI.sprite.loadArchive, "sprite.loadArchive should exist")
-    TestHelper.assertNotNil(EngineAPI.sprite.getSize, "sprite.getSize should exist")
     TestHelper.assertNotNil(EngineAPI.sprite.draw, "sprite.draw should exist")
     -- REQ-MS1-3
     TestHelper.assertNotNil(EngineAPI.sprite.drawTinted, "sprite.drawTinted should exist")
@@ -293,8 +292,6 @@ function TestEngineAPI.testCoroutineModule()
     
     TestHelper.assertNotNil(EngineAPI.coroutine, "coroutine module should exist")
     TestHelper.assertNotNil(EngineAPI.coroutine.isRunning, "coroutine.isRunning should exist")
-    TestHelper.assertNotNil(EngineAPI.coroutine.yieldPoint, "coroutine.yieldPoint should exist")
-    TestHelper.assertNotNil(EngineAPI.coroutine.waitFor, "coroutine.waitFor should exist")
 end
 
 function TestEngineAPI.runAll()

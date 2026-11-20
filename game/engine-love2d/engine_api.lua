@@ -88,12 +88,6 @@ function M.sprite.initSprites(paletteFile) end
 -- @param archiveId number 档案编号
 function M.sprite.loadArchive(idxFile, grpFile, archiveId) end
 
---- 获取精灵尺寸
--- @param archiveId number 档案编号
--- @param spriteId number 精灵编号
--- @return number width, height, xoff, yoff
-function M.sprite.getSize(archiveId, spriteId) end
-
 --- 绘制精灵
 -- @param archiveId number 档案编号
 -- @param spriteId number 精灵编号
@@ -672,17 +666,6 @@ M.coroutine = {}
 --- 检测是否在协程中
 -- @return boolean
 function M.coroutine.isRunning() end
-
---- 标记 yield 点
--- @yieldable
-function M.coroutine.yieldPoint() end
-
---- 等待条件满足
--- @yieldable
--- @param condition function 条件函数
--- @param timeout number|nil 超时（毫秒）
--- @return boolean 条件是否满足
-function M.coroutine.waitFor(condition, timeout) end
 
 --------------------------------------------------------------------
 -- app - 应用程序控制
