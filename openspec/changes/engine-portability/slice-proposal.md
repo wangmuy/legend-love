@@ -140,8 +140,12 @@ port-contract-completeness   14 Task 组 / 82 checkbox   契约完整化 + 解�
 port-script-decoupling       7 Task 组 / 49 checkbox    绘制/流程/游戏逻辑解耦（✓ Complete）
 port-sprite-animation        7 Task 组 / 38 checkbox    sprite 动画时间驱动（✓ Complete）
 battle-extensibility         8 Task 组 / 51 checkbox    战斗流程抽成可覆盖策略模块（✓ Complete）
-port-sprite-native-migration 7 Task 组 / 55 checkbox    SpriteAtlas PNG 修复 + script 层零 lib.Pic*
-port-battle-robustness       5 Task 组 / 41 checkbox    WarLoad 错误码 + WAR.Person 容量
+port-sprite-native-migration 7 Task 组 / 55 checkbox    SpriteAtlas PNG 修复 + script 层零 lib.Pic*（✓ Complete）
+port-battle-robustness       5 Task 组 / 41 checkbox    WarLoad 错误码 + WAR.Person 容量（✓ Complete）
+port-contract-pruning        5 Task 组 / 21 checkbox    删除 3 个无用契约（79→76）（✓ Complete）
+port-blocking-delay          4 Task 组 / 37 checkbox    waitForTime 真等待 + 阻塞消除（批 1 ✓，批 2 待做）
+port-map-render-native      约 12-15 Task              map 绘制契约透明化（未启动）
+port-native-api-completion  约 30-40 Task              225 处 lib.* 迁移（未启动）
 ```
 
 ## Affected Domains

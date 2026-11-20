@@ -121,6 +121,45 @@ parent_epic: null
 - **Depends On**: `battle-extensibility`（战斗模块已抽出）
 - **Status**: [x] Archived / Complete（port-battle-robustness）
 
+### Change: port-contract-pruning
+
+- **Scope**: engine（契约裁剪）
+- **Responsibility**: 删除 3 个无消费者且引擎内部也不用的契约
+  （`sprite.getSize` / `coroutine.yieldPoint` / `coroutine.waitFor`）→ 79 → 76
+- **Depends On**: 无
+- **Status**: [x] Archived / Complete
+
+### Change: port-blocking-delay
+
+- **Scope**: fullstack（协程等待语义 + 阻塞消除）
+- **Responsibility**:
+  1. 修 `CoroutineScheduler:waitForTime`（原实现记录 startTime 但从未使用，
+     实际只等 1 帧；实测 `waitForTime(0.1)` 在帧 2 恢复，期望 6+）
+  2. 修 `timeSource` 构造时绑定 → 动态解析（否则测试 stub 后假时钟推不动）
+  3. `instruct_30` 等 7 个函数的阻塞 `lib.Delay` 处置（批 2，未完成）
+- **Depends On**: 无
+- **Status**: [ ] Implemented 部分（批 1 完成，批 2 待做：26 处 lib.Delay）
+
+### Change: port-map-render-native
+
+- **Scope**: fullstack（map 绘制契约透明化）
+- **Responsibility**:
+  1. `map.drawMain/drawScene/drawBattle` 三个 @deprecated 契约透明化
+     （`framework/map_render.lua` 做投影 + 逐格 `sprite.draw`）
+  2. 补 `map.setTile` 契约（当前不存在，而 `SetWarMap` 需要写地图）
+  3. `lib.LoadMMap/LoadSMap/LoadWarMap` 一并透明化
+  - **这是删 `lib_love.LoadPic` 119 行 + 摘掉 `war_async` 双轨补丁的唯一前提**
+- **Depends On**: `port-contract-pruning`（同改 engine_api）
+- **Status**: [ ] Created
+
+### Change: port-native-api-completion
+
+- **Scope**: fullstack（225 处 `lib.*` 迁移）
+- **Responsibility**: 迁 191 处有 EngineAPI 等价物的 + 补 34 处无等价物的契约
+  （`map.setTile` 等），最后删 `lib.*` 兼容层
+- **Depends On**: `port-map-render-native`（否则 `DrawMMap/DrawSMap` 会重复劳动）
+- **Status**: [ ] Created
+
 ---
 
 ## 依赖图
