@@ -437,16 +437,21 @@ function TestItemStatusMouse.testKeyboardNotOverriddenWhenMouseStill()
 
     -- ① 鼠标移到第 2 格
     --
-    -- 悬停意图由协程的 50ms 超时轮询消费，实测约需 4 帧（80ms）落地。
-    -- 这是**设计上可接受**的延迟：用户感知不到「划过就亮」的 80ms 差。
+    -- 悬停意图由协程的 50ms 超时轮询消费。
+    --
+    -- **帧数已从 5 改成 8**（`port-blocking-delay` Task 1）：原来推 5 帧
+    -- 能过，是因为 `scheduler:waitForTime(0.05)` 有缺陷（记录 startTime 但
+    -- 从未使用，实际只等 1 帧）→ 每轮 50ms超时(3帧) + 1帧 = 4 帧。
+    -- 修好后每轮 = 3 + 3 = 6 帧（50ms 轮询 + 50ms 防连按，这才是设计意图）。
+    -- 推 8 帧留余量。
     mx, my = cx0 + step + 20, cy0 + 20
     JA.pollHover()
-    for _ = 1, 5 do advance(0.02) end
+    for _ = 1, 8 do advance(0.02) end
     TestHelper.assertEquals(2, IA.selectedIndex(), "悬停 → 选中第 2 格")
 
     -- ② 键盘 right → 选中第 3 格
     IM.getInstance():onKeyPressed("right", nil, false)
-    for _ = 1, 5 do advance(0.02) end
+    for _ = 1, 8 do advance(0.02) end
     TestHelper.assertEquals(3, IA.selectedIndex(), "键盘 → 选中第 3 格")
 
     -- ③ 鼠标**不动**，连续跑多帧 pollHover → 不该被拉回
@@ -460,7 +465,7 @@ function TestItemStatusMouse.testKeyboardNotOverriddenWhenMouseStill()
     -- ④ 鼠标真的移动了 → 才夺回焦点
     mx = mx + 2
     JA.pollHover()
-    for _ = 1, 5 do advance(0.02) end
+    for _ = 1, 8 do advance(0.02) end
     TestHelper.assertEquals(2, IA.selectedIndex(),
         "鼠标移动后才夺回焦点")
 

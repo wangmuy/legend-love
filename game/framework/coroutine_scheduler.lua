@@ -40,8 +40,36 @@ function CoroutineScheduler:init(deps)
     coroutines = {}
     currentCoroutine = nil
     coroutineIdCounter = 0
-    -- 注入时间源，默认为 love.timer.getTime
-    self.timeSource = deps.timeSource or (EngineAPI and EngineAPI.time and EngineAPI.time.getTimeSeconds) or os.clock
+    -- 注入时间源
+    --
+    -- **不能在这里就绑定 EngineAPI 的当前函数**：测试通常在 require scheduler
+    -- 之后再 stub EngineAPI（`rawset(_G, "EngineAPI", {time={getTimeSeconds=...}})`)，
+    -- 构造时绑定会让 timeSource 一直指向**旧的**实现 → 假时钟推不动 →
+    -- `waitForTime` 的 deadline 永远不到 → 协程永不恢复（实测 test_item_status_mouse
+    -- 5 条断言 FAIL）。
+    --
+    -- 所以：显式注入的 deps.timeSource 优先（真正固定）；
+    -- 否则留 nil，在 `_now()` 里**每次动态查** EngineAPI。
+    self.timeSource = deps.timeSource or nil
+end
+
+--- 当前时间（秒）——**每次动态解析时间源**
+--
+-- 优先级：
+--   ① 显式注入的 `self.timeSource`（测试/宿主可固定）
+--   ② `EngineAPI.time.getTimeSeconds`（每帧读最新的，支持运行时换引擎/stub）
+--   ③ `os.clock()`
+--
+-- 为什么 ② 要每帧查而不是构造时绑定：见 Init 里 `self.timeSource` 的注释。
+function CoroutineScheduler:_now()
+    if self.timeSource then
+        return self.timeSource()
+    end
+    local api = rawget(_G, "EngineAPI")
+    if api and api.time and api.time.getTimeSeconds then
+        return api.time.getTimeSeconds()
+    end
+    return os.clock()
 end
 
 -- 内部调试方法，便于测试时 mock
@@ -65,6 +93,11 @@ function CoroutineScheduler:create(fn, name)
         name = name or "coroutine_" .. id,
         status = "suspended",
         waitingFor = nil,  -- 等待的条件（如按键、时间等）
+        -- `waitForTime` 的截止时刻（毫秒，时间源同 timeSource）。
+        -- nil = 没有时间约束（普通 yield）；非 nil = 到期前不恢复。
+        -- 见 waitForTime 的注释：原实现记录 startTime 但从未使用，
+        -- 导致 waitForTime(0.1) 实际只等 1 帧。
+        deadline = nil,
         result = nil,      -- 协程返回值
         error = nil        -- 错误信息
     }
@@ -160,17 +193,46 @@ end
 -- 等待时间（事件驱动版本）
 -- @param seconds: 等待的秒数
 -- 注意：这个版本只yield一次，让出时间给love.draw，然后由外部控制是否继续等待
+--- 等待指定时长（**真的等待，不是 yield 一次**）
+-- @param seconds number 秒；<= 0 表示不等待（下一帧恢复）
+--
+-- **原实现的缺陷（实测已修）**：
+-- ```lua
+-- local startTime = self.timeSource and self.timeSource() or 0   -- 记录了
+-- self:yield("time")                                            -- 但从未使用
+-- ```
+-- 而 `update(dt)` 每帧无条件恢复所有非 key/action 协程 → `waitForTime` 的
+-- 实际效果是「等 1 帧」，与参数无关。实测 `waitForTime(0.1)` 在帧 2 恢复
+-- （期望 6+ 帧）。
+--
+-- 受影响调用点：async_wrapper:78 / event_bridge:248 /
+-- item_async:293（0.05）/ person_status_async:132（0.1）。
+-- 用户可见症状：物品栏/人物状态的「翻页防连按」节流失效。
+--
+-- **修法**：把截止时刻写进当前协程的 info，由 `update` 逐帧判断后才恢复。
 function CoroutineScheduler:waitForTime(seconds)
-    -- 记录开始时间
-    local startTime = self.timeSource and self.timeSource() or 0
-    
-    -- yield一次，让love.draw有机会执行
+    seconds = tonumber(seconds) or 0
+
+    local info = currentCoroutine and coroutines[currentCoroutine]
+    if not info then
+        -- 不在协程里（或 id 不可用）：保持原有行为，yield 一次
+        self:yield("time")
+        return
+    end
+
+    if seconds <= 0 then
+        -- 不等待：清掉 deadline，下一帧就恢复
+        info.deadline = nil
+        self:yield("time")
+        return
+    end
+
+    local now = self:_now()
+    info.deadline = now + seconds
     self:yield("time")
-    
-    -- 检查是否已经过了足够的时间
-    -- 如果没有，继续yield（但这样会导致阻塞）
-    -- 在事件驱动架构中，应该由调用方控制帧率
-    -- 这里我们只yield一次，假设调用方会在合适的时间再次调用
+
+    -- 恢复后清空（避免残留导致下次 yield 被误判）
+    info.deadline = nil
 end
 
 -- 等待条件
@@ -278,10 +340,21 @@ function CoroutineScheduler:update(dt)
     end
 
     -- 恢复其他挂起的协程
+    --
+    -- **必须检查 deadline**（`waitForTime` 的截止时刻）：
+    -- 原实现无条件 resume，导致 `waitForTime(N)` 的实际效果是「等 1 帧」，
+    -- 与 N 无关（实测 waitForTime(0.1) 在帧 2 恢复，期望 6+ 帧）。
+    -- 现在未到期的协程本帧跳过，等 `update` 下次被调用时再判断。
+    local nowT = self:_now()
     for _, id in ipairs(activeCoroutines) do
         local info = coroutines[id]
         if info and info.status == "suspended" then
-            self:resume(id)
+            if info.deadline ~= nil and nowT < info.deadline then
+                -- 还没到时间：本帧不恢复（保留 deadline，下帧再判）
+            else
+                info.deadline = nil      -- 到期或本来就没有：清空并恢复
+                self:resume(id)
+            end
         end
     end
 end
