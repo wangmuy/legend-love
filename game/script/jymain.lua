@@ -170,7 +170,9 @@ function JY_Main_sub()        --真正的游戏主程序入口
 
     JY.Status=GAME_START;
 
-    lib.PicInit(CC.PaletteFile);       --加载原来的256色调色板
+    -- 调色板加载已移到 jymain_adapter.init → EngineAPI.sprite.initSprites(CC.PaletteFile)
+    -- （原来这里是 lib.PicInit(CC.PaletteFile)；本行在死代码 JY_Main_sub 里，
+    --   但为保持一致也删掉，避免"两处都在加载调色板"的误解）
 
     lib.PlayMPEG(CONFIG.DataPath .. "start.mpg",VK_ESCAPE);
 
@@ -368,7 +370,6 @@ end
 
 
 function Init_MMap()   --初始化主地图数据
-    lib.PicInit();
     lib.LoadMMap(CC.MMapFile[1],CC.MMapFile[2],CC.MMapFile[3],
             CC.MMapFile[4],CC.MMapFile[5],CC.MWidth,CC.MHeight,JY.Base["人X"],JY.Base["人Y"]);
 
@@ -473,8 +474,7 @@ function Game_MMap()      --主地图
     if JY.SubScene >= 0 then          --进入子场景
         CleanMemory();
         lib.UnloadMMap();
-        lib.PicInit();
-        lib.ShowSlow(50,1)
+            lib.ShowSlow(50,1)
 
         JY.Status=GAME_SMAP;
         JY.MMAPMusic=-1;
@@ -490,7 +490,6 @@ end
 
 --showname  =1 显示场景名 0 不显示
 function Init_SMap(showname)   --初始化场景数据
-    lib.PicInit();
     lib.PicLoadFile(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0);
     lib.PicLoadFile(CC.HeadPicFile[1],CC.HeadPicFile[2],1);
     if CC.LoadThingPic==1 then
@@ -1417,8 +1416,7 @@ function Game_SMap()         --场景处理主函数
     if isout==1 then    --出去，返回主地图
         JY.Status=GAME_MMAP;
 
-        lib.PicInit();
-        CleanMemory();
+            CleanMemory();
         lib.ShowSlow(50,1)
 
         if JY.MMAPMusic<0 then
@@ -4554,7 +4552,6 @@ function WarMain(warid,isexp)           --战斗主函数
     WarSelectEnemy();         --选择敌人
 
     CleanMemory()
-    lib.PicInit();
      lib.ShowSlow(50,1) ;      --场景变暗
 
     WarLoadMap(WAR.Data["地图"]);       --加载战斗地图
@@ -4687,7 +4684,6 @@ function WarMain(warid,isexp)           --战斗主函数
     end
 
     CleanMemory();
-    lib.PicInit();
     lib.PicLoadFile(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0);
     lib.PicLoadFile(CC.HeadPicFile[1],CC.HeadPicFile[2],1);
     if CC.LoadThingPic==1 then

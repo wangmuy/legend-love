@@ -49,14 +49,14 @@
 **Blast Radius**：`game/script/jymain.lua`
 
 **DoD**：
-- [ ] 删除 6 处无参 `lib.PicInit()`（实测 no-op）
-- [ ] 删除 `JY_Main_sub` 里的 `lib.PicInit(CC.PaletteFile)`（死代码 + 已被
+- [x] 删除 6 处无参 `lib.PicInit()`（实测 no-op）
+- [x] 删除 `JY_Main_sub` 里的 `lib.PicInit(CC.PaletteFile)`（死代码 + 已被
       `jymain_adapter.init` → `initSprites` 覆盖）
-- [ ] **前置确认**：`jymain_adapter.init` 确实调了
+- [x] **前置确认**：`jymain_adapter.init` 确实调了
       `EngineAPI.sprite.initSprites(CC.PaletteFile)`（决定调色板仍会加载）
-- [ ] 单测：调色板仍然被加载（检查 `EngineAPI.sprite.initSprites` 的调用）
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] 单测：调色板仍然被加载（检查 `EngineAPI.sprite.initSprites` 的调用）
+- [x] 四版本全量测试零失败
+- [x] 一个 commit
 
 ---
 
