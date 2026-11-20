@@ -91,7 +91,35 @@ parent_epic: null
   5. 实机验证：原版回合制战斗**零回归**（手动/自动/武功/中毒/结算/升级/掉落）
   6. 更新门禁：战斗代码位置断言
 - **Depends On**: `port-script-decoupling`（战斗现在调用了大量 framework facade）
-- **Status**: [x] Implemented（battle-extensibility：67/72，仅剩实机画面走查）
+- **Status**: [x] Archived / Complete（battle-extensibility）
+
+### Change: port-sprite-native-migration
+
+- **Repository**: this repo
+- **Scope**: fullstack（SpriteAtlas PNG 路径修复 + script 层 lib.Pic* 迁移）
+- **Responsibility**:
+  1. 修 `SpriteAtlas.getMeta`/`getHandle` 的 PNG 路径（**前置**：人物 59 的头像
+     命中 PNG 帧 slot 59，当前 getMeta 返回 nil）
+  2. `battle_render.lua` 的 2 处 `lib.Pic*` + 5 处 `lib.DrawWarMap` 迁移
+  3. `jymain.lua` 的 27 处 `lib.Pic*` 迁移（7 PicInit / 14 PicLoadFile /
+     3 PicGetXY / 3 PicLoadCache）
+  4. 移除 `war_async.lua` 的双轨加载补丁（`ebf81af` 的临时妥协）
+  5. gate STEP D 取消 `engine-love2d` 豁免
+- **Depends On**: `port-contract-completeness`（SpriteAtlas 已就绪）
+- **Status**: [ ] Created
+
+### Change: port-battle-robustness
+
+- **Repository**: this repo
+- **Scope**: fullstack（WarLoad 错误码 + WAR.Person 容量）
+- **Responsibility**:
+  1. `WarLoad` 返回明确 `true`/`false`（当前越界只 `JY_Error`，调用方无法分支）
+  2. `WarMainCoroutine` 检查返回值，失败时 `warState.status="ended"` /
+     `result=nil` 并干净退出
+  3. `WAR.Person` 容量 26 → 40（当前 6 我方 + 20 敌方 = **零余量**）
+  4. `WarSelectTeam`/`WarSelectEnemy` 越界守卫
+- **Depends On**: `battle-extensibility`（战斗模块已抽出）
+- **Status**: [ ] Created
 
 ---
 
@@ -120,8 +148,17 @@ parent_epic: null
   │  战斗流程抽成可覆盖策略模块            │
   │  （支持半即时/即时/Hades 式）          │
   └──────────────────────────────────────┘
-       ▲
-       │ 依赖 port-script-decoupling（战斗已走 facade）
+       │
+       ├──▶ ┌──────────────────────────────────────┐
+       │    │ port-battle-robustness               │
+       │    │  WarLoad 错误码 + WAR.Person 容量      │
+       │    └──────────────────────────────────────┘
+       │
+  ┌──────────────────────────────────────┐
+  │ port-sprite-native-migration          │
+  │  消除 script 层 lib.Pic* 双轨          │
+  │  （为 gate 摘掉 engine-love2d 豁免）   │
+  └──────────────────────────────────────┘
        ▲
        │ 无硬依赖，但建议排在上者之后（同文件冲突）
 ```

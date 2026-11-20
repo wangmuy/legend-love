@@ -95,6 +95,11 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 ✗ 资产格式转换（.grp → SpriteFrames/Flipbook）→ 独立 epic
 ✗ 实际写 Godot/Unreal 引擎实现 → 本 slice 只消除契约缺口，不写新引擎
 ✗ 战斗系统的玩法改造 → 归 `battle-extensibility`（本 slice 第 4 个子 change）
+✗ 其余 24 个 `lib.*` 函数的迁移（258 处调用 / 35 函数）→ **本 slice 明确排除**
+   实测：script 层用 258 处 `lib.*`，其中只有 23 个有 EngineAPI 等价物，
+   11 个无等价物（GetD/SetD/GetS/SetS/CleanWarMap/...），且 `map.setTile` 契约不存在。
+   消除它需要 30-40 Task，比本 slice 现有 5 个 change 的总和还大 → 独立评估
+✗ 27 个死契约的清理（audio 6 / map 6 / input 4 / sprite 2 / ...）→ 同上
 ✗ 触摸/手柄的进一步扩展 → 归 input-action-layer 后续
 ✗ 存档格式迁移 → 与引擎无关，不受影响
 ```
@@ -133,8 +138,10 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 ```
 port-contract-completeness   14 Task 组 / 82 checkbox   契约完整化 + 解码搬家 + 多格式 + 修虚拟手柄（✓ Complete）
 port-script-decoupling       7 Task 组 / 49 checkbox    绘制/流程/游戏逻辑解耦（✓ Complete）
-port-sprite-animation        7 Task 组 / 38 checkbox    sprite 动画时间驱动
-battle-extensibility         8 Task 组 / 51 checkbox    战斗流程抽成可覆盖策略模块
+port-sprite-animation        7 Task 组 / 38 checkbox    sprite 动画时间驱动（✓ Complete）
+battle-extensibility         8 Task 组 / 51 checkbox    战斗流程抽成可覆盖策略模块（✓ Complete）
+port-sprite-native-migration 7 Task 组 / 55 checkbox    SpriteAtlas PNG 修复 + script 层零 lib.Pic*
+port-battle-robustness       5 Task 组 / 41 checkbox    WarLoad 错误码 + WAR.Person 容量
 ```
 
 ## Affected Domains
