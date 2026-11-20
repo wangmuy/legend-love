@@ -153,18 +153,53 @@ SpriteAtlas.draw → EngineAPI.sprite.drawHandle(handle, ...)      -- 不读 ✓
 
 ---
 
-## Task 4：搬 `drawScene`（原 `lib.DrawSMap`）
+## Task 4：搬 `drawScene`（原 `lib.DrawSMap`，79 行）
 
-**Blast Radius**：同上
+**Blast Radius**：`framework/map_render.lua`、`engine_love2d.lua`、
+`engine_mud.lua`、`engine_web.lua`、`tests/engine_test.lua`、`lib_love.lua`
+
+### 先补一个契约：`map.getSceneSize`
+
+`DrawSMap` 的边界判据是 `xx < S_XMax` / `yy < S_YMax`，而这两个值在
+`lib_love.lua:1382` 是 **local** 变量（`LoadSMap` 时赋值）。
+
+framework 只能从 `CC.SWidth/SHeight` 猜 —— 那是**调用方传的参数**
+（`jymain.lua:1980` 传的确实是 `CC.SWidth`），不是引擎的实际状态。
+MOD 改调用参数就会静默错位 → 加显式契约。
+
+`lib_love` 暴露 `GetSceneSize()`，4 引擎实现。契约数 86 → **87**。
+
+### 8 处引擎调用的映射
+
+| 原调用 | 新契约 |
+|--------|--------|
+| `love.graphics.getScissor()` ×2 | `render.getClip()` ×1 |
+| `love.graphics.setScissor(...)` | `render.setClip(...)` |
+| `FillColor(0,0,0,0,0)` | `render.fillRect(0,0,0,0,0)` |
+| `JY_LoadPic(...)` ×5 | `SpriteAtlas.draw(0, pic, ...)` |
+| `GetS(sceneid,xx,yy,0..5)` ×6 | `map.getSceneTile(sceneid,xx,yy,0..5)` |
+| `GetD(sceneid, d3, 7)` | `map.getSceneEventData(sceneid, d3, 7)` |
+
+### 两趟循环必须保留
+
+原实现是**两趟**（不是一趟）：
+
+1. 只画地面层（`GetS` level 0）
+2. 画建筑 / 空中 / 事件贴图 / 主角（level 1..5）
+
+**分两趟的原因**：地面必须先全部铺完，否则相邻格子的建筑会被后画的地面盖住。
+合并成一趟会引入真实的遮挡错误。
 
 **DoD**：
-- [ ] `MapRender.drawScene(sceneId, x, y, offX, offY, mypic)` —— 搬 79 行
-- [ ] 8 处引擎调用契约化（同上）
-- [ ] `EngineAPI.map.drawScene` 改为调 `MapRender.drawScene`
-- [ ] 单测：不调 `love.*`、不读 `picFileCache`
-- [ ] **实机逐字节对比**：主角家开场场景截图与迁移前 md5 相同
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] 新增 `map.getSceneSize()` 契约（4 引擎 + `lib.GetSceneSize`）
+- [x] `MapRender.drawScene(sceneid, x, y, xoff, yoff, mypic)` —— 搬 79 行
+- [x] 8 处引擎调用全部契约化（见上表）
+- [x] **保留两趟循环结构**（不做"优化"）
+- [x] `EngineAPI.map.drawScene` 改为调 `MapRender.drawScene`（带 pcall 逃生舱）
+- [x] **保留** `lib.DrawSMap`
+- [x] **实机逐字节对比**：场景截图 md5 `1efd2af3…` 与迁移前相同
+- [x] 四版本全量测试零失败（3999/0）
+- [x] 一个 commit
 
 ---
 

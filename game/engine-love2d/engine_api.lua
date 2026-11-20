@@ -351,6 +351,16 @@ function M.map.clearBattleTile(layer, value) end
 --- 卸载主地图数据（释放内存）
 function M.map.unload() end
 
+--- 取场景地图的尺寸
+--
+-- @return table {w=, h=}（场景坐标系的宽高，原版 `S_XMax` / `S_YMax`）
+--
+-- 为什么需要它：`DrawSMap` 的循环边界判据是 `xx < S_XMax` / `yy < S_YMax`，
+-- 而这两个值在 `lib_love.lua` 是 **local** 变量（`LoadSMap` 时赋值）。
+-- framework 拿不到，只能从 `CC.SWidth/SHeight` 猜 —— 那是**调用方传的参数**，
+-- 不是引擎的实际状态。显式契约更准确（且 MOD 改参数时不会静默错位）。
+function M.map.getSceneSize() end
+
 --- 绘制云层
 --
 -- 云的位置更新是纯游戏逻辑（`tickClouds`），但**云的像素归引擎**：

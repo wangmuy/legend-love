@@ -1381,6 +1381,10 @@ end
 
 local S_XMax = 0
 local S_YMax = 0
+-- 暴露给 EngineAPI.map.getSceneSize（原版是 local，framework 拿不到）
+function GetSceneSize()
+    return { w = S_XMax, h = S_YMax }
+end
 local S_Num = 0
 local smap = {} -- 场景S*数据
 local D_Num1 -- 每个场景D的个数

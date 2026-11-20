@@ -208,6 +208,11 @@ EngineAPI.map.clearBattleTile = function(layer, value)
     logCall("map.clearBattleTile", layer, value)
 end
 
+EngineAPI.map.getSceneSize = function()
+    logCall("map.getSceneSize")
+    return { w = 64, h = 64 }
+end
+
 EngineAPI.map.drawClouds = function(mx, my)
     logCall("map.drawClouds", mx, my)
 end

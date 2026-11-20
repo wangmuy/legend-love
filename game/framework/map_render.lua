@@ -311,6 +311,116 @@ function MapRender.drawMain(x, y, mypic)
     end
 end
 
+-- ---------------------------------------------------------------------------
+-- 场景地图绘制（原 lib.DrawSMap，79 行）
+-- ---------------------------------------------------------------------------
+
+--- 绘制场景地图（**逐字搬移** `lib.DrawSMap`）
+--
+-- @param sceneid number 场景编号
+-- @param x, y number 场景坐标
+-- @param xoff, yoff number 视口偏移
+-- @param mypic number 主角贴图编号
+--
+-- 原实现是**两趟循环**（对应原版 kys_draw.pas 的两层）：
+--   ① 只画地面层（GetS level 0）
+--   ② 画建筑 / 空中 / 事件贴图 / 主角（level 1..5）
+--
+-- 分两趟的原因：地面必须先全部铺完，否则相邻格子的建筑会被后画的地面盖住。
+-- **不要合并成一趟**（顺序是视觉正确性的一部分）。
+function MapRender.drawScene(sceneid, x, y, xoff, yoff, mypic)
+    local EngineAPI = api()
+    if not EngineAPI or not EngineAPI.map or not EngineAPI.render then return end
+
+    local CONFIG = rawget(_G, "CONFIG") or {}
+    local CC = rawget(_G, "CC") or {}
+
+    local sceneSize = EngineAPI.map.getSceneSize and EngineAPI.map.getSceneSize()
+                      or { w = CC.SWidth or 64, h = CC.SHeight or 64 }
+    local SXMax, SYMax = sceneSize.w or 64, sceneSize.h or 64
+
+    local oldClip = EngineAPI.render.getClip()
+    local rect = oldClip or { x = 0, y = 0, w = CONFIG.Width, h = CONFIG.Height }
+    if rect.w == nil then rect.w = CONFIG.Width end
+    if rect.h == nil then rect.h = CONFIG.Height end
+
+    -- 根据 clip 确定循环参数。提高绘制速度
+    local istart = math.floor((rect.x - math.floor(CONFIG.Width / 2)) / (2 * CONFIG.XScale)) - 1 - CONFIG.SMapAddX
+    local iend = math.floor((rect.x + rect.w - math.floor(CONFIG.Width / 2)) / (2 * CONFIG.XScale)) + 1 + CONFIG.SMapAddX
+
+    local jstart = math.floor((rect.y - math.floor(CONFIG.Height / 2)) / (2 * CONFIG.YScale)) - 1
+    local jend = math.floor((rect.y + rect.h - math.floor(CONFIG.Height / 2)) / (2 * CONFIG.YScale)) + 1
+
+    EngineAPI.render.fillRect(0, 0, 0, 0, 0)
+
+    -- ① 地面层
+    for j = 0, 2 * jend - 2 * jstart + CONFIG.SMapAddY do
+        for i = istart, iend do
+            local i1 = i + math.floor(j / 2) + jstart
+            local j1 = -i + math.floor(j / 2) + j % 2 + jstart
+
+            local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+            local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+
+            local xx = x + i1 + xoff
+            local yy = y + j1 + yoff
+
+            if (xx >= 0) and (xx < SXMax) and (yy >= 0) and (yy < SYMax) then
+                local d0 = EngineAPI.map.getSceneTile(sceneid, xx, yy, 0)
+                if d0 > 0 then
+                    drawTile(d0, x1, y1)
+                end
+            end
+        end
+    end
+
+    -- ② 建筑 / 空中 / 事件 / 主角
+    for j = 0, 2 * jend - 2 * jstart + CONFIG.SMapAddY do
+        for i = istart, iend do
+            local i1 = i + math.floor(j / 2) + jstart
+            local j1 = -i + math.floor(j / 2) + j % 2 + jstart
+
+            local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+            local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+
+            local xx = x + i1 + xoff
+            local yy = y + j1 + yoff
+
+            if (xx >= 0) and (xx < SXMax) and (yy >= 0) and (yy < SYMax) then
+                local d1 = EngineAPI.map.getSceneTile(sceneid, xx, yy, 1)
+                local d2 = EngineAPI.map.getSceneTile(sceneid, xx, yy, 2)
+                local d3 = EngineAPI.map.getSceneTile(sceneid, xx, yy, 3)
+                local d4 = EngineAPI.map.getSceneTile(sceneid, xx, yy, 4)
+                local d5 = EngineAPI.map.getSceneTile(sceneid, xx, yy, 5)
+
+                if d1 > 0 then
+                    drawTile(d1, x1, y1 - d4)          -- 建筑
+                end
+                if d2 > 0 then
+                    drawTile(d2, x1, y1 - d5)          -- 空中
+                end
+                if d3 >= 0 then                        -- 事件
+                    local picnum = EngineAPI.map.getSceneEventData(sceneid, d3, 7)
+                    if picnum > 0 then
+                        drawTile(picnum, x1, y1 - d4)
+                    end
+                end
+
+                if (i1 == -xoff) and (j1 == -yoff) then     -- 主角
+                    drawTile(mypic * 2, x1, y1 - d4)
+                end
+            end
+        end
+    end
+
+    if oldClip then
+        EngineAPI.render.setClip(oldClip.x, oldClip.y,
+                                 oldClip.x + oldClip.w, oldClip.y + oldClip.h)
+    else
+        EngineAPI.render.setClip(0, 0, 0, 0)
+    end
+end
+
 --- 重置排序状态（测试用）
 function MapRender.reset()
     buildNumber = 0

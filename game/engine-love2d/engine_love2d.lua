@@ -297,6 +297,14 @@ EngineAPI.map.tickClouds = function()
     lib.CloudTick()
 end
 
+EngineAPI.map.getSceneSize = function()
+    -- S_XMax / S_YMax 在 lib_love.lua 是 **local** → 经框架暴露的访问器读取
+    if lib.GetSceneSize then return lib.GetSceneSize() end
+    -- 兜底：用调用方传的 CC.SWidth/SHeight（正常情况下二者相同）
+    local CC = rawget(_G, "CC") or {}
+    return { w = CC.SWidth or 64, h = CC.SHeight or 64 }
+end
+
 EngineAPI.map.drawClouds = function(mx, my)
     -- 云层绘制归引擎：需要逐像素调色板烘焙（CloudBakeImage），属 sprite 子系统
     lib.DrawClouds(mx, my)
@@ -363,7 +371,22 @@ EngineAPI.map.drawMain = function(playerX, playerY, playerPic)
     lib.DrawMMap(playerX, playerY, playerPic)
 end
 
+--- 场景地图绘制 —— **改走 framework/map_render.lua**
+--
+-- 原实现 `lib.DrawSMap`（79 行）住在引擎里且 .idx/.grp 不透明。
+-- 现在投影数学住 framework，引擎只提供 tile 数据与 handle 绘制。
+--
+-- 逃生舱：framework 模块缺失时回退旧实现（静默丢整张场景地图比回退更糟）。
 EngineAPI.map.drawScene = function(sceneId, x, y, offX, offY, playerPic)
+    local ok, MR = pcall(require, "framework.map_render")
+    if ok and MR and MR.drawScene then
+        MR.drawScene(sceneId, x, y, offX, offY, playerPic)
+        return
+    end
+    if EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("map.drawScene: framework.map_render unavailable, "
+                            .. "falling back to lib.DrawSMap")
+    end
     lib.DrawSMap(sceneId, x, y, offX, offY, playerPic)
 end
 
