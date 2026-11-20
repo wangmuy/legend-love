@@ -7,6 +7,7 @@
 
 ---本代码由游泳的鱼编写
 
+local SpriteAtlas = require("framework.sprite_atlas")
 local RenderFacade = require("framework.render_facade")
 local FileUtil = require "lib_file"
 local ScriptLoader = require "script_loader"
@@ -373,10 +374,10 @@ function Init_MMap()   --初始化主地图数据
     lib.LoadMMap(CC.MMapFile[1],CC.MMapFile[2],CC.MMapFile[3],
             CC.MMapFile[4],CC.MMapFile[5],CC.MWidth,CC.MHeight,JY.Base["人X"],JY.Base["人Y"]);
 
-    lib.PicLoadFile(CC.MMAPPicFile[1],CC.MMAPPicFile[2],0);
-    lib.PicLoadFile(CC.HeadPicFile[1],CC.HeadPicFile[2],1);
+    SpriteAtlas.loadArchive(CC.MMAPPicFile[1],CC.MMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
+    SpriteAtlas.loadArchive(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
     if CC.LoadThingPic==1 then
-        lib.PicLoadFile(CC.ThingPicFile[1],CC.ThingPicFile[2],2);
+        SpriteAtlas.loadArchive(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
     end
 
     -- 主地图飘云（原版 kys_engine.pas:ReadTiles 加载 cloud.idx/grp，
@@ -490,10 +491,10 @@ end
 
 --showname  =1 显示场景名 0 不显示
 function Init_SMap(showname)   --初始化场景数据
-    lib.PicLoadFile(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0);
-    lib.PicLoadFile(CC.HeadPicFile[1],CC.HeadPicFile[2],1);
+    SpriteAtlas.loadArchive(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
+    SpriteAtlas.loadArchive(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
     if CC.LoadThingPic==1 then
-        lib.PicLoadFile(CC.ThingPicFile[1],CC.ThingPicFile[2],2);
+        SpriteAtlas.loadArchive(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
     end
 
     PlayMIDI(JY.Scene[JY.SubScene]["进门音乐"]);
@@ -580,14 +581,28 @@ end
 --返回，裁剪矩形 {x1,y1,x2,y2}
 function Cal_PicClip(dx1,dy1,pic1,id1,dx2,dy2,pic2,id2)   --计算贴图改变形成的Clip裁剪
 
-    local w1,h1,x1_off,y1_off=lib.PicGetXY(id1,pic1*2);
+    -- 迁移（port-sprite-native-migration Task 5）：
+    -- lib.PicGetXY 返回 4 个值 (w, h, xoff, yoff) → SpriteAtlas.getMeta 返回 table。
+    --
+    -- **这是最高风险的一处**：Cal_PicClip 算的是武功动画的裁剪矩形，
+    -- 数值错会导致「人物缺一块」或「动画错位」，且只在实机可见。
+    -- 所以 getMeta 取不到时用 0 兜底（与旧 PicGetXY 的判空返回 0,0,0,0 一致）。
+    local m1 = SpriteAtlas.getMeta(id1, pic1*2);
+    local w1 = m1 and m1.w or 0;
+    local h1 = m1 and m1.h or 0;
+    local x1_off = m1 and m1.xoff or 0;
+    local y1_off = m1 and m1.yoff or 0;
     local old_r={};
     old_r.x1=CC.XScale*(dx1-dy1)+CC.ScreenW/2-x1_off;
     old_r.y1=CC.YScale*(dx1+dy1)+CC.ScreenH/2-y1_off;
     old_r.x2=old_r.x1+w1;
     old_r.y2=old_r.y1+h1;
 
-    local w2,h2,x2_off,y2_off=lib.PicGetXY(id2,pic2*2);
+    local m2 = SpriteAtlas.getMeta(id2, pic2*2);
+    local w2 = m2 and m2.w or 0;
+    local h2 = m2 and m2.h or 0;
+    local x2_off = m2 and m2.xoff or 0;
+    local y2_off = m2 and m2.yoff or 0;
     local new_r={};
     new_r.x1=CC.XScale*(dx2-dy2)+CC.ScreenW/2-x2_off;
     new_r.y1=CC.YScale*(dx2+dy2)+CC.ScreenH/2-y2_off;
@@ -878,12 +893,15 @@ function ShowPersonStatus_sub(id,page)    --显示人物状态页面
     x1=dx+5;
     y1=dy+5;
     x2=4*size;
-    local headw,headh=lib.PicGetXY(1,p["头像代号"]*2);
+    -- 迁移（Task 5）：PicGetXY → getMeta（table），PicLoadCache → draw（flag 0x1）
+    local headMeta = SpriteAtlas.getMeta(1, p["头像代号"]*2);
+    local headw = headMeta and headMeta.w or 0;
+    local headh = headMeta and headMeta.h or 0;
     local headx=(width/2-headw)/2;
     local heady=(h*6-headh)/2;
 
 
-    lib.PicLoadCache(1,p["头像代号"]*2,x1+headx,y1+heady,1);
+    SpriteAtlas.draw(1, p["头像代号"]*2, x1+headx, y1+heady, 0x1);
     i=6;
     DrawString(x1,y1+h*i,p["姓名"],C_WHITE,size);
     DrawString(x1+10*size/2,y1+h*i,string.format("%3d",p["等级"]),C_GOLD,size);
@@ -1321,9 +1339,9 @@ function SelectThing(thing,thingnum)    --显示物品菜单
                 lib.DrawRect(boxx,boxy,boxx+CC.ThingPicWidth+1,boxy+CC.ThingPicHeight+1,boxcolor);
                 if thing[id]>=0 then
                     if CC.LoadThingPic==1 then
-                        lib.PicLoadCache(2,thing[id]*2,boxx+1,boxy+1,1);
+                        SpriteAtlas.draw(2, thing[id]*2, boxx+1, boxy+1, 0x1);
                     else
-                        lib.PicLoadCache(0,(thing[id]+CC.StartThingPic)*2,boxx+1,boxy+1,1);
+                        SpriteAtlas.draw(0, (thing[id]+CC.StartThingPic)*2, boxx+1, boxy+1, 0x1);
                     end
                 end
             end
@@ -4559,12 +4577,12 @@ function WarMain(warid,isexp)           --战斗主函数
     JY.Status=GAME_WMAP;
 
     --加载贴图文件
-    lib.PicLoadFile(CC.WMAPPicFile[1],CC.WMAPPicFile[2],0);
-    lib.PicLoadFile(CC.HeadPicFile[1],CC.HeadPicFile[2],1);
+    SpriteAtlas.loadArchive(CC.WMAPPicFile[1],CC.WMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
+    SpriteAtlas.loadArchive(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
     if CC.LoadThingPic==1 then
-        lib.PicLoadFile(CC.ThingPicFile[1],CC.ThingPicFile[2],2);
+        SpriteAtlas.loadArchive(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
     end
-    lib.PicLoadFile(CC.EffectFile[1],CC.EffectFile[2],3);
+    SpriteAtlas.loadArchive(CC.EffectFile[1],CC.EffectFile[2],3,{paletteFile=CC.PaletteFile});
 
     PlayMIDI(WAR.Data["音乐"]);
 
@@ -4575,9 +4593,9 @@ function WarMain(warid,isexp)           --战斗主函数
 
     for i=0,WAR.PersonNum-1 do
         local pid=WAR.Person[i]["人物编号"];
-        lib.PicLoadFile(string.format(CC.FightPicFile[1],JY.Person[pid]["头像代号"]),
+        SpriteAtlas.loadArchive(string.format(CC.FightPicFile[1],JY.Person[pid]["头像代号"]),
                         string.format(CC.FightPicFile[2],JY.Person[pid]["头像代号"]),
-                        4+i);
+                        4+i,{paletteFile=CC.PaletteFile});
     end
 
     while true do             --战斗主循环
@@ -4684,10 +4702,10 @@ function WarMain(warid,isexp)           --战斗主函数
     end
 
     CleanMemory();
-    lib.PicLoadFile(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0);
-    lib.PicLoadFile(CC.HeadPicFile[1],CC.HeadPicFile[2],1);
+    SpriteAtlas.loadArchive(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
+    SpriteAtlas.loadArchive(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
     if CC.LoadThingPic==1 then
-        lib.PicLoadFile(CC.ThingPicFile[1],CC.ThingPicFile[2],2);
+        SpriteAtlas.loadArchive(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
     end
 
     JY.Status=GAME_SMAP;

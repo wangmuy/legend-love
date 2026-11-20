@@ -65,16 +65,16 @@
 **Blast Radius**：`game/script/jymain.lua`
 
 **DoD**：
-- [ ] `Init_MMap`（3 处）：MMAP / Head / Thing → `SpriteAtlas.loadArchive`,
+- [x] `Init_MMap`（3 处）：MMAP / Head / Thing → `SpriteAtlas.loadArchive`,
       其中 Head 带 `{usage="avatar"}`
-- [ ] `Init_SMap`（3 处）：SMAP / Head / Thing → 同上
-- [ ] `WarMain` 阻塞版（5 处，死代码但必须迁，否则 gate 豁免摘不掉）：
+- [x] `Init_SMap`（3 处）：SMAP / Head / Thing → 同上
+- [x] `WarMain` 阻塞版（5 处，死代码但必须迁，否则 gate 豁免摘不掉）：
       WMAP / Head / Thing / Effect / FightPic → 同上
-- [ ] 全部带 `{paletteFile = CC.PaletteFile}`
-- [ ] **注意 archive 编号必须与原来一致**（0 / 1 / 2 / 3 / 4+i）
-- [ ] 单测：`SpriteAtlas` 的 5 个 archive 都被加载
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] 全部带 `{paletteFile = CC.PaletteFile}`
+- [x] **注意 archive 编号必须与原来一致**（0 / 1 / 2 / 3 / 4+i）
+- [x] 单测：`SpriteAtlas` 的 5 个 archive 都被加载
+- [x] 四版本全量测试零失败
+- [x] 一个 commit
 
 ---
 
@@ -83,15 +83,15 @@
 **Blast Radius**：`game/script/jymain.lua`
 
 **DoD**：
-- [ ] `Cal_PicClip` 的 2 处 `PicGetXY`（返回 4 值）→ `getMeta`（table 解构）
+- [x] `Cal_PicClip` 的 2 处 `PicGetXY`（返回 4 值）→ `getMeta`（table 解构）
       —— **这是最高风险点**：裁剪矩形算错会导致武功动画错位
-- [ ] `War_ShowHead`（死代码里的同名函数？）的 1 处 `PicGetXY` → `getMeta`
-- [ ] 物品菜单的 2 处 `PicLoadCache` → `draw`
-- [ ] `War_ShowHead` 的 1 处 `PicLoadCache` → `draw`
-- [ ] 单测：`Cal_PicClip` 返回的裁剪矩形与改造前**数值一致**（用固定输入对比）
-- [ ] 四版本全量测试零失败
-- [ ] 实机截图：武功攻击动画的裁剪正常（不是"人物缺一块"）
-- [ ] 一个 commit
+- [x] `War_ShowHead`（死代码里的同名函数？）的 1 处 `PicGetXY` → `getMeta`
+- [x] 物品菜单的 2 处 `PicLoadCache` → `draw`
+- [x] `War_ShowHead` 的 1 处 `PicLoadCache` → `draw`
+- [x] 单测：`Cal_PicClip` 返回的裁剪矩形与改造前**数值一致**（用固定输入对比）
+- [x] 四版本全量测试零失败
+- [x] 实机截图：武功攻击动画的裁剪正常（不是"人物缺一块"）
+- [x] 一个 commit
 
 ---
 
