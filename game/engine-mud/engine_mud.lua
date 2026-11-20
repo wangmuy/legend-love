@@ -90,16 +90,6 @@ EngineAPI.sprite.loadArchive = function(idxFile, grpFile, archiveId)
         spriteSizes[archiveId] = { num = num, width = 64, height = 64 }
     end
 end
-
-EngineAPI.sprite.getSize = function(archiveId, spriteId)
-    logCall("sprite.getSize", archiveId, spriteId)
-    local info = spriteSizes[archiveId]
-    if info then
-        return info.width, info.height, 0, 0
-    end
-    return 64, 64, 0, 0
-end
-
 EngineAPI.sprite.draw = function(archiveId, spriteId, x, y, flags, alpha)
     logCall("sprite.draw", archiveId, spriteId, x, y, flags, alpha)
 end
@@ -466,26 +456,6 @@ end
 EngineAPI.coroutine.isRunning = function()
     return coroutine.running() ~= nil
 end
-
-EngineAPI.coroutine.yieldPoint = function()
-    if coroutine.running() then
-        coroutine.yield()
-    end
-end
-
-EngineAPI.coroutine.waitFor = function(condition, timeout)
-    local start = EngineAPI.time.getTime()
-    while not condition() do
-        if timeout and EngineAPI.time.getTime() - start > timeout then
-            return false
-        end
-        if coroutine.running() then
-            coroutine.yield()
-        end
-    end
-    return true
-end
-
 --------------------------------------------------------------------
 -- 向后兼容
 --------------------------------------------------------------------

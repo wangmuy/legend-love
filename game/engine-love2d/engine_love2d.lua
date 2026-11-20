@@ -95,11 +95,6 @@ end
 EngineAPI.sprite.loadArchive = function(idxFile, grpFile, archiveId)
     lib.PicLoadFile(idxFile, grpFile, archiveId)
 end
-
-EngineAPI.sprite.getSize = function(archiveId, spriteId)
-    return lib.PicGetXY(archiveId, spriteId)
-end
-
 EngineAPI.sprite.draw = function(archiveId, spriteId, x, y, flags, alpha)
     lib.PicLoadCache(archiveId, spriteId, x, y, flags, alpha)
 end
@@ -959,26 +954,6 @@ EngineAPI.coroutine.isRunning = function()
     if ismain == true then return false end
     return true
 end
-
-EngineAPI.coroutine.yieldPoint = function()
-    if coroutine.running() then
-        coroutine.yield()
-    end
-end
-
-EngineAPI.coroutine.waitFor = function(condition, timeout)
-    local start = EngineAPI.time.getTime()
-    while not condition() do
-        if timeout and EngineAPI.time.getTime() - start > timeout then
-            return false
-        end
-        if coroutine.running() then
-            coroutine.yield()
-        end
-    end
-    return true
-end
-
 -- 设置全局 lib 变量指向 EngineAPI，保持向后兼容
 -- 使用 __index 元表：EngineAPI 上找不到的函数，回退到 lib_love 原始实现
 _G.EngineAPI = EngineAPI
