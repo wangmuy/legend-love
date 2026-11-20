@@ -64,5 +64,5 @@ math.random(0):
 |----|------|
 | `battle_render.lua` 的 `lib.PicGetXY / PicLoadCache / DrawWarMap` 与 `SpriteAtlas` 双轨 | 需整体迁移，属独立 change |
 | `jymain.lua` 33 处 `lib.Pic*` | 同上 |
-| `WarLoad` 的 `warid` 越界只 JY_Error 不返回错误码 | 调用方无法区分"加载成功"与"静默失败" |
-| `WAR.Person` 固定 26 槽，`WarSelectEnemy` 最多加 20 + `WarSelectTeam` 最多 6 = 26 | **刚好够，无余量**；MOD 改 `TeamNum` 或敌方数量即越界 |
+| ~~`WarLoad` 越界只 JY_Error~~ | **已修**（`port-battle-robustness`）：返回 true/false + 3 调用点检查 |
+| ~~`WAR.Person` 26 槽零余量~~ | **已修**（`port-battle-robustness`）：40 槽 + 3 处越界守卫 |

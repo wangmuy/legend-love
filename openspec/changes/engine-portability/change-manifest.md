@@ -119,7 +119,7 @@ parent_epic: null
   3. `WAR.Person` 容量 26 → 40（当前 6 我方 + 20 敌方 = **零余量**）
   4. `WarSelectTeam`/`WarSelectEnemy` 越界守卫
 - **Depends On**: `battle-extensibility`（战斗模块已抽出）
-- **Status**: [ ] Created
+- **Status**: [x] Archived / Complete（port-battle-robustness）
 
 ---
 
