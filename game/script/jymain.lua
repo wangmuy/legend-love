@@ -1348,7 +1348,14 @@ function SelectThing(thing,thingnum)    --显示物品菜单
             end
         elseif keypress==VK_DOWN then
             if  cur_y ==ynum-1 then
-                if  cur_line < (math.modf(200/xnum)-ynum) then
+                -- **xnum 需判零**：`CC.MenuThingXnum` 是「一行显示几个物品」，
+                -- 由 jyconst 装配（正常 5 或 10），但 MOD 可改成 0。
+                -- `200/0` 在 Lua 里得 inf（不报错），于是
+                -- `cur_line < inf - ynum` 恒真 → cur_line 每按一次下键就 +1
+                -- → 物品索引 `y*xnum + x + xnum*cur_line` 无限增长 → 越界读到 nil。
+                -- 钳到 >= 1 后，除零场景退化为"不会继续翻页"，行为安全。
+                local xnumSafe = (xnum and xnum > 0) and xnum or 1
+                if  cur_line < (math.modf(200/xnumSafe)-ynum) then
                     cur_line = cur_line + 1;
                 end
             else

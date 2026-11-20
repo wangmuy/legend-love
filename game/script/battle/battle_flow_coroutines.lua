@@ -151,7 +151,7 @@ end
 War_AutoMoveCoroutine = function(wugongnum)
     local pid = WAR.Person[WAR.CurID]["人物编号"]
     local wugongid = JY.Person[pid]["武功" .. wugongnum]
-    local level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+    local level = War_WugongLevel(pid, wugongnum)
     
     local wugongtype = JY.Wugong[wugongid]["攻击范围"]
     local movescope = JY.Wugong[wugongid]["移动范围" .. level]
@@ -333,7 +333,7 @@ War_AutoCoroutine = function()
     War_AutoMoveCoroutine(wugongnum)
     
     local wugongid = JY.Person[pid]["武功" .. wugongnum]
-    local level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+    local level = War_WugongLevel(pid, wugongnum)
     local x0 = WAR.Person[WAR.CurID]["坐标X"]
     local y0 = WAR.Person[WAR.CurID]["坐标Y"]
     
@@ -537,7 +537,7 @@ War_AttackCoroutine = function()
     
     local wugongid = menu[r][4]
     local wugongnum = menu[r][5]
-    local level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+    local level = War_WugongLevel(pid, wugongnum)
     local fightscope = JY.Wugong[wugongid]["攻击范围"]
     local x0 = WAR.Person[WAR.CurID]["坐标X"]
     local y0 = WAR.Person[WAR.CurID]["坐标Y"]
@@ -654,8 +654,8 @@ War_Fight_ExecuteCoroutine = function(wugongnum, wugong, level, x, y)
             JY.Person[pid]["武功等级" .. wugongnum] = JY.Person[pid]["武功等级" .. wugongnum] + Rnd(2) + 1
         end
         
-        if math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1 ~= level then
-            level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+        if War_WugongLevel(pid, wugongnum) ~= level then
+            level = War_WugongLevel(pid, wugongnum)
             AsyncMessageBox.ShowMessageCoroutine(-1, -1, 
                 JY.Wugong[wugong]["名称"] .. " 升为 " .. level .. " 级", C_ORANGE, CC.DefaultFont)
         end
@@ -674,7 +674,7 @@ War_Fight_SubCoroutine = function(id, wugongnum, x, y)
     local scheduler = CoroutineScheduler.getInstance()
     local pid = WAR.Person[id]["人物编号"]
     local wugong = JY.Person[pid]["武功" .. wugongnum]
-    local level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+    local level = War_WugongLevel(pid, wugongnum)
     
     CleanWarMap(4, 0)
     
@@ -734,8 +734,8 @@ War_Fight_SubCoroutine = function(id, wugongnum, x, y)
             JY.Person[pid]["武功等级" .. wugongnum] = JY.Person[pid]["武功等级" .. wugongnum] + Rnd(2) + 1
         end
         
-        if math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1 ~= level then
-            level = math.modf(JY.Person[pid]["武功等级" .. wugongnum] / 100) + 1
+        if War_WugongLevel(pid, wugongnum) ~= level then
+            level = War_WugongLevel(pid, wugongnum)
             AsyncMessageBox.ShowMessageCoroutine(-1, -1, 
                 JY.Wugong[wugong]["名称"] .. " 升为 " .. level .. " 级", C_ORANGE, CC.DefaultFont)
         end

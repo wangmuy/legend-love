@@ -4,6 +4,49 @@
 --
 -- battle-extensibility 阶段 1：纯搬移。
 
+-- ---------------------------------------------------------------------------
+-- 武功等级计算（单点钳制）
+-- ---------------------------------------------------------------------------
+--
+-- 原版在 15 处各自写 `math.modf(JY.Person[pid]["武功等级" .. n]/100) + 1`，
+-- **没有任何上界检查**。而武功等级索引的字段（攻击力1..10 / 移动范围1..10 /
+-- 杀伤范围1..10 / 加内力1..10 / 杀内力1..10）只定义了 1..10 共 10 档：
+--
+--     CC.Wugong_S["攻击力" .. i]  for i=1,10      （jyconst.lua:344-352）
+--
+-- 正常数据下 `武功等级` 由战斗内递增保证 < 900 → level ∈ [1, 10]，刚好够用。
+-- 但：
+--   ① 递增守卫只写在 `War_Fight_ExecuteCoroutine` / `battle_action` 的
+--      「+2 经验」分支，**存档直读 / MOD 改数据 / 事件脚本 instruct_* 赋值
+--      都绕过它**；
+--   ② 一旦 `武功等级 >= 1000`，level >= 11 → `["攻击力"..11]` 为 nil
+--      → 下游 `fightnum + (... + nil)/2` 抛
+--      "attempt to perform arithmetic on a nil value"；
+--   ③ 负数同理（`["攻击力"-1]`）。
+--
+-- 所以等级计算是个**真正的单点**：与其在 15 处各加一行 if，不如集中到这里。
+-- 钳制到 [1, 10] 与 CC.Wugong_S 的字段范围严格对齐 —— 这也是原版隐含的契约。
+
+--- 计算某人物某武功槽的「实际使用等级」（1..10）
+--
+-- @param pid number 人物 id
+-- @param wugongnum number 武功槽（1..10）
+-- @return number 等级，恒在 [1, 10]
+function War_WugongLevel(pid, wugongnum)
+    local p = JY.Person[pid]
+    if p == nil then return 1 end
+
+    local raw = p["武功等级" .. tostring(wugongnum)]
+    raw = tonumber(raw) or 0
+    if raw < 0 then raw = 0 end
+
+    local level = math.modf(raw / 100) + 1
+    -- 上界 10 = CC.Wugong_S 里 level 索引字段的最大档位
+    if level > 10 then level = 10 end
+    if level < 1 then level = 1 end
+    return level
+end
+
 function War_PersonLostLife()             --计算战斗后每回合由于中毒或受伤而掉血
     for i=0,WAR.PersonNum-1 do
         local pid=WAR.Person[i]["人物编号"]
@@ -244,7 +287,7 @@ end
 function War_Fight_Sub(id,wugongnum,x,y)          --执行战斗
     local pid=WAR.Person[id]["人物编号"];
     local wugong=JY.Person[pid]["武功" .. wugongnum];
-    local level=math.modf(JY.Person[pid]["武功等级" .. wugongnum]/100)+1;
+    local level=War_WugongLevel(pid, wugongnum);
 
        CleanWarMap(4,0);
 
@@ -307,8 +350,8 @@ for k=1,fightnum  do         --如果左右互搏，则攻击两次
         JY.Person[pid]["武功等级" .. wugongnum]=JY.Person[pid]["武功等级" .. wugongnum]+Rnd(2)+1;
     end
 
-    if math.modf(JY.Person[pid]["武功等级" .. wugongnum]/100)+1 ~= level then    --武功升级了
-        level=math.modf(JY.Person[pid]["武功等级" .. wugongnum]/100)+1;
+    if War_WugongLevel(pid, wugongnum) ~= level then    --武功升级了
+        level=War_WugongLevel(pid, wugongnum);
         DrawStrBox(-1,-1,string.format("%s 升为 %d 级",JY.Wugong[wugong]["名称"],level),C_ORANGE,CC.DefaultFont)
         ShowScreen();
         lib.Delay(500);

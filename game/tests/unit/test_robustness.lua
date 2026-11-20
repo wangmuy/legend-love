@@ -245,6 +245,70 @@ function TestRobustness.testDivByZeroProducesInf()
     TestHelper.assertEquals(60000, clamped, "inf 会被钳到属性最大值（这就是污染机制）")
 end
 
+-- ------------------------------------------------------------ ⑥ 武功等级钳制
+
+function TestRobustness.testWugongLevelClampLogic()
+    print("\n=== Test: 武功等级钳制逻辑（1..10）===")
+    -- 复刻 War_WugongLevel 的核心算术（不依赖全局 JY）
+    local function calc(raw)
+        raw = tonumber(raw) or 0
+        if raw < 0 then raw = 0 end
+        local level = math.modf(raw / 100) + 1
+        if level > 10 then level = 10 end
+        if level < 1 then level = 1 end
+        return level
+    end
+
+    -- 正常范围
+    TestHelper.assertEquals(1, calc(0), "等级 0 → level 1")
+    TestHelper.assertEquals(1, calc(50), "等级 50 → level 1")
+    TestHelper.assertEquals(2, calc(100), "等级 100 → level 2")
+    TestHelper.assertEquals(5, calc(450), "等级 450 → level 5")
+    TestHelper.assertEquals(10, calc(900), "等级 900 → level 10")
+
+    -- **越界钳制**（这就是修复点）
+    TestHelper.assertEquals(10, calc(1000), "等级 1000 → 钳到 10（原本会取到 攻击力11 = nil）")
+    TestHelper.assertEquals(10, calc(1500), "等级 1500 → 钳到 10")
+    TestHelper.assertEquals(10, calc(9999), "等级 9999 → 钳到 10")
+
+    -- 非法输入
+    TestHelper.assertEquals(1, calc(nil), "nil → level 1")
+    TestHelper.assertEquals(1, calc("x"), "字符串 → level 1")
+    TestHelper.assertEquals(1, calc(-500), "负数 → level 1")
+end
+
+function TestRobustness.testWugongLevelHelperExists()
+    print("\n=== Test: 源码里有 War_WugongLevel 辅助函数 ===")
+    local src = readSource("script/battle/battle_action.lua")
+    TestHelper.assertNotNil(src, "应能读到 battle_action.lua")
+
+    TestHelper.assertNotNil(src:find("function War_WugongLevel(pid, wugongnum)", 1, true),
+        "应有 War_WugongLevel 辅助函数")
+    TestHelper.assertNotNil(src:find("if level > 10 then level = 10 end", 1, true),
+        "应有上界钳制（10 与 CC.Wugong_S 的字段档位对齐）")
+end
+
+function TestRobustness.testNoRawLevelComputationLeft()
+    print("\n=== Test: 15 处等级计算已全部改用辅助函数 ===")
+    local files = { "script/battle/battle_action.lua", "script/battle/battle_ai.lua",
+                    "script/battle/battle_flow_coroutines.lua" }
+    local raw = 0
+    for _, rel in ipairs(files) do
+        local src = readSource(rel)
+        TestHelper.assertNotNil(src, "应能读到 " .. rel)
+        local code = src:gsub("%-%-[^\n]*", "")
+        local pos = 1
+        while true do
+            local a = code:find('math.modf(JY.Person[pid]["武功等级"', pos, true)
+            if not a then break end
+            raw = raw + 1
+            pos = a + 1
+        end
+    end
+    TestHelper.assertEquals(0, raw,
+        "不应再有裸的等级计算（实测 " .. raw .. " 处）")
+end
+
 -- ------------------------------------------------------------ 套件入口
 
 function TestRobustness.runAll()
@@ -288,6 +352,10 @@ function TestRobustness.runAll()
 
     TestRobustness.testEndPersonDataSourceHasZeroGuard()
     TestRobustness.testDivByZeroProducesInf()
+
+    TestRobustness.testWugongLevelClampLogic()
+    TestRobustness.testWugongLevelHelperExists()
+    TestRobustness.testNoRawLevelComputationLeft()
 
     return TestHelper.printSummary()
 end

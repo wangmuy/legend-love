@@ -272,7 +272,7 @@ function War_AutoSelectWugong()           --自动选择合适的武功
                --选择杀生命的武功，必须消耗内力比现有内力小，起码可以发出一级的武功。
             if JY.Wugong[wugongid]["伤害类型"]==0 then
                 if JY.Wugong[wugongid]["消耗内力点数"]<=JY.Person[pid]["内力"] then
-                    local level=math.modf(JY.Person[pid]["武功等级" .. i]/100)+1;
+                    local level=War_WugongLevel(pid, i);
                     --总攻击力即为概率
                     probability[i]=(JY.Person[pid]["攻击力"]*3+JY.Wugong[wugongid]["攻击力" .. level ])/2;
                 else
@@ -326,7 +326,7 @@ function War_AutoSelectWugong()           --自动选择合适的武功
                     break;
                 end
             end
-            local level=math.modf(JY.Person[pid]["武功等级" .. i]/100)+1;
+            local level=War_WugongLevel(pid, i);
             probability[i]=probability[i]+JY.Wugong[wugongid]["攻击范围"]*factor*JY.Wugong[wugongid]["杀伤范围" ..level]*20;
         end
     end
@@ -388,7 +388,7 @@ end
 function War_AutoMove(wugongnum)              --自动往敌人方向移动
     local pid=WAR.Person[WAR.CurID]["人物编号"];
     local wugongid=JY.Person[pid]["武功"  ..wugongnum];
-    local level=math.modf(JY.Person[pid]["武功等级".. wugongnum]/100)+1;
+    local level=War_WugongLevel(pid, wugongnum);
 
     local wugongtype=JY.Wugong[wugongid]["攻击范围"];
     local movescope=JY.Wugong[wugongid]["移动范围" ..level];
@@ -714,7 +714,7 @@ function War_AutoExecuteFight(wugongnum)            --自动执行战斗，显�
     local x0=WAR.Person[WAR.CurID]["坐标X"];
     local y0=WAR.Person[WAR.CurID]["坐标Y"];
     local wugongid=JY.Person[pid]["武功"  ..wugongnum];
-    local level=math.modf(JY.Person[pid]["武功等级".. wugongnum]/100)+1;
+    local level=War_WugongLevel(pid, wugongnum);
 
     local maxnum,x,y=War_AutoCalMaxEnemy(x0,y0,wugongid,level);
 

@@ -587,7 +587,18 @@ handlers["GAME_SMAP"] = {
             local anim = JY.AnimationState
             local now = EngineAPI.time.getTime()
             local elapsed = now - anim.startTime
-            local frameIndex = math.floor(elapsed / anim.frameDuration)
+            -- **frameDuration 需判零/判空**：
+            --   单位是毫秒（CC.AnimationFrame = CC.Frame*3 = 150），
+            --   与 EngineAPI.time.getTime() 一致（同为 ms）。
+            --   若被 MOD 设成 0 → elapsed/0 得 inf → math.floor(inf)=inf
+            --   → i = inf → i > endFrame → 动画在第一帧就"结束"（静默失效）。
+            --   若为 nil → "attempt to perform arithmetic on a nil value"（崩）。
+            --   兜底 1ms 保证动画至少能推进（不改变正常数据的时序）。
+            local frameDur = anim.frameDuration
+            if type(frameDur) ~= "number" or frameDur <= 0 then
+                frameDur = 1
+            end
+            local frameIndex = math.floor(elapsed / frameDur)
             local i = anim.startFrame + frameIndex * 2
             
             if i > anim.endFrame then

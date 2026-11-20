@@ -40,11 +40,23 @@ CORO_FILE = "game/script/battle/battle_flow_coroutines.lua"
 # 为什么仍然保留这个脚本：它继续守住「没有其他函数被悄悄改动」。
 # 若以后有人改动了名单外的任何一个战斗函数，这里会 FAIL。
 ALLOWED_DEVIATIONS = {
+    # --- 第一批：5 个健壮性缺陷根因修复 ---
     "War_WugongHurtLife":   "while-true 加显式下界（level>=1），消除无限循环",
     "War_WugongHurtNeili":  "补 level 钳制 + 字段判空（与 HurtLife 对称）",
     "War_AutoMove":         "回溯循环补 prevI 进度守卫 + 硬上限",
     "War_EndPersonData":    "除 liveNum 补零守卫（避免 inf 污染经验）",
+    # --- 第二批：武功等级单点钳制（15 处等级计算收敛到 War_WugongLevel） ---
+    "War_Fight_Sub":        "等级计算改用 War_WugongLevel（钳 1..10）",
+    "War_AutoSelectWugong": "同上",
+    "War_AutoExecuteFight": "同上",
+    "War_AutoMoveCoroutine": "同上（协程版）",
+    "War_AutoCoroutine":    "同上（协程版）",
+    "War_AttackCoroutine":  "同上（协程版）",
+    "War_Fight_ExecuteCoroutine": "同上（协程版）",
+    "War_Fight_SubCoroutine":     "同上（协程版）",
 }
+# 协程组的白名单（结构上与上面同一张表，这里显式声明便于阅读）
+ALLOWED_COROUTINES = set(ALLOWED_DEVIATIONS)
 
 
 def git_show(ref_path):
@@ -134,19 +146,29 @@ def main():
         afterc = extract_coros(f.read())
 
     print(f"  搬移前 {len(beforec)} 个 / 搬移后 {len(afterc)} 个")
-    badc = []
+    badc, allowedc = [], []
     for name, txt in beforec.items():
         if name not in afterc:
             badc.append((name, "缺失"))
         elif afterc[name] != txt:
-            badc.append((name, "内容不一致"))
+            if name in ALLOWED_COROUTINES:
+                allowedc.append(name)
+            else:
+                badc.append((name, "内容不一致（且不在允许偏离名单）"))
+    if allowedc:
+        print(f"  [INFO] {len(allowedc)} 个协程有**已记录的缺陷修复**（允许偏离）：")
+        for n in allowedc:
+            print(f"        {n}: {ALLOWED_DEVIATIONS[n]}")
     if badc:
         print(f"  [FAIL] {len(badc)} 处不一致:")
         for n, why in badc[:10]:
             print(f"    {n}: {why}")
         failures += 1
     else:
-        print(f"  [PASS] 全部 {len(beforec)} 个协程**逐字节一致**")
+        if allowedc:
+            print(f"  [PASS] {len(beforec) - len(allowedc)} 个协程逐字节一致 + {len(allowedc)} 个已记录修复")
+        else:
+            print(f"  [PASS] 全部 {len(beforec)} 个协程**逐字节一致**")
 
     # ---------------- 汇总 ----------------
     print("\n" + "=" * 50)
