@@ -43,11 +43,26 @@ function War_EndPersonData(isexp,warStatus)            --战斗以后设置人�
 
     --分配战斗经验---基本经验，战斗数据中的
     if warStatus==1 then     --赢了才有
+        -- **liveNum 为 0 时不能除**（根因：原实现信任 warStatus 外部参数）
+        --
+        -- `liveNum` = 我方存活人数。warStatus==1 表示胜利，正常流程下
+        -- War_isEnd 已保证「敌方全灭 + 我方至少一人活着」，所以 liveNum >= 1。
+        -- 但 warStatus 是**外部传入**的参数（War_EndPersonData(isexp, warStatus)
+        -- 被 war_async 直接调用，不经过 War_isEnd），MOD 或异常流程可传 (1, 1)
+        -- 而此刻我方恰好全灭 → liveNum == 0。
+        --
+        -- Lua 的 `n/0` 不抛错，而是得 **inf**（实测 5.1: 1.#INF）。
+        -- inf 经 `math.modf` 仍是 inf，再经 AddPersonAttrib 的 limitX 钳到
+        -- 属性最大值（60000）—— 于是「全灭却白拿 60000 经验」，
+        -- 且完全静默（不报错、不日志），是典型的难查数据污染。
+        --
+        -- 修法：liveNum <= 0 时视为「无人可分」，跳过分配（经验归零）。
+        local liveNumForExp = (liveNum > 0) and liveNum or 1
         for i=0,WAR.PersonNum-1 do
             local pid=WAR.Person[i]["人物编号"]
             if WAR.Person[i]["我方"]==true then
-                if JY.Person[pid]["生命"]>0 then
-                    WAR.Person[i]["经验"]=WAR.Person[i]["经验"] + math.modf(WAR.Data["经验"]/liveNum);
+                if liveNum > 0 and JY.Person[pid]["生命"]>0 then
+                    WAR.Person[i]["经验"]=WAR.Person[i]["经验"] + math.modf(WAR.Data["经验"]/liveNumForExp);
                 end
             end
         end

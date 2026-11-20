@@ -475,9 +475,39 @@ function War_AutoMove(wugongnum)              --自动往敌人方向移动
         end
 
         if minDest<math.huge then   --有路可走
-            while true do    --从目的位置反着找到可以移动的位置，作为移动的次序
-                local i=GetWarMap(x,y,3);
-                if i<=WAR.Person[WAR.CurID]["移动步数"] then
+            -- 从目的位置反着找到可以移动的位置，作为移动的次序
+            --
+            -- **必须有「无进展则放弃」的守卫**（根因：靠"总能找到 i-1"的
+            -- 隐含假设，该假设在目标不可达时不成立）。
+            --
+            -- 原实现只有 `i <= 移动步数` 一个退出条件。若目标格的步数是
+            -- 255（不可达），则：
+            --     i = 255 > 移动步数 → 不 break
+            --     四个方向的 GetWarMap == i-1（即 254）都找不到 → x,y 不变
+            -- → **原地空转，永不退出** → love.update 卡死 → 游戏无响应。
+            --
+            -- 这个分支在「敌人被围住 / 我方被围住」时必然走到；
+            -- 协程版（battle_flow_coroutines.lua 的 War_AutoMoveCoroutine）
+            -- 早已加了 prevI 守卫并留了详细注释，script 版一直没同步 ——
+            -- 现在补齐（两个版本语义必须一致，否则只是把 bug 藏起来）。
+            local prevI = nil
+            local guard = 0
+            while true do
+                local i = GetWarMap(x, y, 3);
+                if i <= WAR.Person[WAR.CurID]["移动步数"] then
+                    break;
+                end
+
+                -- 无进展：本轮步数没有严格下降 → 走不到，就地放弃
+                if prevI ~= nil and i >= prevI then
+                    break;
+                end
+                prevI = i;
+
+                -- 硬上限：正常回溯最多「移动步数」轮；
+                -- 给 4 倍余量以容许绕路，超过则判定为数据异常
+                guard = guard + 1
+                if guard > 4 * (WAR.Person[WAR.CurID]["移动步数"] or 1) + 16 then
                     break;
                 end
 
@@ -491,7 +521,7 @@ function War_AutoMove(wugongnum)              --自动往敌人方向移动
                     y=y+1;
                 end
             end
-            War_MovePerson(x,y);    --移动到相应的位置
+            War_MovePerson(x,y);    --移动到相应的位置（走不到就留在原地）
         end
     end
 

@@ -527,15 +527,33 @@ function War_WugongHurtLife(emenyid,wugong,level)             --计算武功伤�
     end
 
     --计算实际使用武功等级
-    while true do
-        if math.modf((level+1)/2)*JY.Wugong[wugong]["消耗内力点数"] > JY.Person[pid]["内力"] then
-            level=level-1;
-        else
+    --
+    -- **关于这个循环的退出保证（根因分析）**：
+    --   原写法 `while true do ... level=level-1 ... end` 只有一个退出路径：
+    --   当 `消耗内力点数 * ceil(level/2) <= 内力` 时 break。
+    --   若 `消耗内力点数 == 0`，左边是 0；此时只要 `内力 >= 0` 就立刻 break，
+    --   所以**正常数据下不会死循环**（`内力` 由 AddPersonAttrib 钳在 [0, 最大值]）。
+    --
+    --   但存在两个真实隐患：
+    --     ① `内力` 可被直接赋值绕过钳制（存档/MOD 写负值，或 `内力最大值` 为负
+    --        导致 limitX(old, 0, 负数) 返回负数）→ `0 > -1` 恒真 → **无限循环**，
+    --        玩家侧表现为游戏卡死无响应。
+    --     ② `level` 会一路减到负数，随后 `"攻击力"..level` 取到 nil
+    --        → "attempt to perform arithmetic on a nil value"。
+    --
+    --   修法：把退出条件写成「step 耗尽 **或** level 到底」两个显式下界。
+    --   `level >= 1` 保证下游 `"攻击力"..level` 一定取到正值键；
+    --   循环次数上限 = 初始 level（每次减 1），天然有界，不需要额外计数器。
+    while level > 1 do
+        if math.modf((level+1)/2)*JY.Wugong[wugong]["消耗内力点数"] <= JY.Person[pid]["内力"] then
             break;
         end
+        level=level-1;
     end
 
-    if level<=0 then     --防止出现左右互博时第一次攻击完毕，第二次攻击没有内力的情况。
+    -- level 兜底：原注释说「防止左右互博时第二次攻击没有内力」。
+    -- 现在循环保证 level >= 1，这里保留是为了防御 level 传入时就是 <= 0 的情况。
+    if level<=0 then
         level=1;
     end
 
@@ -620,8 +638,27 @@ function War_WugongHurtNeili(enemyid,wugong,level)           --计算武功伤�
     local pid=WAR.Person[WAR.CurID]["人物编号"];
     local eid=WAR.Person[enemyid]["人物编号"];
 
+    -- **level 必须钳制到 >= 1**（与 War_WugongHurtLife 对称）
+    --
+    -- 根因：调用方 `War_Fight_ExecuteCoroutine` 里左右互搏会连打两次，
+    -- 第一次扣完内力后第二次仍用同一个 level。`War_WugongHurtLife`
+    -- 内部有递减循环把 level 降到可用值，但**这个函数完全没做**。
+    -- 若调用方传了 0 或负数，`JY.Wugong[wugong]["加内力" .. level]`
+    -- 会取到 `加内力0` / `加内力-1` → nil，随后 `if addvalue>0` 抛
+    -- "attempt to compare number with nil"。
+    --
+    -- `武功等级` 字段是 16 位整数，理论上 >= 0；`math.modf(x/100)+1` >= 1。
+    -- 但存档被 MOD 改坏 / 字段缺失时 level 可为 nil 或 0，故在此兜底。
+    level = tonumber(level) or 1
+    if level < 1 then level = 1 end
+
     local addvalue=JY.Wugong[wugong]["加内力" .. level];
     local decvalue=JY.Wugong[wugong]["杀内力" .. level];
+
+    -- 字段缺失（MOD 的武功表不完整）时当作「无内力伤害」，
+    -- 而不是让 nil 参与算术。
+    addvalue = tonumber(addvalue) or 0
+    decvalue = tonumber(decvalue) or 0
 
     if addvalue>0 then
         if math.modf(addvalue/2)>0 then

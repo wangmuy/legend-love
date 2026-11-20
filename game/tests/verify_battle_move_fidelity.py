@@ -29,6 +29,23 @@ BATTLE_FILES = [
 ]
 CORO_FILE = "game/script/battle/battle_flow_coroutines.lua"
 
+# ---------------------------------------------------------------------------
+# 允许偏离白名单
+# ---------------------------------------------------------------------------
+# 搬移本身是字节保真的（阶段 1 / 2C 的验收结论不变）。
+# 但搬移**之后**又按根因修过若干健壮性缺陷（见 commit "fix(battle): 5 个
+# 健壮性缺陷的根因修复"）。这些函数允许与搬移基准不同 —— 差异必须是
+# **修缺陷**，不是"顺手重构"。
+#
+# 为什么仍然保留这个脚本：它继续守住「没有其他函数被悄悄改动」。
+# 若以后有人改动了名单外的任何一个战斗函数，这里会 FAIL。
+ALLOWED_DEVIATIONS = {
+    "War_WugongHurtLife":   "while-true 加显式下界（level>=1），消除无限循环",
+    "War_WugongHurtNeili":  "补 level 钳制 + 字段判空（与 HurtLife 对称）",
+    "War_AutoMove":         "回溯循环补 prevI 进度守卫 + 硬上限",
+    "War_EndPersonData":    "除 liveNum 补零守卫（避免 inf 污染经验）",
+}
+
 
 def git_show(ref_path):
     r = subprocess.run(["git", "show", ref_path], capture_output=True, text=True, encoding="utf-8")
@@ -86,19 +103,29 @@ def main():
             after.update(extract_funcs(f.read()))
 
     print(f"  搬移前 {len(before)} 个 / 搬移后 {len(after)} 个")
-    bad = []
+    bad, allowed = [], []
     for name, txt in before.items():
         if name not in after:
             bad.append((name, "缺失"))
         elif after[name] != txt:
-            bad.append((name, "内容不一致"))
+            if name in ALLOWED_DEVIATIONS:
+                allowed.append(name)
+            else:
+                bad.append((name, "内容不一致（且不在允许偏离名单）"))
+    if allowed:
+        print(f"  [INFO] {len(allowed)} 个函数有**已记录的缺陷修复**（允许偏离）：")
+        for n in allowed:
+            print(f"        {n}: {ALLOWED_DEVIATIONS[n]}")
     if bad:
         print(f"  [FAIL] {len(bad)} 处不一致:")
         for n, why in bad[:10]:
             print(f"    {n}: {why}")
         failures += 1
     else:
-        print(f"  [PASS] 全部 {len(before)} 个函数**逐字节一致**")
+        if allowed:
+            print(f"  [PASS] {len(before) - len(allowed)} 个逐字节一致 + {len(allowed)} 个已记录修复")
+        else:
+            print(f"  [PASS] 全部 {len(before)} 个函数**逐字节一致**")
 
     # ---------------- 20 个协程 ----------------
     print("\n=== 2. war_async.lua 的 20 个协程 ===")
