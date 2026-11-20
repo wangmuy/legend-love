@@ -69,6 +69,13 @@
 ## 引擎可移植性：剩下的最后一块（TOD 已在 port-contract-completeness 之后产生）
 
 - [x] ~~**script 层 lib.Pic\* 迁移**~~ —— **已完成**（`port-sprite-native-migration`）
+  - ⚠️ **回归**：Task 4 改单写导致地图全黑，已由 `LoadArchiveBoth` 双写修复
+    （见该 change tasks.md 的「回归修复」一节）
+
+- [x] ~~**26 处阻塞 `lib.Delay`**~~ —— **已完成**（`port-blocking-delay`）
+  - `lib.Delay` = `love.timer.sleep` → 真阻塞主线程（实测 101ms）
+  - 26 处全在事件协程里 → 换成 `WaitFrame`（协程里 `waitForTime` 协作式）
+  - gate STEP D3 硬断言：`script/` 无裸 `lib.Delay`
   - 实测实数：**27 处**（不是原估的 33），分布：
     `PicInit` 7 / `PicLoadFile` 14 / `PicGetXY` 3 / `PicLoadCache` 3
   - 处置：7 处 `PicInit` **全删**（6 处无参是 no-op；第 7 处在死代码且已被
@@ -78,6 +85,11 @@
   - **但 `lib_love.lua` 的 `LoadPic` 119 行删不掉** —— 见下一条
 
 - [ ] **`map.drawBattle` 契约透明化（删掉 `lib_love.LoadPic` 的真正前提）**
+
+  > **B 之后的新增前提**：`port-blocking-delay` 完成后，`WaitFrame` 依赖
+  > `CoroutineScheduler:waitFrame`，而 `lib.Delay` 仍作为非协程 fallback 存在。
+  > 删 `lib_love.LoadPic` 不影响 `lib.Delay`（两者无关），但**必须**先做本项
+  > 才能摘掉 `war_async` 双轨 + `LoadArchiveBoth` 双写。
   - 实测结论（`port-sprite-native-migration` Task 6）：
     - 原以为 `battle_render` 迁到 `SpriteAtlas` 后就能删 `war_async` 的双轨补丁
       （`EngineAPI.sprite.loadArchive`）→ **错了**

@@ -86,6 +86,40 @@ fi
 # 消费（war_async 的双轨补丁需要它：引擎内部的 DrawWarMap 走 PicLoadCache
 # → picFileCache）。见 port-sprite-native-migration Task 6 的实测结论。
 
+# ---------------------------------------- D3. script/ 无裸 lib.Delay
+log "=== STEP: D3. script/ 无裸 lib.Delay（阻塞主线程）==="
+# 判据：script/ 里每一处 `lib.Delay(` 都必须出现在 `WaitFrame` 的 fallback 里
+# （即 `function(m) lib.Delay(m) end`）。其余一律 FAIL。
+#
+# 为什么：`lib.Delay` = `love.timer.sleep` → **真阻塞主线程**（实测 101ms）。
+# script 层的帧率控制必须走 `WaitFrame`（协程里 waitForTime 协作式等待）。
+#
+# **用 awk 不用 grep -E**：grep -E 里 `\(` 的转义会被吃掉（同类坑已踩过一次，
+# 见 gate_battle_extensibility.sh STEP J 的注释）。
+bad_d3=$(awk '
+    /lib\.Delay[[:space:]]*\(/ {
+        # 允许：WaitFrame 的 fallback 写法 `function(m) lib.Delay(m) end`
+        if (match($0, /function\(m\)[[:space:]]*lib\.Delay/)) next
+        # 跳过注释行
+        if (match($0, /^[[:space:]]*--/)) next
+        print FILENAME ":" FNR ": " $0
+    }
+' game/script/jymain.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
+[ -n "$bad_d3" ] || bad_d3=0
+if [ "$bad_d3" -eq 0 ]; then
+    log "  [PASS] script/ 无裸 lib.Delay（全部走 WaitFrame）"
+else
+    log "  [FAIL] script/ 仍有 $bad_d3 处裸 lib.Delay（会阻塞主线程）："
+    awk '
+        /lib\.Delay[[:space:]]*\(/ {
+            if (match($0, /function\(m\)[[:space:]]*lib\.Delay/)) next
+            if (match($0, /^[[:space:]]*--/)) next
+            print FILENAME ":" FNR ": " $0
+        }
+    ' game/script/jymain.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null       | head -5 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
 # ---------------------------------------- E. sprite_decoder 零引擎依赖
 # ---------------------------------------- D2. script 层零 lib.Pic*
 log "=== STEP: D2. script/ 零 lib.Pic* ==="

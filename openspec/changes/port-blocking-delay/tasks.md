@@ -23,36 +23,85 @@
 
 ---
 
-## Task 2：给 `instruct_30` 补 async 版本（批 2 起）
+## Task 2：`instruct_30` 等 7 个函数的阻塞处置（批 2）
 
-**Blast Radius**：`game/framework/async_globals.lua`、`game/framework/async_wrapper.lua`
+**Blast Radius**：`game/script/jymain.lua`、`game/script/battle/*.lua`、
+`game/framework/coroutine_scheduler.lua`
+
+### 【方案修正】不需要 async 包装，改用 WaitFrame
+
+原计划「给 `instruct_30` 补协程版本」。实测发现**不需要** —— 因为这些函数
+**本来就在事件协程里跑**：
+
+```
+EventExecuteCoroutine → oldCallEventCoroutine → instruct_30
+```
+
+所以它们内部可以**直接**用 `scheduler:waitForTime` 的协作式等待，
+`yield` 会自动冒泡到调度器。加一层 async 包装是多余的。
+
+### 实测证据
+
+```
+模拟 instruct_30 式同步函数（4 次 WaitFrame(100)）：
+  启动后立即返回: steps=1  lib.Delay=0    ← 不阻塞
+  推进 40 帧后:   steps=4  lib.Delay=0    ← 全部走协作等待
+```
+
+### 实际改动
+
+新增 3 个 API：
+
+| API | 位置 | 作用 |
+|-----|------|------|
+| `CoroutineScheduler:isInCoroutine()` | `framework/coroutine_scheduler.lua` | 是否在**本调度器**的协程里（不是 `coroutine.running()`） |
+| `CoroutineScheduler:waitFrame(ms, fallback)` | 同上 | 协程里 `waitForTime(ms/1000)`；非协程退回 fallback |
+| `WaitFrame(ms)` | `script/jymain.lua`（**global**） | 供 `script/` 各处调用 |
+
+**为什么 `WaitFrame` 是全局**：`script/battle/*.lua` 是全局函数定义
+（不是 `return { ... }` 表），看不到 `jymain` 的 local。
+
+### 26 处替换
+
+| 文件 | 处数 |
+|------|------|
+| `script/jymain.lua` | 17（含 `instruct_25/27/30/44/57/58/62` 的帧率控制） |
+| `script/battle/battle_flow.lua` | 4 |
+| `script/battle/battle_action.lua` | 2 |
+| `script/battle/battle_ai.lua` | 2 |
+| `script/newevent/scene_1_event_19.lua` | 1 |
 
 **DoD**：
-- [x] 新增 `instruct_30` 的包装：起协程 + 逐格 `waitForTime(CC.PersonMoveFrame/1000)`
-- [x] **行为对照**：原实现是「每格：移动 + 等 (PersonMoveFrame - 耗时)」→ 新实现等价
-- [x] 保留原 `instruct_30`（script 层仍有同步调用点？先核实）
-- [x] 单测：`instruct_30` 包装器存在且返回协程
-- [x] 单测：协程内**不调用** `lib.Delay`
+- [x] `scheduler:isInCoroutine()` / `scheduler:waitFrame()` 实现
+- [x] `WaitFrame(ms)`（global）实现，带 fallback
+- [x] 26 处 `lib.Delay` → `WaitFrame`（实测只剩 helper 内的 fallback 1 处）
+- [x] 单测：`test_wait_frame.lua`（14 条）——协程里不阻塞 / 非协程回退 / 边界值
+- [x] 单测：负向对照（把 WaitFrame 改回 `lib.Delay` → FAIL）
+- [x] **实测**：`instruct_30` 式循环不调 `lib.Delay`（`lib.Delay=0`）
+- [x] 搬移保真白名单加 4 个函数（`War_MovePerson`/`War_ShowFight`/`War_Auto`/`War_AutoEatDrug`）
 - [x] 四版本全量测试零失败
-- [x] 实机：主角走动流畅（不卡 100ms/格）
-- [x] 一个 commit
+- [x] 实机：主角家对话场景正常（地图不再全黑）
 
 ---
 
-## Task 3：其余 6 个 `instruct_*` 的处置
+## Task 3：其余函数的处置结论
 
-**Blast Radius**：`game/framework/async_globals.lua`
+**Blast Radius**：同 Task 2
 
 **DoD**：
-- [x] `instruct_25`（2 处 Delay）：核实是否可达 → 处置
-- [x] `instruct_27/44/57/58/62`（各 1 处）：同上
-- [x] `ShowPersonStatus` / `SelectThing`（各 1 处）：同上
-- [x] `Game_Cycle`（1 处）：核实是否死代码
-- [x] `WaitKey`/`ShowMenu`/`ShowMenu2`（各 1 处）：**已有 async 版** →
-      原函数加注释「阻塞版，仅非协程上下文兜底用」
-- [x] 每处都有明确结论（改 / 保留+注释 / 确认死代码）
+- [x] `instruct_25`（2 处）：帧率控制 → `WaitFrame`
+- [x] `instruct_27`（1 处）：动画帧控制 → `WaitFrame`
+- [x] `instruct_30`（4 处）：主角走动帧控制 → `WaitFrame`
+- [x] `instruct_44/57`（各 1 处）：动画帧控制 → `WaitFrame`
+- [x] `instruct_58`（1 处 `Delay(300)`）：固定等待 → `WaitFrame`
+- [x] `instruct_62`（1 处 `Delay(5000)`）：固定等待 → `WaitFrame`
+- [x] `ShowPersonStatus` / `SelectThing`（各 1 处）→ `WaitFrame`
+- [x] `Game_Cycle`（1 处）→ `WaitFrame`
+- [x] `WaitKey`（1 处 `Delay(20)`）→ `WaitFrame`（阻塞版仍在，但有 async 替代）
+- [x] `ShowMenu` / `ShowMenu2`（各 1 处）→ `WaitFrame`
+- [x] `battle_flow` 4 处、`battle_action` 2 处、`battle_ai` 2 处 → `WaitFrame`
+- [x] `scene_1_event_19` 1 处 → `WaitFrame`
 - [x] 四版本全量测试零失败
-- [x] 一个 commit
 
 ---
 
@@ -61,9 +110,10 @@
 **Blast Radius**：`game/tests/gate_engine_contract.sh`、`openspec/project/TODO.md`
 
 **DoD**：
-- [x] 新增断言：`instruct_30` 有 async 版本（`async_globals` 里有对应包装）
-- [x] 新增断言：协程路径里无 `lib.Delay`（静态检查 `async_globals`/`async_wrapper`）
-- [x] 负向对照：在 `async_globals` 加 `lib.Delay(` → gate FAIL
+- [x] 新增断言：`script/` 的 `lib.Delay` 只在 `WaitFrame` 的 fallback 里（其余为 0）
+      → gate STEP D3（awk 实现）
+- [x] 负向对照：把某处 `WaitFrame(` 改回 `lib.Delay(` → gate FAIL（实测）
+      → `[FAIL] script/ 仍有 1 处裸 lib.Delay`
 - [x] 四版本全量测试零失败（记录断言数）
 - [x] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
 - [x] 五门禁全 PASS
