@@ -198,6 +198,11 @@ EngineAPI.map.getTile = function(x, y, layer)
     return v
 end
 
+EngineAPI.map.setTile = function(x, y, layer, value)
+    logCall("map.setTile", x, y, layer, value)
+    EngineAPI.map._tiles[tostring(x) .. "," .. tostring(y) .. "," .. tostring(layer)] = value
+end
+
 EngineAPI.map.getSceneTile = function(sceneId, x, y, layer)
     logCall("map.getSceneTile", sceneId, x, y, layer)
     local key = tostring(sceneId) .. "," .. tostring(x) .. "," .. tostring(y) .. "," .. tostring(layer)

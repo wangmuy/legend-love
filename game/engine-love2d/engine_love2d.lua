@@ -297,6 +297,12 @@ EngineAPI.map.tickClouds = function()
     lib.CloudTick()
 end
 
+EngineAPI.map.setTile = function(x, y, layer, value)
+    -- 消费者：framework/map_render.lua 的 buildingSort（深度排序时临时占用）
+    -- `SetMMap` 在 lib_love.lua 是 **local**，外部调不到 → 经 lib.JY_SetMMap 桥接
+    if lib.JY_SetMMap then lib.JY_SetMMap(x, y, layer, value) end
+end
+
 EngineAPI.map.getSceneTile = function(sceneId, x, y, layer)
     return lib.GetS(sceneId, x, y, layer)
 end

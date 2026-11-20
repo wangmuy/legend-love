@@ -58,6 +58,7 @@ function TestEngineAPI.testMapModule()
     TestHelper.assertNotNil(EngineAPI.map.drawScene, "map.drawScene should exist")
     TestHelper.assertNotNil(EngineAPI.map.drawBattle, "map.drawBattle should exist")
     -- 地图绘制契约（port-map-render-native Task 1）
+    TestHelper.assertNotNil(EngineAPI.map.setTile, "map.setTile should exist")
     TestHelper.assertNotNil(EngineAPI.map.getSceneTile, "map.getSceneTile should exist")
     TestHelper.assertNotNil(EngineAPI.map.setSceneTile, "map.setSceneTile should exist")
     TestHelper.assertNotNil(EngineAPI.map.getSceneEventData, "map.getSceneEventData should exist")

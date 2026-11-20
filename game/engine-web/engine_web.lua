@@ -182,6 +182,8 @@ function EngineAPI.map.drawMain(playerX, playerY, playerPic) end
 function EngineAPI.map.getTile(x, y, layer)
     return -1
 end
+function EngineAPI.map.setTile(x, y, layer, value) end
+
 function EngineAPI.map.getSceneTile(sceneId, x, y, layer)
     return 0
 end

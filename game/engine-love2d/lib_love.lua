@@ -974,6 +974,9 @@ local function SetMMap(x, y, flag, v)
     mmap[mmap_keys[flag]][offset] = v
 end
 
+-- 暴露给 EngineAPI.map.setTile 用（原版是 local，外部调不到）
+JY_SetMMap = SetMMap
+
 --[[
 // 主地图建筑排序 
 // x,y 主角坐标

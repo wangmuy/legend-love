@@ -173,6 +173,10 @@ EngineAPI.map.getTile = function(x, y, layer)
     logCall("map.getTile", x, y, layer)
     return -1
 end
+EngineAPI.map.setTile = function(x, y, layer, value)
+    logCall("map.setTile", x, y, layer, value)
+end
+
 EngineAPI.map.getSceneTile = function(sceneId, x, y, layer)
     logCall("map.getSceneTile", sceneId, x, y, layer)
     return 0

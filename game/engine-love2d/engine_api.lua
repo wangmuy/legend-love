@@ -271,6 +271,19 @@ function M.map.loadBattle(idxFile, grpFile, mapId, num, width, height) end
 -- @return number 瓦片编号（-1 = 越界）
 function M.map.getTile(x, y, layer) end
 
+--- 写主地图瓦片
+--
+-- **消费者是 `framework/map_render.lua` 的 `buildingSort`**：
+-- 它临时把主角/船写进建筑层（layer 2/3/4），参与深度排序，排序后恢复原值
+-- （`lib.BuildingSort` 用 `SetMMap` 做这件事，共 6 处）。
+--
+-- 这不是"地图可编辑"的宣告 —— 只是深度排序的临时占用，写完立刻还原。
+--
+-- @param x, y number 地图坐标
+-- @param layer number 0..4（语义同 getTile）
+-- @param value number 瓦片编号
+function M.map.setTile(x, y, layer, value) end
+
 --- 读场景地图瓦片（小场景）
 --
 -- **签名与 getTile 不同：多一个 sceneId**（对应 `lib.GetS(id, x, y, level)`）。

@@ -11,9 +11,9 @@
 
 **DoD**：
 - [x] `render.getClip()` —— 返回 `{x, y, w, h}`（LÖVE: `love.graphics.getScissor()`）
-- [x] ~~`map.setTile(x, y, layer, value)`~~ —— **删掉了**：主地图是只读静态资源
-      （`SetMMap` 是 `lib_love.lua` 的 local 函数，外部调不到），
-      `DrawMMap` 只读。加它就是"加了没有消费者的契约"，违反约束
+- [x] `map.setTile(x, y, layer, value)` —— LÖVE: `lib.JY_SetMMap`
+      （**消费者是 `map_render.buildingSort`**：它临时把主角/船写进建筑层 2/3/4
+      参与深度排序，排序后恢复。`SetMMap` 原本是 local，已暴露为 `JY_SetMMap`）
 - [x] `map.getSceneTile(sceneId, x, y, layer)` —— LÖVE: `lib.GetS`（**4 参**，
       场景数据按「场景 × 6 层 × 尺寸」排布，必须带 sceneId；层数 0..5 不是 0..4）
 - [x] `map.setSceneTile(sceneId, x, y, layer, value)` —— LÖVE: `lib.SetS`
@@ -24,7 +24,7 @@
 - [x] `map.clearBattleTile(layer, value)` —— LÖVE: `lib.CleanWarMap`
 - [x] `map.setBattleTile(x, y, layer, value)` —— LÖVE: `lib.SetWarMap`
 - [x] MUD / Web / 测试桩各有实现（MUD/Web 可以返回空值，但不能缺）
-- [x] 契约数 76 → **84**（加了 8 个，删掉 1 个 setTile）
+- [x] 契约数 76 → **85**（加 9 个）
 - [x] 单测：每个新契约在 4 个引擎都存在（`assertNotNil`）
 - [x] 四版本全量测试零失败
 - [x] 一个 commit
