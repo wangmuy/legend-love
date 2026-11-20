@@ -45,6 +45,9 @@ ALLOWED_DEVIATIONS = {
     "War_WugongHurtNeili":  "补 level 钳制 + 字段判空（与 HurtLife 对称）",
     "War_AutoMove":         "回溯循环补 prevI 进度守卫 + 硬上限",
     "War_EndPersonData":    "除 liveNum 补零守卫（避免 inf 污染经验）",
+    # --- 第三批：script 层 lib.Pic* 迁移（port-sprite-native-migration Task 2） ---
+    "WarDrawMap":   "lib.DrawWarMap → EngineAPI.map.drawBattle（引擎契约化）",
+    "WarShowHead":  "lib.PicGetXY/PicLoadCache → SpriteAtlas.getMeta/draw（消除双轨）",
     # --- 第二批：武功等级单点钳制（15 处等级计算收敛到 War_WugongLevel） ---
     "War_Fight_Sub":        "等级计算改用 War_WugongLevel（钳 1..10）",
     "War_AutoSelectWugong": "同上",

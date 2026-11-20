@@ -157,21 +157,35 @@ function TestWarCoroutineWiring.testWarMainLoadsBothSpriteSystems()
         "应有 EngineAPI.sprite.loadArchive（写 picFileCache，供 lib.Pic* 用）")
 end
 
-function TestWarCoroutineWiring.testBattleRenderStillUsesLegacyPic()
-    print("\n=== Test: battle_render 仍用 lib.Pic*（这正是需要双轨的原因）===")
-    -- 这个断言的作用是**记录现状**：如果哪天有人把 battle_render 迁到
-    -- SpriteAtlas，这条会失败 —— 那时说明可以删掉 war_async 的双轨补丁，
-    -- 是个值得注意的信号（不是 bug）。
+function TestWarCoroutineWiring.testBattleRenderMigratedToNative()
+    print("\n=== Test: battle_render 已迁到 SpriteAtlas（双轨补丁的前提消失）===")
+    -- **这条断言原来方向是反的**（上一轮刻意留的"现状记录型 canary"）：
+    --   原文断言「battle_render 应仍用 lib.Pic* / DrawWarMap」，注释写着：
+    --   「如果哪天有人把 battle_render 迁到 SpriteAtlas，这条会失败 ——
+    --    那时说明可以删掉 war_async 的双轨补丁，是个值得注意的信号」。
+    --
+    -- 现在它**按设计触发了**（port-sprite-native-migration Task 2 完成迁移），
+    -- 所以按当初的约定反转断言方向（断言"已迁"），而不是删掉这条测试。
+    -- 保留价值：若有人回退迁移（重新引入 lib.Pic*），它会 FAIL。
     local src = readSource("script/battle/battle_render.lua")
     TestHelper.assertNotNil(src, "应能读到 battle_render.lua")
     local code = stripComments(src)
 
-    local hits = 0
-    for _, n in ipairs({ "PicGetXY", "PicLoadCache", "DrawWarMap" }) do
-        if code:find(n, 1, true) then hits = hits + 1 end
+    -- 旧系统调用必须清零
+    local legacy = 0
+    for _, n in ipairs({ "lib.PicGetXY", "lib.PicLoadCache", "lib.DrawWarMap" }) do
+        if code:find(n, 1, true) then legacy = legacy + 1 end
     end
-    TestHelper.assertTrue(hits >= 2,
-        "battle_render 应仍用 lib.Pic* / DrawWarMap（实测命中 " .. hits .. " 个）")
+    TestHelper.assertEquals(0, legacy,
+        "battle_render 不应再有 lib.Pic*/lib.DrawWarMap（实测命中 " .. legacy .. " 个）")
+
+    -- 新系统调用必须存在
+    TestHelper.assertNotNil(code:find("SpriteAtlas.getMeta", 1, true),
+        "应改用 SpriteAtlas.getMeta（对应原 PicGetXY）")
+    TestHelper.assertNotNil(code:find("SpriteAtlas.draw", 1, true),
+        "应改用 SpriteAtlas.draw（对应原 PicLoadCache）")
+    TestHelper.assertNotNil(code:find("EngineAPI.map.drawBattle", 1, true),
+        "应改用 EngineAPI.map.drawBattle（对应原 lib.DrawWarMap）")
 end
 
 -- ------------------------------------------------------------ 套件入口
@@ -188,7 +202,7 @@ function TestWarCoroutineWiring.runAll()
     TestWarCoroutineWiring.testAllForwardsResolve()
     TestWarCoroutineWiring.testForwardCallsThrough()
     TestWarCoroutineWiring.testWarMainLoadsBothSpriteSystems()
-    TestWarCoroutineWiring.testBattleRenderStillUsesLegacyPic()
+    TestWarCoroutineWiring.testBattleRenderMigratedToNative()
 
     return TestHelper.printSummary()
 end

@@ -8,16 +8,18 @@
 **Blast Radius**：`game/framework/sprite_atlas.lua`
 
 **DoD**：
-- [ ] `getHandle` 的 PNG 分支：handle 创建后从 `EngineAPI.sprite.getMeta(handle)`
+- [x] `getHandle` 的 PNG 分支：handle 创建后从 `EngineAPI.sprite.getMeta(handle)`
       回读真实 `w/h`，写进 `atlas.meta[slot]`（不是 `d.w or 0`）
-- [ ] `getMeta` 的 PNG 分支：兜底调 `getHandle`，再取 `atlas.meta[slot]`
-- [ ] **容忍 w=0**：MUD/Web 的 `createFromEncoded` 返回 `{w=0,h=0}`，
+- [x] `getMeta` 的 PNG 分支：兜底调 `getHandle`，再取 `atlas.meta[slot]`
+- [x] **容忍 w=0**：MUD/Web 的 `createFromEncoded` 返回 `{w=0,h=0}`，
       兜底后 `getMeta` 返回 `w=0`（不抛错、不当错误）
-- [ ] 单元测试：用真实 `hdgrp.grp` 的 slot 59（PNG 帧）验证 `getMeta` 返回 `w>0`
-- [ ] 单元测试：MUD 桩引擎下 `getMeta` 返回 `w=0` 且不崩
-- [ ] 负向对照：把 PNG 分支改回 `return nil` → 测试必须 FAIL
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] 单元测试：用真实 `hdgrp.grp` 的 slot 59（PNG 帧）验证 `getMeta` 返回 `w>0`
+- [x] 单元测试：MUD 桩引擎下 `getMeta` 返回 `w=0` 且不崩
+- [x] 负向对照：把 PNG 分支改回 `return nil` → 测试 FAIL（实测生效）
+- [x] 四版本全量测试零失败（3799/0）
+- [x] 一个 commit（992f973）
+- [x] **附带**：修了 `test_runner.lua` 的 60-upvalue 上限（57 模块收进 T 表 +
+      54 个 elseif 改表查）
 
 ---
 
@@ -26,19 +28,19 @@
 **Blast Radius**：`game/script/battle/battle_render.lua`
 
 **DoD**：
-- [ ] `WarShowHead` 的 `lib.PicGetXY(1, p["头像代号"]*2)` →
+- [x] `WarShowHead` 的 `lib.PicGetXY(1, p["头像代号"]*2)` →
       `SpriteAtlas.getMeta(1, p["头像代号"]*2)`（解构改 table）
-- [ ] `WarShowHead` 的 `lib.PicLoadCache(1, ..., 1)` →
+- [x] `WarShowHead` 的 `lib.PicLoadCache(1, ..., 1)` →
       `SpriteAtlas.draw(1, frameId, x, y, 0x1)`（flag 1 = 忽略锚点，语义相同）
-- [ ] `WarDrawMap` 的 5 处 `lib.DrawWarMap(...)` →
+- [x] `WarDrawMap` 的 5 处 `lib.DrawWarMap(...)` →
       `EngineAPI.map.drawBattle(...)`（参数一一对应）
-- [ ] **前置确认**：`EngineAPI.map.drawBattle` 在 4 个引擎里都实现了
+- [x] **前置确认**：`EngineAPI.map.drawBattle` 在 4 个引擎里都实现了
       （若 LÖVE 的 `map.drawBattle` 内部就调 `lib.DrawWarMap`，则等价）
-- [ ] 单测：`WarDrawMap` 4 个 flag（0/1/2/4）各调一次 `map.drawBattle` 且不崩
-- [ ] 单测：`WarShowHead` 不崩（stub `getMeta`/`draw`）
-- [ ] 四版本全量测试零失败
-- [ ] 实机截图：战斗画面正常
-- [ ] 一个 commit
+- [x] 单测：`WarDrawMap` 4 个 flag（0/1/2/4）各调一次 `map.drawBattle` 且不崩
+- [x] 单测：`WarShowHead` 不崩（stub `getMeta`/`draw`）
+- [x] 四版本全量测试零失败
+- [x] 实机截图：战斗画面正常
+- [x] 一个 commit
 
 ---
 

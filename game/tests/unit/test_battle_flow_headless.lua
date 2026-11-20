@@ -433,13 +433,15 @@ end
 -- ------------------------------------------------------------ 渲染调用链不崩
 
 function TestBattleFlowHeadless.testWarDrawMapCallChainNoCrash()
-    print("\n=== Test: WarDrawMap 调用链不崩（stub lib.DrawWarMap）===")
+    print("\n=== Test: WarDrawMap 调用链不崩（stub EngineAPI.map.drawBattle）===")
     -- **注意范围**：这里验证的是「调用链不炸」，不是「画面正确」。
     -- 画面正确性必须实机看 —— 但可以机器验证的这部分不该留空。
     setupBattle()
-    local L = rawget(_G, "lib")
+    -- **stub 目标已变**（port-sprite-native-migration Task 2）：
+    -- lib.DrawWarMap → EngineAPI.map.drawBattle（battle_render 不再用 lib.*）
+    local EA = rawget(_G, "EngineAPI")
     local calls = {}
-    L.DrawWarMap = function(flag, x, y, v1, v2, v3)
+    EA.map.drawBattle = function(flag, x, y, v1, v2, v3)
         calls[#calls + 1] = { flag = flag, x = x, y = y }
     end
     rawset(_G, "WAR", WAR)
@@ -466,10 +468,14 @@ function TestBattleFlowHeadless.testWarShowHeadNoCrash()
     print("\n=== Test: WarShowHead 调用链不崩 ===")
     setupBattle()
     local L = rawget(_G, "lib")
-    -- WarShowHead 需要贴图查询 + 绘制两条链。stub 它们的**返回值语义**
-    -- （PicGetXY 返回 w,h,xoff,yoff），不是简单空实现。
-    L.PicGetXY     = function() return 100, 100, 0, 0 end
-    L.PicLoadCache = function() end
+    -- WarShowHead 的贴图查询 + 绘制已改走 SpriteAtlas（Task 2）
+    -- → stub 目标从 lib.PicGetXY/PicLoadCache 改为 SpriteAtlas.getMeta/draw。
+    -- **注意**：`getMeta` 现在返回 table（不是多返回值）。
+    local SA = require("framework.sprite_atlas")
+    SA.getMeta = function() return { w = 100, h = 100, xoff = 0, yoff = 0 } end
+    SA.draw    = function() return true end
+    --（原 lib.PicGetXY / lib.PicLoadCache 桩已删除：代码不再调用它们）
+    --（原 lib.PicGetXY / lib.PicLoadCache 桩已删除：代码不再调用它们）
     L.DrawPic      = function() end
     L.DrawStr      = function() end
     L.SetClip      = function() end

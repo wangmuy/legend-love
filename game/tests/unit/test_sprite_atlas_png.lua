@@ -96,6 +96,25 @@ function TestSpriteAtlasPng.testPngFrame111GetMeta()
     TestHelper.assertEquals(93, meta.h, "h 应为 93")
 end
 
+function TestSpriteAtlasPng.testFrameIdMapsToRealPngSlot()
+    print("\n=== Test: frameId 118 确实映射到 0-based slot 59（PNG 帧）===")
+    -- 这是「人物 59 会命中 PNG」这条结论的直接验证。
+    -- frameToSlot(frameId) = floor(frameId/2)+1（1-based）→ 0-based = floor(118/2) = 59
+    local SA = fresh()
+    installEngineStub({ pngW = 100, pngH = 102 })
+    SA.loadArchive("data/hdgrp.idx", "data/hdgrp.grp", 1,
+        { paletteFile = "data/mmap.col", usage = "avatar" })
+
+    local atlas = SA.get(1)
+    TestHelper.assertNotNil(atlas, "atlas 应已加载")
+    -- 直接用 parseIdx 的偏移判断 slot 59 的字节是否是 PNG
+    local bytes = require("framework.sprite_decoder").sliceFrame(atlas.grpBytes, atlas.offsets, 60)
+    TestHelper.assertNotNil(bytes, "slot 60（1-based）应有字节")
+    local fmt = require("framework.sprite_decoder").sniffFormat(bytes)
+    TestHelper.assertEquals("png", fmt,
+        "slot 60（1-based，= 0-based 59）应是 PNG 帧——这是人物 59 头像命中的帧")
+end
+
 -- ------------------------------------------------------------ ② getHandle 存真值
 
 function TestSpriteAtlasPng.testGetHandleStoresRealSize()
@@ -206,6 +225,7 @@ function TestSpriteAtlasPng.runAll()
 
     TestSpriteAtlasPng.testPngFrameGetMetaNotNil()
     TestSpriteAtlasPng.testPngFrame111GetMeta()
+    TestSpriteAtlasPng.testFrameIdMapsToRealPngSlot()
     TestSpriteAtlasPng.testGetHandleStoresRealSize()
     TestSpriteAtlasPng.testRleFrameStillWorks()
     TestSpriteAtlasPng.testToleratesEngineWithoutDecode()
