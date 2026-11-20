@@ -111,6 +111,81 @@ else
     log "  [SKIP] 无 python3（无法做字节级校验）"
 fi
 
+# ------------------------------- H. WAR.Person 容量 >= 40（REQ-BRB-3）
+log "=== STEP: H. WAR.Person 容量 >= 40 ==="
+if grep -q 'WAR_PERSON_CAPACITY = 40' game/script/jymain.lua 2>/dev/null; then
+    log "  [PASS] WAR_PERSON_CAPACITY = 40（原硬编码 26 = 我方6+敌方20 = 零余量）"
+else
+    log "  [FAIL] 未定义 WAR_PERSON_CAPACITY = 40"
+    fail=$((fail + 1))
+fi
+if grep -q 'for i=0,26-1 do' game/script/jymain.lua 2>/dev/null; then
+    log "  [FAIL] 仍有硬编码 26（应改用 WAR_PERSON_CAPACITY）"
+    fail=$((fail + 1))
+else
+    log "  [PASS] 无硬编码 26 循环"
+fi
+
+# ------------------------------- I. WarLoad 返回布尔（REQ-BRB-1）
+log "=== STEP: I. WarLoad 返回 true/false ==="
+# 取 WarLoad 函数体，查 return false / return true
+nf_count=$(awk '/^function WarLoad\(/,/^end$/' game/script/jymain.lua 2>/dev/null | grep -c 'return false')
+[ -n "$nf_count" ] || nf_count=0
+# **至少 2 处**：越界 + Byte.loadfile 失败（负向对照时改一处仍应 PASS 另一处）
+if [ "$nf_count" -ge 2 ]; then
+    log "  [PASS] WarLoad 有 $nf_count 处 return false（越界 + 读取失败）"
+else
+    log "  [FAIL] WarLoad 缺 return false"
+    fail=$((fail + 1))
+fi
+if awk '/^function WarLoad\(/,/^end$/' game/script/jymain.lua 2>/dev/null | grep -q 'return true'; then
+    log "  [PASS] WarLoad 有 return true（成功）"
+else
+    log "  [FAIL] WarLoad 缺 return true"
+    fail=$((fail + 1))
+fi
+
+# ------------------------------- J. 调用点检查 WarLoad 返回值（REQ-BRB-2）
+log "=== STEP: J. WarLoad 调用点检查返回值 ==="
+# 判据：每一处 `WarLoad(` 调用都必须带返回值捕获。
+#   合法：`if not WarLoad(...)`  /  `xxx = WarLoad(...)`
+#   非法：`WarLoad(...)` 单独成句
+#
+# **为什么用 awk 而不是 grep -vE 链**：
+#   我第一版用 `grep -vE 'if not WarLoad\(|= WarLoad\('`，负向对照
+#   （加一行 `WarLoad(0)`）**不 FAIL**。排查了很久发现是 shell/grep 的
+#   反斜杠转义在 grep -E 里被吃掉，导致过滤模式实际变成了 `if not WarLoad(`
+#   —— 那个裸括号被当成分组符号，匹配行为不符合预期。
+#   awk 逐行判断，不用正则转义，行为确定。
+unchecked=$(awk '
+    /WarLoad[[:space:]]*\(/ {
+        # 跳过函数定义行
+        if (match($0, /function[[:space:]]+WarLoad/)) next
+        # 跳过注释行
+        if (match($0, /^[[:space:]]*--/)) next
+        # 必须带捕获：if not WarLoad( 或 xxx = WarLoad(
+        if (match($0, /if[[:space:]]+not[[:space:]]+WarLoad/) ||
+            match($0, /=[[:space:]]*WarLoad/)) next
+        print FNR ": " $0
+    }
+' game/framework/war_async.lua game/script/jymain.lua 2>/dev/null | wc -l | tr -dc '0-9')
+[ -n "$unchecked" ] || unchecked=0
+if [ "$unchecked" -eq 0 ]; then
+    log "  [PASS] 所有 WarLoad(...) 调用都捕获了返回值"
+else
+    log "  [FAIL] 仍有 $unchecked 处裸 WarLoad(...) 调用："
+    awk '
+        /WarLoad[[:space:]]*\(/ {
+            if (match($0, /function[[:space:]]+WarLoad/)) next
+            if (match($0, /^[[:space:]]*--/)) next
+            if (match($0, /if[[:space:]]+not[[:space:]]+WarLoad/) ||
+                match($0, /=[[:space:]]*WarLoad/)) next
+            print FNR ": " $0
+        }
+    ' game/framework/war_async.lua game/script/jymain.lua 2>/dev/null | head -5 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
 # --------------------------------------------------------------- 汇总
 log "============================================"
 if [ "$fail" -eq 0 ]; then

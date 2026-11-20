@@ -45,6 +45,11 @@ ALLOWED_DEVIATIONS = {
     "War_WugongHurtNeili":  "补 level 钳制 + 字段判空（与 HurtLife 对称）",
     "War_AutoMove":         "回溯循环补 prevI 进度守卫 + 硬上限",
     "War_EndPersonData":    "除 liveNum 补零守卫（避免 inf 污染经验）",
+    # --- 第四批：capacity 守卫（port-battle-robustness Task 4） ---
+    "WarSelectTeam":  "容量守卫（WAR.PersonNum >= WAR_PERSON_CAPACITY 时停止 + JY_Error）",
+    "WarSelectEnemy": "同上",
+    # --- 第五批：WarLoad 返回布尔（port-battle-robustness Task 1） ---
+    "WarLoad":        "越界返回 false / 成功返回 true（原裸 return = nil）",
     # --- 第三批：script 层 lib.Pic* 迁移（port-sprite-native-migration Task 2） ---
     "WarDrawMap":   "lib.DrawWarMap → EngineAPI.map.drawBattle（引擎契约化）",
     "WarShowHead":  "lib.PicGetXY/PicLoadCache → SpriteAtlas.getMeta/draw（消除双轨）",

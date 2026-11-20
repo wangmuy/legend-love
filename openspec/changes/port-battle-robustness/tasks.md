@@ -70,13 +70,13 @@
 **Blast Radius**：`game/tests/gate_battle_extensibility.sh`、`openspec/project/ROBUSTNESS_AUDIT.md`
 
 **DoD**：
-- [ ] `gate_battle_extensibility.sh` 新增断言：`WAR.Person` 容量 >= 40
-- [ ] 新增断言：`WarLoad` 源码里有 `return false` 和 `return true`
-- [ ] 负向对照：把 40 改回 26 → gate FAIL
-- [ ] 负向对照：把 `return false` 改回裸 `return` → gate FAIL
-- [ ] 四版本全量测试零失败（记录断言数）
-- [ ] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
-- [ ] 五门禁全 PASS
-- [ ] 实机截图：战斗仍能正常起（`--shot --battle=4`）
-- [ ] 更新 `ROBUSTNESS_AUDIT.md`（把这两项从「未处理」移到「已修」）
-- [ ] 一个 commit
+- [x] `gate_battle_extensibility.sh` 新增断言：`WAR.Person` 容量 >= 40
+- [x] 新增断言：`WarLoad` 源码里有 `return false` 和 `return true`
+- [x] 负向对照：把 40 改回 26 → gate FAIL
+- [x] 负向对照：把 `return false` 改回裸 `return` → gate FAIL
+- [x] 四版本全量测试零失败（记录断言数）
+- [x] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
+- [x] 五门禁全 PASS
+- [x] 实机截图：战斗仍能正常起（`--shot --battle=4`）
+- [x] 更新 `ROBUSTNESS_AUDIT.md`（把这两项从「未处理」移到「已修」）
+- [x] 一个 commit

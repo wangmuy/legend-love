@@ -314,6 +314,15 @@ function WarSelectTeam()            --选择我方参战人
     for i=1,6 do
         local id=WAR.Data["自动选择参战人" .. i];
         if id>=0 then
+            -- **容量守卫**（port-battle-robustness Task 4）：
+            -- WAR.Person 的槽数是 WAR_PERSON_CAPACITY（40）。原版 26 时
+            -- 我方 6 + 敌方 20 = 刚好 26（零余量）→ MOD 改 CC.TeamNum 或
+            -- 敌方数量 > 20 就会写到 WAR.Person[26] = nil → 下一行崩。
+            if WAR.PersonNum >= (WAR_PERSON_CAPACITY or 26) then
+                JY_Error("WarSelectTeam: person 槽位已满（上限 %d），忽略剩余参战人",
+                         WAR_PERSON_CAPACITY or 26)
+                break
+            end
             WAR.Person[WAR.PersonNum]["人物编号"]=id;
             WAR.Person[WAR.PersonNum]["我方"]=true;
             WAR.Person[WAR.PersonNum]["坐标X"]=WAR.Data["我方X"  .. i];
@@ -365,6 +374,15 @@ function WarSelectTeam()            --选择我方参战人
 
         for i=1,6 do
             if WAR.SelectPerson[i]>0 then
+                -- **容量守卫**（port-battle-robustness Task 4）：
+                -- WAR.Person 的槽数是 WAR_PERSON_CAPACITY（40）。原版 26 时
+                -- 我方 6 + 敌方 20 = 刚好 26（零余量）→ MOD 改 CC.TeamNum 或
+                -- 敌方数量 > 20 就会写到 WAR.Person[26] = nil → 下一行崩。
+                if WAR.PersonNum >= (WAR_PERSON_CAPACITY or 26) then
+                    JY_Error("WarSelectTeam: person 槽位已满（上限 %d），忽略剩余参战人",
+                             WAR_PERSON_CAPACITY or 26)
+                    break
+                end
                 WAR.Person[WAR.PersonNum]["人物编号"]=JY.Base["队伍" ..i];
                 WAR.Person[WAR.PersonNum]["我方"]=true;
                 WAR.Person[WAR.PersonNum]["坐标X"]=WAR.Data["我方X"  .. i];
@@ -405,6 +423,15 @@ end
 function WarSelectEnemy()            --选择敌方参战人
     for i=1,20 do
         if WAR.Data["敌人"  .. i]>0 then
+            -- **容量守卫**（port-battle-robustness Task 4）：
+            -- WAR.Person 的槽数是 WAR_PERSON_CAPACITY（40）。原版 26 时
+            -- 我方 6 + 敌方 20 = 刚好 26（零余量）→ MOD 改 CC.TeamNum 或
+            -- 敌方数量 > 20 就会写到 WAR.Person[26] = nil → 下一行崩。
+            if WAR.PersonNum >= (WAR_PERSON_CAPACITY or 26) then
+                JY_Error("WarSelectEnemy: person 槽位已满（上限 %d），忽略剩余参战人",
+                         WAR_PERSON_CAPACITY or 26)
+                break
+            end
             WAR.Person[WAR.PersonNum]["人物编号"]=WAR.Data["敌人"  .. i];
             WAR.Person[WAR.PersonNum]["我方"]=false;
             WAR.Person[WAR.PersonNum]["坐标X"]=WAR.Data["敌方X"  .. i];

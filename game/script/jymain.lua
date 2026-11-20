@@ -4259,7 +4259,13 @@ function instruct_58()           --武道大会比武
                 end
             end
             local warnum =r+i*num1;      --武道大会战斗编号
-            WarLoad(warnum + startwar);
+            -- **检查返回值**：越界时 WarLoad 只 JY_Error + return false，
+            -- 继续用 WAR.Data 会读到上一场的数据（甚至越界索引 JY.Person）。
+            if not WarLoad(warnum + startwar) then
+                JY_Error("instruct_58: WarLoad failed for warid=%d, aborting tournament",
+                         warnum + startwar);
+                return;
+            end
             instruct_1(2854+warnum, JY.Person[WAR.Data["敌人1"]]["头像代号"], 0);
             instruct_0();
             if WarMain(warnum + startwar, 0) ==true  then     --赢
@@ -4492,6 +4498,16 @@ end
 --入口函数为WarMain，由战斗指令调用
 
 --设置战斗全程变量
+-- 战斗人物槽位容量（port-battle-robustness Task 3）
+--
+-- 原版是硬编码 26（`for i=0,26-1`），刚好等于：
+--   我方最多 6（CC.TeamNum）+ 敌方最多 20（WarSelectEnemy 的 for i=1,20）
+-- ⇒ **零余量**。MOD 把 CC.TeamNum 改成 >6、或敌方 >20 就会越界写
+-- WAR.Person[26]（nil）→ 下一行索引崩。
+--
+-- 40 = 6 + 20 + 14 余量，够 MOD 把队伍提到 10、敌方提到 25 这类合理改动。
+WAR_PERSON_CAPACITY = 40;
+
 function WarSetGlobal()            --设置战斗全程变量
     WAR={};
 
@@ -4500,7 +4516,7 @@ function WarSetGlobal()            --设置战斗全程变量
     WAR.SelectPerson={}            --设置选择参战人  0 未选，1 选，不可取消，2 选，可取消。选择参展人菜单调用使用
 
     WAR.Person={};                 --战斗人物信息
-    for i=0,26-1 do
+    for i=0,(WAR_PERSON_CAPACITY or 26)-1 do
         WAR.Person[i]={};
         WAR.Person[i]["人物编号"]=-1;
         WAR.Person[i]["我方"]=true;            --true 我方，false敌人
@@ -4543,20 +4559,33 @@ end
 --加载战斗数据
 function WarLoad(warid)              --加载战斗数据
     WarSetGlobal();         --初始化战斗变量
-    -- 边界校验（MOD 的 war.sta 大小不同）：warid 越界时报错而非静默加载失败
+
+    -- 边界校验（MOD 的 war.sta 大小不同）：warid 越界时报错并**返回 false**
+    --
+    -- 为什么必须返回布尔（而不是裸 `return`）：
+    --   `JY_Error` 实测只是 `Log()`（framework/lib_log.lua:54），**不抛错、不终止**。
+    --   而调用方 `WarMainCoroutine` 原先不检查返回值 → 越界时会用
+    --   **上一场战斗的 WAR.Data** 继续跑（地图/敌人/音乐全是错的），
+    --   且 `warState.result` 保持上个值 → 调用方读到**错误的胜负**。
     do
         local ok, ModData = pcall(require, "framework.mod_data")
         if ok and ModData and ModData.WarRecordCount then
             local n = ModData.WarRecordCount(CC.WarFile, CC.WarDataSize)
             if n and (warid < 0 or warid >= n) then
                 JY_Error("WarLoad: warid=%d out of range (war.sta has %d records)", warid, n)
-                return
+                return false
             end
         end
     end
     local data=Byte.create(CC.WarDataSize);      --读取战斗数据
-    Byte.loadfile(data,CC.WarFile,warid*CC.WarDataSize,CC.WarDataSize);
+    local okRead, errRead = pcall(Byte.loadfile, data, CC.WarFile,
+                                  warid*CC.WarDataSize, CC.WarDataSize);
+    if not okRead then
+        JY_Error("WarLoad: Byte.loadfile failed for warid=%d: %s", warid, tostring(errRead))
+        return false
+    end
     LoadData(WAR.Data,CC.WarData_S,data);
+    return true
 end
 
 --战斗主函数
@@ -4565,7 +4594,11 @@ end
 --返回  true 战斗胜利，false 失败
 function WarMain(warid,isexp)           --战斗主函数
     lib.Debug(string.format("war start. warid=%d",warid));
-    WarLoad(warid);
+    -- 检查返回值（与 WarMainCoroutine 一致；这是阻塞版，仅在非协程上下文兜底用）
+    if not WarLoad(warid) then
+        lib.Debug("WarMain: WarLoad failed, aborting");
+        return false;
+    end
     WarSelectTeam();          --选择我方
     WarSelectEnemy();         --选择敌人
 

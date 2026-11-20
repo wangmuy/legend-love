@@ -61,12 +61,26 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     warState.warId = warid
     warState.isExp = isexp or 1
     warState.status = "running"
-    warState.result = nil
+    warState.result = nil      -- **开头就清空**：任何后续失败都不该让调用方读到上场的胜负
     warState.round = 0
     
     -- 初始化战斗
+    --
+    -- **必须检查返回值**（port-battle-robustness Task 2）：
+    -- `WarLoad` 越界时只 `JY_Error`（纯日志，不抛错）+ 返回 false。
+    -- 若不检查，会继续用**上一场战斗的 WAR.Data**（地图/敌人/音乐全错），
+    -- 并让 `warState.result` 保持上一个值 → 调用方读到**错误的胜负**。
     EngineAPI.debug.log("WarMainCoroutine: calling WarLoad")
-    WarLoad(warid)
+    local okLoad = WarLoad(warid)
+    if not okLoad then
+        EngineAPI.debug.log("WarMainCoroutine: WarLoad failed, aborting battle")
+        warState.status = "ended"
+        warState.result = nil          -- 明确「没有结果」，而不是上一场的 true/false
+        -- 恢复输入状态：战斗未真正开始，但玩家可能已被 disableInput 影响
+        local InputManager = require("framework.input_manager")
+        InputManager.disableInput = false
+        return false
+    end
     
     EngineAPI.debug.log("WarMainCoroutine: calling WarSelectTeam")
     WarSelectTeam()
