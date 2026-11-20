@@ -216,9 +216,31 @@ function SpriteAtlas.getHandle(atlasId, frameId)
 
     if not handle then return nil end
     atlas.cache[slot] = handle
+
+    -- **PNG 帧的真实尺寸只能从引擎 handle 回读**（d.w/d.h 是 nil，因为
+    -- framework 不做 PNG 解压）。
+    --
+    -- 原实现写 `w = d.w or 0` → PNG 帧存成 0×0 → 之后所有读 meta 的地方
+    -- 都拿到 0 → 头像居中算成 (100-0)/2 = 50（错位）。
+    --
+    -- 为什么这里必须修而不能只在 getMeta 兜底：meta 缓存是共享的，
+    -- 一旦 getHandle 写进 0×0，getMeta 的兜底也会读到 0×0。
+    local realW, realH = d.w, d.h
+    if (realW == nil or realH == nil)
+        and EngineAPI.sprite.getMeta
+        and d.format == "png" then
+        local okMeta, em = pcall(EngineAPI.sprite.getMeta, handle)
+        if okMeta and type(em) == "table" then
+            realW = em.w or 0
+            realH = em.h or 0
+        end
+    end
+
     atlas.meta[slot] = {
-        w = d.w or 0, h = d.h or 0,
-        xoff = anchors.xoff, yoff = anchors.yoff,
+        w = realW or 0,
+        h = realH or 0,
+        xoff = anchors.xoff,
+        yoff = anchors.yoff,
     }
     return handle
 end
@@ -242,7 +264,23 @@ function SpriteAtlas.getMeta(atlasId, frameId)
     local bytes = SpriteDecoder.sliceFrame(atlas.grpBytes, atlas.offsets, slot)
     if not bytes then return nil end
     if SpriteDecoder.sniffFormat(bytes) == SpriteDecoder.FORMAT_PNG then
-        return nil   -- PNG 必须引擎解码才知道尺寸
+        -- **PNG 帧兜底走 getHandle**（它会解码 + 把真实 w/h 写进 meta 缓存）
+        --
+        -- 原实现 `return nil`，理由是「PNG 必须引擎解码才知道尺寸」——
+        -- 这个理由成立，但**正确性优先**：实测 hdgrp 的 PNG 帧是 slot 59/111，
+        -- 而 r1.grp 里人物 59 的头像代号就是 59（picid=118 → slot=59）→
+        -- 头像尺寸会拿到 nil，居中计算崩。
+        --
+        -- 代价可忽略：真实数据里 115 个 slot 只有 2 个是 PNG，
+        -- 且 getHandle 有 cache，第二次调用不会再解码。
+        local handle = SpriteAtlas.getHandle(atlasId, frameId)
+        if handle then
+            local cached = atlas.meta[slot]
+            if cached then return cached end
+        end
+        -- 引擎不支持解码（MUD/Web 返回 w=0 的 handle）→ 返回 0×0 而非 nil，
+        -- 让调用方能走统一的"尺寸未知"分支（不是崩溃）。
+        return { w = 0, h = 0, xoff = 0, yoff = 0 }
     end
     local d = SpriteDecoder.decodeRLE(bytes, atlas.palette)
     if not d then return nil end

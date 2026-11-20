@@ -2,63 +2,72 @@
 -- 测试运行器 - 运行所有单元测试
 
 local TestHelper = require("tests.test_helper")
-local TestStateMachine = require("tests.unit.test_state_machine")
-local TestInputManager = require("tests.unit.test_input_manager")
-local TestEventBridge = require("tests.unit.test_event_bridge")
-local TestCoroutineScheduler = require("tests.unit.test_coroutine_scheduler")
-local TestByteIO = require("tests.unit.test_byte_io")
-local TestScriptLoader = require("tests.unit.test_script_loader")
-local TestItemAsync = require("tests.unit.test_item_async")
-local TestWarAsync = require("tests.unit.test_war_async")
-local TestEngineAPI = require("tests.unit.test_engine_api")
-local TestEngineTest = require("tests.unit.test_engine_test")
-local TestModIni = require("tests.unit.test_mod_ini")
-local TestModData = require("tests.unit.test_mod_data")
-local TestModEncoding = require("tests.unit.test_mod_encoding")
-local TestModBuild = require("tests.unit.test_mod_build")
-local TestModResources = require("tests.unit.test_mod_resources")
-local TestModAudit = require("tests.unit.test_mod_audit")
-local TestFormatSpec = require("tests.unit.test_format_spec")
+
 local TestModE2E = require("tests.unit.test_mod_e2e")
-local TestModBoot = require("tests.unit.test_mod_boot")
-local TestSceneName = require("tests.unit.test_scene_name")
-local TestFontSize = require("tests.unit.test_font_size")
-local TestNewEvent = require("tests.unit.test_new_event")
-local TestDialogLayout = require("tests.unit.test_dialog_layout")
-local TestTextBoxLayout = require("tests.unit.test_text_box_layout")
-local TestMmapDepth = require("tests.unit.test_mmap_depth")
-local TestCloud = require("tests.unit.test_cloud")
-local TestVersionCompat = require("tests.unit.test_version_compat")
-local TestSettings = require("tests.unit.test_settings")
-local TestSettingsStore = require("tests.unit.test_settings_store")
-local TestAudioSettings = require("tests.unit.test_audio_settings")
-local TestMenuValueItem = require("tests.unit.test_menu_value_item")
-local TestStartMenuLayout = require("tests.unit.test_start_menu_layout")
-local TestEngineSystem = require("tests.unit.test_engine_system")
-local TestMouseInput = require("tests.unit.test_mouse_input")
-local TestMenuHitTest = require("tests.unit.test_menu_hit_test")
-local TestMouseMenu = require("tests.unit.test_mouse_menu")
-local TestPathfind = require("tests.unit.test_pathfind")
-local TestMouseHover = require("tests.unit.test_mouse_hover")
-local TestAutoMove = require("tests.unit.test_auto_move")
-local TestInteract = require("tests.unit.test_interact")
-local TestItemStatusMouse = require("tests.unit.test_item_status_mouse")
-local TestBattleMouse = require("tests.unit.test_battle_mouse")
-local TestBaseMusic = require("tests.unit.test_base_music")
-local TestInputActions = require("tests.unit.test_input_actions")
-local TestInputBindings = require("tests.unit.test_input_bindings")
-local TestVirtualPad = require("tests.unit.test_virtual_pad")
-local TestVolumeMenuEsc = require("tests.unit.test_volume_menu_esc")
-local TestMenuAlign = require("tests.unit.test_menu_align")
-local TestSpriteDecoder = require("tests.unit.test_sprite_decoder")
-local TestVirtualPadWiring = require("tests.unit.test_virtual_pad_wiring")
-local TestEngineConformance = require("tests.unit.test_engine_conformance")
-local TestSpriteAnim = require("tests.unit.test_sprite_anim")
-local TestBattleRules = require("tests.unit.test_battle_rules")
-local TestBattleWiring = require("tests.unit.test_battle_wiring")
-local TestBattleFlowHeadless = require("tests.unit.test_battle_flow_headless")
-local TestWarCoroutineWiring = require("tests.unit.test_war_coroutine_wiring")
-local TestRobustness = require("tests.unit.test_robustness")
+
+-- **所有测试模块放进一个表**：
+-- 原因：Lua 5.1 的函数最多 60 个 upvalue，而 runAll 要引用 60+ 个
+-- 模块局部变量 → 编译期直接报 "more than 60 upvalues"。
+-- 收进一张表后 runAll 只捕获 1 个 upvalue（T）。
+local T = {
+    state_machine = require("tests.unit.test_state_machine"),
+    input_manager = require("tests.unit.test_input_manager"),
+    event_bridge = require("tests.unit.test_event_bridge"),
+    coroutine_scheduler = require("tests.unit.test_coroutine_scheduler"),
+    byte_io = require("tests.unit.test_byte_io"),
+    script_loader = require("tests.unit.test_script_loader"),
+    item_async = require("tests.unit.test_item_async"),
+    war_async = require("tests.unit.test_war_async"),
+    engine_api = require("tests.unit.test_engine_api"),
+    engine_test = require("tests.unit.test_engine_test"),
+    mod_ini = require("tests.unit.test_mod_ini"),
+    mod_data = require("tests.unit.test_mod_data"),
+    mod_encoding = require("tests.unit.test_mod_encoding"),
+    mod_build = require("tests.unit.test_mod_build"),
+    mod_resources = require("tests.unit.test_mod_resources"),
+    mod_audit = require("tests.unit.test_mod_audit"),
+    format_spec = require("tests.unit.test_format_spec"),
+    mod_boot = require("tests.unit.test_mod_boot"),
+    scene_name = require("tests.unit.test_scene_name"),
+    font_size = require("tests.unit.test_font_size"),
+    new_event = require("tests.unit.test_new_event"),
+    dialog_layout = require("tests.unit.test_dialog_layout"),
+    text_box_layout = require("tests.unit.test_text_box_layout"),
+    mmap_depth = require("tests.unit.test_mmap_depth"),
+    cloud = require("tests.unit.test_cloud"),
+    version_compat = require("tests.unit.test_version_compat"),
+    settings = require("tests.unit.test_settings"),
+    settings_store = require("tests.unit.test_settings_store"),
+    audio_settings = require("tests.unit.test_audio_settings"),
+    menu_value_item = require("tests.unit.test_menu_value_item"),
+    start_menu_layout = require("tests.unit.test_start_menu_layout"),
+    engine_system = require("tests.unit.test_engine_system"),
+    mouse_input = require("tests.unit.test_mouse_input"),
+    menu_hit_test = require("tests.unit.test_menu_hit_test"),
+    mouse_menu = require("tests.unit.test_mouse_menu"),
+    pathfind = require("tests.unit.test_pathfind"),
+    mouse_hover = require("tests.unit.test_mouse_hover"),
+    auto_move = require("tests.unit.test_auto_move"),
+    interact = require("tests.unit.test_interact"),
+    item_status_mouse = require("tests.unit.test_item_status_mouse"),
+    battle_mouse = require("tests.unit.test_battle_mouse"),
+    base_music = require("tests.unit.test_base_music"),
+    input_actions = require("tests.unit.test_input_actions"),
+    input_bindings = require("tests.unit.test_input_bindings"),
+    virtual_pad = require("tests.unit.test_virtual_pad"),
+    volume_menu_esc = require("tests.unit.test_volume_menu_esc"),
+    menu_align = require("tests.unit.test_menu_align"),
+    sprite_decoder = require("tests.unit.test_sprite_decoder"),
+    virtual_pad_wiring = require("tests.unit.test_virtual_pad_wiring"),
+    engine_conformance = require("tests.unit.test_engine_conformance"),
+    sprite_anim = require("tests.unit.test_sprite_anim"),
+    battle_rules = require("tests.unit.test_battle_rules"),
+    battle_wiring = require("tests.unit.test_battle_wiring"),
+    battle_flow_headless = require("tests.unit.test_battle_flow_headless"),
+    war_coroutine_wiring = require("tests.unit.test_war_coroutine_wiring"),
+    robustness = require("tests.unit.test_robustness"),
+    sprite_atlas_png = require("tests.unit.test_sprite_atlas_png"),
+}
 
 local TestRunner = {}
 
@@ -153,7 +162,7 @@ function TestRunner.runAll()
     print("运行状态机测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local smResult = TestStateMachine.runAll()
+    local smResult = T.state_machine.runAll()
     local smStats = TestHelper.getStats()
     totalStats.total = totalStats.total + smStats.total
     totalStats.passed = totalStats.passed + smStats.passed
@@ -165,7 +174,7 @@ function TestRunner.runAll()
     print("运行输入管理器测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local imResult = TestInputManager.runAll()
+    local imResult = T.input_manager.runAll()
     local imStats = TestHelper.getStats()
     totalStats.total = totalStats.total + imStats.total
     totalStats.passed = totalStats.passed + imStats.passed
@@ -177,7 +186,7 @@ function TestRunner.runAll()
     print("运行事件桥接测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local ebResult = TestEventBridge.runAll()
+    local ebResult = T.event_bridge.runAll()
     local ebStats = TestHelper.getStats()
     totalStats.total = totalStats.total + ebStats.total
     totalStats.passed = totalStats.passed + ebStats.passed
@@ -189,7 +198,7 @@ function TestRunner.runAll()
     print("运行协程调度器测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local csResult = TestCoroutineScheduler.runAll()
+    local csResult = T.coroutine_scheduler.runAll()
     local csStats = TestHelper.getStats()
     totalStats.total = totalStats.total + csStats.total
     totalStats.passed = totalStats.passed + csStats.passed
@@ -201,7 +210,7 @@ function TestRunner.runAll()
     print("运行 Byte I/O 测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local bioResult = TestByteIO.runAll()
+    local bioResult = T.byte_io.runAll()
     local bioStats = TestHelper.getStats()
     totalStats.total = totalStats.total + bioStats.total
     totalStats.passed = totalStats.passed + bioStats.passed
@@ -212,7 +221,7 @@ function TestRunner.runAll()
     print("运行脚本加载器测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local slResult = TestScriptLoader.runAll()
+    local slResult = T.script_loader.runAll()
     local slStats = TestHelper.getStats()
     totalStats.total = totalStats.total + slStats.total
     totalStats.passed = totalStats.passed + slStats.passed
@@ -223,7 +232,7 @@ function TestRunner.runAll()
     print("运行物品系统测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local itemResult = TestItemAsync.runAll()
+    local itemResult = T.item_async.runAll()
     local itemStats = TestHelper.getStats()
     totalStats.total = totalStats.total + itemStats.total
     totalStats.passed = totalStats.passed + itemStats.passed
@@ -234,7 +243,7 @@ function TestRunner.runAll()
     print("运行战斗系统测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local warResult = TestWarAsync.runAll()
+    local warResult = T.war_async.runAll()
     local warStats = TestHelper.getStats()
     totalStats.total = totalStats.total + warStats.total
     totalStats.passed = totalStats.passed + warStats.passed
@@ -245,7 +254,7 @@ function TestRunner.runAll()
     print("运行 EngineAPI 接口测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local eaResult = TestEngineAPI.runAll()
+    local eaResult = T.engine_api.runAll()
     local eaStats = TestHelper.getStats()
     totalStats.total = totalStats.total + eaStats.total
     totalStats.passed = totalStats.passed + eaStats.passed
@@ -256,7 +265,7 @@ function TestRunner.runAll()
     print("运行测试引擎测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local etResult = TestEngineTest.runAll()
+    local etResult = T.engine_test.runAll()
     local etStats = TestHelper.getStats()
     totalStats.total = totalStats.total + etStats.total
     totalStats.passed = totalStats.passed + etStats.passed
@@ -267,7 +276,7 @@ function TestRunner.runAll()
     print("运行 ModIni 解析器测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local miResult = runModModule("mod_ini", TestModIni.runAll)
+    local miResult = runModModule("mod_ini", T.mod_ini.runAll)
     local miStats = TestHelper.getStats()
     totalStats.total = totalStats.total + miStats.total
     totalStats.passed = totalStats.passed + miStats.passed
@@ -278,7 +287,7 @@ function TestRunner.runAll()
     print("运行 ModData 数据回退测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local mdResult = runModModule("mod_data", TestModData.runAll)
+    local mdResult = runModModule("mod_data", T.mod_data.runAll)
     local mdStats = TestHelper.getStats()
     totalStats.total = totalStats.total + mdStats.total
     totalStats.passed = totalStats.passed + mdStats.passed
@@ -289,7 +298,7 @@ function TestRunner.runAll()
     print("运行 MOD 编码/布局逆向测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local meResult = runModModule("mod_encoding", TestModEncoding.runAll)
+    local meResult = runModModule("mod_encoding", T.mod_encoding.runAll)
     local meStats = TestHelper.getStats()
     totalStats.total = totalStats.total + meStats.total
     totalStats.passed = totalStats.passed + meStats.passed
@@ -300,7 +309,7 @@ function TestRunner.runAll()
     print("运行 mod_build 构建期测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local buildResult = runModModule("mod_build", TestModBuild.runAll)
+    local buildResult = runModModule("mod_build", T.mod_build.runAll)
     local buildStats = TestHelper.getStats()
     totalStats.total = totalStats.total + buildStats.total
     totalStats.passed = totalStats.passed + buildStats.passed
@@ -311,7 +320,7 @@ function TestRunner.runAll()
     print("运行 MOD 资源分类测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local resResult = runModModule("mod_resources", TestModResources.runAll)
+    local resResult = runModModule("mod_resources", T.mod_resources.runAll)
     local resStats = TestHelper.getStats()
     totalStats.total = totalStats.total + resStats.total
     totalStats.passed = totalStats.passed + resStats.passed
@@ -322,7 +331,7 @@ function TestRunner.runAll()
     print("运行 MOD 资源穷举审计测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local auditResult = runModModule("mod_audit", TestModAudit.runAll)
+    local auditResult = runModModule("mod_audit", T.mod_audit.runAll)
     local auditStats = TestHelper.getStats()
     totalStats.total = totalStats.total + auditStats.total
     totalStats.passed = totalStats.passed + auditStats.passed
@@ -333,7 +342,7 @@ function TestRunner.runAll()
     print("运行格式字段级覆盖测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local fmtResult = runModModule("format_spec", TestFormatSpec.runAll)
+    local fmtResult = runModModule("format_spec", T.format_spec.runAll)
     local fmtStats = TestHelper.getStats()
     totalStats.total = totalStats.total + fmtStats.total
     totalStats.passed = totalStats.passed + fmtStats.passed
@@ -355,7 +364,7 @@ function TestRunner.runAll()
     print("运行全启动链路无头验证...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local bootResult = runModModule("mod_boot", TestModBoot.runAll)
+    local bootResult = runModModule("mod_boot", T.mod_boot.runAll)
     local bootStats = TestHelper.getStats()
     totalStats.total = totalStats.total + bootStats.total
     totalStats.passed = totalStats.passed + bootStats.passed
@@ -368,7 +377,7 @@ function TestRunner.runAll()
     print("运行场景名提示测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local snResult = TestSceneName.runAll()
+    local snResult = T.scene_name.runAll()
     local snStats = TestHelper.getStats()
     totalStats.total = totalStats.total + snStats.total
     totalStats.passed = totalStats.passed + snStats.passed
@@ -379,7 +388,7 @@ function TestRunner.runAll()
     print("运行字体大小测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local fsResult = TestFontSize.runAll()
+    local fsResult = T.font_size.runAll()
     local fsStats = TestHelper.getStats()
     totalStats.total = totalStats.total + fsStats.total
     totalStats.passed = totalStats.passed + fsStats.passed
@@ -390,7 +399,7 @@ function TestRunner.runAll()
     print("运行 newevent 事件分派测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local neResult = TestNewEvent.runAll()
+    local neResult = T.new_event.runAll()
     local neStats = TestHelper.getStats()
     totalStats.total = totalStats.total + neStats.total
     totalStats.passed = totalStats.passed + neStats.passed
@@ -401,7 +410,7 @@ function TestRunner.runAll()
     print("运行对话框排版测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local dlgResult = TestDialogLayout.runAll()
+    local dlgResult = T.dialog_layout.runAll()
     local dlgStats = TestHelper.getStats()
     totalStats.total = totalStats.total + dlgStats.total
     totalStats.passed = totalStats.passed + dlgStats.passed
@@ -412,7 +421,7 @@ function TestRunner.runAll()
     print("运行单行文本框尺寸测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local tboxResult = TestTextBoxLayout.runAll()
+    local tboxResult = T.text_box_layout.runAll()
     local tboxStats = TestHelper.getStats()
     totalStats.total = totalStats.total + tboxStats.total
     totalStats.passed = totalStats.passed + tboxStats.passed
@@ -423,7 +432,7 @@ function TestRunner.runAll()
     print("运行主地图 2.5D 遮挡关系测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local mmResult = TestMmapDepth.runAll()
+    local mmResult = T.mmap_depth.runAll()
     local mmStats = TestHelper.getStats()
     totalStats.total = totalStats.total + mmStats.total
     totalStats.passed = totalStats.passed + mmStats.passed
@@ -434,7 +443,7 @@ function TestRunner.runAll()
     print("运行主地图飘云测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local clResult = TestCloud.runAll()
+    local clResult = T.cloud.runAll()
     local clStats = TestHelper.getStats()
     totalStats.total = totalStats.total + clStats.total
     totalStats.passed = totalStats.passed + clStats.passed
@@ -445,7 +454,7 @@ function TestRunner.runAll()
     print("运行跨版本兼容性测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local vcResult = TestVersionCompat.runAll()
+    local vcResult = T.version_compat.runAll()
     local vcStats = TestHelper.getStats()
     totalStats.total = totalStats.total + vcStats.total
     totalStats.passed = totalStats.passed + vcStats.passed
@@ -456,7 +465,7 @@ function TestRunner.runAll()
     print("运行设置系统测试...")
     print(string.rep("-", 60))
     TestHelper.resetCounts()
-    local stResult = TestSettings.runAll()
+    local stResult = T.settings.runAll()
     local stStats = TestHelper.getStats()
     totalStats.total = totalStats.total + stStats.total
     totalStats.passed = totalStats.passed + stStats.passed
@@ -464,7 +473,7 @@ function TestRunner.runAll()
     allPassed = allPassed and stResult
 
     TestHelper.resetCounts()
-    local ssResult = TestSettingsStore.runAll()
+    local ssResult = T.settings_store.runAll()
     local ssStats = TestHelper.getStats()
     totalStats.total = totalStats.total + ssStats.total
     totalStats.passed = totalStats.passed + ssStats.passed
@@ -472,7 +481,7 @@ function TestRunner.runAll()
     allPassed = allPassed and ssResult
 
     TestHelper.resetCounts()
-    local asResult = TestAudioSettings.runAll()
+    local asResult = T.audio_settings.runAll()
     local asStats = TestHelper.getStats()
     totalStats.total = totalStats.total + asStats.total
     totalStats.passed = totalStats.passed + asStats.passed
@@ -480,7 +489,7 @@ function TestRunner.runAll()
     allPassed = allPassed and asResult
 
     TestHelper.resetCounts()
-    local mvResult = TestMenuValueItem.runAll()
+    local mvResult = T.menu_value_item.runAll()
     local mvStats = TestHelper.getStats()
     totalStats.total = totalStats.total + mvStats.total
     totalStats.passed = totalStats.passed + mvStats.passed
@@ -488,7 +497,7 @@ function TestRunner.runAll()
     allPassed = allPassed and mvResult
 
     TestHelper.resetCounts()
-    local smlResult = TestStartMenuLayout.runAll()
+    local smlResult = T.start_menu_layout.runAll()
     local smlStats = TestHelper.getStats()
     totalStats.total = totalStats.total + smlStats.total
     totalStats.passed = totalStats.passed + smlStats.passed
@@ -496,7 +505,7 @@ function TestRunner.runAll()
     allPassed = allPassed and smlResult
 
     TestHelper.resetCounts()
-    local mesResult = TestEngineSystem.runAll()
+    local mesResult = T.engine_system.runAll()
     local mesStats = TestHelper.getStats()
     totalStats.total = totalStats.total + mesStats.total
     totalStats.passed = totalStats.passed + mesStats.passed
@@ -504,7 +513,7 @@ function TestRunner.runAll()
     allPassed = allPassed and mesResult
 
     TestHelper.resetCounts()
-    local minResult = TestMouseInput.runAll()
+    local minResult = T.mouse_input.runAll()
     local minStats = TestHelper.getStats()
     totalStats.total = totalStats.total + minStats.total
     totalStats.passed = totalStats.passed + minStats.passed
@@ -512,7 +521,7 @@ function TestRunner.runAll()
     allPassed = allPassed and minResult
 
     TestHelper.resetCounts()
-    local mhtResult = TestMenuHitTest.runAll()
+    local mhtResult = T.menu_hit_test.runAll()
     local mhtStats = TestHelper.getStats()
     totalStats.total = totalStats.total + mhtStats.total
     totalStats.passed = totalStats.passed + mhtStats.passed
@@ -520,7 +529,7 @@ function TestRunner.runAll()
     allPassed = allPassed and mhtResult
 
     TestHelper.resetCounts()
-    local mmnResult = TestMouseMenu.runAll()
+    local mmnResult = T.mouse_menu.runAll()
     local mmnStats = TestHelper.getStats()
     totalStats.total = totalStats.total + mmnStats.total
     totalStats.passed = totalStats.passed + mmnStats.passed
@@ -528,7 +537,7 @@ function TestRunner.runAll()
     allPassed = allPassed and mmnResult
 
     TestHelper.resetCounts()
-    local pfResult = TestPathfind.runAll()
+    local pfResult = T.pathfind.runAll()
     local pfStats = TestHelper.getStats()
     totalStats.total = totalStats.total + pfStats.total
     totalStats.passed = totalStats.passed + pfStats.passed
@@ -536,7 +545,7 @@ function TestRunner.runAll()
     allPassed = allPassed and pfResult
 
     TestHelper.resetCounts()
-    local mhResult = TestMouseHover.runAll()
+    local mhResult = T.mouse_hover.runAll()
     local mhStats = TestHelper.getStats()
     totalStats.total = totalStats.total + mhStats.total
     totalStats.passed = totalStats.passed + mhStats.passed
@@ -544,7 +553,7 @@ function TestRunner.runAll()
     allPassed = allPassed and mhResult
 
     TestHelper.resetCounts()
-    local amResult = TestAutoMove.runAll()
+    local amResult = T.auto_move.runAll()
     local amStats = TestHelper.getStats()
     totalStats.total = totalStats.total + amStats.total
     totalStats.passed = totalStats.passed + amStats.passed
@@ -552,7 +561,7 @@ function TestRunner.runAll()
     allPassed = allPassed and amResult
 
     TestHelper.resetCounts()
-    local itxResult = TestInteract.runAll()
+    local itxResult = T.interact.runAll()
     local itxStats = TestHelper.getStats()
     totalStats.total = totalStats.total + itxStats.total
     totalStats.passed = totalStats.passed + itxStats.passed
@@ -560,7 +569,7 @@ function TestRunner.runAll()
     allPassed = allPassed and itxResult
 
     TestHelper.resetCounts()
-    local ismResult = TestItemStatusMouse.runAll()
+    local ismResult = T.item_status_mouse.runAll()
     local ismStats = TestHelper.getStats()
     totalStats.total = totalStats.total + ismStats.total
     totalStats.passed = totalStats.passed + ismStats.passed
@@ -568,7 +577,7 @@ function TestRunner.runAll()
     allPassed = allPassed and ismResult
 
     TestHelper.resetCounts()
-    local btmResult = TestBattleMouse.runAll()
+    local btmResult = T.battle_mouse.runAll()
     local btmStats = TestHelper.getStats()
     totalStats.total = totalStats.total + btmStats.total
     totalStats.passed = totalStats.passed + btmStats.passed
@@ -576,7 +585,7 @@ function TestRunner.runAll()
     allPassed = allPassed and btmResult
 
     TestHelper.resetCounts()
-    local bgmResult = TestBaseMusic.runAll()
+    local bgmResult = T.base_music.runAll()
     local bgmStats = TestHelper.getStats()
     totalStats.total = totalStats.total + bgmStats.total
     totalStats.passed = totalStats.passed + bgmStats.passed
@@ -584,7 +593,7 @@ function TestRunner.runAll()
     allPassed = allPassed and bgmResult
 
     TestHelper.resetCounts()
-    local iaResult = TestInputActions.runAll()
+    local iaResult = T.input_actions.runAll()
     local iaStats = TestHelper.getStats()
     totalStats.total = totalStats.total + iaStats.total
     totalStats.passed = totalStats.passed + iaStats.passed
@@ -592,7 +601,7 @@ function TestRunner.runAll()
     allPassed = allPassed and iaResult
 
     TestHelper.resetCounts()
-    local ibResult = TestInputBindings.runAll()
+    local ibResult = T.input_bindings.runAll()
     local ibStats = TestHelper.getStats()
     totalStats.total = totalStats.total + ibStats.total
     totalStats.passed = totalStats.passed + ibStats.passed
@@ -600,7 +609,7 @@ function TestRunner.runAll()
     allPassed = allPassed and ibResult
 
     TestHelper.resetCounts()
-    local vpResult = TestVirtualPad.runAll()
+    local vpResult = T.virtual_pad.runAll()
     local vpStats = TestHelper.getStats()
     totalStats.total = totalStats.total + vpStats.total
     totalStats.passed = totalStats.passed + vpStats.passed
@@ -608,7 +617,7 @@ function TestRunner.runAll()
     allPassed = allPassed and vpResult
 
     TestHelper.resetCounts()
-    local vescResult = TestVolumeMenuEsc.runAll()
+    local vescResult = T.volume_menu_esc.runAll()
     local vescStats = TestHelper.getStats()
     totalStats.total = totalStats.total + vescStats.total
     totalStats.passed = totalStats.passed + vescStats.passed
@@ -616,7 +625,7 @@ function TestRunner.runAll()
     allPassed = allPassed and vescResult
 
     TestHelper.resetCounts()
-    local maResult = TestMenuAlign.runAll()
+    local maResult = T.menu_align.runAll()
     local maStats = TestHelper.getStats()
     totalStats.total = totalStats.total + maStats.total
     totalStats.passed = totalStats.passed + maStats.passed
@@ -624,7 +633,7 @@ function TestRunner.runAll()
     allPassed = allPassed and maResult
 
     TestHelper.resetCounts()
-    local sdResult = TestSpriteDecoder.runAll()
+    local sdResult = T.sprite_decoder.runAll()
     local sdStats = TestHelper.getStats()
     totalStats.total = totalStats.total + sdStats.total
     totalStats.passed = totalStats.passed + sdStats.passed
@@ -632,7 +641,7 @@ function TestRunner.runAll()
     allPassed = allPassed and sdResult
 
     TestHelper.resetCounts()
-    local vpwResult = TestVirtualPadWiring.runAll()
+    local vpwResult = T.virtual_pad_wiring.runAll()
     local vpwStats = TestHelper.getStats()
     totalStats.total = totalStats.total + vpwStats.total
     totalStats.passed = totalStats.passed + vpwStats.passed
@@ -640,7 +649,7 @@ function TestRunner.runAll()
     allPassed = allPassed and vpwResult
 
     TestHelper.resetCounts()
-    local ecfResult = TestEngineConformance.runAll()
+    local ecfResult = T.engine_conformance.runAll()
     local ecfStats = TestHelper.getStats()
     totalStats.total = totalStats.total + ecfStats.total
     totalStats.passed = totalStats.passed + ecfStats.passed
@@ -648,7 +657,7 @@ function TestRunner.runAll()
     allPassed = allPassed and ecfResult
 
     TestHelper.resetCounts()
-    local sanResult = TestSpriteAnim.runAll()
+    local sanResult = T.sprite_anim.runAll()
     local sanStats = TestHelper.getStats()
     totalStats.total = totalStats.total + sanStats.total
     totalStats.passed = totalStats.passed + sanStats.passed
@@ -656,7 +665,7 @@ function TestRunner.runAll()
     allPassed = allPassed and sanResult
 
     TestHelper.resetCounts()
-    local brResult = TestBattleRules.runAll()
+    local brResult = T.battle_rules.runAll()
     local brStats = TestHelper.getStats()
     totalStats.total = totalStats.total + brStats.total
     totalStats.passed = totalStats.passed + brStats.passed
@@ -664,7 +673,7 @@ function TestRunner.runAll()
     allPassed = allPassed and brResult
 
     TestHelper.resetCounts()
-    local bwResult = TestBattleWiring.runAll()
+    local bwResult = T.battle_wiring.runAll()
     local bwStats = TestHelper.getStats()
     totalStats.total = totalStats.total + bwStats.total
     totalStats.passed = totalStats.passed + bwStats.passed
@@ -672,7 +681,7 @@ function TestRunner.runAll()
     allPassed = allPassed and bwResult
 
     TestHelper.resetCounts()
-    local bhResult = TestBattleFlowHeadless.runAll()
+    local bhResult = T.battle_flow_headless.runAll()
     local bhStats = TestHelper.getStats()
     totalStats.total = totalStats.total + bhStats.total
     totalStats.passed = totalStats.passed + bhStats.passed
@@ -680,7 +689,7 @@ function TestRunner.runAll()
     allPassed = allPassed and bhResult
 
     TestHelper.resetCounts()
-    local wcwResult = TestWarCoroutineWiring.runAll()
+    local wcwResult = T.war_coroutine_wiring.runAll()
     local wcwStats = TestHelper.getStats()
     totalStats.total = totalStats.total + wcwStats.total
     totalStats.passed = totalStats.passed + wcwStats.passed
@@ -688,12 +697,20 @@ function TestRunner.runAll()
     allPassed = allPassed and wcwResult
 
     TestHelper.resetCounts()
-    local rbResult = TestRobustness.runAll()
+    local rbResult = T.robustness.runAll()
     local rbStats = TestHelper.getStats()
     totalStats.total = totalStats.total + rbStats.total
     totalStats.passed = totalStats.passed + rbStats.passed
     totalStats.failed = totalStats.failed + rbStats.failed
     allPassed = allPassed and rbResult
+
+    TestHelper.resetCounts()
+    local sapResult = T.sprite_atlas_png.runAll()
+    local sapStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + sapStats.total
+    totalStats.passed = totalStats.passed + sapStats.passed
+    totalStats.failed = totalStats.failed + sapStats.failed
+    allPassed = allPassed and sapResult
 
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
@@ -719,117 +736,19 @@ function TestRunner.runModule(moduleName)
     -- 与全量运行相同的入口自愈（单模块入口同样适用）
     TestHelper.healAllModSaves()
     
-    if moduleName == "state_machine" then
-        return TestStateMachine.runAll()
-    elseif moduleName == "input_manager" then
-        return TestInputManager.runAll()
-    elseif moduleName == "event_bridge" then
-        return TestEventBridge.runAll()
-    elseif moduleName == "coroutine_scheduler" then
-        return TestCoroutineScheduler.runAll()
-    elseif moduleName == "byte_io" then
-        return TestByteIO.runAll()
-    elseif moduleName == "script_loader" then
-        return TestScriptLoader.runAll()
-    elseif moduleName == "item_async" then
-        return TestItemAsync.runAll()
-    elseif moduleName == "war_async" then
-        return TestWarAsync.runAll()
-    elseif moduleName == "engine_api" then
-        return TestEngineAPI.runAll()
-    elseif moduleName == "engine_test" then
-        return TestEngineTest.runAll()
-    elseif moduleName == "mod_ini" then
-        return runModModule("mod_ini", TestModIni.runAll)
-    elseif moduleName == "mod_data" then
-        return runModModule("mod_data", TestModData.runAll)
-    elseif moduleName == "mod_encoding" then
-        return runModModule("mod_encoding", TestModEncoding.runAll)
-    elseif moduleName == "mod_build" then
-        return runModModule("mod_build", TestModBuild.runAll)
-    elseif moduleName == "mod_resources" then
-        return runModModule("mod_resources", TestModResources.runAll)
-    elseif moduleName == "mod_audit" then
-        return runModModule("mod_audit", TestModAudit.runAll)
-    elseif moduleName == "format_spec" then
-        return runModModule("format_spec", TestFormatSpec.runAll)
-    elseif moduleName == "mod_e2e" then
-        return runModModule("mod_e2e", TestModE2E.runAll)
-    elseif moduleName == "mod_boot" then
-        return runModModule("mod_boot", TestModBoot.runAll)
-    elseif moduleName == "text_box_layout" then
-        return TestTextBoxLayout.runAll()
-    elseif moduleName == "dialog_layout" then
-        return TestDialogLayout.runAll()
-    elseif moduleName == "mmap_depth" then
-        return TestMmapDepth.runAll()
-    elseif moduleName == "cloud" then
-        return TestCloud.runAll()
-    elseif moduleName == "version_compat" then
-        return TestVersionCompat.runAll()
-    elseif moduleName == "settings" then
-        return TestSettings.runAll()
-    elseif moduleName == "settings_store" then
-        return TestSettingsStore.runAll()
-    elseif moduleName == "audio_settings" then
-        return TestAudioSettings.runAll()
-    elseif moduleName == "menu_value_item" then
-        return TestMenuValueItem.runAll()
-    elseif moduleName == "start_menu_layout" then
-        return TestStartMenuLayout.runAll()
-    elseif moduleName == "engine_system" then
-        return TestEngineSystem.runAll()
-    elseif moduleName == "mouse_input" then
-        return TestMouseInput.runAll()
-    elseif moduleName == "menu_hit_test" then
-        return TestMenuHitTest.runAll()
-    elseif moduleName == "mouse_menu" then
-        return TestMouseMenu.runAll()
-    elseif moduleName == "pathfind" then
-        return TestPathfind.runAll()
-    elseif moduleName == "mouse_hover" then
-        return TestMouseHover.runAll()
-    elseif moduleName == "auto_move" then
-        return TestAutoMove.runAll()
-    elseif moduleName == "interact" then
-        return TestInteract.runAll()
-    elseif moduleName == "item_status_mouse" then
-        return TestItemStatusMouse.runAll()
-    elseif moduleName == "battle_mouse" then
-        return TestBattleMouse.runAll()
-    elseif moduleName == "base_music" then
-        return TestBaseMusic.runAll()
-    elseif moduleName == "input_actions" then
-        return TestInputActions.runAll()
-    elseif moduleName == "input_bindings" then
-        return TestInputBindings.runAll()
-    elseif moduleName == "virtual_pad" then
-        return TestVirtualPad.runAll()
-    elseif moduleName == "volume_menu_esc" then
-        return TestVolumeMenuEsc.runAll()
-    elseif moduleName == "menu_align" then
-        return TestMenuAlign.runAll()
-    elseif moduleName == "sprite_decoder" then
-        return TestSpriteDecoder.runAll()
-    elseif moduleName == "virtual_pad_wiring" then
-        return TestVirtualPadWiring.runAll()
-    elseif moduleName == "engine_conformance" then
-        return TestEngineConformance.runAll()
-    elseif moduleName == "sprite_anim" then
-        return TestSpriteAnim.runAll()
-    elseif moduleName == "battle_rules" then
-        return TestBattleRules.runAll()
-    elseif moduleName == "battle_wiring" then
-        return TestBattleWiring.runAll()
-    elseif moduleName == "battle_flow_headless" then
-        return TestBattleFlowHeadless.runAll()
-    elseif moduleName == "war_coroutine_wiring" then
-        return TestWarCoroutineWiring.runAll()
-    elseif moduleName == "robustness" then
-        return TestRobustness.runAll()
+    -- **表查分发**（原是 54 个 elseif 链）：
+    --
+    -- 为什么改：Lua 5.1 的函数最多 60 个 upvalue，而 runAll + 这个分发表
+    -- 一起引用 57 个模块 → 加第 58 个测试时就撞 "more than 60 upvalues"。
+    -- 收进 T 表后，两处都只捕获 T 这一个 upvalue，新增测试不再触发上限。
+    --
+    -- 语义不变：T[key] 存在就调它的 runAll()，不存在就落到下面的"未知模块"。
+    local fn = T[moduleName]
+    if fn and type(fn.runAll) == "function" then
+        return fn.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc, menu_align, sprite_decoder, virtual_pad_wiring, engine_conformance, sprite_anim, battle_rules, battle_wiring, battle_flow_headless, war_coroutine_wiring, robustness")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc, menu_align, sprite_decoder, virtual_pad_wiring, engine_conformance, sprite_anim, battle_rules, battle_wiring, battle_flow_headless, war_coroutine_wiring, robustness, sprite_atlas_png")
         return false
     end
 end
