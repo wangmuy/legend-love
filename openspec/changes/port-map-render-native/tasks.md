@@ -10,17 +10,24 @@
 `engine_web.lua`、`tests/engine_test.lua`、`tests/unit/test_engine_api.lua`
 
 **DoD**：
-- [ ] `render.getClip()` —— 返回 `{x, y, w, h}`（LÖVE: `love.graphics.getScissor()`）
-- [ ] `map.setTile(x, y, layer, value)` —— LÖVE: `lib.SetWarMap`
-- [ ] `map.getSceneTile(x, y, layer)` —— LÖVE: `lib.GetSMap`
-- [ ] `map.setSceneTile(x, y, layer, value)` —— LÖVE: `lib.SetD`
-- [ ] `map.getBattleTile(x, y, layer)` —— LÖVE: `lib.GetWarMap`
-- [ ] `map.setBattleTile(x, y, layer, value)` —— LÖVE: `lib.SetWarMap`
-- [ ] MUD / Web / 测试桩各有实现（MUD/Web 可以返回空值，但不能缺）
-- [ ] 契约数 76 → **82**
-- [ ] 单测：每个新契约在 4 个引擎都存在（`assertNotNil`）
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] `render.getClip()` —— 返回 `{x, y, w, h}`（LÖVE: `love.graphics.getScissor()`）
+- [x] ~~`map.setTile(x, y, layer, value)`~~ —— **删掉了**：主地图是只读静态资源
+      （`SetMMap` 是 `lib_love.lua` 的 local 函数，外部调不到），
+      `DrawMMap` 只读。加它就是"加了没有消费者的契约"，违反约束
+- [x] `map.getSceneTile(sceneId, x, y, layer)` —— LÖVE: `lib.GetS`（**4 参**，
+      场景数据按「场景 × 6 层 × 尺寸」排布，必须带 sceneId；层数 0..5 不是 0..4）
+- [x] `map.setSceneTile(sceneId, x, y, layer, value)` —— LÖVE: `lib.SetS`
+- [x] `map.getBattleTile(x, y, layer)` —— LÖVE: `lib.GetWarMap`
+- [x] `map.getSceneEventData(sceneId, eventId, field)` —— LÖVE: `lib.GetD`
+      （**不是地图瓦片**，是场景 tile 上挂的事件数据；`DrawSMap` 用它查贴图）
+- [x] `map.setSceneEventData(sceneId, eventId, field, value)` —— LÖVE: `lib.SetD`
+- [x] `map.clearBattleTile(layer, value)` —— LÖVE: `lib.CleanWarMap`
+- [x] `map.setBattleTile(x, y, layer, value)` —— LÖVE: `lib.SetWarMap`
+- [x] MUD / Web / 测试桩各有实现（MUD/Web 可以返回空值，但不能缺）
+- [x] 契约数 76 → **84**（加了 8 个，删掉 1 个 setTile）
+- [x] 单测：每个新契约在 4 个引擎都存在（`assertNotNil`）
+- [x] 四版本全量测试零失败
+- [x] 一个 commit
 
 ---
 

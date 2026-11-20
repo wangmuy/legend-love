@@ -93,7 +93,9 @@ end
 function love.load()
     for _, a in ipairs(rawget(_G, "arg") or {}) do
         if type(a) == "string" then
-            local shot = a:match("^%-%-shot=(%w+)")
+            -- **用 %S 而不是 %w**：%w 只匹配字母数字，`--shot=c_battle`
+            -- 会被截成 `c` 存成 c.png（实测踩过）。%S 匹配直到空格/参数结束。
+            local shot = a:match("^%-%-shot=([^%s]+)")
             if shot then _SHOT_MODE = true; _SHOT_NAME = shot end
             local fr = a:match("^%-%-frame=(%d+)")
             if fr then _SHOT_FRAME = tonumber(fr) end

@@ -42,6 +42,18 @@ function M.render.drawBackground(x1, y1, x2, y2, brightness) end
 -- @param x1, y1, x2, y2 number 裁剪区域
 function M.render.setClip(x1, y1, x2, y2) end
 
+--- 读当前裁剪区域
+--
+-- 为什么必须有它：地图绘制（`framework/map_render.lua`）要用当前 clip
+-- 反算可见瓦片的循环范围（`lib.DrawMMap/DrawSMap/DrawWarMap` 都这么做）。
+-- 没有它就只能让引擎自己算循环范围 —— 那是把游戏逻辑留在引擎里。
+--
+-- 返回**未裁剪**时的哨兵值：`{x=0, y=0, w=<屏幕宽>, h=<屏幕高>}`
+-- （与 `lib.SetClip(0,0,0,0)` 的"清除裁剪"语义对应）。
+--
+-- @return table {x=, y=, w=, h=}
+function M.render.getClip() end
+
 --- 取当前渲染目标的宽（逻辑像素）
 --
 -- 为什么必须有它：调用方目前靠全局 CC.ScreenW（**编译期常量**）拿屏幕宽。
@@ -258,6 +270,70 @@ function M.map.loadBattle(idxFile, grpFile, mapId, num, width, height) end
 -- @param layer number 0..4
 -- @return number 瓦片编号（-1 = 越界）
 function M.map.getTile(x, y, layer) end
+
+--- 读场景地图瓦片（小场景）
+--
+-- **签名与 getTile 不同：多一个 sceneId**（对应 `lib.GetS(id, x, y, level)`）。
+-- 场景数据是**另一套数组**（`smap`，按场景 × 6 层 × 尺寸 排布），
+-- 所以必须带 sceneId 才能定位。
+--
+-- layer 语义同 `getTile` 的 0..4，但场景有**6 层**（0..5，第 5 层是空中）：
+--   0 地面 / 1 建筑 / 2 空中 / 3 事件编号 / 4 建筑高度修正 / 5 空中高度修正
+--
+-- @param sceneId number 场景编号
+-- @param x, y number 场景坐标
+-- @param layer number 0..5
+-- @return number 瓦片编号（越界/无效 = 0，与原版 GetS 一致）
+function M.map.getSceneTile(sceneId, x, y, layer) end
+
+--- 写场景地图瓦片
+-- @param sceneId number 场景编号
+-- @param x, y number 场景坐标
+-- @param layer number 0..5
+-- @param value number 瓦片编号
+function M.map.setSceneTile(sceneId, x, y, layer, value) end
+
+--- 读场景事件数据（`lib.GetD`）
+--
+-- **这不是地图瓦片**：`D` 数组存的是「每个场景 tile 上挂了什么事件」
+-- （id 是场景内 tile 索引，i 是字段号：0..7）。
+-- `DrawSMap` 用它查第 3 层的事件编号对应哪个贴图（`GetD(sceneid, d3, 7)`）。
+--
+-- @param sceneId number 场景编号
+-- @param eventId number 场景内事件索引
+-- @param field number 字段号 0..7
+-- @return number
+function M.map.getSceneEventData(sceneId, eventId, field) end
+
+--- 写场景事件数据（`lib.SetD`）
+-- @param sceneId number 场景编号
+-- @param eventId number 场景内事件索引
+-- @param field number 字段号 0..7
+-- @param value number
+function M.map.setSceneEventData(sceneId, eventId, field, value) end
+
+--- 读战斗地图瓦片
+--
+-- layer 语义同 `getTile`。战斗地图是**第三套数组**（`lib.GetWarMap`）。
+--
+-- @param x, y number 战斗地图坐标
+-- @param layer number 0..4
+-- @return number 瓦片编号（-1 = 越界）
+function M.map.getBattleTile(x, y, layer) end
+
+--- 写战斗地图瓦片
+--
+-- 战斗地图有 **6 层**（0..5）。
+--
+-- @param x, y number 战斗地图坐标
+-- @param layer number 0..5
+-- @param value number 瓦片编号
+function M.map.setBattleTile(x, y, layer, value) end
+
+--- 清空战斗地图的某一层（`lib.CleanWarMap`）
+-- @param layer number 0..5
+-- @param value number 填入值
+function M.map.clearBattleTile(layer, value) end
 
 --- 卸载主地图数据（释放内存）
 function M.map.unload() end

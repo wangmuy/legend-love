@@ -21,6 +21,7 @@ function TestEngineAPI.testRenderModule()
     TestHelper.assertNotNil(EngineAPI.render.rectOutline, "render.rectOutline should exist")
     TestHelper.assertNotNil(EngineAPI.render.drawBackground, "render.drawBackground should exist")
     TestHelper.assertNotNil(EngineAPI.render.setClip, "render.setClip should exist")
+    TestHelper.assertNotNil(EngineAPI.render.getClip, "render.getClip should exist")
     TestHelper.assertNotNil(EngineAPI.render.present, "render.present should exist")
     TestHelper.assertNotNil(EngineAPI.render.presentAndWait, "render.presentAndWait should exist")
 end
@@ -56,6 +57,14 @@ function TestEngineAPI.testMapModule()
     TestHelper.assertNotNil(EngineAPI.map.drawMain, "map.drawMain should exist")
     TestHelper.assertNotNil(EngineAPI.map.drawScene, "map.drawScene should exist")
     TestHelper.assertNotNil(EngineAPI.map.drawBattle, "map.drawBattle should exist")
+    -- 地图绘制契约（port-map-render-native Task 1）
+    TestHelper.assertNotNil(EngineAPI.map.getSceneTile, "map.getSceneTile should exist")
+    TestHelper.assertNotNil(EngineAPI.map.setSceneTile, "map.setSceneTile should exist")
+    TestHelper.assertNotNil(EngineAPI.map.getSceneEventData, "map.getSceneEventData should exist")
+    TestHelper.assertNotNil(EngineAPI.map.setSceneEventData, "map.setSceneEventData should exist")
+    TestHelper.assertNotNil(EngineAPI.map.getBattleTile, "map.getBattleTile should exist")
+    TestHelper.assertNotNil(EngineAPI.map.setBattleTile, "map.setBattleTile should exist")
+    TestHelper.assertNotNil(EngineAPI.map.clearBattleTile, "map.clearBattleTile should exist")
 end
 
 function TestEngineAPI.testInputModule()

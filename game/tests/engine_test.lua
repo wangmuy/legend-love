@@ -49,6 +49,13 @@ end
 
 EngineAPI.render.setClip = function(x1, y1, x2, y2)
     logCall("render.setClip", x1, y1, x2, y2)
+    EngineAPI.render._clip = { x = x1, y = y1, w = (x2 - x1), h = (y2 - y1) }
+end
+
+EngineAPI.render.getClip = function()
+    logCall("render.getClip")
+    -- 与 setClip 对称：未设过裁剪时返回屏幕全尺寸哨兵
+    return EngineAPI.render._clip or { x = 0, y = 0, w = 1024, h = 768 }
 end
 
 EngineAPI.render.present = function()
@@ -180,12 +187,58 @@ end
 
 --- 可注入的地图瓦片（测试用）
 EngineAPI.map._tiles = {}
+EngineAPI.map._sceneTiles = {}
+EngineAPI.map._sceneEventData = {}
+EngineAPI.map._battleTiles = {}
 EngineAPI.map.getTile = function(x, y, layer)
     logCall("map.getTile", x, y, layer)
     local key = tostring(x) .. "," .. tostring(y) .. "," .. tostring(layer)
     local v = EngineAPI.map._tiles[key]
     if v == nil then return -1 end
     return v
+end
+
+EngineAPI.map.getSceneTile = function(sceneId, x, y, layer)
+    logCall("map.getSceneTile", sceneId, x, y, layer)
+    local key = tostring(sceneId) .. "," .. tostring(x) .. "," .. tostring(y) .. "," .. tostring(layer)
+    local v = EngineAPI.map._sceneTiles[key]
+    if v == nil then return 0 end
+    return v
+end
+
+EngineAPI.map.setSceneTile = function(sceneId, x, y, layer, value)
+    logCall("map.setSceneTile", sceneId, x, y, layer, value)
+    EngineAPI.map._sceneTiles[tostring(sceneId) .. "," .. tostring(x) .. "," .. tostring(y) .. "," .. tostring(layer)] = value
+end
+
+EngineAPI.map.getSceneEventData = function(sceneId, eventId, field)
+    logCall("map.getSceneEventData", sceneId, eventId, field)
+    local v = EngineAPI.map._sceneEventData[tostring(sceneId) .. "," .. tostring(eventId) .. "," .. tostring(field)]
+    if v == nil then return 0 end
+    return v
+end
+
+EngineAPI.map.setSceneEventData = function(sceneId, eventId, field, value)
+    logCall("map.setSceneEventData", sceneId, eventId, field, value)
+    EngineAPI.map._sceneEventData[tostring(sceneId) .. "," .. tostring(eventId) .. "," .. tostring(field)] = value
+end
+
+EngineAPI.map.getBattleTile = function(x, y, layer)
+    logCall("map.getBattleTile", x, y, layer)
+    local key = tostring(x) .. "," .. tostring(y) .. "," .. tostring(layer)
+    local v = EngineAPI.map._battleTiles[key]
+    if v == nil then return 0 end
+    return v
+end
+
+EngineAPI.map.setBattleTile = function(x, y, layer, value)
+    logCall("map.setBattleTile", x, y, layer, value)
+    EngineAPI.map._battleTiles[tostring(x) .. "," .. tostring(y) .. "," .. tostring(layer)] = value
+end
+
+EngineAPI.map.clearBattleTile = function(layer, value)
+    logCall("map.clearBattleTile", layer, value)
+    EngineAPI.map._battleTiles = {}
 end
 
 EngineAPI.map.unload = function()

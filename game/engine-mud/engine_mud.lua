@@ -50,6 +50,10 @@ end
 EngineAPI.render.setClip = function(x1, y1, x2, y2)
     logCall("render.setClip", x1, y1, x2, y2)
 end
+EngineAPI.render.getClip = function()
+    logCall("render.getClip")
+    return { x = 0, y = 0, w = 1024, h = 768 }   -- MUD 无图形：返回哨兵值
+end
 
 EngineAPI.render.present = function()
     logCall("render.present")
@@ -168,6 +172,36 @@ end
 EngineAPI.map.getTile = function(x, y, layer)
     logCall("map.getTile", x, y, layer)
     return -1
+end
+EngineAPI.map.getSceneTile = function(sceneId, x, y, layer)
+    logCall("map.getSceneTile", sceneId, x, y, layer)
+    return 0
+end
+
+EngineAPI.map.setSceneTile = function(sceneId, x, y, layer, value)
+    logCall("map.setSceneTile", sceneId, x, y, layer, value)
+end
+
+EngineAPI.map.getSceneEventData = function(sceneId, eventId, field)
+    logCall("map.getSceneEventData", sceneId, eventId, field)
+    return 0
+end
+
+EngineAPI.map.setSceneEventData = function(sceneId, eventId, field, value)
+    logCall("map.setSceneEventData", sceneId, eventId, field, value)
+end
+
+EngineAPI.map.getBattleTile = function(x, y, layer)
+    logCall("map.getBattleTile", x, y, layer)
+    return 0
+end
+
+EngineAPI.map.setBattleTile = function(x, y, layer, value)
+    logCall("map.setBattleTile", x, y, layer, value)
+end
+
+EngineAPI.map.clearBattleTile = function(layer, value)
+    logCall("map.clearBattleTile", layer, value)
 end
 
 EngineAPI.map.unload = function()

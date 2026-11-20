@@ -48,6 +48,17 @@ end
 EngineAPI.render.setClip = function(x1, y1, x2, y2)
     lib.SetClip(x1, y1, x2, y2)
 end
+EngineAPI.render.getClip = function()
+    if love and love.graphics and love.graphics.getScissor then
+        local x, y, w, h = love.graphics.getScissor()
+        if x == nil then
+            return { x = 0, y = 0, w = CONFIG.Width, h = CONFIG.Height }
+        end
+        return { x = x, y = y, w = w, h = h }
+    end
+    return { x = 0, y = 0, w = CONFIG.Width, h = CONFIG.Height }
+end
+
 
 EngineAPI.render.present = function()
     lib.ShowSurface()
@@ -285,6 +296,35 @@ end
 EngineAPI.map.tickClouds = function()
     lib.CloudTick()
 end
+
+EngineAPI.map.getSceneTile = function(sceneId, x, y, layer)
+    return lib.GetS(sceneId, x, y, layer)
+end
+
+EngineAPI.map.setSceneTile = function(sceneId, x, y, layer, value)
+    lib.SetS(sceneId, x, y, layer, value)
+end
+
+EngineAPI.map.getSceneEventData = function(sceneId, eventId, field)
+    return lib.GetD(sceneId, eventId, field)
+end
+
+EngineAPI.map.setSceneEventData = function(sceneId, eventId, field, value)
+    lib.SetD(sceneId, eventId, field, value)
+end
+
+EngineAPI.map.getBattleTile = function(x, y, layer)
+    return lib.GetWarMap(x, y, layer)
+end
+
+EngineAPI.map.setBattleTile = function(x, y, layer, value)
+    lib.SetWarMap(x, y, layer, value)
+end
+
+EngineAPI.map.clearBattleTile = function(layer, value)
+    lib.CleanWarMap(layer, value)
+end
+
 
 EngineAPI.map.drawMain = function(playerX, playerY, playerPic)
     lib.DrawMMap(playerX, playerY, playerPic)

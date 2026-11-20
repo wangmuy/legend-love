@@ -63,6 +63,10 @@ end
 function EngineAPI.render.setClip(x1, y1, x2, y2) end
 EngineAPI.render.SetClip = EngineAPI.render.setClip
 
+function EngineAPI.render.getClip()
+    return { x = 0, y = 0, w = 1024, h = 768 }
+end
+
 function EngineAPI.render.present()
     -- Worker 模式下 renderBuffer 为空（text 已直接写 WebUI），present 不做操作
     renderBuffer = {}
@@ -178,6 +182,25 @@ function EngineAPI.map.drawMain(playerX, playerY, playerPic) end
 function EngineAPI.map.getTile(x, y, layer)
     return -1
 end
+function EngineAPI.map.getSceneTile(sceneId, x, y, layer)
+    return 0
+end
+
+function EngineAPI.map.setSceneTile(sceneId, x, y, layer, value) end
+
+function EngineAPI.map.getSceneEventData(sceneId, eventId, field)
+    return 0
+end
+
+function EngineAPI.map.setSceneEventData(sceneId, eventId, field, value) end
+
+function EngineAPI.map.getBattleTile(x, y, layer)
+    return 0
+end
+
+function EngineAPI.map.setBattleTile(x, y, layer, value) end
+
+function EngineAPI.map.clearBattleTile(layer, value) end
 
 function EngineAPI.map.unload() end
 
