@@ -160,14 +160,14 @@ Task 2 迁移后我跑了一次截图，hash 与迁移前**逐字节相同** —
 **Blast Radius**：`game/tests/gate_engine_contract.sh`、`openspec/project/TODO.md`
 
 **DoD**：
-- [ ] `gate_engine_contract.sh` STEP D 删除 `engine-love2d` 豁免的 INFO 行
-- [ ] STEP D 对 4 个引擎执行同一判据
-- [ ] 新增 STEP：`script/` 零 `lib.Pic*`（硬断言）
-- [ ] 负向对照：在 `script/` 加一处 `SpriteAtlas.loadArchive(` 之外的 lib.Pic 调用 → gate FAIL
-- [ ] 四版本全量测试零失败（记录断言数）
-- [ ] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
-- [ ] 五门禁全 PASS
-- [ ] **实机截图**：战斗 / 物品栏 / 人物状态 三个界面全部正常
-- [ ] **人物 59 头像专项**：确认 PNG 帧路径正常（这是唯一的 PNG 命中案例）
-- [ ] 更新 `openspec/project/TODO.md`（删掉已完成的条目）
-- [ ] 一个 commit
+- [x] `gate_engine_contract.sh` STEP D 删除 `engine-love2d` 豁免的 INFO 行
+- [x] STEP D 对 4 个引擎执行同一判据
+- [x] 新增 STEP：`script/` 零 `lib.Pic*`（硬断言）
+- [x] 负向对照：在 `script/` 加一处 `SpriteAtlas.loadArchive(` 之外的 lib.Pic 调用 → gate FAIL
+- [x] 四版本全量测试零失败（记录断言数）
+- [x] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
+- [x] 五门禁全 PASS
+- [x] **实机截图**：战斗 / 物品栏 / 人物状态 三个界面全部正常
+- [x] **人物 59 头像专项**：确认 PNG 帧路径正常（这是唯一的 PNG 命中案例）
+- [x] 更新 `openspec/project/TODO.md`（删掉已完成的条目）
+- [x] 一个 commit

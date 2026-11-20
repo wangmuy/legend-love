@@ -77,12 +77,35 @@ else
     log "  [FAIL] 引擎里出现 RLE 解码特征 $bad_d 处（违反 ADR-PORT-013）"
     fail=$((fail + 1))
 fi
-# LOVE 引擎豁免：sprite_decoder + sprite_atlas 接线已完成（framework 侧
-# 不再把文件名交给引擎），但 script/jymain.lua 仍有 33 处 lib.Pic* 调用，
-# 所以 lib_love 的 LoadPic 119 行删不掉。见 decisions.md「真实边界」一节。
-log "  [INFO] engine-love2d 豁免理由已变更：script 层 33 处 lib.Pic* 未迁移"
+# **豁免已摘除**（port-sprite-native-migration Task 7）：
+# `script/` 层已零 `lib.Pic*`（实测 0 处），所以不再为 engine-love2d 单开豁免。
+# 下面的 STEP D2 用同一判据检查（hard fail）。
+#
+# 注意：`lib_love.lua` 的 `LoadPic`（119 行 RLE 解码）**仍存在** ——
+# 它被 `PicLoadFile` 调用，而 `PicLoadFile` 仍被 `EngineAPI.sprite.loadArchive`
+# 消费（war_async 的双轨补丁需要它：引擎内部的 DrawWarMap 走 PicLoadCache
+# → picFileCache）。见 port-sprite-native-migration Task 6 的实测结论。
 
 # ---------------------------------------- E. sprite_decoder 零引擎依赖
+# ---------------------------------------- D2. script 层零 lib.Pic*
+log "=== STEP: D2. script/ 零 lib.Pic* ==="
+# 判据：排除注释行；命中即 FAIL。
+# 为什么是硬断言：script 层的 lib.Pic* 是「引擎可见 .idx/.grp」的最后一条通道。
+# 它们存在时，换引擎必须再造一份 lib_love.lua 的 PicLoadFile/PicGetXY/PicLoadCache。
+# 已全部迁到 SpriteAtlas（port-sprite-native-migration），所以本步可以变硬。
+SCRIPT_PIC_FILES="game/script/jymain.lua game/script/battle/*.lua"
+bad_d2=$(grep -rnE "lib\.Pic[A-Za-z]*\(" $SCRIPT_PIC_FILES 2>/dev/null \
+         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$bad_d2" ] || bad_d2=0
+if [ "$bad_d2" -eq 0 ]; then
+    log "  [PASS] script/ 零 lib.Pic*（贴图全部走 SpriteAtlas）"
+else
+    log "  [FAIL] script/ 仍有 $bad_d2 处 lib.Pic* 调用："
+    grep -rnE "lib\.Pic[A-Za-z]*\(" $SCRIPT_PIC_FILES 2>/dev/null \
+      | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | head -5 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
 log "=== STEP: E. sprite_decoder 零引擎依赖 ==="
 if [ -f game/framework/sprite_decoder.lua ]; then
     # 判据：love. 前面不能是下划线或字母（排除 lib_love.lua 的提及）

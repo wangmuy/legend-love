@@ -68,16 +68,35 @@
 
 ## 引擎可移植性：剩下的最后一块（TOD 已在 port-contract-completeness 之后产生）
 
-- [ ] **script 层 33 处 lib.Pic\* 迁移**
-  - 现状：`game/script/jymain.lua` 有 33 处 `lib.PicInit` / `lib.PicLoadFile` /
-    `lib.PicGetXY` / `lib.PicLoadCache`（存档界面、头像绘制、战斗贴图）
-  - 后果：**「图集格式对引擎透明」只在 framework 范围内成立**，
-    script 层仍需引擎提供 lib 级别的 .idx/.grp 解析
-  - 这是 `lib_love.lua` 的 `LoadPic` 那 119 行解码删不掉的唯一原因
-  - 触发条件：要宣称「换引擎零改动」时
-  - 预估：1 个 change（jymain.lua 的 33 处改走 `EngineAPI.sprite.*` 或
-    `SpriteAtlas`，需实机验证存档/头像/战斗全部画面）
-  - 注意：jymain.lua 是 2000 行的游戏脚本，改动风险高于 framework
+- [x] ~~**script 层 lib.Pic\* 迁移**~~ —— **已完成**（`port-sprite-native-migration`）
+  - 实测实数：**27 处**（不是原估的 33），分布：
+    `PicInit` 7 / `PicLoadFile` 14 / `PicGetXY` 3 / `PicLoadCache` 3
+  - 处置：7 处 `PicInit` **全删**（6 处无参是 no-op；第 7 处在死代码且已被
+    `initSprites` 覆盖）；14 处 `PicLoadFile` → `SpriteAtlas.loadArchive`；
+    6 处 `PicGetXY`/`PicLoadCache` → `getMeta`/`draw`
+  - **结果：`script/` 全仓 `lib.Pic*` = 0**（gate 新增 STEP D2 硬断言）
+  - **但 `lib_love.lua` 的 `LoadPic` 119 行删不掉** —— 见下一条
+
+- [ ] **`map.drawBattle` 契约透明化（删掉 `lib_love.LoadPic` 的真正前提）**
+  - 实测结论（`port-sprite-native-migration` Task 6）：
+    - 原以为 `battle_render` 迁到 `SpriteAtlas` 后就能删 `war_async` 的双轨补丁
+      （`EngineAPI.sprite.loadArchive`）→ **错了**
+    - 删掉后实机截图：战斗地图**全黑**（26865 字节 vs 正常 397034）
+    - 根因链：
+      ```
+      EngineAPI.map.drawBattle  (engine_love2d.lua:302，只是转发)
+        → lib.DrawWarMap        (lib_love.lua:1650)
+           → JY_LoadPic         (lib_love.lua:582)
+              = PicLoadCache    ← **读 picFileCache**
+                 → 必须由 PicLoadFile 写入
+      ```
+    - 即 **`map.drawBattle` 不是 .idx/.grp 透明的契约**，它把旧系统包了一层
+  - 要求：`framework/map_render.lua` 做投影 + 逐格 `sprite.draw`，
+    取代 `map.drawMain/drawScene/drawBattle`（这三个已标 `@deprecated`）
+  - 完成后可删：`war_async` 的双轨补丁 + `lib_love.LoadPic` 119 行
+  - 预估：独立 change（涉及 3 个地图绘制契约 + 战斗/主图/场景三个界面实机验证）
+  - **教训**：「全量测试绿」不等于「可以移除代码」。回归验证（改前改后对比）
+    和移除性验证（删掉后单独跑）是两件不同的事 —— 后者必须实机。
 
 ## 涌现想法（执行过程中产生，不打断当前 slice）
 
