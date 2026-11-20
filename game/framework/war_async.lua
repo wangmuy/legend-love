@@ -96,8 +96,8 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     -- 这是**实机才能发现的 bug**：单测里这些函数都是被 stub 的，
     -- 或者 lib 桩返回假数据，不会暴露两套系统不互通。
     --
-    -- 彻底修法是把 battle_render 的 lib.Pic* 迁到 SpriteAtlas
-    -- （openspec/project/TODO.md 已记录，属独立 change）。
+    -- **注意**：`battle_render.lua` 已迁到 SpriteAtlas（Task 2 完成），
+    -- 但这一半**仍需保留** —— 因为 `map.drawBattle` 内部依赖它（见下方）。
 
     SpriteAtlas.loadArchive(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0, { paletteFile = CC.PaletteFile })
     SpriteAtlas.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1, { paletteFile = CC.PaletteFile, usage = "avatar" })
@@ -106,14 +106,31 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     end
     SpriteAtlas.loadArchive(CC.EffectFile[1], CC.EffectFile[2], 3, { paletteFile = CC.PaletteFile })
 
-    -- 旧系统的档案（供 script/battle/battle_render.lua 的 lib.Pic* 使用）
+    -- 旧系统的档案（供**引擎内部**的 lib.PicLoadCache 使用）
     --
     -- `EngineAPI.sprite.loadArchive` 在各引擎里就是 `lib.PicLoadFile`
     -- （LÖVE 实现见 engine_love2d.lua:95-97），会把档案写进引擎的
     -- `picFileCache`。而 `SpriteAtlas.loadArchive` 走的是新解码链
     -- （framework/sprite_decoder），**不写 picFileCache**。
     --
-    -- 两套都要调 —— 见上方注释的"双轨制"说明。
+    -- **这不是"临时妥协"，删不掉**（实测：删掉 → 战斗地图全黑，
+    -- 截图从 397034 字节掉到 26865 字节）。根因：
+    --
+    --   EngineAPI.map.drawBattle      (engine_love2d.lua:302，只是转发)
+    --     → lib.DrawWarMap            (lib_love.lua:1650)
+    --        → JY_LoadPic             (lib_love.lua:582)
+    --           = PicLoadCache        ← **读 picFileCache**
+    --              → picFileCache[fileid]  ← 必须由 PicLoadFile 写入
+    --
+    -- 也就是说 `map.drawBattle` **不是** .idx/.grp 透明的契约，它把旧系统
+    -- 包了一层，内部仍依赖 `PicLoadFile` 写入的数据。
+    --
+    -- 即使 `battle_render.lua` 已经不调 `lib.Pic*`（port-sprite-native-migration
+    -- 已迁移），**引擎内部的 DrawWarMap 仍然需要**。
+    --
+    -- 要真正删掉这一半，前提是让 `map.drawBattle` 契约透明化
+    -- （`framework/map_render.lua` 做投影 + 逐格 `sprite.draw`），
+    -- 那是 `map.drawBattle` 的 @deprecated 条目，属独立 change。
     if EngineAPI and EngineAPI.sprite and EngineAPI.sprite.loadArchive then
         EngineAPI.sprite.loadArchive(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0)
         EngineAPI.sprite.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)

@@ -144,7 +144,25 @@ end
 -- ------------------------------------------------------------ 双轨贴图
 
 function TestWarCoroutineWiring.testWarMainLoadsBothSpriteSystems()
-    print("\n=== Test: WarMainCoroutine 同时加载两套贴图系统 ===")
+    print("\n=== Test: WarMainCoroutine 必须同时加载两套贴图系统 ===")
+    -- **这条断言被"反转了又反转回来"，过程值得记**：
+    --
+    -- 原始理由（实机 bug）：只用 SpriteAtlas.loadArchive 时 picFileCache 是空的，
+    -- 而 battle_render.lua 的 lib.PicGetXY / lib.PicLoadCache 读 picFileCache
+    -- → WarShowHead 崩（PicGetXY: attempt to index a nil value）。
+    --
+    -- 2026-11 的 `port-sprite-native-migration` Task 6 计划是"移除双轨补丁"
+    -- （因为 battle_render 已迁到 SpriteAtlas，旧系统似乎无消费者了）。
+    -- 我按计划删了 4 行、把这条断言改成"只应有一套"，**全量测试照样全绿**。
+    --
+    -- **但实机截图立刻暴露**：战斗地图全黑（26865 字节 vs 397034 字节）。
+    -- 根因：`EngineAPI.map.drawBattle` 只是转发 `lib.DrawWarMap`，
+    -- 后者内部走 `JY_LoadPic` = `PicLoadCache` → 读 `picFileCache`。
+    -- **引擎自己的绘制函数依赖 PicLoadFile 写入的数据**，
+    -- 与 battle_render 是否调用 lib.Pic* 完全无关。
+    --
+    -- 所以断言恢复原方向，并把理由写准确。
+    -- **教训**：「全量测试绿」不等于「可以移除代码」。移除性必须实机验证。
     -- **实机 bug**：只用 SpriteAtlas.loadArchive 时 picFileCache 是空的，
     -- 而 battle_render.lua 的 lib.PicGetXY / lib.PicLoadCache 读 picFileCache
     -- → WarShowHead 崩（PicGetXY: attempt to index a nil value）。

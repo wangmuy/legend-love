@@ -95,16 +95,63 @@
 
 ---
 
-## Task 6：移除 `war_async` 的双轨补丁
+## Task 6：移除 `war_async` 的双轨补丁 —— **实测不可行，改为记录**
 
-**Blast Radius**：`game/framework/war_async.lua`
+**Blast Radius**：`game/framework/war_async.lua`（只加注释，不改代码）
+
+**结论：这个 Task 的前提是错的，双轨补丁不能删。**
+
+### 实测过程
+
+先按计划删掉 4 行 `EngineAPI.sprite.loadArchive(...)`，然后实机截图：
+
+```
+正常战斗画面: 397034 字节（地图/人物/树木/围栏全在）
+删补丁后:      26865 字节（**只有菜单和头像，地图全黑**）
+```
+
+### 根因（完整调用链）
+
+```
+EngineAPI.map.drawBattle          (engine_love2d.lua:302，只是转发)
+  → lib.DrawWarMap                (lib_love.lua:1650)
+     → JY_LoadPic                 (lib_love.lua:582)
+        = PicLoadCache            ← **读 picFileCache**
+           → picFileCache[fileid]  ← 必须由 PicLoadFile 写入
+```
+
+**关键**：`EngineAPI.map.drawBattle` **不是** `.idx/.grp` 透明的契约 ——
+它只是把旧系统包了一层，内部仍然走 `PicLoadCache` → `picFileCache`。
+
+所以即使 `battle_render.lua` 已经不调 `lib.Pic*`，**引擎内部的
+`DrawWarMap` 仍然依赖 `PicLoadFile` 写入的数据**。
+
+### 为什么 Task 2 的截图验证没发现
+
+Task 2 迁移后我跑了一次截图，hash 与迁移前**逐字节相同** ——
+因为当时双轨补丁还在，`picFileCache` 仍有数据。
+
+**这暴露了我验证方法的漏洞**：用"hash 相同"证明"零回归"是对的，
+但它**不能证明"可以移除某段代码"**。移除性验证必须单独做。
+
+### 处置
+
+保留双轨补丁，**但把注释改成"当前状态的准确说明"**：
+- 原来注释说"这是临时妥协，迁完 battle_render 就能删"
+- 改成"这不是临时妥协，是引擎契约的现状：map.drawBattle 内部依赖 picFileCache"
+
+并在 `decisions.md` / `TODO.md` 记录真实结论：
+**要删双轨，必须先让 `map.drawBattle` 契约真正透明**（即 `src/map_render.lua`
+逐格 `sprite.draw`），那是 `port-contract-completeness` 的
+`map.drawMain/drawScene/drawBattle @deprecated` 条目，属独立 change。
 
 **DoD**：
-- [ ] 删除 `EngineAPI.sprite.loadArchive(...)` 那 4 行（保留 `SpriteAtlas` 的）
-- [ ] `grep -c 'sprite.loadArchive' framework/war_async.lua` = 0
+- [x] 实测确认：删补丁 → 战斗地图全黑（26865 vs 397034 字节）
+- [x] 根因定位：`map.drawBattle` → `lib.DrawWarMap` → `JY_LoadPic` → `picFileCache`
+- [x] **Task 2 的截图 hash 相同不能证明"可移除"** —— 验证方法的教训
+- [x] 保留补丁，把注释改成准确说明（不再说"可以删"）
+- [ ] 记录到 `decisions.md` + `TODO.md`：删双轨的前提是 map 契约透明化
 - [ ] 四版本全量测试零失败
-- [ ] 实机截图：战斗画面正常（这是 `ebf81af` 修的那个 bug 的回归验证）
-- [ ] 一个 commit
 
 ---
 
@@ -116,7 +163,7 @@
 - [ ] `gate_engine_contract.sh` STEP D 删除 `engine-love2d` 豁免的 INFO 行
 - [ ] STEP D 对 4 个引擎执行同一判据
 - [ ] 新增 STEP：`script/` 零 `lib.Pic*`（硬断言）
-- [ ] 负向对照：在 `script/` 加一处 `lib.PicLoadFile(` → gate FAIL
+- [ ] 负向对照：在 `script/` 加一处 `SpriteAtlas.loadArchive(` 之外的 lib.Pic 调用 → gate FAIL
 - [ ] 四版本全量测试零失败（记录断言数）
 - [ ] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
 - [ ] 五门禁全 PASS
