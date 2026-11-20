@@ -55,7 +55,9 @@ fi
 
 # ---------------------------------------- C. framework 无 require engine-*
 log "=== STEP: C. framework 零 require engine-* ==="
-bad_c=$(grep -rn 'require("engine' game/framework/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
+# **排除注释行**：注释里写「不 require("engine-*")」是说明文字，不是违规。
+# （实测踩过：map_render.lua 的负约束注释触发了这条判据。）
+bad_c=$(grep -rn 'require("engine' game/framework/*.lua 2>/dev/null        | grep -vE ':[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_c" ] || bad_c=0
 if [ "$bad_c" -eq 0 ]; then
     log "  [PASS] framework/ 无 require engine-*"

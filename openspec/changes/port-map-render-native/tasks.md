@@ -73,17 +73,17 @@ drawMain     → 读 buildList → 逐条 sprite.draw
 → 记入 Out of Scope。
 
 **DoD**：
-- [ ] `MapRender.buildingSort(x, y, mypic)` —— **逐字搬移**（83 行逻辑不改）
-- [ ] `buildList` / `buildNumber` 成为 `map_render.lua` 的模块内 local
-- [ ] `MapRender.buildingList()` / `MapRender.buildingCount()` 供 drawMain 读
-- [ ] 用 `EngineAPI.map.getTile` / `EngineAPI.map.setTile`
-- [ ] `CC.MWidth` / `CC.MHeight` / `CONFIG.*` 照抄（framework 现有惯例）
-- [ ] `framework/map_render.lua` 零 `love.*`、零 `require("engine-*")`
-- [ ] 单测：同样的地图输入 → 与 `lib.BuildingSort` **排序结果完全一致**
+- [x] `MapRender.buildingSort(x, y, mypic)` —— **逐字搬移**（83 行逻辑不改）
+- [x] `buildList` / `buildNumber` 成为 `map_render.lua` 的模块内 local
+- [x] `MapRender.buildingList()` / `MapRender.buildingCount()` 供 drawMain 读
+- [x] 用 `EngineAPI.map.getTile` / `EngineAPI.map.setTile`
+- [x] `CC.MWidth` / `CC.MHeight` / `CONFIG.*` 照抄（framework 现有惯例）
+- [x] `framework/map_render.lua` 零 `love.*`、零 `require("engine-*")`
+- [x] 单测：同样的地图输入 → 与 `lib.BuildingSort` **排序结果完全一致**
       （用测试桩引擎注入 `_tiles`，两个实现各跑一遍，逐条对比 `x/y/num`）
-- [ ] 单测：负向对照（把右旋那段改成 `table.insert` → 单测 FAIL，验证它守住了原版语义）
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] 单测：负向对照（把右旋那段改成 `table.insert` → 单测 FAIL，验证它守住了原版语义）
+- [x] 四版本全量测试零失败
+- [x] 一个 commit
 
 ---
 
