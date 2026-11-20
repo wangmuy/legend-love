@@ -23,7 +23,11 @@ local function installEnv()
 
     rawset(_G, "CONFIG", {
         Width = 1024, Height = 768, XScale = 18, YScale = 9,
+        -- **三个地图各有自己的 AddX/AddY**：缺一个，对应的 draw* 就算不出
+        -- 循环边界（`... - CONFIG.WMapAddX` 会得到 nil 参与算术 → NaN/错范围）。
         MMapAddX = 0, MMapAddY = 0,
+        SMapAddX = 0, SMapAddY = 0,
+        WMapAddX = 0, WMapAddY = 0,
     })
     rawset(_G, "CC", { MWidth = 40, MHeight = 40 })
 
@@ -282,6 +286,165 @@ function TestMapRender.testDrawMainUsesHandleNotPicCache()
         .. "，实测 " .. counts.draw .. " 次")
 end
 
+-- ------------------------------------------------------------ ②c flags 语义
+
+function TestMapRender.testDrawHandleFlagBitsIndependent()
+    print("\n=== Test: drawHandle 的 black/alpha 位必须独立（不是互斥）===")
+    -- **真实视觉回归**：DrawWarMap 的 flag=1/2 传 `JY_LoadPic(0,0,x,y,2+4,128)`
+    --   = 变黑(0x4) + alpha(0x2)。
+    -- `PicLoadCache` 里三者独立 → r,g,b=0 且 a=128/255 → **半透明黑**（移动范围高亮）
+    -- 互斥的 elseif 链 → r,g,b=0 且 a=1 → **不透明黑块**（错）
+    --
+    -- 这里做纯算术复刻，验证「独立 vs 互斥」的差别。
+    local function legacySemantics(flag, alpha)
+        local r, g, b, a = 1, 1, 1, 1
+        if math.floor(flag / 4) % 2 == 1 then r, g, b = 0, 0, 0 end
+        if math.floor(flag / 8) % 2 == 1 then r, g, b = 1, 1, 1 end
+        if math.floor(flag / 2) % 2 == 1 then a = (alpha or 128) / 255 end
+        return r, g, b, a
+    end
+
+    local function exclusiveSemantics(flag, alpha)
+        local r, g, b, a = 1, 1, 1, 1
+        if math.floor(flag / 4) % 2 == 1 then
+            r, g, b = 0, 0, 0
+        elseif math.floor(flag / 8) % 2 == 1 then
+            r, g, b = 1, 1, 1
+        elseif math.floor(flag / 2) % 2 == 1 then
+            a = (alpha or 128) / 255
+        end
+        return r, g, b, a
+    end
+
+    -- flag = 2+4 = 6（移动范围高亮）
+    local r1, g1, b1, a1 = legacySemantics(6, 128)
+    TestHelper.assertEquals(0, r1, "独立语义: r 应为 0（变黑）")
+    TestHelper.assertEquals(128 / 255, a1, "独立语义: alpha 应为 128/255（半透明）")
+
+    local r2, g2, b2, a2 = exclusiveSemantics(6, 128)
+    TestHelper.assertEquals(0, r2, "互斥语义: r 也应为 0")
+    TestHelper.assertEquals(1, a2, "互斥语义: alpha 被忽略 → 1（不透明）")
+
+    TestHelper.assertTrue(math.abs(a1 - a2) > 0.4,
+        "两种语义的 alpha 必须明显不同（实测差 " ..
+        string.format("%.2f", math.abs(a1 - a2)) .. "）")
+
+    -- 源码检查：drawHandle 不能用 elseif 链
+    local f = io.open("engine-love2d/engine_love2d.lua", "r")
+    if not f then f = io.open("../game/engine-love2d/engine_love2d.lua", "r") end
+    TestHelper.assertNotNil(f, "应能读到 engine_love2d.lua")
+    local src = f:read("*a")
+    f:close()
+
+    local st = src:find("EngineAPI.sprite.drawHandle = function", 1, true)
+    TestHelper.assertNotNil(st, "应找到 drawHandle")
+    local en = src:find("\nEngineAPI.", st + 10)
+    local body = src:sub(st, (en or (#src + 1)) - 1)
+
+    -- **必须检查「独立」而不是「存在」**：
+    -- 我第一版只查 `hasBit(flags, 0x2)` 是否出现 —— 改成 elseif 链后它**仍然出现**
+    -- → 负向对照不 FAIL（判据太弱）。
+    --
+    -- 正确判据：找 alpha 那行的**前一个非空行**，它必须是 `end`（即上一个 if 已闭合），
+    -- 不能是 `elseif` 或 `else`。
+    local lines = {}
+    for line in body:gmatch("[^\r\n]+") do
+        local code = line:gsub("^%s+", ""):gsub("%s+$", "")
+        if code ~= "" and not code:match("^%-%-") then
+            lines[#lines + 1] = code
+        end
+    end
+
+    local alphaIdx = nil
+    for i, code in ipairs(lines) do
+        if code:find("hasBit(flags, 0x2)", 1, true)
+            or code:find("band(flags, 0x2)", 1, true) then
+            alphaIdx = i
+            break
+        end
+    end
+    TestHelper.assertNotNil(alphaIdx, "drawHandle 应有 alpha 位判断")
+
+    -- **正确判据**：alpha 那行**自身**必须以 `if` 开头（不是 `elseif`）。
+    --
+    -- 我上一版查「前一行必须是 end」—— 那是错的：颜色判断是单行
+    -- `elseif hasBit(...) then ... end`，本身就以 end 结尾，所以
+    -- alpha 行前一行的确是 `...end`，判据误报。
+    local alphaLine = lines[alphaIdx]
+    TestHelper.assertNotNil(alphaLine:match("^if%s"),
+        "alpha 判断必须以 `if` 开头（实测: " .. alphaLine .. "）")
+    TestHelper.assertNil(alphaLine:match("^elseif"),
+        "alpha 判断不能是 elseif（那会与颜色判断互斥）")
+end
+
+-- ------------------------------------------------------------ ②d flag=1/2 移动范围
+
+function TestMapRender.testDrawBattleRangeFlags()
+    print("\n=== Test: drawBattle 的 flag=1/2 走「高亮格」路径 ===")
+    -- 不靠按键序列触发（实测按键注入不稳定），直接调 drawBattle(1, ...)。
+    --
+    -- 守的是 C Task 5 里最容易错的一段：`JY_LoadPic(0, 0, x1, y1, 2+4, 128)`
+    -- → 语义是「变黑 + alpha」（半透明黑高亮格）。
+    local tiles = installEnv()
+    seedMap(tiles)
+
+    local EA = rawget(_G, "EngineAPI")
+    local calls = {}
+    EA.sprite.drawHandle = function(handle, x, y, flags, alpha)
+        calls[#calls + 1] = { x = x, y = y, flags = flags, alpha = alpha }
+        return true
+    end
+    EA.map.getBattleSize = function() return { w = 40, h = 40 } end
+
+    -- 注入假 atlas + handle
+    package.loaded["framework.sprite_atlas"] = nil
+    local SA = require("framework.sprite_atlas")
+    SA.clear()
+    if SA._injectForTest then
+        local fake = { frameCount = 100, cache = {}, meta = {}, usage = "map" }
+        for slot = 1, 100 do
+            fake.cache[slot] = { img = true, xoff = 0, yoff = 0 }
+            fake.meta[slot] = { w = 16, h = 16, xoff = 0, yoff = 0 }
+        end
+        SA._injectForTest(0, fake)
+        -- 战斗地图还会用 archive 3（武功特效）
+        SA._injectForTest(3, fake)
+    end
+
+    -- 造地图：把若干格标成「可走」（level 3 < 128）
+    local K = function(x, y, l) return x .. "," .. y .. "," .. l end
+    for x = 0, 39 do
+        for y = 0, 39 do
+            tiles[K(x, y, 3)] = 100      -- 默认不可走（>=128）
+        end
+    end
+    tiles[K(10, 10, 3)] = 0          -- 可走
+    tiles[K(11, 10, 3)] = 0          -- 可走
+
+    local MR = require("framework.map_render")
+    local before = #calls
+    local ok = pcall(MR.drawBattle, 1, 10, 10, 11, 10, -1)   -- flag=1
+
+    -- flag=1 的高亮格：flags 应是 2+4=6，alpha 128（当前格）或 64
+    --
+    -- **循环里只收集，不断言**：drawBattle 会画几千格，逐格 assert 会让
+    -- 断言数爆炸（实测 1429 条）。一次聚合断言更清楚也更省。
+    local foundCount, badAlpha = 0, nil
+    for i = before + 1, #calls do
+        if calls[i].flags == 6 then
+            foundCount = foundCount + 1
+            if calls[i].alpha ~= 128 and calls[i].alpha ~= 64 and badAlpha == nil then
+                badAlpha = calls[i].alpha
+            end
+        end
+    end
+    TestHelper.assertTrue(foundCount > 0,
+        "drawBattle(flag=1) 应画出 flags=6（变黑+alpha）的高亮格，实测 "
+        .. foundCount .. " 格")
+    TestHelper.assertNil(badAlpha,
+        "高亮格的 alpha 只能是 128 或 64，实测出现 " .. tostring(badAlpha))
+end
+
 -- ------------------------------------------------------------ ③ 零引擎依赖
 
 function TestMapRender.testNoLoveCalls()
@@ -329,6 +492,8 @@ function TestMapRender.runAll()
     TestMapRender.testPlayerWrittenThenRestored()
     TestMapRender.testInsertWouldBreakOrder()
     TestMapRender.testDrawMainUsesHandleNotPicCache()
+    TestMapRender.testDrawHandleFlagBitsIndependent()
+    TestMapRender.testDrawBattleRangeFlags()
     TestMapRender.testNoLoveCalls()
     TestMapRender.testRespectsJSYState()
 

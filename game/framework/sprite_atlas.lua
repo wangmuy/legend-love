@@ -120,6 +120,23 @@ function SpriteAtlas.loadArchive(idxFile, grpFile, atlasId, opts)
     return SpriteAtlas.load(atlasId, opts)
 end
 
+--- **仅测试用**：直接注入一个假的已解码档案
+--
+-- 为什么需要：测试桩引擎没有 PNG 解码能力（`createFromEncoded` 返回空 handle），
+-- 所以 `loadArchive` 拿不到可用帧。地图绘制测试（`test_map_render.lua`）
+-- 需要验证「画了哪些 frameId / flags」，绕不开 handle。
+--
+-- 生产代码 SHALL NOT 调用它。
+-- @param atlasId number
+-- @param atlas table 需含 frameCount / cache[slot] / meta[slot]
+function SpriteAtlas._injectForTest(atlasId, atlas)
+    if type(atlasId) ~= "number" or type(atlas) ~= "table" then return false end
+    atlas.cache = atlas.cache or {}
+    atlas.meta = atlas.meta or {}
+    atlases[atlasId] = atlas
+    return true
+end
+
 --- 取一个已加载的档案
 -- @return table|nil
 function SpriteAtlas.get(atlasId)

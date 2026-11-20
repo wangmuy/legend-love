@@ -209,6 +209,19 @@ end
 --   `drawHandle`  ：black/white/alpha **互斥**（0x4 优先，此时 alpha 被忽略）
 --   地图绘制只用到 flag=0 和一处 `4+2`（见 drawBattle）：
 --   后者黑化且 alpha=255 → 旧 a=255/255=1，新 alpha 忽略（默认 1）→ **像素相同**
+--- 绘制指定档案的一帧（`drawTile` 的 archiveId 变体）
+--
+-- 战斗武功效果用 `drawTileFrom(3, v3, ...)`（特效档案 3），
+-- 替身贴图用 `drawTileFrom(v2, v1, ...)`（动态档案编号）。
+function drawTileFrom(atlasId, picnum, x, y, flags, alpha)
+    local SA = require("framework.sprite_atlas")
+    return SA.draw(atlasId, picnum, x, y, flags or 0, alpha)
+end
+
+--- 绘制一格地图贴图（含锚点偏移）
+--
+-- @param picnum number 容器帧编号（既有代码里的 picid）
+-- @param x, y number 屏幕坐标
 function drawTile(picnum, x, y, flags, alpha)
     local EngineAPI = api()
     if not EngineAPI or not EngineAPI.sprite then return false end
@@ -418,6 +431,165 @@ function MapRender.drawScene(sceneid, x, y, xoff, yoff, mypic)
                                  oldClip.x + oldClip.w, oldClip.y + oldClip.h)
     else
         EngineAPI.render.setClip(0, 0, 0, 0)
+    end
+end
+
+-- ---------------------------------------------------------------------------
+-- 战斗地图绘制（原 lib.DrawWarMap，122 行，三个地图里最复杂）
+-- ---------------------------------------------------------------------------
+
+--- 绘制战斗地图（**逐字搬移** `lib.DrawWarMap`）
+--
+-- @param flag number 绘制模式：
+--   0 = 常规（地面 + 建筑 + 人）
+--   1 = 移动范围（+ 高亮格）
+--   2 = 攻击范围（+ 高亮格，不同颜色）
+--   3 = 命中反馈（血/内力的「变黑」效果）
+--   4 = 武功效果（`v3` 是特效帧，`v1`/`v2` 是替身贴图 archive/id）
+--   5 = 特殊（与 0 同路的常规显示）
+-- @param x, y number 视口中心（战斗地图坐标）
+-- @param v1, v2, v3 number 依 flag 语义不同（见上）
+--
+-- **为什么 flag=3 分支的 `4+2` 值得单独记一笔**：
+--   `JY_LoadPic(0, pic, x1, y1, 4+2, 255)` = 「变黑 + alpha 255」。
+--   旧实现（`PicLoadCache`）里 black(0x4) 和 alpha(0x2) **独立**判断
+--   → a = 255/255 = 1；新实现（`drawHandle`）里 black 优先、alpha 忽略
+--   → 默认 a = 1。**两者像素结果相同**，所以迁移后不会变。
+function MapRender.drawBattle(flag, x, y, v1, v2, v3)
+    local EngineAPI = api()
+    if not EngineAPI or not EngineAPI.map or not EngineAPI.render then return end
+
+    local CONFIG = rawget(_G, "CONFIG") or {}
+
+    local battleSize = EngineAPI.map.getBattleSize and EngineAPI.map.getBattleSize()
+                       or { w = 64, h = 64 }
+    local WarXMax, WarYMax = battleSize.w or 64, battleSize.h or 64
+
+    local rect = EngineAPI.render.getClip()
+                  or { x = 0, y = 0, w = CONFIG.Width, h = CONFIG.Height }
+    if rect.w == nil then rect.w = CONFIG.Width end
+    if rect.h == nil then rect.h = CONFIG.Height end
+
+    -- 根据 clip 确定循环参数。提高绘制速度
+    local istart = math.floor((rect.x - math.floor(CONFIG.Width / 2)) / (2 * CONFIG.XScale)) - 1 - CONFIG.WMapAddX
+    local iend = math.floor((rect.x + rect.w - math.floor(CONFIG.Width / 2)) / (2 * CONFIG.XScale)) + 1 + CONFIG.WMapAddX
+
+    local jstart = math.floor((rect.y - math.floor(CONFIG.Height / 2)) / (2 * CONFIG.YScale)) - 1
+    local jend = math.floor((rect.y + rect.h - math.floor(CONFIG.Height / 2)) / (2 * CONFIG.YScale)) + 1
+
+    EngineAPI.render.fillRect(0, 0, 0, 0, 0)
+
+    -- 绘战斗地面
+    for j = 0, 2 * jend - 2 * jstart + CONFIG.WMapAddY do
+        for i = istart, iend do
+            local i1 = i + math.floor(j / 2) + jstart
+            local j1 = -i + math.floor(j / 2) + j % 2 + jstart
+
+            local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+            local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+            local xx = x + i1
+            local yy = y + j1
+            if (xx >= 0) and (xx < WarXMax) and (yy >= 0) and (yy < WarYMax) then
+                local num = EngineAPI.map.getBattleTile(xx, yy, 0)
+                if num > 0 then
+                    drawTile(num, x1, y1)       -- 地面
+                end
+            end
+        end
+    end
+
+    -- 移动/攻击范围（flag 1/2）：只画「可走格」(level 3 < 128)
+    if (flag == 1) or (flag == 2) then
+        if EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log(string.format(
+                "DrawWarMap: flag=%d, drawing move range", flag))
+        end
+        for j = 0, 2 * jend - 2 * jstart + CONFIG.WMapAddY do
+            for i = istart, iend do
+                local i1 = i + math.floor(j / 2) + jstart
+                local j1 = -i + math.floor(j / 2) + j % 2 + jstart
+
+                local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+                local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+                local xx = x + i1
+                local yy = y + j1
+                if (xx >= 0) and (xx < WarXMax) and (yy >= 0) and (yy < WarYMax) then
+                    if EngineAPI.map.getBattleTile(xx, yy, 3) < 128 then
+                        local showflag
+                        if flag == 1 then
+                            showflag = 2 + 4
+                        else
+                            showflag = 2 + 8
+                        end
+
+                        -- **picnum=0 是有意的**：高亮格不是贴图，是引擎的
+                        -- 「纯色块」绘制路径（drawHandle 收到 picnum=0 →
+                        -- SpriteAtlas 取不到 handle → 不画）。
+                        -- 原实现靠 PicLoadCache 的 flag 位来画色块，这里必须由
+                        -- 引擎侧另行处理（见 drawBattleRange 契约说明）。
+                        if (xx == v1) and (yy == v2) then
+                            drawTile(0, x1, y1, showflag, 128)
+                        else
+                            drawTile(0, x1, y1, showflag, 64)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 绘战斗建筑和人
+    for j = 0, 2 * jend - 2 * jstart + CONFIG.WMapAddY do
+        for i = istart, iend do
+            local i1 = i + math.floor(j / 2) + jstart
+            local j1 = -i + math.floor(j / 2) + j % 2 + jstart
+
+            local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+            local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+            local xx = x + i1
+            local yy = y + j1
+            if (xx >= 0) and (xx < WarXMax) and (yy >= 0) and (yy < WarYMax) then
+                local num = EngineAPI.map.getBattleTile(xx, yy, 1)     -- 建筑
+                if num > 0 then
+                    drawTile(num, x1, y1)
+                end
+
+                num = EngineAPI.map.getBattleTile(xx, yy, 2)           -- 战斗人
+                if num >= 0 then
+                    local pic = EngineAPI.map.getBattleTile(xx, yy, 5)  -- 人贴图
+                    if pic >= 0 then
+                        if flag == 0 or flag == 1 or flag == 2 or flag == 5 then
+                            -- 人物常规显示
+                            drawTile(pic, x1, y1)
+                        elseif flag == 3 then
+                            if EngineAPI.map.getBattleTile(xx, yy, 4) > 1 then    -- 命中
+                                drawTile(pic, x1, y1, 4 + 2, 255)                  -- 变黑
+                            else
+                                drawTile(pic, x1, y1)
+                            end
+                        elseif flag == 4 then
+                            if (xx == x) and (yy == y) then
+                                if v2 == 0 then
+                                    drawTile(pic, x1, y1)
+                                else
+                                    -- 替身贴图：archive=v2, frameId=v1
+                                    drawTileFrom(v2, v1, x1, y1)
+                                end
+                            else
+                                drawTile(pic, x1, y1)
+                            end
+                        end
+                    end
+                end
+
+                if flag == 4 and v3 >= 0 then       -- 武功效果
+                    local effect = EngineAPI.map.getBattleTile(xx, yy, 4)
+                    if effect > 0 then
+                        drawTileFrom(3, v3, x1, y1)
+                    end
+                end
+            end
+        end
     end
 end
 

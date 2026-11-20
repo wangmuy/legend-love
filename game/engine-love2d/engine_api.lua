@@ -361,6 +361,14 @@ function M.map.unload() end
 -- 不是引擎的实际状态。显式契约更准确（且 MOD 改参数时不会静默错位）。
 function M.map.getSceneSize() end
 
+--- 取战斗地图的尺寸
+--
+-- @return table {w=, h=}（原版 `War_XMax` / `War_YMax`）
+--
+-- 与 `getSceneSize` 同理：这两个值在 `lib_love.lua:1577` 是 **local**
+-- （`LoadWarMap` 时赋值），framework 拿不到。
+function M.map.getBattleSize() end
+
 --- 绘制云层
 --
 -- 云的位置更新是纯游戏逻辑（`tickClouds`），但**云的像素归引擎**：

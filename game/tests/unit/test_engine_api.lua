@@ -68,6 +68,7 @@ function TestEngineAPI.testMapModule()
     TestHelper.assertNotNil(EngineAPI.map.clearBattleTile, "map.clearBattleTile should exist")
     TestHelper.assertNotNil(EngineAPI.map.drawClouds, "map.drawClouds should exist")
     TestHelper.assertNotNil(EngineAPI.map.getSceneSize, "map.getSceneSize should exist")
+    TestHelper.assertNotNil(EngineAPI.map.getBattleSize, "map.getBattleSize should exist")
 end
 
 function TestEngineAPI.testInputModule()

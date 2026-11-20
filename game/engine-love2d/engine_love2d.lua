@@ -224,16 +224,26 @@ EngineAPI.sprite.drawHandle = function(handle, x, y, flags, alpha)
         ynew = y - (handle.yoff or 0)
     end
 
+    -- 颜色位与 alpha 位**独立判断**（与 `PicLoadCache` 逐位一致）
+    --
+    -- **原实现是 elseif 链（互斥）**，那是错的：`PicLoadCache` 里
+    -- hasAlpha / isBlack / isWhite 三个判断互相独立：
+    --
+    --   flag = 0x6（移动范围高亮）= black + alpha
+    --   旧 PicLoadCache → r,g,b=0 且 a = 128/255 → **半透明黑**
+    --   互斥版 drawHandle → r,g,b=0 且 a = 1  → **不透明黑**
+    --
+    -- 实测：`DrawWarMap` 的 flag=1/2 分支正是传 `2+4`（= 0x6）和
+    -- alpha 128/64。互斥语义会让「移动范围」从半透明高亮变成实心黑块。
     local r, g, b, a = 1, 1, 1, 1
-    if bit32 then
-        if bit32.band(flags, 0x4) ~= 0 then r, g, b = 0, 0, 0
-        elseif bit32.band(flags, 0x8) ~= 0 then r, g, b = 1, 1, 1
-        elseif bit32.band(flags, 0x2) ~= 0 then a = (alpha or 128) / 255 end
-    else
-        if math.floor(flags / 4) % 2 == 1 then r, g, b = 0, 0, 0
-        elseif math.floor(flags / 8) % 2 == 1 then r, g, b = 1, 1, 1
-        elseif math.floor(flags / 2) % 2 == 1 then a = (alpha or 128) / 255 end
+    -- 跨版本位测试：Lua 5.4/5.5 没有 bit32，用整除法等价实现
+    local function hasBit(v, m)
+        if bit32 and bit32.band then return bit32.band(v, m) ~= 0 end
+        return math.floor(v / m) % 2 == 1
     end
+    if hasBit(flags, 0x4) then r, g, b = 0, 0, 0
+    elseif hasBit(flags, 0x8) then r, g, b = 1, 1, 1 end
+    if hasBit(flags, 0x2) then a = (alpha or 128) / 255 end
 
     love.graphics.setColor(r, g, b, a)
     love.graphics.draw(handle.img, xnew, ynew)
@@ -303,6 +313,11 @@ EngineAPI.map.getSceneSize = function()
     -- 兜底：用调用方传的 CC.SWidth/SHeight（正常情况下二者相同）
     local CC = rawget(_G, "CC") or {}
     return { w = CC.SWidth or 64, h = CC.SHeight or 64 }
+end
+
+EngineAPI.map.getBattleSize = function()
+    if lib.GetBattleSize then return lib.GetBattleSize() end
+    return { w = 64, h = 64 }
 end
 
 EngineAPI.map.drawClouds = function(mx, my)
@@ -390,7 +405,26 @@ EngineAPI.map.drawScene = function(sceneId, x, y, offX, offY, playerPic)
     lib.DrawSMap(sceneId, x, y, offX, offY, playerPic)
 end
 
+--- 战斗地图绘制 —— **改走 framework/map_render.lua**
+--
+-- 原实现 `lib.DrawWarMap`（122 行）住在引擎里且 .idx/.grp 不透明。
+--
+-- **注意 flag=1/2 的语义**：原实现传 `JY_LoadPic(0, 0, x, y, 2+4, 128)` ——
+-- 即「变黑 + alpha」，在 `PicLoadCache` 里两者**独立**生效（半透明黑高亮）。
+-- 为此同步修了 `sprite.drawHandle` 的位判断（原来用 elseif 链互斥，
+-- 会把移动范围画成不透明黑块）。
+--
+-- 逃生舱：framework 模块缺失时回退旧实现。
 EngineAPI.map.drawBattle = function(flag, x, y, v1, v2, v3)
+    local ok, MR = pcall(require, "framework.map_render")
+    if ok and MR and MR.drawBattle then
+        MR.drawBattle(flag, x, y, v1, v2, v3)
+        return
+    end
+    if EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("map.drawBattle: framework.map_render unavailable, "
+                            .. "falling back to lib.DrawWarMap")
+    end
     lib.DrawWarMap(flag, x, y, v1, v2, v3)
 end
 

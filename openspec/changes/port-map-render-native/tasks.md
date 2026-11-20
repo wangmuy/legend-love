@@ -203,18 +203,84 @@ MOD 改调用参数就会静默错位 → 加显式契约。
 
 ---
 
-## Task 5：搬 `drawBattle`（原 `lib.DrawWarMap`，122 行，最复杂）
+## Task 5：搬 `drawBattle`（原 `lib.DrawWarMap`，122 行，三个里最复杂）
 
-**Blast Radius**：同上
+**Blast Radius**：`framework/map_render.lua`、`engine_love2d.lua`、
+`engine_mud.lua`、`engine_web.lua`、`tests/engine_test.lua`、`lib_love.lua`
+
+### 先补一个契约：`map.getBattleSize`
+
+`DrawWarMap` 用 `War_XMax` / `War_YMax` 做边界判据，而它们在
+`lib_love.lua:1577` 是 **local**（`LoadWarMap` 时赋值）。
+同 `getSceneSize` 的理由 → 加显式契约。契约数 87 → **88**。
+
+### 12 处引擎调用的映射
+
+| 原调用 | 新契约 |
+|--------|--------|
+| `love.graphics.getScissor()` | `render.getClip()` |
+| `FillColor(0,0,0,0,0)` | `render.fillRect(0,0,0,0,0)` |
+| `GetWarMap(x,y,0/1/2/3/4/5)` | `map.getBattleTile(x,y,0..5)` |
+| `JY_LoadPic(0,pic,...)` ×6 | `SpriteAtlas.draw(0, pic, ...)` |
+| `JY_LoadPic(3,v3,...)`（特效档案） | `drawTileFrom(3, v3, ...)` |
+| `JY_LoadPic(v2,v1,...)`（替身档案） | `drawTileFrom(v2, v1, ...)` |
+
+### 【本 Task 最重要发现】`sprite.drawHandle` 的 flags 语义是错的
+
+原实现（`PicLoadCache`）位判断**三者独立**：
+
+```lua
+hasAlpha = flag & 0x2   → a = val/255      ← 独立
+isBlack  = flag & 0x4   → r,g,b = 0,0,0    ← 独立
+isWhite  = flag & 0x8   → r,g,b = 1,1,1    ← 独立
+```
+
+而 `drawHandle` 是 **elseif 链（互斥）**，`0x4` 优先、alpha 被忽略。
+
+**唯一重叠用例正好是战斗的移动/攻击范围**：
+
+```lua
+JY_LoadPic(0, 0, x1, y1, 2+4, 128)     -- flag=1/2 的高亮格
+-- 旧 PicLoadCache → r,g,b=0 且 a=128/255 → **半透明黑**（范围高亮）
+-- 旧 drawHandle   → r,g,b=0 且 a=1       → **不透明黑块**（错）
+```
+
+我之前在 Task 2 的注释里写「唯一重叠用例 4+2 的结果相同」—— **那是对的另一处**
+（`4+2=0x6` 但 alpha=255，255/255=1 与默认 1 相同）。
+**这一处的 alpha 是 128/64**，完全不同。
+
+→ 已修 `drawHandle`：改为三者独立判断（`hasBit` 辅助函数，跨版本）。
+
+### 验证方式的教训
+
+先试「按键注入触发移动范围」→ **两版截图 md5 完全相同（b693e7da…），
+但都没有高亮** —— 说明按键序列没触发到 flag=1，**不能据此判断迁移对不对**。
+
+改为**直接单测**：调 `drawBattle(1, ...)`，Stub `sprite.drawHandle` 收集
+`(flags, alpha)`，断言存在 `flags=6` 且 `alpha ∈ {128, 64}`。
+
+**负向对照**：把 `alpha=128` 改成 `alpha=1`
+→ `[FAIL] 高亮格的 alpha 只能是 128 或 64，实测出现 1` ✓
+
+### 顺带修了两个测试基础设施问题
+
+1. `installEnv` 的 `CONFIG` 缺 `WMapAddX/WMapAddY` → `drawBattle` 的循环边界
+   算出 NaN（`... - CONFIG.WMapAddX` 得 nil 参与算术）
+2. 循环里逐格 `assertTrue` → 断言数爆炸（实测 1429 条）。
+   改成循环收集、末尾聚合断言。
 
 **DoD**：
-- [ ] `MapRender.drawBattle(flag, x, y, v1, v2, v3)` —— 搬 122 行
-- [ ] 12 处引擎调用契约化（含 `JY_LoadPic(v2,v1,...)` 这种动态 archive）
-- [ ] `EngineAPI.map.drawBattle` 改为调 `MapRender.drawBattle`
-- [ ] 单测：不调 `love.*`、不读 `picFileCache`
-- [ ] **实机逐字节对比**：战斗画面截图与迁移前 md5 相同
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] 新增 `map.getBattleSize()` 契约（4 引擎 + `lib.GetBattleSize`）
+- [x] `MapRender.drawBattle(flag, x, y, v1, v2, v3)` —— 搬 122 行
+- [x] 12 处引擎调用全部契约化
+- [x] **修 `sprite.drawHandle` 的 flags 语义**（互斥 → 三者独立）
+- [x] `drawTileFrom(atlasId, ...)` 支持动态档案（特效 3 / 替身 v2）
+- [x] `EngineAPI.map.drawBattle` 改为调 `MapRender.drawBattle`（带 pcall 逃生舱）
+- [x] 单测：`drawBattle(flag=1)` 画出 `flags=6` 且 alpha ∈ {128,64}
+- [x] 单测：`drawHandle` 的 black/alpha 位**独立**（负向对照已验证）
+- [x] **实机逐字节对比**：战斗 md5 `6c8eb322…` 不变
+- [x] 四版本全量测试零失败（4011/0）
+- [x] 一个 commit
 
 ---
 

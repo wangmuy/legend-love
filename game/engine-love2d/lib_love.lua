@@ -1576,6 +1576,10 @@ end
 
 local War_XMax=0 -- 战斗地图大小
 local War_YMax=0
+-- 暴露给 EngineAPI.map.getBattleSize（原版是 local，framework 拿不到）
+function GetBattleSize()
+    return { w = War_XMax, h = War_YMax }
+end
 local War_Num=0 -- 战斗地图层数
 local warmap = {}
 
