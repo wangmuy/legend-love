@@ -31,16 +31,57 @@
 
 ---
 
-## Task 2：搬 `BuildingSort` + `DrawClouds`（零/低引擎调用）
+## Task 2：搬 `BuildingSort`（零引擎调用，83 行）
 
 **Blast Radius**：`framework/map_render.lua`（新建）
 
+### 【关键实测】BuildingSort 写主地图
+
+```lua
+local bak  = GetMMap(x,y,2)
+local bakx = GetMMap(x,y,3)
+local baky = GetMMap(x,y,4)
+SetMMap(x,y,2, bit32.band(Mypic*2, 0xFFFF))   ← 临时写建筑层
+SetMMap(x,y,3, x)
+SetMMap(x,y,4, y)
+... （排序）
+SetMMap(x,y,2, bak)                            ← 恢复
+SetMMap(x,y,3, bakx)
+SetMMap(x,y,4, baky)
+```
+
+它把主角/船临时写进建筑层参与深度排序 —— 这就是 `map.setTile` 的**唯一消费者**
+（我先前删掉它又加回来，原因就在这）。
+
+### 【关键实测】`buildList` 归 framework，不在引擎
+
+`buildList` / `buildNumber` 存的是「附近有哪些建筑 + 深度顺序」：
+
+```
+BuildingSort → 扫地图（map.getTile 2/3/4 层）→ 写 buildList
+drawMain     → 读 buildList → 逐条 sprite.draw
+```
+
+输入是地图数据 + 主角坐标 = **纯游戏逻辑**，引擎只做最后的绘制。
+所以搬进 framework 时把 `buildList` 变成 `map_render` 的**模块内状态**。
+
+### 【决策】`DrawClouds` 不搬
+
+它依赖 `love.graphics.newImage(CloudBakeImage(...))` 的**逐像素调色板烘焙**
+（`lib_love.lua:1255`），属 sprite 子系统，不是 map 投影逻辑。
+`map.tickClouds` 契约已负责位置更新（纯时间驱动），像素归引擎。
+→ 记入 Out of Scope。
+
 **DoD**：
-- [ ] `MapRender.buildingSort(x, y, mypic)` —— **逐字搬移** `lib.BuildingSort`（83 行）
-- [ ] `MapRender.drawClouds(x, y)` —— 搬 `lib.DrawClouds`，时间源改 `EngineAPI.time.getTime`
-- [ ] 两者都用 `EngineAPI.map.getTile` 取地图数据
+- [ ] `MapRender.buildingSort(x, y, mypic)` —— **逐字搬移**（83 行逻辑不改）
+- [ ] `buildList` / `buildNumber` 成为 `map_render.lua` 的模块内 local
+- [ ] `MapRender.buildingList()` / `MapRender.buildingCount()` 供 drawMain 读
+- [ ] 用 `EngineAPI.map.getTile` / `EngineAPI.map.setTile`
+- [ ] `CC.MWidth` / `CC.MHeight` / `CONFIG.*` 照抄（framework 现有惯例）
 - [ ] `framework/map_render.lua` 零 `love.*`、零 `require("engine-*")`
-- [ ] 单测：`buildingSort` 的排序结果与 `lib.BuildingSort` 一致（同样的输入 → 同样的顺序）
+- [ ] 单测：同样的地图输入 → 与 `lib.BuildingSort` **排序结果完全一致**
+      （用测试桩引擎注入 `_tiles`，两个实现各跑一遍，逐条对比 `x/y/num`）
+- [ ] 单测：负向对照（把右旋那段改成 `table.insert` → 单测 FAIL，验证它守住了原版语义）
 - [ ] 四版本全量测试零失败
 - [ ] 一个 commit
 
