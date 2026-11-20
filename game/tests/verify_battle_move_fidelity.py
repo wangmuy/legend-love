@@ -45,6 +45,15 @@ ALLOWED_DEVIATIONS = {
     "War_WugongHurtNeili":  "补 level 钳制 + 字段判空（与 HurtLife 对称）",
     "War_AutoMove":         "回溯循环补 prevI 进度守卫 + 硬上限",
     "War_EndPersonData":    "除 liveNum 补零守卫（避免 inf 污染经验）",
+    # --- 第六批：lib.Delay → WaitFrame（port-blocking-delay Task 2） ---
+    # 这 4 个函数里的 `lib.Delay(...)` 全部换成 `WaitFrame(...)`：
+    # lib.Delay = love.timer.sleep（真阻塞主线程，实测 101ms）；
+    # WaitFrame 在事件协程里走 scheduler:waitForTime（协作式），
+    # 非协程上下文才退回 lib.Delay。语义等价、行为等价、仅消除阻塞。
+    "War_MovePerson":   "lib.Delay → WaitFrame（消除主线程阻塞）",
+    "War_ShowFight":    "同上",
+    "War_Auto":         "同上",
+    "War_AutoEatDrug":  "同上",
     # --- 第四批：capacity 守卫（port-battle-robustness Task 4） ---
     "WarSelectTeam":  "容量守卫（WAR.PersonNum >= WAR_PERSON_CAPACITY 时停止 + JY_Error）",
     "WarSelectEnemy": "同上",

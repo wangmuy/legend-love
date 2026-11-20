@@ -33,7 +33,7 @@ function War_Auto()             --自动战斗主函数
     WAR.ShowHead=1;
     WarDrawMap(0);
     ShowScreen();
-    lib.Delay(CC.WarAutoDelay);
+    WaitFrame(CC.WarAutoDelay);
     WAR.ShowHead=0;
 
     if CC.AutoWarShowHead==1 then
@@ -893,7 +893,7 @@ function War_AutoEatDrug(flag)          ---吃药加参数
         end
     end
 
-    lib.Delay(500);
+    WaitFrame(500);
 end
 
 

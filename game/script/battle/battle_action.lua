@@ -239,7 +239,7 @@ function War_MovePerson(x,y)            --移动人物到位置x,y
         local t2=lib.GetTime();
         if i<movenum then
             if (t2-t1)< 2*CC.Frame then
-                lib.Delay(2*CC.Frame-(t2-t1));
+                WaitFrame(2*CC.Frame-(t2-t1));
             end
         end
     end
@@ -354,7 +354,7 @@ for k=1,fightnum  do         --如果左右互搏，则攻击两次
         level=War_WugongLevel(pid, wugongnum);
         DrawStrBox(-1,-1,string.format("%s 升为 %d 级",JY.Wugong[wugong]["名称"],level),C_ORANGE,CC.DefaultFont)
         ShowScreen();
-        lib.Delay(500);
+        WaitFrame(500);
         Cls();
         ShowScreen();
     end

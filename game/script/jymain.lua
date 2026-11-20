@@ -8,6 +8,9 @@
 ---本代码由游泳的鱼编写
 
 local SpriteAtlas = require("framework.sprite_atlas")
+-- 协程感知的「等一帧」（port-blocking-delay Task 2）
+-- 事件协程里走 scheduler:waitForTime（非阻塞）；非协程上下文退回 lib.Delay。
+local CoroutineScheduler = require("framework.coroutine_scheduler")
 local RenderFacade = require("framework.render_facade")
 local FileUtil = require "lib_file"
 local ScriptLoader = require "script_loader"
@@ -20,6 +23,60 @@ local TextBoxLayout = require("framework.text_box_layout")
 --为加快速度，显示主地图/场景地图/战斗地图部分用C API实现。
 
 --导入其他模块。之所以做成函数是为了避免编译查错时编译器会寻找这些模块。
+--- 等一帧（毫秒）——**协程感知的 lib.Delay 替代品**
+--
+-- @param ms number 毫秒
+--
+-- **为什么需要它**（port-blocking-delay Task 2）：
+--   script 层的帧率控制模式是
+--   ```
+--   t1 = lib.GetTime(); 动作(); t2 = lib.GetTime()
+--   lib.Delay(FRAME - (t2 - t1))
+--   ```
+--   而 `lib.Delay` = `love.timer.sleep` → **真阻塞主线程**（实测占 101ms）。
+--
+--   这些 `instruct_*` 实际上都在**事件协程里**跑
+--   （`EventExecuteCoroutine` → `oldCallEventCoroutine` → `instruct_30`），
+--   所以可以用 `scheduler:waitForTime` 把阻塞换成协作式等待。
+--
+-- **兼容非协程上下文**：`waitForTime` 在非协程里会 error，所以
+--   `CoroutineScheduler.waitFrame` 先判 `isInCoroutine()`，不在协程里就
+--   退回阻塞的 `lib.Delay`（不会崩，只是那一处仍阻塞）。
+--
+-- **为什么是全局函数而不是 local**：`script/battle/*.lua` 是全局函数定义
+-- （不是 `return { ... }` 表），它们也要用这个 helper。全局是唯一可行方式。
+-- 命名带 `WaitFrame` 前缀以免与游戏函数撞名。
+function WaitFrame(ms)
+    if ms == nil or ms <= 0 then return end
+    CoroutineScheduler.getInstance():waitFrame(ms, function(m) lib.Delay(m) end)
+end
+
+--- 加载贴图档案——**同时写两套系统**
+-- @param idxFile string .idx 文件
+-- @param grpFile string .grp 文件
+-- @param archiveId number 档案编号
+-- @param opts table|nil 传给 SpriteAtlas.loadArchive 的选项
+--
+-- **为什么必须双写**（这是 port-sprite-native-migration Task 4 的一个回归）：
+--
+--   `SpriteAtlas.loadArchive` 走新解码链（framework/sprite_decoder），
+--   **不写** 引擎的 `picFileCache`。
+--
+--   而引擎自己的地图绘制函数（`lib.DrawSMap` / `lib.DrawMMap` / `lib.DrawWarMap`）
+--   内部走 `JY_LoadPic` = `PicLoadCache` → 读 `picFileCache`。
+--
+--   所以只写 SpriteAtlas → 地图**全黑**（实测：开场小场景 + 主地图都是）。
+--   而战斗没暴露是因为 `war_async` 里有双轨补丁兜住了。
+--
+--   要真正只写一套，前提是让 map 绘制契约透明化
+--   （`port-map-render-native`），在那之前必须双写。
+function LoadArchiveBoth(idxFile, grpFile, archiveId, opts)
+    SpriteAtlas.loadArchive(idxFile, grpFile, archiveId, opts)
+    if EngineAPI and EngineAPI.sprite and EngineAPI.sprite.loadArchive then
+        EngineAPI.sprite.loadArchive(idxFile, grpFile, archiveId)
+    end
+end
+
 function IncludeFile()              --导入其他模块
     --dofile("config.lua");       --此文件在C函数中预先加载。这里就不加载了
     -- 通过 ScriptLoader 加载脚本（内部委托 EngineAPI.script.load 支持 .love 打包）
@@ -364,7 +421,7 @@ function Game_Cycle()       --游戏主循环
         local tend=lib.GetTime();
 
         if tend-tstart<CC.Frame then
-            lib.Delay(CC.Frame-(tend-tstart));
+            WaitFrame(CC.Frame-(tend-tstart));
         end
     end
 end
@@ -374,10 +431,10 @@ function Init_MMap()   --初始化主地图数据
     lib.LoadMMap(CC.MMapFile[1],CC.MMapFile[2],CC.MMapFile[3],
             CC.MMapFile[4],CC.MMapFile[5],CC.MWidth,CC.MHeight,JY.Base["人X"],JY.Base["人Y"]);
 
-    SpriteAtlas.loadArchive(CC.MMAPPicFile[1],CC.MMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
-    SpriteAtlas.loadArchive(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
+    LoadArchiveBoth(CC.MMAPPicFile[1],CC.MMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
+    LoadArchiveBoth(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
     if CC.LoadThingPic==1 then
-        SpriteAtlas.loadArchive(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
+        LoadArchiveBoth(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
     end
 
     -- 主地图飘云（原版 kys_engine.pas:ReadTiles 加载 cloud.idx/grp，
@@ -491,10 +548,10 @@ end
 
 --showname  =1 显示场景名 0 不显示
 function Init_SMap(showname)   --初始化场景数据
-    SpriteAtlas.loadArchive(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
-    SpriteAtlas.loadArchive(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
+    LoadArchiveBoth(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
+    LoadArchiveBoth(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
     if CC.LoadThingPic==1 then
-        SpriteAtlas.loadArchive(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
+        LoadArchiveBoth(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
     end
 
     PlayMIDI(JY.Scene[JY.SubScene]["进门音乐"]);
@@ -857,7 +914,7 @@ function ShowPersonStatus(teamid)---显示队友状态
 
         ShowScreen();
         local keypress=WaitKey();
-        lib.Delay(100);
+        WaitFrame(100);
         if keypress==VK_ESCAPE then
             break;
         elseif keypress==VK_UP then
@@ -1349,7 +1406,7 @@ function SelectThing(thing,thingnum)    --显示物品菜单
 
         ShowScreen();
         local keypress=WaitKey();
-        lib.Delay(100);
+        WaitFrame(100);
         if keypress==VK_ESCAPE then
             cur_thing=-1;
             break;
@@ -2109,7 +2166,7 @@ function WaitKey()       --等待键盘输入
         if keyPress ~=-1 then
              break;
         end
-        lib.Delay(20);
+        WaitFrame(20);
     end
     return keyPress;
 end
@@ -2409,7 +2466,7 @@ function ShowMenu(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,se
         end
         ShowScreen();
         keyPress=WaitKey();
-        lib.Delay(100);
+        WaitFrame(100);
         if keyPress==VK_ESCAPE then                  --Esc 退出
             if isEsc==1 then
                 break;
@@ -2535,7 +2592,7 @@ function ShowMenu2(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,s
         end
         ShowScreen();
         keyPress=WaitKey();
-        lib.Delay(100);
+        WaitFrame(100);
 
         if keyPress==VK_ESCAPE then                  --Esc 退出
             if isEsc==1 then
@@ -3670,7 +3727,7 @@ function instruct_25(x1,y1,x2,y2)             --场景移动
             ShowScreen();
             local t2=lib.GetTime();
             if (t2-t1)<CC.SceneMoveFrame then
-                lib.Delay(CC.SceneMoveFrame-(t2-t1));
+                WaitFrame(CC.SceneMoveFrame-(t2-t1));
             end
         end
     end
@@ -3691,7 +3748,7 @@ function instruct_25(x1,y1,x2,y2)             --场景移动
             ShowScreen();
             local t2=lib.GetTime();
             if (t2-t1)<CC.SceneMoveFrame then
-                lib.Delay(CC.SceneMoveFrame-(t2-t1));
+                WaitFrame(CC.SceneMoveFrame-(t2-t1));
             end
         end
     end
@@ -3774,7 +3831,7 @@ function instruct_27(id,startpic,endpic)           --显示动画
             ShowScreen();
             local t2 = lib.GetTime();
             if t2 - t1 < CC.AnimationFrame then
-                lib.Delay(CC.AnimationFrame - (t2 - t1));
+                WaitFrame(CC.AnimationFrame - (t2 - t1));
             end
         end
     end
@@ -3824,7 +3881,7 @@ function instruct_30(x1,y1,x2,y2)                --主角走动
             instruct_30_sub(1);
             local t2=lib.GetTime();
             if (t2-t1)<CC.PersonMoveFrame then
-                lib.Delay(CC.PersonMoveFrame-(t2-t1));
+                WaitFrame(CC.PersonMoveFrame-(t2-t1));
             end
         end
     elseif x1>x2 then
@@ -3833,7 +3890,7 @@ function instruct_30(x1,y1,x2,y2)                --主角走动
             instruct_30_sub(2);
             local t2=lib.GetTime();
             if (t2-t1)<CC.PersonMoveFrame then
-                lib.Delay(CC.PersonMoveFrame-(t2-t1));
+                WaitFrame(CC.PersonMoveFrame-(t2-t1));
             end
         end
     end
@@ -3844,7 +3901,7 @@ function instruct_30(x1,y1,x2,y2)                --主角走动
             instruct_30_sub(3);
             local t2=lib.GetTime();
             if (t2-t1)<CC.PersonMoveFrame then
-                lib.Delay(CC.PersonMoveFrame-(t2-t1));
+                WaitFrame(CC.PersonMoveFrame-(t2-t1));
             end
         end
     elseif y1>y2 then
@@ -3853,7 +3910,7 @@ function instruct_30(x1,y1,x2,y2)                --主角走动
             instruct_30_sub(0);
             local t2=lib.GetTime();
             if (t2-t1)<CC.PersonMoveFrame then
-                lib.Delay(CC.PersonMoveFrame-(t2-t1));
+                WaitFrame(CC.PersonMoveFrame-(t2-t1));
             end
         end
     end
@@ -4095,7 +4152,7 @@ function instruct_44(id1,startpic1,endpic1,id2,startpic2,endpic2)     --同时�
         ShowScreen();
         local t2=lib.GetTime();
         if t2-t1<CC.AnimationFrame then
-            lib.Delay(CC.AnimationFrame-(t2-t1));
+            WaitFrame(CC.AnimationFrame-(t2-t1));
         end
     end
     SetD(JY.SubScene,id1,5,old1);
@@ -4231,7 +4288,7 @@ function instruct_57()       --高昌迷宫劈门
         ShowScreen();
         local t2=lib.GetTime();
         if t2-t1<CC.AnimationFrame then
-            lib.Delay(CC.AnimationFrame-(t2-t1));
+            WaitFrame(CC.AnimationFrame-(t2-t1));
         end
     end
 end
@@ -4283,7 +4340,7 @@ function instruct_58()           --武道大会比武
             TalkEx("少侠已连战三场，*可先休息再战．", 70, 0);
             instruct_0();
             instruct_14();
-            lib.Delay(300);
+            WaitFrame(300);
             if JY.Person[0]["受伤程度"] < 50 and JY.Person[0]["中毒程度"] <= 0 then
                JY.Person[0]["受伤程度"] = 0
                AddPersonAttrib(0,"体力",math.huge);
@@ -4368,7 +4425,7 @@ function instruct_62(id1,startnum1,endnum1,id2,startnum2,endnum2)      --播放�
       lib.LoadPicture(CONFIG.PicturePath .."end.png",-1,-1);
       ShowScreen();
       PlayMIDI(24);
-      lib.Delay(5000);
+      WaitFrame(5000);
       lib.GetKey();
       WaitKey();
       JY.Status=GAME_END;
@@ -4610,12 +4667,12 @@ function WarMain(warid,isexp)           --战斗主函数
     JY.Status=GAME_WMAP;
 
     --加载贴图文件
-    SpriteAtlas.loadArchive(CC.WMAPPicFile[1],CC.WMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
-    SpriteAtlas.loadArchive(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
+    LoadArchiveBoth(CC.WMAPPicFile[1],CC.WMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
+    LoadArchiveBoth(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
     if CC.LoadThingPic==1 then
-        SpriteAtlas.loadArchive(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
+        LoadArchiveBoth(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
     end
-    SpriteAtlas.loadArchive(CC.EffectFile[1],CC.EffectFile[2],3,{paletteFile=CC.PaletteFile});
+    LoadArchiveBoth(CC.EffectFile[1],CC.EffectFile[2],3,{paletteFile=CC.PaletteFile});
 
     PlayMIDI(WAR.Data["音乐"]);
 
@@ -4626,7 +4683,7 @@ function WarMain(warid,isexp)           --战斗主函数
 
     for i=0,WAR.PersonNum-1 do
         local pid=WAR.Person[i]["人物编号"];
-        SpriteAtlas.loadArchive(string.format(CC.FightPicFile[1],JY.Person[pid]["头像代号"]),
+        LoadArchiveBoth(string.format(CC.FightPicFile[1],JY.Person[pid]["头像代号"]),
                         string.format(CC.FightPicFile[2],JY.Person[pid]["头像代号"]),
                         4+i,{paletteFile=CC.PaletteFile});
     end
@@ -4735,10 +4792,10 @@ function WarMain(warid,isexp)           --战斗主函数
     end
 
     CleanMemory();
-    SpriteAtlas.loadArchive(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
-    SpriteAtlas.loadArchive(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
+    LoadArchiveBoth(CC.SMAPPicFile[1],CC.SMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
+    LoadArchiveBoth(CC.HeadPicFile[1],CC.HeadPicFile[2],1,{paletteFile=CC.PaletteFile,usage="avatar"});
     if CC.LoadThingPic==1 then
-        SpriteAtlas.loadArchive(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
+        LoadArchiveBoth(CC.ThingPicFile[1],CC.ThingPicFile[2],2,{paletteFile=CC.PaletteFile});
     end
 
     JY.Status=GAME_SMAP;

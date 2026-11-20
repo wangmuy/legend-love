@@ -171,3 +171,56 @@ Task 2 迁移后我跑了一次截图，hash 与迁移前**逐字节相同** —
 - [x] **人物 59 头像专项**：确认 PNG 帧路径正常（这是唯一的 PNG 命中案例）
 - [x] 更新 `openspec/project/TODO.md`（删掉已完成的条目）
 - [x] 一个 commit
+
+---
+
+## 回归修复：地图全黑（Task 4 的副作用）
+
+**发现方式**：实机手动验证（**不是自动化测试** —— 3930 条断言全绿也发现不了）。
+
+### 缺陷
+
+Task 4 把 `lib.PicLoadFile(...)` 换成 `SpriteAtlas.loadArchive(...)`，
+后者**不写** 引擎的 `picFileCache`。而引擎的地图绘制内部走 `PicLoadCache`：
+
+```
+lib.DrawSMap  → JY_LoadPic = PicLoadCache → picFileCache[0]
+lib.DrawMMap  → 同上
+lib.DrawWarMap → 同上
+```
+
+⇒ **开场小场景 + 主地图全黑**（只有文字框能显示）。
+
+### 为什么自动化测试没发现
+
+测试里 `lib.DrawSMap` 是**桩**（`L.DrawSMap = function() end`），桩不读
+`picFileCache`，所以 3930 条断言全绿。
+
+### 为什么战斗没暴露
+
+`war_async` 里早就有双轨补丁（`ebf81af` 修的另一个 bug）兜住了战斗路径。
+但 `Init_MMap` / `Init_SMap` 没有双轨。
+
+### 修法
+
+抽 `LoadArchiveBoth(idxFile, grpFile, archiveId, opts)` 同时写两套，
+`Init_MMap` / `Init_SMap` / `WarMain` 的 15 处全部改用它。
+
+### 同批修掉的两个自己的错
+
+1. 第一版 helper 写成了**自递归**（`LoadArchiveBoth` 内部调自己）
+   → `stack overflow`，被 2 条测试抓到
+2. 测试里 `find("SpriteAtlas%.loadArchive", 1, true)` —— 第 4 参数 `true`
+   是**纯文本匹配**，`%` 会被当字面量 → 3 条断言误报。要去掉 `%`
+
+### 新增回归测试
+
+`test_archive_dual_write.lua`（21 条断言）：
+- `LoadArchiveBoth` 确实调两套
+- jymain 里无单写 `SpriteAtlas.loadArchive`（除 helper 内部）
+- helper 不自递归（**要把签名行排除**，否则 `function LoadArchiveBoth(` 会误报）
+- 引擎侧 `DrawSMap/DrawMMap/DrawWarMap` 确实经 `JY_LoadPic`
+- 行为复刻：单写 → `picFileCache[0] == nil` → 地图全黑
+
+**负向对照**：把 helper 的 `EngineAPI.sprite.loadArchive` 那行删掉
+→ `[FAIL] helper 体内应调 EngineAPI.sprite.loadArchive` ✓

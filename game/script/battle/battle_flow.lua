@@ -737,7 +737,7 @@ function War_ShowFight(pid,wugong,wugongtype,level,x,y,eft)              --显�
 
         local tend=lib.GetTime();
         if tend-tstart<1*CC.Frame then
-            lib.Delay(1*CC.Frame-(tend-tstart));
+            WaitFrame(1*CC.Frame-(tend-tstart));
         end
 
     end
@@ -749,11 +749,11 @@ function War_ShowFight(pid,wugong,wugongtype,level,x,y,eft)              --显�
     WarDrawMap(0);
 
     ShowScreen();
-    lib.Delay(200);
+    WaitFrame(200);
 
     WarDrawMap(2);          --全黑显示命中人物
     ShowScreen();
-    lib.Delay(200);
+    WaitFrame(200);
 
     WarDrawMap(0);
     ShowScreen();
@@ -821,7 +821,7 @@ if HitXYNum>0 then
 
         local tend=lib.GetTime();
         if (tend-tstart)<CC.Frame then
-            lib.Delay(CC.Frame-(tend-tstart));
+            WaitFrame(CC.Frame-(tend-tstart));
         end
     end
 end

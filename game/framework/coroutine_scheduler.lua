@@ -376,6 +376,49 @@ function CoroutineScheduler:getCurrentCoroutine()
     return currentCoroutine
 end
 
+--- 当前是否在**本调度器管理的**协程里运行
+-- @return boolean
+--
+-- 与 `EngineAPI.coroutine.isRunning()` 的区别：后者只看 `coroutine.running()`
+-- 是否为主线程；本函数看**本调度器的 currentCoroutine**。
+-- 只有后者非 nil 时 `waitForTime` 才能安全 yield（否则会 error）。
+function CoroutineScheduler:isInCoroutine()
+    return currentCoroutine ~= nil
+end
+
+--- 等一帧（毫秒）——**协程感知的阻塞替代品**
+--
+-- @param ms number 毫秒
+-- @param fallback function|nil 非协程上下文时的退路（通常是 lib.Delay）
+--
+-- **为什么需要这个 helper**：
+--   script 层的帧率控制模式是
+--   `t1=GetTime(); 动作(); t2=GetTime(); lib.Delay(FRAME-(t2-t1))`，
+--   其中 `lib.Delay` = `love.timer.sleep` → **真阻塞主线程**（实测 101ms）。
+--
+--   而这些 `instruct_*` 实际上是在**事件协程里**跑的
+--   （`EventExecuteCoroutine` → `oldCallEventCoroutine` → `instruct_30`），
+--   所以可以用 `waitForTime` 把阻塞换成协作式等待。
+--
+--   **但 `waitForTime` 在非协程上下文会 `error("Cannot yield from outside a coroutine")`**，
+--   所以这里先判 `isInCoroutine()`，不在协程里就退回 `fallback`（阻塞但不崩）。
+--
+-- @return boolean 是否走了非阻塞路径
+function CoroutineScheduler:waitFrame(ms, fallback)
+    ms = tonumber(ms) or 0
+    if ms <= 0 then return true end
+
+    if self:isInCoroutine() then
+        self:waitForTime(ms / 1000)
+        return true
+    end
+
+    if type(fallback) == "function" then
+        fallback(ms)
+    end
+    return false
+end
+
 -- 获取协程信息
 -- @param id: 协程ID
 -- @return: 协程信息表

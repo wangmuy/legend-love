@@ -70,6 +70,8 @@ local T = {
     cal_pic_clip = require("tests.unit.test_cal_pic_clip"),
     battle_robustness = require("tests.unit.test_battle_robustness"),
     wait_for_time = require("tests.unit.test_wait_for_time"),
+    wait_frame = require("tests.unit.test_wait_frame"),
+    archive_dual_write = require("tests.unit.test_archive_dual_write"),
 }
 
 local TestRunner = {}
@@ -739,6 +741,22 @@ function TestRunner.runAll()
     totalStats.failed = totalStats.failed + wftStats.failed
     allPassed = allPassed and wftResult
 
+    TestHelper.resetCounts()
+    local wfResult = T.wait_frame.runAll()
+    local wfStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + wfStats.total
+    totalStats.passed = totalStats.passed + wfStats.passed
+    totalStats.failed = totalStats.failed + wfStats.failed
+    allPassed = allPassed and wfResult
+
+    TestHelper.resetCounts()
+    local adwResult = T.archive_dual_write.runAll()
+    local adwStats = TestHelper.getStats()
+    totalStats.total = totalStats.total + adwStats.total
+    totalStats.passed = totalStats.passed + adwStats.passed
+    totalStats.failed = totalStats.failed + adwStats.failed
+    allPassed = allPassed and adwResult
+
     print("\n" .. string.rep("=", 60))
     print("总体测试结果")
     print(string.rep("=", 60))
@@ -775,7 +793,7 @@ function TestRunner.runModule(moduleName)
         return fn.runAll()
     else
         print("未知测试模块: " .. tostring(moduleName))
-        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc, menu_align, sprite_decoder, virtual_pad_wiring, engine_conformance, sprite_anim, battle_rules, battle_wiring, battle_flow_headless, war_coroutine_wiring, robustness, sprite_atlas_png, cal_pic_clip, battle_robustness, wait_for_time")
+        print("可用模块: state_machine, input_manager, event_bridge, coroutine_scheduler, byte_io, script_loader, item_async, war_async, engine_api, engine_test, mod_ini, mod_data, mod_encoding, mod_build, mod_resources, mod_audit, format_spec, mod_e2e, mod_boot, dialog_layout, text_box_layout, mmap_depth, cloud, version_compat, settings, settings_store, audio_settings, menu_value_item, start_menu_layout, engine_system, mouse_input, menu_hit_test, mouse_menu, pathfind, mouse_hover, auto_move, interact, item_status_mouse, battle_mouse, base_music, input_actions, input_bindings, virtual_pad, volume_menu_esc, menu_align, sprite_decoder, virtual_pad_wiring, engine_conformance, sprite_anim, battle_rules, battle_wiring, battle_flow_headless, war_coroutine_wiring, robustness, sprite_atlas_png, cal_pic_clip, battle_robustness, wait_for_time, wait_frame, archive_dual_write")
         return false
     end
 end
