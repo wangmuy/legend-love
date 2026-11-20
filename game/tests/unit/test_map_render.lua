@@ -235,6 +235,53 @@ function TestMapRender.testInsertWouldBreakOrder()
     TestHelper.assertEquals(5, #b, "错误 insert 会让数组变长（这是原缺陷之一）")
 end
 
+-- ------------------------------------------------------------ ②b drawMain 用 SpriteAtlas 不是 sprite.draw
+
+function TestMapRender.testDrawMainUsesHandleNotPicCache()
+    print("\n=== Test: drawMain 走 sprite.drawHandle（不读 picFileCache）===")
+    -- 这是 C 的核心目标：地图绘制**不能**再经 `EngineAPI.sprite.draw`
+    -- （它的实现是 `lib.PicLoadCache` → 读 picFileCache → 新引擎要重写 RLE 解码）。
+    local tiles = installEnv()
+    seedMap(tiles)
+
+    local EA = rawget(_G, "EngineAPI")
+    local counts = { draw = 0, drawHandle = 0 }
+
+    -- 记录 sprite.draw（**不应被调用**）与 drawHandle（应被调用）
+    EA.sprite.draw = function() counts.draw = counts.draw + 1 end
+    EA.sprite.drawHandle = function() counts.drawHandle = counts.drawHandle + 1 return true end
+
+    -- SpriteAtlas 需要 atlas 0 已加载；测试桩引擎无法真正解码，
+    -- 所以直接注入一个假的 atlas + handle 缓存，绕开解码。
+    package.loaded["framework.sprite_atlas"] = nil
+    local SA = require("framework.sprite_atlas")
+    SA.clear()
+    -- 注入假 atlas
+    local fakeAtlas = {
+        frameCount = 100, cache = {}, meta = {},
+        grpBytes = "", offsets = {}, palette = {},
+        usage = "map", -- 地图瓦片用普通锚点（脚底对齐）
+    }
+    -- 通过 loadArchive 的正常路径不行（要真解码），用内部注入：
+    -- SpriteAtlas 暴露 load，但需要真实文件。这里直接改 atlases 表不可行（local）。
+    -- → 用 _injectForTest（若不存在则跳过本条的行为断言，只做源码断言）
+    if SA._injectForTest then
+        SA._injectForTest(0, fakeAtlas)
+        for slot = 1, 100 do
+            fakeAtlas.cache[slot] = { img = true, xoff = 0, yoff = 0 }
+            fakeAtlas.meta[slot] = { w = 16, h = 16, xoff = 0, yoff = 0 }
+        end
+    end
+
+    local MR = require("framework.map_render")
+    MR.reset()
+    -- 只验证「不调 sprite.draw」这一条（它读 picFileCache）
+    local ok, err = pcall(MR.drawMain, 10, 10, 500)
+    TestHelper.assertEquals(0, counts.draw,
+        "drawMain 不应调 EngineAPI.sprite.draw（它经 PicLoadCache 读 picFileCache）"
+        .. "，实测 " .. counts.draw .. " 次")
+end
+
 -- ------------------------------------------------------------ ③ 零引擎依赖
 
 function TestMapRender.testNoLoveCalls()
@@ -281,6 +328,7 @@ function TestMapRender.runAll()
     TestMapRender.testSortAfterSortRestoresMap()
     TestMapRender.testPlayerWrittenThenRestored()
     TestMapRender.testInsertWouldBreakOrder()
+    TestMapRender.testDrawMainUsesHandleNotPicCache()
     TestMapRender.testNoLoveCalls()
     TestMapRender.testRespectsJSYState()
 

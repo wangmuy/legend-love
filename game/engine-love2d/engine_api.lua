@@ -351,6 +351,18 @@ function M.map.clearBattleTile(layer, value) end
 --- 卸载主地图数据（释放内存）
 function M.map.unload() end
 
+--- 绘制云层
+--
+-- 云的位置更新是纯游戏逻辑（`tickClouds`），但**云的像素归引擎**：
+-- LÖVE 侧要做逐像素调色板烘焙（`CloudBakeImage`，`lib_love.lua:1255`），
+-- 那是 sprite 子系统的事，不是 map 投影逻辑。
+--
+-- 所以 framework 的 `map_render.drawMain` 在建筑层之后调本契约，
+-- 引擎负责把云画上去（天空层，永远在地面/建筑之上）。
+--
+-- @param mx, my number 主角地图坐标（云的位置相对它偏移）
+function M.map.drawClouds(mx, my) end
+
 --- 推进云层动画（纯时间驱动的位置更新）
 --
 -- 云的位置纯粹是**游戏逻辑**（每 40ms 按 Speedx/Speedy 移动），

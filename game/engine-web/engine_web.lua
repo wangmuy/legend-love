@@ -204,6 +204,8 @@ function EngineAPI.map.setBattleTile(x, y, layer, value) end
 
 function EngineAPI.map.clearBattleTile(layer, value) end
 
+function EngineAPI.map.drawClouds(mx, my) end
+
 function EngineAPI.map.unload() end
 
 function EngineAPI.map.tickClouds() end

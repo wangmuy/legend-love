@@ -246,6 +246,10 @@ EngineAPI.map.clearBattleTile = function(layer, value)
     EngineAPI.map._battleTiles = {}
 end
 
+EngineAPI.map.drawClouds = function(mx, my)
+    logCall("map.drawClouds", mx, my)
+end
+
 EngineAPI.map.unload = function()
     logCall("map.unload")
 end

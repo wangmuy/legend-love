@@ -297,6 +297,11 @@ EngineAPI.map.tickClouds = function()
     lib.CloudTick()
 end
 
+EngineAPI.map.drawClouds = function(mx, my)
+    -- 云层绘制归引擎：需要逐像素调色板烘焙（CloudBakeImage），属 sprite 子系统
+    lib.DrawClouds(mx, my)
+end
+
 EngineAPI.map.setTile = function(x, y, layer, value)
     -- 消费者：framework/map_render.lua 的 buildingSort（深度排序时临时占用）
     -- `SetMMap` 在 lib_love.lua 是 **local**，外部调不到 → 经 lib.JY_SetMMap 桥接
@@ -332,7 +337,29 @@ EngineAPI.map.clearBattleTile = function(layer, value)
 end
 
 
+--- 主地图绘制 —— **改走 framework/map_render.lua**
+--
+-- 原实现是 `lib.DrawMMap`（79 行，住在引擎里），它是 `.idx/.grp` **不透明**的：
+-- 内部经 `JY_LoadPic` = `PicLoadCache` 读 `picFileCache`，新引擎要重写整套
+-- RLE 解码 + 档案缓存才能实现这个契约。
+--
+-- 现在：投影数学住 `framework/map_render.lua`（用 `sprite.drawHandle` 画已解好的
+-- handle），引擎不再持有等距投影逻辑。
+--
+-- `lib.DrawMMap` **保留**（`lib.*` 兼容层仍有人用），只是本契约不再转发它。
+--
+-- 逃生舱：若 `framework.map_render` 加载失败（打包时漏文件），回退到旧实现
+-- 而不是画空白 —— 静默丢失整张地图比回退更糟。
 EngineAPI.map.drawMain = function(playerX, playerY, playerPic)
+    local ok, MR = pcall(require, "framework.map_render")
+    if ok and MR and MR.drawMain then
+        MR.drawMain(playerX, playerY, playerPic)
+        return
+    end
+    if EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("map.drawMain: framework.map_render unavailable, "
+                            .. "falling back to lib.DrawMMap")
+    end
     lib.DrawMMap(playerX, playerY, playerPic)
 end
 

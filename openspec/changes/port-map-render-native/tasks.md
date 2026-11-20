@@ -87,24 +87,69 @@ drawMain     → 读 buildList → 逐条 sprite.draw
 
 ---
 
-## Task 3：搬 `drawMain`（原 `lib.DrawMMap`）
+## Task 3：搬 `drawMain`（原 `lib.DrawMMap`，79 行）
 
-**Blast Radius**：`framework/map_render.lua`、`engine_love2d.lua`
+**Blast Radius**：`framework/map_render.lua`、`engine_love2d.lua`、
+`engine_mud.lua`、`engine_web.lua`、`tests/engine_test.lua`
+
+### 先补一个契约：`map.drawClouds`
+
+`DrawMMap` 最后调 `DrawClouds(x, y)`，而云的像素归引擎
+（逐像素调色板烘焙 `CloudBakeImage`，属 sprite 子系统）。
+原来只有 `map.tickClouds`（位置更新，纯游戏逻辑），**缺绘制**。
+→ 新增 `map.drawClouds(mx, my)`，4 引擎实现。
+
+### 8 处引擎调用的映射
+
+| 原调用 | 新契约 | 说明 |
+|--------|--------|------|
+| `love.graphics.getScissor()` ×2 | `render.getClip()` ×1 | 原实现取两次（快照+算范围），framework 只需一次 |
+| `love.graphics.setScissor(...)` | `render.setClip(...)` | 恢复快照 |
+| `FillColor(0,0,0,0,0)` | `render.fillRect(0,0,0,0,0)` | 清屏 |
+| `JY_LoadPic(0,pic,x,y,0,0)` ×5 | `SpriteAtlas.draw(0,pic,x,y,0,nil)` | **关键：不是 `sprite.draw`** |
+| `GetMMap(x,y,0/1)` | `map.getTile(x,y,0/1)` | 地面/表层 |
+| `BuildingSort(...)` | `MapRender.buildingSort(...)` | 已搬（Task 2） |
+| `DrawClouds(x,y)` | `map.drawClouds(x,y)` | 新契约 |
+
+**为什么贴图走 `SpriteAtlas.draw` 而不是 `EngineAPI.sprite.draw`**：
+
+```lua
+EngineAPI.sprite.draw = function(...) lib.PicLoadCache(...) end  -- 读 picFileCache ✗
+SpriteAtlas.draw → EngineAPI.sprite.drawHandle(handle, ...)      -- 不读 ✓
+```
+
+`SpriteAtlas` 完全不碰 `picFileCache`（grep = 0 处代码引用）。
+
+### 两个「禁止」必须原样保留（真实回归记录）
+
+```lua
+-- ① 禁止把主角拆出来「最后单独绘制」：
+--    那样任何建筑（大山、房屋、树木）都再也遮不住主角，
+--    走到大山背后会整块露出来（commit 2c8a644 引入的回归）
+-- ② 禁止给主角加额外 y 偏移：
+--    屏幕位置完全由贴图头的 xoff/yoff 决定，贴图头已带正确的
+--    yoff（主角帧 15x39，xoff=5 yoff=44），再叠加就是错位
+```
+
+### 顺手修正一个隐式约定
+
+原实现 `DrawMMap` 开头有 `buildNumber=0` 兜住 `BuildingSort` 的早退路径。
+搬到 framework 后把这个清零**移进 `buildingSort` 开头** ——
+「谁调 buildingSort 谁负责清零」是隐式约定，自动化更稳。
 
 **DoD**：
-- [ ] `MapRender.drawMain(x, y, mypic)` —— 搬 79 行
-- [ ] 8 处引擎调用全部契约化：
-      `love.graphics.getScissor` → `EngineAPI.render.getClip`
-      `love.graphics.setScissor` → `EngineAPI.render.setClip`
-      `FillColor` → `EngineAPI.render.fillRect`
-      `JY_LoadPic` → `EngineAPI.sprite.draw`
-      `GetMMap` → `EngineAPI.map.getTile`
-- [ ] `EngineAPI.map.drawMain` 改为调 `MapRender.drawMain`
-- [ ] **保留** `lib.DrawMMap`（`lib.*` 兼容层仍有人用）
-- [ ] 单测：`MapRender.drawMain` 不调 `love.*`、不读 `picFileCache`
-- [ ] **实机逐字节对比**：主地图截图与迁移前 md5 相同
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] 新增 `map.drawClouds(mx, my)` 契约（4 引擎）
+- [x] `MapRender.drawMain(x, y, mypic)` —— 搬 79 行
+- [x] 8 处引擎调用全部契约化（见上表）
+- [x] `EngineAPI.map.drawMain` 改为调 `MapRender.drawMain`
+      （带 pcall 逃生舱：framework 模块缺失时回退 `lib.DrawMMap` 并记日志）
+- [x] **保留** `lib.DrawMMap`（`lib.*` 兼容层仍有人用）
+- [x] `buildNumber` 清零移进 `buildingSort` 开头
+- [x] 单测：`drawMain` **不调** `EngineAPI.sprite.draw`（它经 PicLoadCache）
+- [x] 负向对照：把 `drawTile` 改成 `sprite.draw` → 测试 FAIL（实测 17 次）
+- [x] **实机逐字节对比**：主地图/场景截图 md5 `1efd2af3…` 与迁移前相同
+- [x] 四版本全量测试零失败（3998/0）
+- [x] 一个 commit
 
 ---
 

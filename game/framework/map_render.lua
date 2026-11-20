@@ -76,6 +76,11 @@ end
 -- @param x, y number 主角地图坐标
 -- @param mypic number 主角贴图编号
 function MapRender.buildingSort(x, y, mypic)
+    -- **开头就清零**：原实现靠 `DrawMMap` 里的 `buildNumber=0` 兜住早退路径，
+    -- 但那样「谁调 buildingSort 谁负责清零」是隐式约定。放这里更稳 ——
+    -- 任何早退（EngineAPI 缺失 / 地图未加载）都留下 0 而不是上一次的旧值。
+    buildNumber = 0
+
     local EngineAPI = api()
     if not EngineAPI or not EngineAPI.map then return end
 
@@ -175,6 +180,135 @@ function MapRender.buildingAt(i)
     local idx = i + 1
     if idx < 1 or idx > buildNumber then return nil end
     return buildList[idx]
+end
+
+-- ---------------------------------------------------------------------------
+-- 贴图绘制
+-- ---------------------------------------------------------------------------
+
+--- 绘制一格地图贴图（含锚点偏移）
+--
+-- @param picnum number 容器帧编号（既有代码里的 picid）
+-- @param x, y number 屏幕坐标
+--
+-- **为什么用 `SpriteAtlas.draw` 而不是 `EngineAPI.sprite.draw`**：
+--
+--   `EngineAPI.sprite.draw` 的实现是 `lib.PicLoadCache` —— **读 picFileCache**，
+--   换引擎时仍要重写那套 RLE 解码（这是 C 要消除的东西）。
+--
+--   `SpriteAtlas.draw` 走 `EngineAPI.sprite.drawHandle(handle, ...)` ——
+--   贴图已由 framework 解好并缓存在 handle 里，引擎只负责把 handle 画出来。
+--
+-- **编号约定实测一致**：
+--   `PicLoadCache(fileid, picid)` → 档案 `picFileCache[fileid+1]`，帧 `floor(picid/2)+1`
+--   `SpriteAtlas(atlasId, frameId)` → 档案 `atlases[atlasId]`，帧 `floor(frameId/2)+1`
+--   所以 `JY_LoadPic(0, picnum, ...)` 等价于 `SpriteAtlas.draw(0, picnum, ...)`
+--
+-- **flags 语义差异**（唯一风险点，实测已核对）：
+--   `PicLoadCache`：black(0x4) / white(0x8) / alpha(0x2) **三者独立**
+--   `drawHandle`  ：black/white/alpha **互斥**（0x4 优先，此时 alpha 被忽略）
+--   地图绘制只用到 flag=0 和一处 `4+2`（见 drawBattle）：
+--   后者黑化且 alpha=255 → 旧 a=255/255=1，新 alpha 忽略（默认 1）→ **像素相同**
+function drawTile(picnum, x, y, flags, alpha)
+    local EngineAPI = api()
+    if not EngineAPI or not EngineAPI.sprite then return false end
+    local SA = require("framework.sprite_atlas")
+    return SA.draw(0, picnum, x, y, flags or 0, alpha)
+end
+
+-- ---------------------------------------------------------------------------
+-- 主地图绘制（原 lib.DrawMMap，79 行）
+-- ---------------------------------------------------------------------------
+
+--- 绘制主地图（**逐字搬移** `lib.DrawMMap`）
+--
+-- @param x, y number 主角地图坐标
+-- @param mypic number 主角贴图编号
+--
+-- **工程要点**（都是从原实现注释里保留下来的，改动会引入真实回归）：
+--
+--  ① 建筑层：单次按 `buildingSort` 的顺序绘制。主角/船由 buildingSort
+--     临时写进建筑层，和其它建筑一起参与同一份排序，所以绘制次序 = 深度次序
+--     （对应原版 mainmap.c:JY_DrawMMap 唯一的一层循环）。
+--
+--     **禁止**把主角拆出来「最后单独绘制」：那样任何建筑都遮不住主角，
+--     走到大山背后会整块露出来（commit 2c8a644 引入过的回归）。
+--
+--     **禁止**给主角加额外 y 偏移：屏幕位置完全由贴图头的 xoff/yoff 决定，
+--     贴图头里已带正确的 yoff（主角帧 15x39，xoff=5 yoff=44），再叠加就错位。
+--
+--  ② 云层在建筑层之后、解除裁剪之前绘制（天空层，永远在地面/建筑之上）。
+function MapRender.drawMain(x, y, mypic)
+    local EngineAPI = api()
+    if not EngineAPI or not EngineAPI.map or not EngineAPI.render then return end
+
+    local CONFIG = rawget(_G, "CONFIG") or {}
+    local CC = rawget(_G, "CC") or {}
+
+    -- 原实现用 love.graphics.getScissor() 取两次（一次存快照、一次算循环范围）。
+    -- framework 只需一次 —— 契约返回的就是当前 clip。
+    local oldClip = EngineAPI.render.getClip()
+
+    local rect = oldClip or { x = 0, y = 0, w = CONFIG.Width, h = CONFIG.Height }
+    if rect.w == nil then rect.w = CONFIG.Width end
+    if rect.h == nil then rect.h = CONFIG.Height end
+
+    -- 根据 clip 确定循环参数。提高绘制速度
+    local istart = math.floor((rect.x - math.floor(CONFIG.Width / 2)) / (2 * CONFIG.XScale)) - 1 - CONFIG.MMapAddX
+    local iend = math.floor((rect.x + rect.w - math.floor(CONFIG.Width / 2)) / (2 * CONFIG.XScale)) + 1 + CONFIG.MMapAddX
+
+    local jstart = math.floor((rect.y - math.floor(CONFIG.Height / 2)) / (2 * CONFIG.YScale)) - 1
+    local jend = math.floor((rect.y + rect.h - math.floor(CONFIG.Height / 2)) / (2 * CONFIG.YScale)) + 1
+
+    -- 建筑排序
+    MapRender.buildingSort(x, y, mypic)
+    EngineAPI.render.fillRect(0, 0, 0, 0, 0)
+
+    for j = 0, 2 * jend - 2 * jstart + CONFIG.MMapAddY do
+        for i = istart, iend do
+            local i1 = i + math.floor(j / 2) + jstart
+            local j1 = -i + math.floor(j / 2) + j % 2 + jstart
+
+            local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+            local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+            if (x + i1) >= 0 and (x + i1) < CC.MWidth and (y + j1) >= 0 and (y + j1) < CC.MHeight then
+                local picnum = EngineAPI.map.getTile(x + i1, y + j1, 0)
+                if picnum > 0 then
+                    drawTile(picnum, x1, y1)
+                end
+                picnum = EngineAPI.map.getTile(x + i1, y + j1, 1)
+                if picnum > 0 then
+                    drawTile(picnum, x1, y1)
+                end
+            end
+        end
+    end
+
+    -- 建筑层（见上方 ① 的说明）
+    for i = 0, buildNumber - 1 do
+        local idxi = i + 1
+        local i1 = buildList[idxi].x - x
+        local j1 = buildList[idxi].y - y
+        local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+        local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+        local picnum = buildList[idxi].num
+        if picnum > 0 then
+            drawTile(picnum, x1, y1)
+        end
+    end
+
+    -- 云层（见上方 ② 的说明）
+    if EngineAPI.map.drawClouds then
+        EngineAPI.map.drawClouds(x, y)
+    end
+
+    -- 恢复裁剪（原实现就是恢复快照；setClip(0,0,0,0) 表示"清除裁剪"）
+    if oldClip then
+        EngineAPI.render.setClip(oldClip.x, oldClip.y,
+                                 oldClip.x + oldClip.w, oldClip.y + oldClip.h)
+    else
+        EngineAPI.render.setClip(0, 0, 0, 0)
+    end
 end
 
 --- 重置排序状态（测试用）
