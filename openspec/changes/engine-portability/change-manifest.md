@@ -183,7 +183,7 @@ parent_epic: null
   **实测 27808 个事件脚本（1018 基础 + 26790 MOD）零 `lib.` 引用**，
   调用面恰好是 `instruct_0..67`（67 个）→ 该前提不成立。
 - **Depends On**: `port-native-api-completion`（script 已零 `lib.*`）
-- **Status**: [ ] Not Started
+- **Status**: [x] Archived / Complete（port-compat-layer-removal）
 
 ### Change: port-legacy-picture-removal
 
