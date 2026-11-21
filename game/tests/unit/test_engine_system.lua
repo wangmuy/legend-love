@@ -210,64 +210,50 @@ function TestEngineSystem.testMousePositionContractDocumented()
 end
 
 -- ============================================================
--- REQ-MS1-3 drawTinted
+-- REQ-MS1-3 染色绘制（drawTinted → drawHandleTinted）
 -- ============================================================
+--
+-- port-legacy-picture-removal：旧的 `sprite.drawTinted(archiveId, spriteId, …)`
+-- 已删除（零消费者）。染色能力由 `drawHandleTinted(handle, …)` 承载 ——
+-- 引擎只认句柄，容器解析在 framework/sprite_atlas.lua。
 
-function TestEngineSystem.testDrawTintedDeclared()
-    print("\n=== Test: drawTinted 接口声明 ===")
+function TestEngineSystem.testDrawTintedIsDeleted()
+    print("\n=== Test: 旧 drawTinted 已删除，染色走 drawHandleTinted ===")
     local api = require("engine-love2d.engine_api")
-    TestHelper.assertNotNil(api.sprite.drawTinted, "engine_api 声明了 drawTinted")
+    TestHelper.assertNil(api.sprite.drawTinted, "旧 sprite.drawTinted 应已删除")
+    TestHelper.assertNotNil(api.sprite.drawHandleTinted,
+        "染色能力应由 sprite.drawHandleTinted 承载")
 end
 
-function TestEngineSystem.testDrawTintedRecordsArgs()
-    print("\n=== Test: drawTinted 记录参数 ===")
-    local te = freshTestEngine()
-    te.sprite._lastTint = nil
-    te.sprite.drawTinted(0, 0, 100, 200, { r = 1, g = 0, b = 0 }, 180)
-    local last = te.sprite._lastTint
-    TestHelper.assertNotNil(last, "记录了调用")
-    TestHelper.assertEquals(0, last.archiveId, "archiveId 透传")
-    TestHelper.assertEquals(0, last.spriteId, "spriteId 透传")
-    TestHelper.assertEquals(100, last.x, "x 透传")
-    TestHelper.assertEquals(200, last.y, "y 透传")
-    TestHelper.assertEquals(1, last.color.r, "color.r 透传")
-    TestHelper.assertEquals(180, last.alpha, "alpha 透传")
-end
-
-function TestEngineSystem.testDrawTintedAcceptsAnySpriteId()
-    print("\n=== Test: drawTinted 接受任意 spriteId ===")
-    local te = freshTestEngine()
-    te.sprite.drawTinted(0, 42, 10, 20, { r = 0, g = 1, b = 0 }, 255)
-    TestHelper.assertEquals(42, te.sprite._lastTint.spriteId,
-        "spriteId 不硬编码为 0（可用于任意图标）")
-end
-
-function TestEngineSystem.testMudDrawTintedNoThrow()
-    print("\n=== Test: mud 的 drawTinted 不抛错 ===")
+function TestEngineSystem.testMudDrawHandleTintedNoThrow()
+    print("\n=== Test: mud 的 drawHandleTinted 不抛错 ===")
     withFreshEngine(function()
         return dofile("./engine-mud/engine_mud.lua")
     end, function(mud)
-        local ok = pcall(mud.sprite.drawTinted, 0, 0, 1, 1, { r = 1, g = 0, b = 0 }, 100)
-        TestHelper.assertTrue(ok, "mud 的 drawTinted 不抛错")
+        local ok = pcall(mud.sprite.drawHandleTinted, { w = 1, h = 1 }, 1, 1,
+                         { r = 1, g = 0, b = 0 }, 100)
+        TestHelper.assertTrue(ok, "mud 的 drawHandleTinted 不抛错")
     end)
 end
 
-function TestEngineSystem.testWebDrawTintedNoThrow()
-    print("\n=== Test: web 的 drawTinted 存在且不抛错 ===")
+function TestEngineSystem.testWebDrawHandleTintedExists()
+    print("\n=== Test: web 已实现 drawHandleTinted ===")
     local Fs = require("framework.fs_compat")
     local src = Fs.readFile("./engine-web/engine_web.lua")
-    TestHelper.assertTrue(src:find("function EngineAPI.sprite.drawTinted", 1, true) ~= nil,
-        "web 实现了 drawTinted")
+    TestHelper.assertTrue(
+        src:find("EngineAPI.sprite.drawHandleTinted", 1, true) ~= nil,
+        "web 实现了 drawHandleTinted")
+    TestHelper.assertNil(src:find("function EngineAPI.sprite.drawTinted", 1, true),
+        "web 不应再有旧 drawTinted")
 end
 
-function TestEngineSystem.testDrawTintedColorFallback()
-    print("\n=== Test: drawTinted 的颜色容错（接口注释承诺）===")
-    -- 契约：color 为 nil / 缺分量时按原色绘制，不抛错。
-    -- 这里在测试引擎上验证「不抛错」（真实染色在 love2d，需实机）。
+function TestEngineSystem.testDrawHandleTintedColorFallback()
+    print("\n=== Test: drawHandleTinted 的颜色容错（接口注释承诺）===")
     local te = freshTestEngine()
-    local ok1 = pcall(te.sprite.drawTinted, 0, 0, 0, 0, nil, nil)
-    local ok2 = pcall(te.sprite.drawTinted, 0, 0, 0, 0, {}, 100)
-    local ok3 = pcall(te.sprite.drawTinted, 0, 0, 0, 0, { r = 1 }, 100)
+    local h = { w = 1, h = 1 }
+    local ok1 = pcall(te.sprite.drawHandleTinted, h, 0, 0, nil, nil)
+    local ok2 = pcall(te.sprite.drawHandleTinted, h, 0, 0, {}, 100)
+    local ok3 = pcall(te.sprite.drawHandleTinted, h, 0, 0, { r = 1 }, 100)
     TestHelper.assertTrue(ok1, "color=nil 不抛错")
     TestHelper.assertTrue(ok2, "color={} 不抛错")
     TestHelper.assertTrue(ok3, "color 缺分量不抛错")
@@ -275,7 +261,7 @@ end
 
 function TestEngineSystem.runAll()
     print("\n" .. string.rep("=", 60))
-    print("EngineAPI.system / 鼠标 / drawTinted 测试")
+    print("EngineAPI.system / 鼠标 / drawHandleTinted 测试")
     print(string.rep("=", 60))
     TestHelper.resetCounts()
 
@@ -291,12 +277,10 @@ function TestEngineSystem.runAll()
     TestEngineSystem.testLove2dNoDpiConversion()
     TestEngineSystem.testMousePositionContractDocumented()
 
-    TestEngineSystem.testDrawTintedDeclared()
-    TestEngineSystem.testDrawTintedRecordsArgs()
-    TestEngineSystem.testDrawTintedAcceptsAnySpriteId()
-    TestEngineSystem.testMudDrawTintedNoThrow()
-    TestEngineSystem.testWebDrawTintedNoThrow()
-    TestEngineSystem.testDrawTintedColorFallback()
+    TestEngineSystem.testDrawTintedIsDeleted()
+    TestEngineSystem.testMudDrawHandleTintedNoThrow()
+    TestEngineSystem.testWebDrawHandleTintedExists()
+    TestEngineSystem.testDrawHandleTintedColorFallback()
 
     return TestHelper.printSummary()
 end

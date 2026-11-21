@@ -83,38 +83,15 @@ EngineAPI.render.setDrawLoopFlag = function(flag)
 end
 
 --------------------------------------------------------------------
--- sprite 模块 - loadArchive 解析尺寸但不创建纹理，draw 为空操作
+-- sprite 模块 - 只保留 createFromRGBA/drawHandle 等格式透明契约
 --------------------------------------------------------------------
-local spriteSizes = {}
 
 EngineAPI.sprite.initSprites = function()
     logCall("sprite.initSprites")
 end
 
-EngineAPI.sprite.loadArchive = function(idxFile, grpFile, archiveId)
-    logCall("sprite.loadArchive", idxFile, grpFile, archiveId)
-    -- 解析 idx 文件获取尺寸信息
-    local f = io.open(idxFile, "rb")
-    if f then
-        local idxLen = f:seek("end")
-        f:close()
-        local num = math.floor(idxLen / 4)
-        spriteSizes[archiveId] = { num = num, width = 64, height = 64 }
-    end
-end
-EngineAPI.sprite.draw = function(archiveId, spriteId, x, y, flags, alpha)
-    logCall("sprite.draw", archiveId, spriteId, x, y, flags, alpha)
-end
-
--- 染色绘制（REQ-MS1-3）：记录调用，并把最后一次参数存起来便于断言
-EngineAPI.sprite._lastTint = nil
-EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
-    EngineAPI.sprite._lastTint = {
-        archiveId = archiveId, spriteId = spriteId,
-        x = x, y = y, color = color, alpha = alpha,
-    }
-    logCall("sprite.drawTinted", archiveId, spriteId, x, y, color, alpha)
-end
+-- **`sprite.loadArchive` / `sprite.draw` / `sprite.drawTinted` 已删除**
+-- （port-legacy-picture-removal）：零消费者。
 
 -- 可注入的纹理创建（测试多格式路径用）
 EngineAPI.sprite._failCreate = false

@@ -7,12 +7,12 @@
 ## Task 0：前置核实（只读）
 
 **DoD**：
-- [ ] `grep -rnE '(EngineAPI|EA)\.sprite\.(draw|drawTinted|loadArchive)\s*\(' game --include=*.lua`
+- [x] `grep -rnE '(EngineAPI|EA)\.sprite\.(draw|drawTinted|loadArchive)\s*\(' game --include=*.lua`
       → 排除 tests 与 engine-* 后为 **0**（本轮已核，见 proposal）
-- [ ] `grep -rn 'lib\.PicGetXY\|lib\.PicLoadCache' game --include=*.lua` → 只剩
-      `engine_love2d.lua:1066/1069` 的 dialog 逃逸舱
-- [ ] 27908 个事件脚本零 `lib.`（本轮已核）
-- [ ] 云 9 帧对拍 9/9 SAME（本轮已核）
+- [x] `grep -rn 'lib\.PicGetXY\|lib\.PicLoadCache' game --include=*.lua` → 只剩
+      `engine_love2d.lua` 的 dialog 逃逸舱
+- [x] 27808 个事件脚本零 `lib.`（本轮已核）
+- [x] 云 9 帧对拍 9/9 SAME（本轮已核）
 
 ## Task 1：删 3 个死契约
 
@@ -20,11 +20,12 @@
 `engine_web.lua`、`tests/engine_test.lua`、`tests/unit/test_engine_api.lua`
 
 **DoD**：
-- [ ] 删 `M.sprite.draw` / `M.sprite.drawTinted` / `M.sprite.loadArchive` 声明（含注释块）
-- [ ] 删 4 引擎实现
-- [ ] 删单测存在性断言；更新契约计数 92 → **89**（承接 port-compat-layer-removal 的 +1）
-- [ ] 全量测试零失败（4011，可能有几条因契约计数变化）
-- [ ] 一个 commit
+- [x] 删 `M.sprite.draw` / `M.sprite.drawTinted` / `M.sprite.loadArchive` 声明（留 `@deprecated` 指向注释）
+- [x] 删 4 引擎实现（LÖVE/MUD/Web/测试桩）
+- [x] 删单测存在性断言（改为 `assertNil` + 旧的 `drawTinted` 用例改测 `drawHandleTinted`）；
+      契约数 92 → **89**
+- [x] 全量测试零失败（4007，比 4013 少 6 = 删掉的 3 个旧契约断言 + 合并的旧用例）
+- [x] 一个 commit
 
 ## Task 2：dialog 头像逃逸舱改显式降级
 

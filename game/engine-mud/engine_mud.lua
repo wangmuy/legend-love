@@ -80,33 +80,15 @@ EngineAPI.render.setDrawLoopFlag = function(flag)
 end
 
 --------------------------------------------------------------------
--- sprite 模块 - loadArchive 解析尺寸但不创建纹理，draw 为空操作
+-- sprite 模块 - 只保留 createFromRGBA/drawHandle 等格式透明契约
 --------------------------------------------------------------------
-local spriteSizes = {}
 
 EngineAPI.sprite.initSprites = function()
     logCall("sprite.initSprites")
 end
 
-EngineAPI.sprite.loadArchive = function(idxFile, grpFile, archiveId)
-    logCall("sprite.loadArchive", idxFile, grpFile, archiveId)
-    -- 解析 idx 文件获取尺寸信息
-    local f = io.open(idxFile, "rb")
-    if f then
-        local idxLen = f:seek("end")
-        f:close()
-        local num = math.floor(idxLen / 4)
-        spriteSizes[archiveId] = { num = num, width = 64, height = 64 }
-    end
-end
-EngineAPI.sprite.draw = function(archiveId, spriteId, x, y, flags, alpha)
-    logCall("sprite.draw", archiveId, spriteId, x, y, flags, alpha)
-end
-
--- 染色绘制（REQ-MS1-3）：MUD 引擎无渲染，记录调用即可
-EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
-    logCall("sprite.drawTinted", archiveId, spriteId, x, y, color, alpha)
-end
+-- **`sprite.loadArchive` / `sprite.draw` / `sprite.drawTinted` 已删除**
+-- （port-legacy-picture-removal）：零消费者，容器解析归 framework/sprite_atlas。
 
 --- 从 RGBA 字节创建纹理：MUD 无纹理概念，返回哨兵 handle
 EngineAPI.sprite.createFromRGBA = function(w, h, rgbaBytes, opts)

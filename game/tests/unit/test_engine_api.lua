@@ -35,10 +35,11 @@ function TestEngineAPI.testSpriteModule()
     
     TestHelper.assertNotNil(EngineAPI.sprite, "sprite module should exist")
     TestHelper.assertNotNil(EngineAPI.sprite.initSprites, "sprite.initSprites should exist")
-    TestHelper.assertNotNil(EngineAPI.sprite.loadArchive, "sprite.loadArchive should exist")
-    TestHelper.assertNotNil(EngineAPI.sprite.draw, "sprite.draw should exist")
-    -- REQ-MS1-3
-    TestHelper.assertNotNil(EngineAPI.sprite.drawTinted, "sprite.drawTinted should exist")
+    -- sprite.loadArchive / sprite.draw / sprite.drawTinted 已删除（port-legacy-picture-removal）
+    TestHelper.assertNil(EngineAPI.sprite.loadArchive, "sprite.loadArchive 应已删除")
+    TestHelper.assertNil(EngineAPI.sprite.draw, "sprite.draw 应已删除")
+    -- REQ-MS1-3 的染色能力已由 drawHandleTinted 承载
+    TestHelper.assertNotNil(EngineAPI.sprite.drawHandleTinted, "sprite.drawHandleTinted should exist")
     
     -- 验证 initPalette 不存在
     TestHelper.assertEquals(nil, EngineAPI.sprite.initPalette, "sprite.initPalette should NOT exist")

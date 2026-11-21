@@ -114,17 +114,10 @@ EngineAPI.sprite.initSprites = function(paletteFile)
     end
 end
 
-EngineAPI.sprite.loadArchive = function(idxFile, grpFile, archiveId)
-    lib.PicLoadFile(idxFile, grpFile, archiveId)
-end
-EngineAPI.sprite.draw = function(archiveId, spriteId, x, y, flags, alpha)
-    lib.PicLoadCache(archiveId, spriteId, x, y, flags, alpha)
-end
-
--- 染色绘制（REQ-MS1-3）：颜色来自 {r,g,b}，不是位域 flag
-EngineAPI.sprite.drawTinted = function(archiveId, spriteId, x, y, color, alpha)
-    lib.DrawPicTinted(archiveId, spriteId, x, y, color, alpha)
-end
+-- **`sprite.loadArchive` / `sprite.draw` / `sprite.drawTinted` 已删除**
+-- （port-legacy-picture-removal）：三者在 framework/script 里零消费者，
+-- 新链路走 `SpriteAtlas` → `sprite.createFromRGBA` / `drawHandle`
+-- （引擎不再需要解析 .idx/.grp，也不再维护 picFileCache）。
 
 -- ADR-PORT-013：从原始 RGBA 字节创建纹理
 --

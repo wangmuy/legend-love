@@ -112,42 +112,29 @@ M.sprite = {}
 -- 但实现**不得**在收到 paletteFile 时静默丢弃 —— 兼容旧资产的引擎必须加载。
 function M.sprite.initSprites(paletteFile) end
 
---- 加载精灵档案（idx/grp 文件对）
--- @param idxFile string 索引文件路径
--- @param grpFile string 图片组文件路径
--- @param archiveId number 档案编号
-function M.sprite.loadArchive(idxFile, grpFile, archiveId) end
+--- **已删除**：`sprite.loadArchive(idxFile, grpFile, archiveId)`
+--
+-- 原契约要求引擎自己解析 `.idx/.grp` 并维护 `picFileCache` 注册表。
+-- `port-native-api-completion` 把 script 层全迁到 `SpriteAtlas` 之后，
+-- framework/script 里**零调用**（实测 2026-11-21）→ 由
+-- `port-legacy-picture-removal` 删除。容器解析归 `framework/sprite_atlas.lua`。
+--
+-- 新代码请用：`require("framework.sprite_atlas").loadArchive(...)`
 
---- 绘制精灵
--- @param archiveId number 档案编号
--- @param spriteId number 精灵编号
--- @param x, y number 绘制位置
--- @param flags number 绘制标志
--- @param alpha number|nil 透明度 0-255
-function M.sprite.draw(archiveId, spriteId, x, y, flags, alpha) end
+--- **已删除**：`sprite.draw(archiveId, spriteId, x, y, flags, alpha)`
+--
+-- 原契约要求引擎持有 archive 表 + RLE 解码（575 行 `picFileCache` 链）。
+-- 实测 framework/script **零调用**；新代码走
+-- `SpriteAtlas.draw(atlasId, frameId, …)` → `sprite.drawHandle`。
+--
+-- @deprecated 已被 `sprite.drawHandle(handle, x, y, flags, alpha)` 取代
 
---- 绘制染色精灵
+--- **已删除**：`sprite.drawTinted(archiveId, spriteId, x, y, color, alpha)`
 --
--- 与 `sprite.draw` 的区别：用 `color` 表染色，而非位域 flag。
+-- 实测 framework/script 零调用（`mouse_hover.lua` 已改走
+-- `SpriteAtlas.drawTinted`）。染色能力由 `sprite.drawHandleTinted` 承载。
 --
--- 为什么需要它（REQ-MS1-3）：
---   现有 `draw` 的颜色能力只有「原色 / 全黑 / 全白」三档
---   （`lib_love.lua` 的 PicLoadCache 用 flag 的 0x4 / 0x8 位）。
---   鼠标功能的「寻路失败红闪」需要红色，现有接口无法表达。
---
--- 为什么用 {r,g,b} 而不是再加一个 flag 位：
---   flag 是原版 PAL 引擎的位域约定，加位会污染该契约，且只能表达有限颜色。
---   {r,g,b} 是通用的颜色概念，引擎无关，且同一个函数能覆盖
---   「悬停高亮（黑）」「红闪（红）」「物品金色高亮」等全部用例。
---
--- spriteId 可任意 —— 不只用于菱形，未来任何精灵都能染色。
---
--- @param archiveId number 档案编号
--- @param spriteId number 精灵编号
--- @param x, y number 绘制位置
--- @param color table {r=, g=, b=} 0-1 浮点；nil 或分量缺失时按原色绘制
--- @param alpha number|nil 透明度 0-255（默认 255）
-function M.sprite.drawTinted(archiveId, spriteId, x, y, color, alpha) end
+-- @deprecated 已被 `sprite.drawHandleTinted(handle, x, y, color, alpha)` 取代
 
 --- 从原始 RGBA 字节创建纹理
 --

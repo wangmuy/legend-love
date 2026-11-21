@@ -127,13 +127,8 @@ EngineAPI.sprite = {}
 
 function EngineAPI.sprite.initSprites() end
 
-function EngineAPI.sprite.loadArchive(idxFile, grpFile, archiveId)
-    return true
-end
-function EngineAPI.sprite.draw(archiveId, spriteId, x, y, flags, alpha) end
-
--- 染色绘制（REQ-MS1-3）：web 终端无图形渲染
-function EngineAPI.sprite.drawTinted(archiveId, spriteId, x, y, color, alpha) end
+-- **`sprite.loadArchive` / `sprite.draw` / `sprite.drawTinted` 已删除**
+-- （port-legacy-picture-removal）：零消费者，Web 本就无图形渲染。
 
 --- 从 RGBA 字节创建纹理：web 无纹理概念，返回哨兵 handle
 function EngineAPI.sprite.createFromRGBA(w, h, rgbaBytes, opts)
