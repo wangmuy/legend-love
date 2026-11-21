@@ -213,7 +213,7 @@ end
 --
 -- 战斗武功效果用 `drawTileFrom(3, v3, ...)`（特效档案 3），
 -- 替身贴图用 `drawTileFrom(v2, v1, ...)`（动态档案编号）。
-function drawTileFrom(atlasId, picnum, x, y, flags, alpha)
+local function drawTileFrom(atlasId, picnum, x, y, flags, alpha)
     local SA = require("framework.sprite_atlas")
     return SA.draw(atlasId, picnum, x, y, flags or 0, alpha)
 end
@@ -222,7 +222,7 @@ end
 --
 -- @param picnum number 容器帧编号（既有代码里的 picid）
 -- @param x, y number 屏幕坐标
-function drawTile(picnum, x, y, flags, alpha)
+local function drawTile(picnum, x, y, flags, alpha)
     local EngineAPI = api()
     if not EngineAPI or not EngineAPI.sprite then return false end
     local SA = require("framework.sprite_atlas")

@@ -142,8 +142,11 @@ function TestArchiveDualWrite.testNoSelfRecursion()
     -- 我第一版就是这么错的 —— 三条断言全 FAIL。
     TestHelper.assertNotNil(afterSig:find("SpriteAtlas.loadArchive", 1, true),
         "helper 体内应调 SpriteAtlas.loadArchive")
-    TestHelper.assertNotNil(afterSig:find("sprite.loadArchive", 1, true),
-        "helper 体内应调 EngineAPI.sprite.loadArchive")
+    -- **双写已摘除**（port-map-render-native Task 6）：
+    -- 3 个地图绘制契约改走 SpriteAtlas 后不再读 picFileCache，
+    -- 所以 helper 只需写一套。
+    TestHelper.assertNil(afterSig:find("sprite.loadArchive", 1, true),
+        "helper 体内不应再调 EngineAPI.sprite.loadArchive（双写已摘除）")
 end
 
 -- ------------------------------------------------------------ ③ 引擎侧确实读 picFileCache

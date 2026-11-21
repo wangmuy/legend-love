@@ -1031,10 +1031,33 @@ EngineAPI.dialog.draw = function(spec, layout)
     if layout.showHead ~= false and layout.headId and layout.headId >= 0 and layout.headBox then
         local hb = layout.headBox
         dlgDrawBox(hb.x, hb.y, hb.x + hb.w, hb.y + hb.h, color)
-        local w, h = lib.PicGetXY(1, layout.headId * 2)
-        local offX = (DLG_PICW - (w or 0)) / 2
-        local offY = (DLG_PICH - (h or 0)) / 2
-        lib.PicLoadCache(1, layout.headId * 2, hb.x + 5 + offX, hb.y + 5 + offY, 1)
+        -- 头像贴图（archive 1 = HeadPic 档案）
+        --
+        -- **原来走 `lib.PicGetXY` / `lib.PicLoadCache`** —— 那两个读
+        -- 引擎的 `picFileCache`，而 `SpriteAtlas.loadArchive` 不写它。
+        -- 所以摘掉 `LoadArchiveBoth` 的双写后头像就不见了（实测：右下角框变空）。
+        --
+        -- 现在改走 `SpriteAtlas`：`getMeta` 拿尺寸算居中，`draw` 画 handle。
+        -- 与 `battle_render` / `map_render` 的迁移是同一套约定。
+        local SA = nil
+        do
+            local okSA, mod = pcall(require, "framework.sprite_atlas")
+            if okSA then SA = mod end
+        end
+        if SA and SA.getMeta then
+            local meta = SA.getMeta(1, layout.headId * 2)
+            local w = meta and meta.w or 0
+            local h = meta and meta.h or 0
+            local offX = (DLG_PICW - w) / 2
+            local offY = (DLG_PICH - h) / 2
+            SA.draw(1, layout.headId * 2, hb.x + 5 + offX, hb.y + 5 + offY, 0x1)
+        else
+            -- 逃生舱：SpriteAtlas 不可用时退回旧路径（会读 picFileCache）
+            local w, h = lib.PicGetXY(1, layout.headId * 2)
+            local offX = (DLG_PICW - (w or 0)) / 2
+            local offY = (DLG_PICH - (h or 0)) / 2
+            lib.PicLoadCache(1, layout.headId * 2, hb.x + 5 + offX, hb.y + 5 + offY, 1)
+        end
     end
 
     -- 对话框（框宽由 measure 决定，随内容自适应）

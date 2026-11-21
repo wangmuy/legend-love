@@ -284,18 +284,94 @@ JY_LoadPic(0, 0, x1, y1, 2+4, 128)     -- flag=1/2 的高亮格
 
 ---
 
-## Task 6：摘掉双轨/双写（验证 Task 1-5 的成果）
+## Task 6：摘掉双轨/双写（验证契约真透明了）
 
-**Blast Radius**：`framework/war_async.lua`、`script/jymain.lua`
+**Blast Radius**：`framework/war_async.lua`、`script/jymain.lua`、
+`engine_love2d.lua`
+
+### 第一次尝试失败（截图 26865 字节 = 地图全黑）
+
+按计划删了 `war_async` 的 4 行双轨 + `LoadArchiveBoth` 的双写
+→ 战斗地图**全黑**。
+
+### 根因：`pcall(require)` 吞掉了真实的加载错误
+
+在 `EngineAPI.map.drawBattle` 里加探针，拿到了被吞掉的错误：
+
+```
+ok2=false | MR2=framework/map_render.lua:216:
+             attempt read write to undeclared variable drawTileFrom
+```
+
+`map_render.lua` 的两个 helper 写成了**全局函数**：
+
+```lua
+function drawTileFrom(...)  ... end   -- ✗ 全局
+function drawTile(...)  ... end       -- ✗ 全局
+```
+
+而 LÖVE 的 `JYMainAdapter.init`（`jymain_adapter.lua:172`）装了**严格 `_G`**
+metatable（`__newindex` 抛错）。`map_render` 是**draw 时才 require** 的
+（晚于 init）→ 严格模式生效 → 写全局抛错 → `pcall(require)` 把它吞掉
+→ **静默回退 `lib.DrawWarMap`** → 摘掉双轨后全黑，**且没有任何日志**。
+
+改成 `local function` 后 `pcall(require)` 成功，`MapRender` 真的在跑。
+
+**教训**：「延迟 require + pcall 逃生舱」的组合会把加载失败**完全静默**。
+逃生舱本身是对的（地图不该静默消失），但**必须有办法发现它在回退**。
+
+### 第二次尝试：战斗好了，场景还是黑
+
+摘掉双写后战斗 md5 正确，但场景截图 **3995 字节（全黑）**。
+
+根因：**`EngineAPI.map.drawScene` 是零消费者的死契约**。
+
+```lua
+-- script/jymain.lua 的 DrawSMap 包装（4 处）
+lib.DrawSMap(JY.SubScene, ...)      -- ✗ 直接用引擎的旧实现
+```
+
+Task 4 搬好的 `MapRender.drawScene` 根本没被调用。改成
+`EngineAPI.map.drawScene(...)` 后场景恢复。
+
+**教训**：搬一个函数**不等于**接上调用点。「契约有实现」和
+「调用方在用这个契约」是两件事，必须分别验证。
+
+### 第三次：场景好了，但对话框头像不见了
+
+场景 md5 恢复 `1efd2af3…`，但右下角头像框是**空的**。
+
+根因：`EngineAPI.dialog.draw` 内部也读 `picFileCache`：
+
+```lua
+local w, h = lib.PicGetXY(1, layout.headId * 2)
+lib.PicLoadCache(1, layout.headId * 2, ...)
+```
+
+摘掉双写后 `picFileCache` 空 → 头像画不出来。
+
+改成 `SpriteAtlas.getMeta(1, ...)` + `SpriteAtlas.draw(1, ...)`
+（archive 1 = HeadPic，`usage="avatar"`），保留旧路径作逃生舱。
+
+### 最终验证（三界面全部逐字节相同）
+
+| 界面 | md5 | 与基线 |
+|------|-----|--------|
+| 主地图/场景（主角家对话） | `1efd2af3…` | ✓ 相同 |
+| 战斗 | `6c8eb322…` | ✓ 相同 |
+| 主地图（走一段后） | `36fd32b0…` | ✓ 相同 |
 
 **DoD**：
-- [ ] 删 `war_async` 的 `EngineAPI.sprite.loadArchive` 那 4 行
-- [ ] `LoadArchiveBoth` 改回单写（或直接删 helper，用 `SpriteAtlas.loadArchive`）
-- [ ] **实机验证**：主地图 / 场景 / 战斗三个界面**都不黑**
-      （这是"契约真的透明了"的唯一判据）
-- [ ] 若任一界面黑 → 说明 Task 3/4/5 有遗漏，**回退**这个 Task
-- [ ] 四版本全量测试零失败
-- [ ] 一个 commit
+- [x] 删 `war_async` 的 4 行 `EngineAPI.sprite.loadArchive` 双轨
+- [x] `LoadArchiveBoth` 去掉 `EngineAPI.sprite.loadArchive` 那半边
+- [x] **修 `map_render.lua` 的全局函数**（`local function`）
+- [x] **接上 `EngineAPI.map.drawScene` 的调用点**（`lib.DrawSMap` ×4）
+- [x] **迁移 `EngineAPI.dialog.draw` 的头像路径**（`PicGetXY`/`PicLoadCache` → `SpriteAtlas`）
+- [x] 新增 gate STEP D4：延迟 require 的模块零全局函数（负向对照已验证）
+- [x] 反转两条 canary 断言（`war_coroutine_wiring` / `archive_dual_write`）
+- [x] **实机三界面逐字节相同**
+- [x] 四版本全量测试零失败（4011/0）
+- [x] 一个 commit
 
 ---
 

@@ -171,8 +171,17 @@ function TestWarCoroutineWiring.testWarMainLoadsBothSpriteSystems()
 
     TestHelper.assertNotNil(code:find("SpriteAtlas.loadArchive", 1, true),
         "应有 SpriteAtlas.loadArchive（新解码链）")
-    TestHelper.assertNotNil(code:find("sprite.loadArchive", 1, true),
-        "应有 EngineAPI.sprite.loadArchive（写 picFileCache，供 lib.Pic* 用）")
+
+    -- **双轨已摘除**（port-map-render-native Task 6 完成）：
+    -- 3 个地图绘制契约都不再读 picFileCache，所以不再需要第二套加载。
+    -- 这是当初这条 canary 预期的终点 —— 断言方向反转（断言"只有一套"），
+    -- 保留价值：若有人重新引入双轨，它会 FAIL。
+    local legacy = 0
+    for line in code:gmatch("[^\r\n]+") do
+        if line:find("sprite.loadArchive", 1, true) then legacy = legacy + 1 end
+    end
+    TestHelper.assertEquals(0, legacy,
+        "不应再有 EngineAPI.sprite.loadArchive（双轨已摘除，实测 " .. legacy .. " 处）")
 end
 
 function TestWarCoroutineWiring.testBattleRenderMigratedToNative()

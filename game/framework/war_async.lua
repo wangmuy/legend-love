@@ -145,14 +145,7 @@ function WarAsync.WarMainCoroutine(warid, isexp)
     -- 要真正删掉这一半，前提是让 `map.drawBattle` 契约透明化
     -- （`framework/map_render.lua` 做投影 + 逐格 `sprite.draw`），
     -- 那是 `map.drawBattle` 的 @deprecated 条目，属独立 change。
-    if EngineAPI and EngineAPI.sprite and EngineAPI.sprite.loadArchive then
-        EngineAPI.sprite.loadArchive(CC.WMAPPicFile[1], CC.WMAPPicFile[2], 0)
-        EngineAPI.sprite.loadArchive(CC.HeadPicFile[1], CC.HeadPicFile[2], 1)
-        if CC.LoadThingPic == 1 then
-            EngineAPI.sprite.loadArchive(CC.ThingPicFile[1], CC.ThingPicFile[2], 2)
-        end
-        EngineAPI.sprite.loadArchive(CC.EffectFile[1], CC.EffectFile[2], 3)
-    end
+
     
     GameHooks.playMIDI(WAR.Data["音乐"])
     

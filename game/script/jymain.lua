@@ -72,9 +72,6 @@ end
 --   （`port-map-render-native`），在那之前必须双写。
 function LoadArchiveBoth(idxFile, grpFile, archiveId, opts)
     SpriteAtlas.loadArchive(idxFile, grpFile, archiveId, opts)
-    if EngineAPI and EngineAPI.sprite and EngineAPI.sprite.loadArchive then
-        EngineAPI.sprite.loadArchive(idxFile, grpFile, archiveId)
-    end
 end
 
 function IncludeFile()              --导入其他模块
@@ -1691,7 +1688,7 @@ function DrawSMap(fastdraw)         --绘场景地图
     local y=limitX(y0,CC.SceneYMin,CC.SceneYMax)-JY.Base["人Y1"];
 
     if fastdraw==0 then
-        lib.DrawSMap(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
+        EngineAPI.map.drawScene(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
     else
         if JY.oldSMapX>=0 and JY.oldSMapY>=0 and
            JY.oldSMapX+JY.oldSMapXoff==JY.Base["人X1"]+x and         --绘图中心点不变，人走路也可以用裁剪方式绘图
@@ -1737,16 +1734,16 @@ function DrawSMap(fastdraw)         --绘场景地图
                 for i=0,num_clip-1 do
                     if clip[i]~=nil then
                         lib.SetClip(clip[i].x1,clip[i].y1,clip[i].x2,clip[i].y2);
-                        lib.DrawSMap(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
+                        EngineAPI.map.drawScene(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
                     end
                 end
             else    --面积太大，直接重绘
                 lib.SetClip(0,0,CC.ScreenW,CC.ScreenH);   --由于redraw=0，必须给出裁剪矩形以后才能ShowSurface
-                lib.DrawSMap(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
+                EngineAPI.map.drawScene(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
             end
         else
             lib.SetClip(0,0,CC.ScreenW,CC.ScreenH);
-            lib.DrawSMap(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
+            EngineAPI.map.drawScene(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
         end
     end
 

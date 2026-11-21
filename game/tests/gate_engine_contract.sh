@@ -122,6 +122,39 @@ else
     fail=$((fail + 1))
 fi
 
+# --------------------- D4. 延迟 require 的 framework 模块零全局函数
+log "=== STEP: D4. 延迟 require 的 framework 模块零全局函数 ==="
+# **只查「运行时才 require 的模块」**，不是全部 framework。
+#
+# 为什么必须区分：
+#   LÖVE 的严格 `_G` metatable 在 `JYMainAdapter.init`（jymain_adapter.lua:172）
+#   才装上。**init 之前**加载的模块（event_executor / game_states 等，main.lua
+#   顶部 require）写全局函数不受影响 —— 那 33 处既有代码就是这么活的。
+#
+#   但**draw 时才 require** 的模块（map_render 由 map.drawMain/drawScene/drawBattle
+#   延迟加载）在严格 _G 生效之后才执行 → 写全局会抛：
+#     "attempt read write to undeclared variable drawTile"
+#   而 `pcall(require)` 会把错误吞掉 → 静默回退旧实现 → **地图全黑且无日志**。
+#
+#   实测踩过：map_render.lua 的两个 helper 写成全局，摘掉双轨后战斗地图全黑，
+#   排查很久才发现是 require 失败被 pcall 吞了。
+LATE_MODULES="game/framework/map_render.lua"
+bad_d4=$(awk '
+    /^function [A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(/ { print FILENAME ":" FNR ": " $0; next }
+    /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*function/ { print FILENAME ":" FNR ": " $0 }
+' $LATE_MODULES 2>/dev/null | wc -l | tr -dc '0-9')
+[ -n "$bad_d4" ] || bad_d4=0
+if [ "$bad_d4" -eq 0 ]; then
+    log "  [PASS] 延迟 require 的模块零全局函数定义（全部 local）"
+else
+    log "  [FAIL] 延迟 require 的模块有 $bad_d4 处全局函数定义（严格 _G 会拒绝）："
+    awk '
+        /^function [A-Za-z_][A-Za-z0-9_]*[[:space:]]*\(/ { print FILENAME ":" FNR ": " $0; next }
+        /^[A-Za-z_][A-Za-z0-9_]*[[:space:]]*=[[:space:]]*function/ { print FILENAME ":" FNR ": " $0 }
+    ' $LATE_MODULES 2>/dev/null | head -5 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
 # ---------------------------------------- E. sprite_decoder 零引擎依赖
 # ---------------------------------------- D2. script 层零 lib.Pic*
 log "=== STEP: D2. script/ 零 lib.Pic* ==="
