@@ -537,13 +537,11 @@ EngineAPI.ShowSurface = function() end
 EngineAPI.ShowSlow = function() end
 EngineAPI.LoadPicture = function() end
 
--- 设置全局 lib
+-- 只暴露 EngineAPI。
+--
+-- **`_G.lib` 已删除**（port-compat-layer-removal）：实测本文件自身零 `lib.`
+-- 引用，且 framework/script/入口 已零 `lib.*` → 这条兼容层无消费者。
 _G.EngineAPI = EngineAPI
-_G.lib = setmetatable(EngineAPI, { __index = {
-    Debug = function(...) EngineAPI.debug.log(...) end,
-    GetTime = EngineAPI.time.getTime,
-    Delay = EngineAPI.time.sleep,
-} })
 
 -- system 模块（REQ-MS1-1）：MUD 引擎无平台概念
 EngineAPI.system = EngineAPI.system or {}

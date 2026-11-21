@@ -1128,10 +1128,15 @@ EngineAPI.coroutine.isRunning = function()
     if ismain == true then return false end
     return true
 end
--- 设置全局 lib 变量指向 EngineAPI，保持向后兼容
--- 使用 __index 元表：EngineAPI 上找不到的函数，回退到 lib_love 原始实现
+-- 只暴露 EngineAPI 这一个全局。
+--
+-- **`_G.lib` 已删除**（port-compat-layer-removal）：
+--   它曾经是 `setmetatable(EngineAPI, { __index = lib })` —— 等价于把
+--   `lib` 与 `EngineAPI` 变成**同一张表**，于是任何 `lib.xxx = ...` 都会
+--   往 EngineAPI 写一个契约外的键（`async_globals` 的 Delay 补丁就这么错了位）。
+--   实测依据：27808 个事件脚本（1018 基础 + 20 MOD 的 26790）零 `lib.*`，
+--   framework/script/入口 也已零 `lib.*` → 这条回退通道没有消费者了。
 _G.EngineAPI = EngineAPI
-_G.lib = setmetatable(EngineAPI, { __index = lib })
 
 -- 向后兼容：添加 lib_love 中已有的函数，供现有代码直接调用
 EngineAPI.SetDrawLoopFlag = function(flag)

@@ -30,9 +30,12 @@ test.describe('Lua VM 初始化', () => {
     expect(r && r.ok).toBe(true);
   });
 
-  test('lib 表存在', async ({ page }) => {
+  // port-compat-layer-removal：`_G.lib` 兼容层已删除。
+  // 断言它为 **nil** —— 若将来有人把兼容层加回来，这里会立刻红。
+  test('lib 兼容层已删除（_G.lib == nil）', async ({ page }) => {
     const r = await luaEval(page, 'return type(rawget(_G, "lib"))');
     expect(r && r.ok).toBe(true);
+    expect(r.result).toBe('nil');
   });
 
   test('initDataSource._loaded == true', async ({ page }) => {

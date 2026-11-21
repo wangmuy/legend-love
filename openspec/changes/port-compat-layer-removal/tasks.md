@@ -69,14 +69,17 @@
 `game/engine-web/engine_web.lua`
 
 **DoD**：
-- [ ] 删 `interact.lua:185` 的死变量
-- [ ] 删 `settings_store.lua:45` 的死变量
-- [ ] 删 `engine_love2d.lua:1123` 的 `_G.lib = setmetatable(...)`
-- [ ] `engine_mud.lua:537` / `engine_web.lua:642` 的 `_G.lib`：先 `grep` 各引擎内部
-      对 `lib.` 的引用，确认是 `local lib` 还是全局后，删除或降级
-- [ ] 三个引擎都冒烟：LÖVE 实机三界面 + MUD 跑一局 + Web 起一次
-- [ ] `grep -rn '_G.lib =' game/` = 0（tests/ 除外）
-- [ ] 一个 commit
+- [x] 删 `interact.lua:185` 的死变量
+- [x] 删 `settings_store.lua:45` 的死变量（同时补 `local EngineAPI = rawget(...)`，
+      原代码在本函数内引用 `EngineAPI` 会拿到 nil）
+- [x] 删 `engine_love2d.lua` 的 `_G.lib = setmetatable(...)`
+- [x] `engine_mud.lua` / `engine_web.lua` 的 `_G.lib` 一并删除
+      （实测两引擎运行时零 `lib.` 引用；Web 的 30 余条 if 链整块删除）
+- [x] 三个引擎都冒烟：LÖVE 场景 `1efd2af3…` ✓ / 战斗 `6c8eb322…` ✓ /
+      主地图目视正常；MUD 与 Web 各自 `require` 后 `rawget(_G,"lib") == nil` ✓
+- [x] `grep -rn '_G.lib =' game/` = 0（tests/ 与 tools/ 除外）
+- [x] Web 的 `lua-vm.spec.js` 断言从「lib 存在」改为「lib == nil」
+- [x] 一个 commit
 
 ## Task 6：门禁 + 文档
 

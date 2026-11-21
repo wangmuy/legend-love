@@ -648,78 +648,10 @@ end
 --------------------------------------------------------------------------------
 _G.EngineAPI = EngineAPI
 
-_G.lib = setmetatable({}, {
-    __index = function(_, key)
-        if key == "Debug" then return EngineAPI.debug.log end
-        if key == "GetTime" then return EngineAPI.time.getTime end
-        if key == "Delay" then return EngineAPI.time.sleep end
-        if key == "GetKey" then return EngineAPI.input.getKey end
-        if key == "EnableKeyRepeat" then return EngineAPI.input.setKeyRepeat end
-        if key == "SetClip" then return EngineAPI.render.setClip end
-        if key == "FillColor" then return EngineAPI.render.FillColor end
-        if key == "DrawStr" then return EngineAPI.render.DrawStr end
-        if key == "ShowSurface" then return EngineAPI.render.ShowSurface end
-        if key == "LoadPicture" then return EngineAPI.render.LoadPicture end
-        if key == "DrawMMap" then return EngineAPI.render.DrawMMap end
-        if key == "PicInit" then return EngineAPI.render.PicInit end
-        if key == "ShowSlow" then return EngineAPI.render.ShowSlow end
-        if key == "PlayMIDI" then return EngineAPI.render.PlayMIDI end
-        if key == "PlayMPEG" then return EngineAPI.render.PlayMPEG end
-        if key == "Background" then return EngineAPI.render.FillColor end
-        if key == "DrawRect" then return EngineAPI.render.FillColor end
-        -- Stubs for functions called by game_state.lua but not needed in MUD mode:
-        if key == "LoadMMap" then return function() end end
-        if key == "GetMMap" then return function() return 0 end end
-        if key == "UnloadMMap" then return function() end end
-        if key == "PicLoadFile" then return function() end end
-        if key == "GetS" then return function() return -1 end end
-        if key == "SetS" then return function() end end
-        -- lib.SetD / lib.GetD: 操作 JY.D{sceneId} Lua 运行时表（供 jymain.lua 调用）
-        if key == "SetD" then
-            return function(sceneId, eventId, field, value)
-                local JY = rawget(_G, "JY")
-                if not JY then
-                    JY = {}
-                    rawset(_G, "JY", JY)
-                end
-                sceneId = tonumber(sceneId) or sceneId
-                eventId = tonumber(eventId) or 0
-                field = tonumber(field) or 0
-                JY.D = JY.D or {}
-                JY.D[sceneId] = JY.D[sceneId] or {}
-                JY.D[sceneId][eventId] = JY.D[sceneId][eventId] or {}
-                JY.D[sceneId][eventId][field] = value
-            end
-        end
-        if key == "GetD" then
-            return function(sceneId, eventId, field)
-                local JY = rawget(_G, "JY")
-                if not JY or not JY.D then return 0 end
-                sceneId = tonumber(sceneId) or sceneId
-                eventId = tonumber(eventId) or 0
-                field = tonumber(field) or 0
-                local sceneD = JY.D[sceneId]
-                if not sceneD then return 0 end
-                local evt = sceneD[eventId]
-                if not evt then return 0 end
-                -- 当查询字段 0（事件ID）时，检查字段 4/5 是否被 instruct_3 修改
-                -- instruct_3 修改字段 4/5 作为后续事件 ID，字段 0 保持不变
-                if field == 0 then
-                    if evt[5] and evt[5] > 0 then return evt[5] end
-                    if evt[4] and evt[4] > 0 then return evt[4] end
-                    if evt[3] and evt[3] > 0 then return evt[3] end
-                    if evt[2] and evt[2] > 0 then return evt[2] end
-                end
-                return evt[field] or 0
-            end
-        end
-        for _, mod in pairs(EngineAPI) do
-            if type(mod) == "table" and mod[key] then
-                return mod[key]
-            end
-        end
-        return nil
-    end
-})
+-- **`_G.lib` 已删除**（port-compat-layer-removal）。
+--
+-- 它曾是 `setmetatable({}, {__index = ...})` 的字符串键别名表（30 余条 if 链），
+-- 为 Web 引擎模拟 LÖVE 的 lib API。实测本引擎运行时零 `lib.` 引用，
+-- framework/script/入口 也已零 `lib.*` → 无消费者。
 
 return EngineAPI
