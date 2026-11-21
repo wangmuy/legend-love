@@ -820,6 +820,15 @@ M.app = {}
 --- 退出游戏
 function M.app.quit() end
 
+--- 切换全屏/窗口模式（对应 `lib.FullScreen`）
+--
+-- 各引擎的形态不同：LÖVE 是 `love.graphics.toggleFullscreen()`，
+-- Godot 是 `DisplayServer.window_set_mode()`，Web 可能是 no-op
+-- 或 `element.requestFullscreen()`。所以需要契约。
+--
+-- @return boolean 是否真的切换了（无图形能力的引擎返回 false）
+function M.app.toggleFullscreen() end
+
 --------------------------------------------------------------------
 -- system - 系统/平台信息
 --

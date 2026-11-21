@@ -106,7 +106,7 @@ bad_d3=$(awk '
         if (match($0, /^[[:space:]]*--/)) next
         print FILENAME ":" FNR ": " $0
     }
-' game/script/jymain.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
+' game/script/*.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
 [ -n "$bad_d3" ] || bad_d3=0
 if [ "$bad_d3" -eq 0 ]; then
     log "  [PASS] script/ 无裸 lib.Delay（全部走 WaitFrame）"
@@ -118,7 +118,7 @@ else
             if (match($0, /^[[:space:]]*--/)) next
             print FILENAME ":" FNR ": " $0
         }
-    ' game/script/jymain.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null       | head -5 | tee -a "$LOG"
+    ' game/script/*.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null       | head -5 | tee -a "$LOG"
     fail=$((fail + 1))
 fi
 
@@ -171,7 +171,7 @@ bad_d6=$(awk '
         if (match($0, /^[[:space:]]*--/)) next
         print FILENAME ":" FNR ": " $0
     }
-' game/script/jymain.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
+' game/script/*.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
 [ -n "$bad_d6" ] || bad_d6=0
 if [ "$bad_d6" -eq 0 ]; then
     log "  [PASS] script/ 零 lib.*（全部走 EngineAPI）"
@@ -183,7 +183,7 @@ else
             if (match($0, /^[[:space:]]*--/)) next
             print FILENAME ":" FNR ": " $0
         }
-    ' game/script/jymain.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null       | head -5 | tee -a "$LOG"
+    ' game/script/*.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null       | head -5 | tee -a "$LOG"
     fail=$((fail + 1))
 fi
 

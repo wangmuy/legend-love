@@ -576,6 +576,10 @@ end
 --------------------------------------------------------------------------------
 EngineAPI.app = {}
 
+function EngineAPI.app.toggleFullscreen()
+    return false          -- Web 无原生全屏切换（可用 element.requestFullscreen）
+end
+
 --------------------------------------------------------------------------------
 -- system - platform info（REQ-MS1-1）
 --

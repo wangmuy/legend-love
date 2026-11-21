@@ -70,6 +70,10 @@ function TestEngineAPI.testMapModule()
     TestHelper.assertNotNil(EngineAPI.map.getSceneSize, "map.getSceneSize should exist")
     TestHelper.assertNotNil(EngineAPI.map.getBattleSize, "map.getBattleSize should exist")
     TestHelper.assertNotNil(EngineAPI.map.loadClouds, "map.loadClouds should exist")
+    TestHelper.assertNotNil(EngineAPI.app.toggleFullscreen,
+        "app.toggleFullscreen should exist")
+    TestHelper.assertNotNil(EngineAPI.sprite.clearPictureCache,
+        "sprite.clearPictureCache should exist")
 end
 
 function TestEngineAPI.testInputModule()

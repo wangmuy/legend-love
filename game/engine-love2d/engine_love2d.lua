@@ -1157,6 +1157,11 @@ EngineAPI.init = function()
 end
 
 EngineAPI.app = EngineAPI.app or {}
+EngineAPI.app.toggleFullscreen = function()
+    lib.FullScreen()
+    return true
+end
+
 EngineAPI.app.quit = function()
     love.event.quit()
 end

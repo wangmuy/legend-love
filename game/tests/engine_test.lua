@@ -627,6 +627,12 @@ _G.lib = setmetatable(EngineAPI, { __index = {
 EngineAPI.init = function() end
 
 EngineAPI.app = EngineAPI.app or {}
+
+EngineAPI.app.toggleFullscreen = function()
+    logCall("app.toggleFullscreen")
+    EngineAPI.app._fullscreen = not EngineAPI.app._fullscreen
+    return true
+end
 EngineAPI.app.quit = function()
     logCall("app.quit")
 end

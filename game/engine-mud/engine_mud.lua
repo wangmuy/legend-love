@@ -213,6 +213,13 @@ EngineAPI.map.getSceneSize = function()
     return { w = 64, h = 64 }
 end
 
+EngineAPI.app = EngineAPI.app or {}
+
+EngineAPI.app.toggleFullscreen = function()
+    logCall("app.toggleFullscreen")
+    return false          -- MUD 无图形
+end
+
 EngineAPI.sprite.clearPictureCache = function()
     logCall("sprite.clearPictureCache")
 end

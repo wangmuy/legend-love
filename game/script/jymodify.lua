@@ -38,8 +38,8 @@ end
 
 
 function Menu_FullScreen()
-    lib.FullScreen();
-	lib.Debug("finish fullscreen");
+    EngineAPI.app.toggleFullscreen();
+	EngineAPI.debug.log("finish fullscreen");
 end
 
 
@@ -206,11 +206,11 @@ end
 --如果是全新的处理函数，直接使用newCallEvent即可。
 --flag 1 空格触发，2，物品触发，3，路过触发
 function newSceneEvent_1(flag)
-    lib.Debug(string.format("newSceneEvent_1: flag=%d, CurrentD=%d", flag, JY.CurrentD));
+    EngineAPI.debug.log(string.format("newSceneEvent_1: flag=%d, CurrentD=%d", flag, JY.CurrentD));
     
     -- 调试：显示D* 16的数据
     if JY.CurrentD == 16 then
-        lib.Debug(string.format("D*16: v0=%d, v1=%d, v2=%d, v3=%d, v4=%d", 
+        EngineAPI.debug.log(string.format("D*16: v0=%d, v1=%d, v2=%d, v3=%d, v4=%d", 
             GetD(JY.SubScene, 16, 0),
             GetD(JY.SubScene, 16, 1),
             GetD(JY.SubScene, 16, 2),
@@ -221,13 +221,13 @@ function newSceneEvent_1(flag)
     -- 检查是否在协程中，如果在协程中使用异步版本
     local EventExecutor = require("framework.event_executor")
     if JY.CurrentD<=18 then     --对以前编号的D*，仍然调用旧的处理函数
-        lib.Debug("newSceneEvent_1: calling oldEventExecuteCoroutine");
+        EngineAPI.debug.log("newSceneEvent_1: calling oldEventExecuteCoroutine");
         EventExecutor.oldEventExecuteCoroutine(flag);
-        lib.Debug("newSceneEvent_1: oldEventExecuteCoroutine returned");
+        EngineAPI.debug.log("newSceneEvent_1: oldEventExecuteCoroutine returned");
     else
-        lib.Debug("newSceneEvent_1: calling newCallEvent");
+        EngineAPI.debug.log("newSceneEvent_1: calling newCallEvent");
         newCallEvent(flag);
-        lib.Debug("newSceneEvent_1: newCallEvent returned");
+        EngineAPI.debug.log("newSceneEvent_1: newCallEvent returned");
 	end
 end
 
