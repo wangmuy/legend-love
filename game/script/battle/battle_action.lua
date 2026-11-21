@@ -221,7 +221,7 @@ function War_MovePerson(x,y)            --移动人物到位置x,y
     end
 
     for i=1,movenum do
-        local t1=lib.GetTime();
+        local t1=EngineAPI.time.getTime();
 
         SetWarMap(WAR.Person[WAR.CurID]["坐标X"],WAR.Person[WAR.CurID]["坐标Y"],2,-1);
         SetWarMap(WAR.Person[WAR.CurID]["坐标X"],WAR.Person[WAR.CurID]["坐标Y"],5,-1);
@@ -236,7 +236,7 @@ function War_MovePerson(x,y)            --移动人物到位置x,y
 
         WarDrawMap(0);
         ShowScreen();
-        local t2=lib.GetTime();
+        local t2=EngineAPI.time.getTime();
         if i<movenum then
             if (t2-t1)< 2*CC.Frame then
                 WaitFrame(2*CC.Frame-(t2-t1));
@@ -380,7 +380,7 @@ function War_FightSelectType0(wugong,level,x1,y1)          --选择点攻击
         x1,y1=War_SelectMove();              --选择攻击对象
     end
     if x1 ==nil then
-        lib.GetKey();
+        EngineAPI.input.getKey();
         Cls();
         return false;
     end
@@ -498,7 +498,7 @@ function War_FightSelectType3(wugong,level,x1,y1)            --选择面攻击
     end
 
     if x1 ==nil then
-        lib.GetKey();
+        EngineAPI.input.getKey();
         Cls();
         return false;
     end

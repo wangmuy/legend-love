@@ -190,24 +190,24 @@ function JY_Main()        --主程序入口
 end
 
 function myErrFun(err)      --错误处理，打印错误信息
-    lib.Debug(err);                 --输出错误信息
-    lib.Debug(debug.traceback());   --输出调用堆栈信息
+    EngineAPI.debug.log(err);                 --输出错误信息
+    EngineAPI.debug.log(debug.traceback());   --输出调用堆栈信息
 end
 
 function JY_Main_sub()        --真正的游戏主程序入口
-    lib.Debug("JY_Main_sub started")
+    EngineAPI.debug.log("JY_Main_sub started")
     IncludeFile();         --导入其他模块
-    lib.Debug("IncludeFile done")
+    EngineAPI.debug.log("IncludeFile done")
     SetGlobalConst();    --设置全程变量 CC, 程序使用的常量
-    lib.Debug("SetGlobalConst done")
+    EngineAPI.debug.log("SetGlobalConst done")
     SetGlobal();         --设置全程变量 JY
-    lib.Debug("SetGlobal done")
+    EngineAPI.debug.log("SetGlobal done")
 
     GenTalkIdx();        --生成对话 idx
-    lib.Debug("GenTalkIdx done")
+    EngineAPI.debug.log("GenTalkIdx done")
 
     SetModify();         --设置对函数的修改，定义新的物品，事件等等
-    lib.Debug("SetModify done")
+    EngineAPI.debug.log("SetModify done")
 
     --禁止访问全程变量
     setmetatable(_G,{ __newindex =function (_,n)
@@ -217,11 +217,11 @@ function JY_Main_sub()        --真正的游戏主程序入口
                        error("attempt read read to undeclared variable " .. n,2);
                        end,
                      }  );
-    lib.Debug("JY_Main start.");
+    EngineAPI.debug.log("JY_Main start.");
 
     math.randomseed(os.time());          --初始化随机数发生器
 
-    lib.EnableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);   --设置键盘重复率
+    EngineAPI.input.enableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);   --设置键盘重复率
 
     JY.Status=GAME_START;
 
@@ -234,7 +234,7 @@ function JY_Main_sub()        --真正的游戏主程序入口
     Cls();
 
     PlayMIDI(16);
-    lib.ShowSlow(50,0);
+    EngineAPI.render.present();
 
     local menu={  {"重新开始",nil,1},
                   {"载入进度",nil,1},
@@ -256,7 +256,7 @@ function JY_Main_sub()        --真正的游戏主程序入口
         JY.Base["人Y1"]=CC.NewGameSceneY;
         JY.MyPic=CC.NewPersonPic;
 
-        lib.ShowSlow(50,1)
+        EngineAPI.render.present()
         JY.Status=GAME_SMAP;
         JY.MMAPMusic=-1;
 
@@ -293,7 +293,7 @@ function JY_Main_sub()        --真正的游戏主程序入口
         return ;
     end
     lib.LoadPicture("",0,0);
-    lib.GetKey();
+    EngineAPI.input.getKey();
     Game_Cycle();
 end
 
@@ -380,10 +380,10 @@ end
 
 
 function Game_Cycle()       --游戏主循环
-    lib.Debug("Start game cycle");
+    EngineAPI.debug.log("Start game cycle");
 
     while JY.Status ~=GAME_END do
-        local tstart=lib.GetTime();
+        local tstart=EngineAPI.time.getTime();
 
         JY.MyTick=JY.MyTick+1;    --20个节拍无击键，则主角变为站立状态
         JY.MyTick2=JY.MyTick2+1;    --20个节拍无击键，则主角变为站立状态
@@ -399,14 +399,14 @@ function Game_Cycle()       --游戏主循环
 
         if JY.Status==GAME_FIRSTMMAP then  --首次显示主场景，重新调用主场景贴图，渐变显示。然后转到正常显示
             CleanMemory();
-            lib.ShowSlow(50,1)
+            EngineAPI.render.present()
             JY.MmapMusic=16;
             JY.Status=GAME_MMAP;
 
             Init_MMap();
 
             lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],GetMyPic());
-            lib.ShowSlow(50,0);
+            EngineAPI.render.present();
         elseif JY.Status==GAME_MMAP then
             Game_MMap();
          elseif JY.Status==GAME_SMAP then
@@ -415,7 +415,7 @@ function Game_Cycle()       --游戏主循环
 
         collectgarbage("step",0);
 
-        local tend=lib.GetTime();
+        local tend=EngineAPI.time.getTime();
 
         if tend-tstart<CC.Frame then
             WaitFrame(CC.Frame-(tend-tstart));
@@ -449,7 +449,7 @@ end
 function Game_MMap()      --主地图
 
     local direct = -1;
-    local keypress = lib.GetKey();
+    local keypress = EngineAPI.input.getKey();
     if keypress ~= -1 then
         JY.MyTick=0;
         if keypress==VK_ESCAPE then
@@ -503,12 +503,12 @@ function Game_MMap()      --主地图
             if JY.oldMMapPic>=0 and JY.oldMMapPic ~= pic then        --主角贴图有变化，则刷新显示。
                 local rr=ClipRect(Cal_PicClip(0,0,JY.oldMMapPic,0,0,0,pic,0));
                 if rr~=nil then
-                    lib.SetClip(rr.x1,rr.y1,rr.x2,rr.y2);
+                    EngineAPI.render.setClip(rr.x1,rr.y1,rr.x2,rr.y2);
                     lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],pic);             --显示主地图
                 end
             end
         else
-            lib.SetClip(0,0,CC.ScreenW,CC.ScreenH);
+            EngineAPI.render.setClip(0,0,CC.ScreenW,CC.ScreenH);
             lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],pic);             --显示主地图
         end
     else  --全部显示
@@ -520,7 +520,7 @@ function Game_MMap()      --主地图
     end
 
     ShowScreen(CONFIG.FastShowScreen);
-    lib.SetClip(0,0,0,0);
+    EngineAPI.render.setClip(0,0,0,0);
 
     JY.oldMMapX=JY.Base["人X"];
     JY.oldMMapY=JY.Base["人Y"];
@@ -529,7 +529,7 @@ function Game_MMap()      --主地图
     if JY.SubScene >= 0 then          --进入子场景
         CleanMemory();
         lib.UnloadMMap();
-            lib.ShowSlow(50,1)
+            EngineAPI.render.present()
 
         JY.Status=GAME_SMAP;
         JY.MMAPMusic=-1;
@@ -563,8 +563,8 @@ function Init_SMap(showname)   --初始化场景数据
     JY.D_Valid=nil;
 
     DrawSMap();
-    lib.ShowSlow(50,0)
-    lib.GetKey();
+    EngineAPI.render.present()
+    EngineAPI.input.getKey();
 
     --showname=1 时提示场景名。
     --
@@ -1390,7 +1390,7 @@ function SelectThing(thing,thingnum)    --显示物品菜单
                 end
                 local boxx=dx+CC.ThingGapOut+x*(CC.ThingPicWidth+CC.ThingGapIn);
                 local boxy=y3_1+CC.ThingGapOut+y*(CC.ThingPicHeight+CC.ThingGapIn);
-                lib.DrawRect(boxx,boxy,boxx+CC.ThingPicWidth+1,boxy+CC.ThingPicHeight+1,boxcolor);
+                EngineAPI.render.rectOutline(boxx,boxy,boxx+CC.ThingPicWidth+1,boxy+CC.ThingPicHeight+1,boxcolor);
                 if thing[id]>=0 then
                     if CC.LoadThingPic==1 then
                         SpriteAtlas.draw(2, thing[id]*2, boxx+1, boxy+1, 0x1);
@@ -1463,7 +1463,7 @@ function Game_SMap()         --场景处理主函数
 
     ShowScreen(CONFIG.FastShowScreen);
 
-    lib.SetClip(0,0,0,0);
+    EngineAPI.render.setClip(0,0,0,0);
 
     local d_pass=GetS(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],3);   --当前路过事件
     if d_pass>=0 then
@@ -1489,7 +1489,7 @@ function Game_SMap()         --场景处理主函数
         JY.Status=GAME_MMAP;
 
             CleanMemory();
-        lib.ShowSlow(50,1)
+        EngineAPI.render.present()
 
         if JY.MMAPMusic<0 then
             JY.MMAPMusic=JY.Scene[JY.SubScene]["出门音乐"];
@@ -1504,8 +1504,8 @@ function Game_SMap()         --场景处理主函数
         JY.oldSMapY=-1;
 
         lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],GetMyPic());
-        lib.ShowSlow(50,0)
-        lib.GetKey();
+        EngineAPI.render.present()
+        EngineAPI.input.getKey();
         return;
     end
 
@@ -1513,7 +1513,7 @@ function Game_SMap()         --场景处理主函数
     if JY.Scene[JY.SubScene]["跳转场景"] >=0 then
         if JY.Base["人X1"]==JY.Scene[JY.SubScene]["跳转口X1"] and JY.Base["人Y1"]==JY.Scene[JY.SubScene]["跳转口Y1"] then
             JY.SubScene=JY.Scene[JY.SubScene]["跳转场景"];
-            lib.ShowSlow(50,1);
+            EngineAPI.render.present();
 
             if JY.Scene[JY.SubScene]["外景入口X1"]==0 and JY.Scene[JY.SubScene]["外景入口Y1"]==0 then
                 JY.Base["人X1"]=JY.Scene[JY.SubScene]["入口X"];            --新场景的外景入口为0，表示这是一个内部场景
@@ -1530,7 +1530,7 @@ function Game_SMap()         --场景处理主函数
     end
 
     local x,y;
-    local keypress = lib.GetKey();
+    local keypress = EngineAPI.input.getKey();
     local direct=-1;
     if keypress ~= -1 then
         JY.MyTick=0;
@@ -1733,16 +1733,16 @@ function DrawSMap(fastdraw)         --绘场景地图
             if area <CC.ScreenW*CC.ScreenH/2 and num_clip<15 then        --面积足够小，矩形数目少，则更新脏矩形。
                 for i=0,num_clip-1 do
                     if clip[i]~=nil then
-                        lib.SetClip(clip[i].x1,clip[i].y1,clip[i].x2,clip[i].y2);
+                        EngineAPI.render.setClip(clip[i].x1,clip[i].y1,clip[i].x2,clip[i].y2);
                         EngineAPI.map.drawScene(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
                     end
                 end
             else    --面积太大，直接重绘
-                lib.SetClip(0,0,CC.ScreenW,CC.ScreenH);   --由于redraw=0，必须给出裁剪矩形以后才能ShowSurface
+                EngineAPI.render.setClip(0,0,CC.ScreenW,CC.ScreenH);   --由于redraw=0，必须给出裁剪矩形以后才能ShowSurface
                 EngineAPI.map.drawScene(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
             end
         else
-            lib.SetClip(0,0,CC.ScreenW,CC.ScreenH);
+            EngineAPI.render.setClip(0,0,CC.ScreenW,CC.ScreenH);
             EngineAPI.map.drawScene(JY.SubScene,JY.Base["人X1"],JY.Base["人Y1"],x,y,JY.MyPic);
         end
     end
@@ -1825,26 +1825,26 @@ end
 --这里是先把数据读入Byte数组中。然后定义访问相应表的方法，在访问表时直接从数组访问。
 --与以前的实现相比，从文件中读取和保存到文件的时间显著加快。而且内存占用少了
 function LoadRecord(id)       -- 读取游戏进度
-    local t1=lib.GetTime();
+    local t1=EngineAPI.time.getTime();
 
     local idxFile = CC.R_IDXFilename[id]
     local grpFile = CC.R_GRPFilename[id]
     local sFile = CC.S_Filename[id]
     local dFile = CC.D_Filename[id]
 
-    lib.Debug(string.format("LoadRecord: id=%d", id));
-    lib.Debug(string.format("LoadRecord: idx=%s grp=%s s=%s d=%s", tostring(idxFile), tostring(grpFile), tostring(sFile), tostring(dFile)));
+    EngineAPI.debug.log(string.format("LoadRecord: id=%d", id));
+    EngineAPI.debug.log(string.format("LoadRecord: idx=%s grp=%s s=%s d=%s", tostring(idxFile), tostring(grpFile), tostring(sFile), tostring(dFile)));
 
     -- 存档文件不存在时，不做任何读取，避免崩溃
     if id > 0 then
         if not FileUtil.exists(idxFile) or not FileUtil.exists(grpFile) or not FileUtil.exists(sFile) or not FileUtil.exists(dFile) then
-            lib.Debug(string.format("LoadRecord: save slot %d missing files, skip load", id));
+            EngineAPI.debug.log(string.format("LoadRecord: save slot %d missing files, skip load", id));
             return false;
         end
     else
         -- 新游戏基础数据必须存在
         if not FileUtil.exists(idxFile) or not FileUtil.exists(grpFile) then
-            lib.Debug("LoadRecord: base new game files missing, skip load");
+            EngineAPI.debug.log("LoadRecord: base new game files missing, skip load");
             return false;
         end
     end
@@ -1977,16 +1977,16 @@ function LoadRecord(id)       -- 读取游戏进度
     lib.LoadSMap(sFile,CC.TempS_Filename,JY.SceneNum,CC.SWidth,CC.SHeight,dFile,CC.DNum,11);
     collectgarbage();
 
-    lib.Debug(string.format("Loadrecord time=%d",lib.GetTime()-t1));
+    EngineAPI.debug.log(string.format("Loadrecord time=%d",EngineAPI.time.getTime()-t1));
     return true;
 end
 
 -- 写游戏进度
 -- id=0 新进度，=1/2/3 进度
 function SaveRecord(id)         -- 写游戏进度
-    lib.Debug("SaveRecord: start id=" .. tostring(id))
+    EngineAPI.debug.log("SaveRecord: start id=" .. tostring(id))
     --读取R*.idx文件
-    local t1=lib.GetTime();
+    local t1=EngineAPI.time.getTime();
 
     -- 首次保存该槽时，存档目录里还没有 rN.idx（分段偏移表），
     -- 先从 MOD/原版的基础数据模板（ranger.idx）播种一份，否则会读到全 0 idx，
@@ -1997,12 +1997,12 @@ function SaveRecord(id)         -- 写游戏进度
             ModData.EnsureSaveDir()
             local seeded = ModData.SeedSaveSlot(id)
             if seeded then
-                lib.Debug(string.format("SaveRecord: seeded idx from template -> %s", seeded))
+                EngineAPI.debug.log(string.format("SaveRecord: seeded idx from template -> %s", seeded))
             end
         end
     end
 
-    lib.Debug("SaveRecord: reading idx file")
+    EngineAPI.debug.log("SaveRecord: reading idx file")
     local data=Byte.create(6*4);
     Byte.loadfile(data,CC.R_IDXFilename[id],0,6*4);
 
@@ -2012,7 +2012,7 @@ function SaveRecord(id)         -- 写游戏进度
         idx[i]=Byte.get32(data,4*(i-1));
     end
 
-    lib.Debug("SaveRecord: writing grp files")
+    EngineAPI.debug.log("SaveRecord: writing grp files")
     --写R*.grp文件
     Byte.savefile(JY.Data_Base,CC.R_GRPFilename[id],idx[0],idx[1]-idx[0]);
 
@@ -2026,7 +2026,7 @@ function SaveRecord(id)         -- 写游戏进度
 
     Byte.savefile(JY.Data_Shop,CC.R_GRPFilename[id],idx[5],CC.ShopSize*JY.ShopNum);
 
-    lib.Debug("SaveRecord: calling SaveSMap")
+    EngineAPI.debug.log("SaveRecord: calling SaveSMap")
     lib.SaveSMap(CC.S_Filename[id],CC.D_Filename[id]);
 
     -- MOD 存档覆盖表：把本次会话中修改过的字符串写入 rN.ovr
@@ -2037,8 +2037,8 @@ function SaveRecord(id)         -- 写游戏进度
         end
     end
 
-    lib.Debug(string.format("SaveRecord time=%d",lib.GetTime()-t1));
-    lib.Debug("SaveRecord: done")
+    EngineAPI.debug.log(string.format("SaveRecord time=%d",EngineAPI.time.getTime()-t1));
+    EngineAPI.debug.log("SaveRecord: done")
 
 end
 -------------------------------------------------------------------------------------
@@ -2159,7 +2159,7 @@ end
 function WaitKey()       --等待键盘输入
     local keyPress=-1;
     while true do
-        keyPress=lib.GetKey();
+        keyPress=EngineAPI.input.getKey();
         if keyPress ~=-1 then
              break;
         end
@@ -2220,7 +2220,7 @@ end
 --(x,y) 坐标，如果都为-1,则在屏幕中间显示
 --改为用菜单询问是否
 function DrawStrBoxYesNo(x,y,str,color,size)        --显示字符串并询问Y/N
-    lib.GetKey();
+    EngineAPI.input.getKey();
     size = size or CC.DefaultFont;
     -- 与 DrawStrBox 同源：框宽必须按真实像素宽算，
     -- 否则下面 ShowMenu 的 x 定位（依赖 w）也会偏。
@@ -2251,7 +2251,7 @@ end
 
 --显示字符串并等待击键，字符串带框，显示在屏幕中间
 function DrawStrBoxWaitKey(s,color,size)          --显示字符串并等待击键
-    lib.GetKey();
+    EngineAPI.input.getKey();
     Cls();
     DrawStrBox(-1,-1,s,color,size);
     ShowScreen();
@@ -2344,7 +2344,7 @@ end
 --flag =0 or nil 全部刷新屏幕
 --      1 考虑脏矩形的快速刷新
 function ShowScreen(flag)              --刷新屏幕显示
-    lib.Debug(string.format("ShowScreen called: flag=%s, Darkness=%d", tostring(flag), JY.Darkness));
+    EngineAPI.debug.log(string.format("ShowScreen called: flag=%s, Darkness=%d", tostring(flag), JY.Darkness));
     if JY.Darkness==0 then
         if flag==nil then
             flag=0;
@@ -2383,7 +2383,7 @@ end
 --         <0 选中的菜单项，调用函数要求退出父菜单，这个用于退出多层菜单
 
 function ShowMenu(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,selectColor)     --通用菜单函数
-    lib.Debug(string.format("ShowMenu called: numItem=%d, numShow=%d", numItem, numShow));
+    EngineAPI.debug.log(string.format("ShowMenu called: numItem=%d, numShow=%d", numItem, numShow));
     
     local w=0;
     local h=0;   --边框的宽高
@@ -2391,7 +2391,7 @@ function ShowMenu(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,se
     local num=0;     --实际的显示菜单项
     local newNumItem=0;  --能够显示的总菜单项数
 
-    lib.GetKey();
+    EngineAPI.input.getKey();
 
     local newMenu={};   -- 定义新的数组，以保存所有能显示的菜单项
 
@@ -2507,7 +2507,7 @@ function ShowMenu(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,se
 
     Cls(x1,y1,x1+w+1,y1+h+1,0,1);
 
-    lib.Debug(string.format("ShowMenu returned: returnValue=%d", returnValue));
+    EngineAPI.debug.log(string.format("ShowMenu returned: returnValue=%d", returnValue));
     return returnValue;
 end
 
@@ -2519,7 +2519,7 @@ function ShowMenu2(menuItem,numItem,numShow,x1,y1,x2,y2,isBox,isEsc,size,color,s
     local num=0;     --实际的显示菜单项
     local newNumItem=0;  --能够显示的总菜单项数
 
-    lib.GetKey();
+    EngineAPI.input.getKey();
 
     local newMenu={};   -- 定义新的数组，以保存所有能显示的菜单项
 
@@ -2996,12 +2996,12 @@ end
 --flag 1 空格触发，2，物品触发，3，路过触发
 function EventExecute(id,flag)               --事件调用主入口
     JY.CurrentD=id;
-    lib.Debug(string.format("EventExecute: id=%d, flag=%d, SubScene=%d", id, flag, JY.SubScene));
+    EngineAPI.debug.log(string.format("EventExecute: id=%d, flag=%d, SubScene=%d", id, flag, JY.SubScene));
     if JY.SceneNewEventFunction[JY.SubScene]==nil then         --没有定义新的事件处理函数，调用旧的
-        lib.Debug("EventExecute: calling oldEventExecute");
+        EngineAPI.debug.log("EventExecute: calling oldEventExecute");
         oldEventExecute(flag)
     else
-        lib.Debug("EventExecute: calling SceneNewEventFunction");
+        EngineAPI.debug.log("EventExecute: calling SceneNewEventFunction");
         JY.SceneNewEventFunction[JY.SubScene](flag)         --调用新的事件处理函数
     end
     JY.CurrentD=-1;
@@ -3021,7 +3021,7 @@ function oldEventExecute(flag)            --调用原有的指定位置的函数
         eventnum=GetD(JY.SubScene,JY.CurrentD,4);
     end
 
-    lib.Debug(string.format("oldEventExecute: flag=%d, CurrentD=%d, eventnum=%d", flag, JY.CurrentD, eventnum or -1));
+    EngineAPI.debug.log(string.format("oldEventExecute: flag=%d, CurrentD=%d, eventnum=%d", flag, JY.CurrentD, eventnum or -1));
 
     if eventnum>0 then
         oldCallEvent(eventnum);
@@ -3031,14 +3031,14 @@ end
 
 function oldCallEvent(eventnum)     --执行旧的事件函数
     local eventfilename=string.format("oldevent_%d.lua",eventnum);
-    lib.Debug(string.format("oldCallEvent: eventnum=%d, filename=%s", eventnum, eventfilename));
+    EngineAPI.debug.log(string.format("oldCallEvent: eventnum=%d, filename=%s", eventnum, eventfilename));
     local chunk, err = ScriptLoader.load(CONFIG.OldEventPath .. eventfilename)
     if chunk then
         chunk()
     else
         JY_Error("oldCallEvent load failed: %s (%s)", tostring(eventfilename), tostring(err))
     end
-    lib.Debug(string.format("oldCallEvent: eventnum=%d finished", eventnum));
+    EngineAPI.debug.log(string.format("oldCallEvent: eventnum=%d finished", eventnum));
 end
 
 
@@ -3069,11 +3069,11 @@ function Cls(x1,y1,x2,y2)                    --清除屏幕
         y2=0;
     end
 
-    lib.Debug(string.format("Cls called: x1=%s, y1=%s, x2=%s, y2=%s, Status=%d", tostring(x1), tostring(y1), tostring(x2), tostring(y2), JY.Status));
-    lib.SetClip(x1,y1,x2,y2);
+    EngineAPI.debug.log(string.format("Cls called: x1=%s, y1=%s, x2=%s, y2=%s, Status=%d", tostring(x1), tostring(y1), tostring(x2), tostring(y2), JY.Status));
+    EngineAPI.render.setClip(x1,y1,x2,y2);
 
     if JY.Status==GAME_START then
-        lib.FillColor(0,0,0,0,0);
+        EngineAPI.render.fillRect(0,0,0,0,0);
         lib.LoadPicture(CC.FirstFile,-1,-1);
     elseif JY.Status==GAME_MMAP then
         lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],GetMyPic());             --显示主地图
@@ -3082,10 +3082,10 @@ function Cls(x1,y1,x2,y2)                    --清除屏幕
     elseif JY.Status==GAME_WMAP then
         WarDrawMap(0);
     elseif JY.Status==GAME_DEAD then
-        lib.FillColor(0,0,0,0,0);
+        EngineAPI.render.fillRect(0,0,0,0,0);
         lib.LoadPicture(CC.DeadFile,-1,-1);
     end
-    lib.SetClip(0,0,0,0);
+    EngineAPI.render.setClip(0,0,0,0);
 end
 
 
@@ -3142,7 +3142,7 @@ end
 --复杂版本对话
 --s 字符串，必须加上*作为分行，如果里面没有*,则会自动加上
 function TalkEx(s,headid,flag)          --复杂版本对话
-    lib.Debug(string.format("TalkEx called: headid=%d, flag=%d, s=%s", headid, flag, string.sub(s, 1, 30)));
+    EngineAPI.debug.log(string.format("TalkEx called: headid=%d, flag=%d, s=%s", headid, flag, string.sub(s, 1, 30)));
 
     if flag<0 or flag>5 then
         flag=0;
@@ -3156,14 +3156,14 @@ function TalkEx(s,headid,flag)          --复杂版本对话
     local dialog = EngineAPI.dialog;
 
     if CONFIG.KeyRepeat==0 then
-         lib.EnableKeyRepeat(0,CONFIG.KeyRepeatInterval);
+         EngineAPI.input.enableKeyRepeat(0,CONFIG.KeyRepeatInterval);
     end
-    lib.GetKey();
+    EngineAPI.input.getKey();
 
     if not layout or not layout.lines or #layout.lines == 0 then
         -- 引擎未实现排版（非图形引擎）：直接结束
         if CONFIG.KeyRepeat==0 then
-             lib.EnableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);
+             EngineAPI.input.enableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);
         end
         Cls();
         return;
@@ -3209,7 +3209,7 @@ function TalkEx(s,headid,flag)          --复杂版本对话
     end
 
     if CONFIG.KeyRepeat==0 then
-         lib.EnableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);
+         EngineAPI.input.enableKeyRepeat(CONFIG.KeyRepeatDelay,CONFIG.KeyRepeatInterval);
     end
 
     Cls();
@@ -3223,9 +3223,9 @@ end
 
 --清屏
 function instruct_0()         --清屏
-    lib.Debug("instruct_0: START");
+    EngineAPI.debug.log("instruct_0: START");
     Cls();
-    lib.Debug("instruct_0: FINISHED");
+    EngineAPI.debug.log("instruct_0: FINISHED");
 end
 
 --对话
@@ -3239,15 +3239,15 @@ end
 --            5 屏幕下方显示, 左边头像，右边对话
 
 function instruct_1(talkid,headid,flag)        --对话
-    lib.Debug(string.format("instruct_1: START talkid=%d, headid=%d, flag=%d", talkid, headid, flag));
+    EngineAPI.debug.log(string.format("instruct_1: START talkid=%d, headid=%d, flag=%d", talkid, headid, flag));
     local s=ReadTalk(talkid);
     if s==nil then        --对话id不存在
-        lib.Debug(string.format("instruct_1: talkid=%d not found", talkid));
+        EngineAPI.debug.log(string.format("instruct_1: talkid=%d not found", talkid));
         return ;
     end
-    lib.Debug(string.format("instruct_1: calling TalkEx with talkid=%d", talkid));
+    EngineAPI.debug.log(string.format("instruct_1: calling TalkEx with talkid=%d", talkid));
     TalkEx(s,headid,flag);
-    lib.Debug(string.format("instruct_1: FINISHED talkid=%d", talkid));
+    EngineAPI.debug.log(string.format("instruct_1: FINISHED talkid=%d", talkid));
 end
 
 --根据oldtalk.grp文件来idx索引文件。供后面读对话使用
@@ -3313,7 +3313,7 @@ function ReadTalk(talkid)            --从文件读取一条对话
     local length=filelength(idxfile);
 
     if talkid<0 or talkid>=length/4 then
-        lib.Debug(string.format("ReadTalk: talkid=%d out of range", talkid));
+        EngineAPI.debug.log(string.format("ReadTalk: talkid=%d out of range", talkid));
         return
     end
 
@@ -3337,7 +3337,7 @@ function ReadTalk(talkid)            --从文件读取一条对话
     local talk=p:read("*line");
     p:close();
 
-    lib.Debug(string.format("ReadTalk: talkid=%d, talk=%s", talkid, string.sub(talk or "nil", 1, 30)));
+    EngineAPI.debug.log(string.format("ReadTalk: talkid=%d, talk=%s", talkid, string.sub(talk or "nil", 1, 30)));
 
     return talk;
 
@@ -3447,38 +3447,38 @@ function instruct_6(warid,tmp,tmp2,flag)      --战斗
     local co = coroutine.running()
     local isexp = (flag == 0) and 0 or (flag or 1)
     if co then
-        lib.Debug("instruct_6: running in coroutine, warid=" .. warid .. ", flag=" .. tostring(flag) .. ", isexp=" .. tostring(isexp))
+        EngineAPI.debug.log("instruct_6: running in coroutine, warid=" .. warid .. ", flag=" .. tostring(flag) .. ", isexp=" .. tostring(isexp))
         -- 注意：必须写全 framework.* 前缀。裸名 "coroutine_scheduler"/"war_async"
         -- 在 package.path 下找不到（实测 require 直接失败），会让 instruct_6
         -- 在协程分支抛错、整场战斗无法开始。
         local scheduler = require("framework.coroutine_scheduler").getInstance()
         local WarAsync = require("framework.war_async")
         
-        lib.Debug("instruct_6: creating battle sub-coroutine")
+        EngineAPI.debug.log("instruct_6: creating battle sub-coroutine")
         local warCo = scheduler:create(function()
             return WarAsync.WarMainCoroutine(warid, isexp)
         end, "battle_sub")
         
-        lib.Debug("instruct_6: created sub-coroutine id=" .. tostring(warCo))
+        EngineAPI.debug.log("instruct_6: created sub-coroutine id=" .. tostring(warCo))
         
         scheduler:start(warCo)
-        lib.Debug("instruct_6: started sub-coroutine, now waiting")
+        EngineAPI.debug.log("instruct_6: started sub-coroutine, now waiting")
         
         -- 等待战斗协程结束
         local waitCount = 0
         while scheduler:isActive(warCo) do
             waitCount = waitCount + 1
             if waitCount % 100 == 0 then
-                lib.Debug("instruct_6: waiting for battle, count=" .. waitCount .. ", isActive=" .. tostring(scheduler:isActive(warCo)))
+                EngineAPI.debug.log("instruct_6: waiting for battle, count=" .. waitCount .. ", isActive=" .. tostring(scheduler:isActive(warCo)))
             end
             scheduler:yield("battle_person_done")
         end
         
         local result = scheduler:getResult(warCo)
-        lib.Debug("instruct_6: battle ended, result=" .. tostring(result))
+        EngineAPI.debug.log("instruct_6: battle ended, result=" .. tostring(result))
         return result
     else
-        lib.Debug("instruct_6: NOT in coroutine, warid=" .. warid .. ", using blocking WarMain")
+        EngineAPI.debug.log("instruct_6: NOT in coroutine, warid=" .. warid .. ", using blocking WarMain")
         return WarMain(warid, isexp)
     end
 end
@@ -3502,14 +3502,14 @@ end
 
 function instruct_10(personid)            --加入队员
     if JY.Person[personid]==nil then
-        lib.Debug("instruct_10 error: person id not exist");
+        EngineAPI.debug.log("instruct_10 error: person id not exist");
         return ;
     end
     -- 防重复入队：若该角色已在队伍中（不区分其当前所在地），直接返回，避免因
     -- 重复触发加入剧情（如重复对话、事件在同 tile 多实体上重复分发）而产生两份相同队员。
     for i =1, CC.TeamNum do
         if JY.Base and JY.Base["队伍"..i]==personid then
-            lib.Debug("instruct_10 info: person "..tostring(personid).." already in team, skip duplicate join");
+            EngineAPI.debug.log("instruct_10 info: person "..tostring(personid).." already in team, skip duplicate join");
             return ;
         end
     end
@@ -3522,7 +3522,7 @@ function instruct_10(personid)            --加入队员
         end
     end
     if add==0 then
-        lib.Debug("instruct_10 error: 加入队伍已满");
+        EngineAPI.debug.log("instruct_10 error: 加入队伍已满");
         return ;
     end
 
@@ -3562,13 +3562,13 @@ end
 function instruct_13()            --场景变亮
     Cls();
     JY.Darkness=0;
-    lib.ShowSlow(50,0)
-    lib.GetKey();
+    EngineAPI.render.present()
+    EngineAPI.input.getKey();
 end
 
 
 function instruct_14()             --场景变黑
-    lib.ShowSlow(50,1);
+    EngineAPI.render.present();
     JY.Darkness=1;
 end
 
@@ -3648,7 +3648,7 @@ end
 
 function instruct_21(personid)               --离队
     if JY.Person[personid]==nil then
-        lib.Debug("instruct_21 error: personid not exist");
+        EngineAPI.debug.log("instruct_21 error: personid not exist");
         return ;
     end
     local j=0;
@@ -3716,13 +3716,13 @@ function instruct_25(x1,y1,x2,y2)             --场景移动
             sign=1;
         end
         for i=y1+sign,y2,sign do
-            local t1=lib.GetTime();
+            local t1=EngineAPI.time.getTime();
             JY.SubSceneY=JY.SubSceneY+sign;
             --JY.oldSMapX=-1;
             --JY.oldSMapY=-1;
             DrawSMap();
             ShowScreen();
-            local t2=lib.GetTime();
+            local t2=EngineAPI.time.getTime();
             if (t2-t1)<CC.SceneMoveFrame then
                 WaitFrame(CC.SceneMoveFrame-(t2-t1));
             end
@@ -3736,14 +3736,14 @@ function instruct_25(x1,y1,x2,y2)             --场景移动
             sign=1;
         end
         for i=x1+sign,x2,sign do
-            local t1=lib.GetTime();
+            local t1=EngineAPI.time.getTime();
             JY.SubSceneX=JY.SubSceneX+sign;
             --JY.oldSMapX=-1;
             --JY.oldSMapY=-1;
 
             DrawSMap();
             ShowScreen();
-            local t2=lib.GetTime();
+            local t2=EngineAPI.time.getTime();
             if (t2-t1)<CC.SceneMoveFrame then
                 WaitFrame(CC.SceneMoveFrame-(t2-t1));
             end
@@ -3768,8 +3768,8 @@ end
 --显示动画 id=-1 主角位置动画
 -- 事件驱动架构版本：设置动画状态，由 GAME_SMAP.update 驱动
 function instruct_27(id,startpic,endpic)           --显示动画
-    local startTime = lib.GetTime()
-    lib.Debug(string.format("instruct_27: START id=%d, startpic=%d, endpic=%d, time=%d", id, startpic, endpic, startTime));
+    local startTime = EngineAPI.time.getTime()
+    EngineAPI.debug.log(string.format("instruct_27: START id=%d, startpic=%d, endpic=%d, time=%d", id, startpic, endpic, startTime));
     local old1,old2,old3;
     if id ~=-1 then
         old1=GetD(JY.SubScene,id,5);
@@ -3791,10 +3791,10 @@ function instruct_27(id,startpic,endpic)           --显示动画
             startFrame = startpic,
             endFrame = endpic,
             currentFrame = startpic,
-            startTime = lib.GetTime(),
+            startTime = EngineAPI.time.getTime(),
             frameDuration = CC.AnimationFrame,
         }
-        lib.Debug(string.format("instruct_27: set AnimationState id=%d, startFrame=%d, endFrame=%d", id, startpic, endpic))
+        EngineAPI.debug.log(string.format("instruct_27: set AnimationState id=%d, startFrame=%d, endFrame=%d", id, startpic, endpic))
         -- 等待动画完成
         -- 使用 yield 让出协程，让 GAME_SMAP.update 播放动画
         while JY.AnimationState.active do
@@ -3803,21 +3803,21 @@ function instruct_27(id,startpic,endpic)           --显示动画
         
         -- 动画结束后重置 currentFrame
         JY.AnimationState.currentFrame = 0
-        lib.Debug("instruct_27: animation finished, currentFrame reset to 0")
+        EngineAPI.debug.log("instruct_27: animation finished, currentFrame reset to 0")
     else
         -- 不在协程中，使用原版同步方式
         for i = startpic, endpic, 2 do
-            local t1 = lib.GetTime();
+            local t1 = EngineAPI.time.getTime();
             
             -- 设置当前帧
             if id == -1 then
                 JY.MyPic = i / 2;
-                lib.Debug(string.format("instruct_27: frame id=-1, i=%d, MyPic=%d", i, JY.MyPic));
+                EngineAPI.debug.log(string.format("instruct_27: frame id=-1, i=%d, MyPic=%d", i, JY.MyPic));
             else
                 SetD(JY.SubScene, id, 5, i);
                 SetD(JY.SubScene, id, 6, i);
                 SetD(JY.SubScene, id, 7, i);
-                lib.Debug(string.format("instruct_27: frame id=%d, i=%d", id, i));
+                EngineAPI.debug.log(string.format("instruct_27: frame id=%d, i=%d", id, i));
             end
             
             -- 更新场景数据
@@ -3826,7 +3826,7 @@ function instruct_27(id,startpic,endpic)           --显示动画
             -- 原版方式：直接绘制和显示
             DrawSMap();
             ShowScreen();
-            local t2 = lib.GetTime();
+            local t2 = EngineAPI.time.getTime();
             if t2 - t1 < CC.AnimationFrame then
                 WaitFrame(CC.AnimationFrame - (t2 - t1));
             end
@@ -3842,8 +3842,8 @@ function instruct_27(id,startpic,endpic)           --显示动画
         SetD(JY.SubScene,id,6,old2);
         SetD(JY.SubScene,id,7,old3);
     end
-    local endTime = lib.GetTime()
-    lib.Debug(string.format("instruct_27: END id=%d, final MyPic=%d, duration=%dms", id, JY.MyPic, endTime - startTime));
+    local endTime = EngineAPI.time.getTime()
+    EngineAPI.debug.log(string.format("instruct_27: END id=%d, final MyPic=%d, duration=%dms", id, JY.MyPic, endTime - startTime));
 end
 
 --判断品德
@@ -3874,18 +3874,18 @@ function instruct_30(x1,y1,x2,y2)                --主角走动
 
     if x1<x2 then
         for i=x1+1,x2 do
-            local t1=lib.GetTime();
+            local t1=EngineAPI.time.getTime();
             instruct_30_sub(1);
-            local t2=lib.GetTime();
+            local t2=EngineAPI.time.getTime();
             if (t2-t1)<CC.PersonMoveFrame then
                 WaitFrame(CC.PersonMoveFrame-(t2-t1));
             end
         end
     elseif x1>x2 then
         for i=x2+1,x1 do
-            local t1=lib.GetTime();
+            local t1=EngineAPI.time.getTime();
             instruct_30_sub(2);
-            local t2=lib.GetTime();
+            local t2=EngineAPI.time.getTime();
             if (t2-t1)<CC.PersonMoveFrame then
                 WaitFrame(CC.PersonMoveFrame-(t2-t1));
             end
@@ -3894,18 +3894,18 @@ function instruct_30(x1,y1,x2,y2)                --主角走动
 
     if y1<y2 then
         for i=y1+1,y2 do
-            local t1=lib.GetTime();
+            local t1=EngineAPI.time.getTime();
             instruct_30_sub(3);
-            local t2=lib.GetTime();
+            local t2=EngineAPI.time.getTime();
             if (t2-t1)<CC.PersonMoveFrame then
                 WaitFrame(CC.PersonMoveFrame-(t2-t1));
             end
         end
     elseif y1>y2 then
         for i=y2+1,y1 do
-            local t1=lib.GetTime();
+            local t1=EngineAPI.time.getTime();
             instruct_30_sub(0);
-            local t2=lib.GetTime();
+            local t2=EngineAPI.time.getTime();
             if (t2-t1)<CC.PersonMoveFrame then
                 WaitFrame(CC.PersonMoveFrame-(t2-t1));
             end
@@ -4129,7 +4129,7 @@ function instruct_44(id1,startpic1,endpic1,id2,startpic2,endpic2)     --同时�
     --Cls();
     --ShowScreen();
     for i =startpic1,endpic1,2 do
-        local t1=lib.GetTime();
+        local t1=EngineAPI.time.getTime();
         if id1==-1 then
             JY.MyPic=i/2;
         else
@@ -4147,7 +4147,7 @@ function instruct_44(id1,startpic1,endpic1,id2,startpic2,endpic2)     --同时�
         DtoSMap();
         DrawSMap();
         ShowScreen();
-        local t2=lib.GetTime();
+        local t2=EngineAPI.time.getTime();
         if t2-t1<CC.AnimationFrame then
             WaitFrame(CC.AnimationFrame-(t2-t1));
         end
@@ -4266,7 +4266,7 @@ function instruct_57()       --高昌迷宫劈门
     --Cls();
     --ShowScreen();
     for i=0,56,2 do
-        local t1=lib.GetTime();
+        local t1=EngineAPI.time.getTime();
         if JY.MyPic< 7688/2 then
             JY.MyPic=(7676+i)/2;
         end
@@ -4283,7 +4283,7 @@ function instruct_57()       --高昌迷宫劈门
         DtoSMap();
         DrawSMap();
         ShowScreen();
-        local t2=lib.GetTime();
+        local t2=EngineAPI.time.getTime();
         if t2-t1<CC.AnimationFrame then
             WaitFrame(CC.AnimationFrame-(t2-t1));
         end
@@ -4423,7 +4423,7 @@ function instruct_62(id1,startnum1,endnum1,id2,startnum2,endnum2)      --播放�
       ShowScreen();
       PlayMIDI(24);
       WaitFrame(5000);
-      lib.GetKey();
+      EngineAPI.input.getKey();
       WaitKey();
       JY.Status=GAME_END;
 end
@@ -4437,25 +4437,25 @@ end
 function instruct_64()                 --小宝卖东西
     local headid=111;           --小宝头像
 
-    lib.Debug(string.format("instruct_64: JY.SubScene=%d, JY.ShopNum=%d", JY.SubScene, JY.ShopNum));
-    lib.Debug(string.format("instruct_64: CurrentD=%d, CurrentEventType=%d", JY.CurrentD, JY.CurrentEventType));
+    EngineAPI.debug.log(string.format("instruct_64: JY.SubScene=%d, JY.ShopNum=%d", JY.SubScene, JY.ShopNum));
+    EngineAPI.debug.log(string.format("instruct_64: CurrentD=%d, CurrentEventType=%d", JY.CurrentD, JY.CurrentEventType));
 
     local id=-1;
     for i=0,JY.ShopNum-1 do                --找到当前商店id
-        lib.Debug(string.format("  ShopScene[%d].sceneid=%d", i, CC.ShopScene[i].sceneid));
+        EngineAPI.debug.log(string.format("  ShopScene[%d].sceneid=%d", i, CC.ShopScene[i].sceneid));
         if CC.ShopScene[i].sceneid==JY.SubScene then
             id=i;
             break;
         end
     end
     if id<0 then
-        lib.Debug("instruct_64: Shop scene not found, using default shop 0");
+        EngineAPI.debug.log("instruct_64: Shop scene not found, using default shop 0");
         id=0;  -- 默认使用第一个商店
     end
 
-    lib.Debug("instruct_64: About to call TalkEx");
+    EngineAPI.debug.log("instruct_64: About to call TalkEx");
     TalkEx("这位小哥，看看有什麽需要*的，小宝我卖的东西价钱绝*对公道．",headid,0);
-    lib.Debug("instruct_64: TalkEx returned");
+    EngineAPI.debug.log("instruct_64: TalkEx returned");
 
     local menu={};
     -- 名称与价格必须按**显示宽度**对齐，不能按字节数。
@@ -4647,17 +4647,17 @@ end
 --isexp  输后是否有经验 0 没经验，1 有经验
 --返回  true 战斗胜利，false 失败
 function WarMain(warid,isexp)           --战斗主函数
-    lib.Debug(string.format("war start. warid=%d",warid));
+    EngineAPI.debug.log(string.format("war start. warid=%d",warid));
     -- 检查返回值（与 WarMainCoroutine 一致；这是阻塞版，仅在非协程上下文兜底用）
     if not WarLoad(warid) then
-        lib.Debug("WarMain: WarLoad failed, aborting");
+        EngineAPI.debug.log("WarMain: WarLoad failed, aborting");
         return false;
     end
     WarSelectTeam();          --选择我方
     WarSelectEnemy();         --选择敌人
 
     CleanMemory()
-     lib.ShowSlow(50,1) ;      --场景变暗
+     EngineAPI.render.present() ;      --场景变暗
 
     WarLoadMap(WAR.Data["地图"]);       --加载战斗地图
 
@@ -4706,7 +4706,7 @@ function WarMain(warid,isexp)           --战斗主函数
             collectgarbage("step",0);
             WAR.Effect=0;
             if WAR.AutoFight==1 then                 --我方自动战斗时读取键盘，看是否取消
-                local keypress=lib.GetKey();
+                local keypress=EngineAPI.input.getKey();
                 if keypress==VK_SPACE or keypress==VK_RETURN then
                     WAR.AutoFight=0;
                 end
@@ -4719,7 +4719,7 @@ function WarMain(warid,isexp)           --战斗主函数
 
                 if first==0 then              --第一次渐亮显示
                     WarDrawMap(0);
-                    lib.ShowSlow(50,0)
+                    EngineAPI.render.present()
                     first=1;
                 else
 --                    WarDrawMap(0);
@@ -4780,7 +4780,7 @@ function WarMain(warid,isexp)           --战斗主函数
         WAR.Person[i]["经验"]=0;
     end
 
-    lib.ShowSlow(50,1);
+    EngineAPI.render.present();
 
     if JY.Scene[JY.SubScene]["进门音乐"]>=0 then
         PlayMIDI(JY.Scene[JY.SubScene]["进门音乐"]);

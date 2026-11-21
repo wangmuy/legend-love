@@ -545,7 +545,7 @@ function War_Manual_Sub()                --手动战斗菜单
         menu[5][3]=0;
     end
 
-    lib.GetKey();
+    EngineAPI.input.getKey();
     Cls();
     return ShowMenu(menu,10,0,CC.MainMenuX,CC.MainMenuY,0,0,1,0,CC.DefaultFont,C_ORANGE,C_WHITE);
 
@@ -569,7 +569,7 @@ function War_MoveMenu()           --执行移动菜单
         WAR.ShowHead=1;
         Cls();
     end
-    lib.GetKey();
+    EngineAPI.input.getKey();
     return r;
 end
 
@@ -666,7 +666,7 @@ function War_ShowFight(pid,wugong,wugongtype,level,x,y,eft)              --显�
     local oldeft=-1;
 
     for i=0,framenum-1 do
-        local tstart=lib.GetTime();
+        local tstart=EngineAPI.time.getTime();
         local mytype;
         if fightframe>0 then
             WAR.Person[WAR.CurID]["贴图类型"]=1;
@@ -690,10 +690,10 @@ function War_ShowFight(pid,wugong,wugongtype,level,x,y,eft)              --显�
         if fastdraw==1 then
             local rr=ClipRect(Cal_PicClip(0,0,oldpic,oldpic_type,0,0,pic,mytype));
             if rr ~=nil then
-                lib.SetClip(rr.x1,rr.y1,rr.x2,rr.y2);
+                EngineAPI.render.setClip(rr.x1,rr.y1,rr.x2,rr.y2);
             end
         else
-            lib.SetClip(0,0,0,0);
+            EngineAPI.render.setClip(0,0,0,0);
         end
         oldpic=pic;
         oldpic_type=mytype;
@@ -716,33 +716,33 @@ function War_ShowFight(pid,wugong,wugongtype,level,x,y,eft)              --显�
                     local area=(clip.x2-clip.x1)*(clip.y2-clip.y1);          --计算脏矩形面积
                     if area <CC.ScreenW*CC.ScreenH/2 then        --面积足够小，则更新脏矩形。
                         WarDrawMap(4,pic*2,mytype,starteft*2);
-                        lib.SetClip(clip.x1,clip.y1,clip.x2,clip.y2);
+                        EngineAPI.render.setClip(clip.x1,clip.y1,clip.x2,clip.y2);
                         WarDrawMap(4,pic*2,mytype,starteft*2);
                     else    --面积太大，直接重绘
-                        lib.SetClip(0,0,CC.ScreenW,CC.ScreenH);
+                        EngineAPI.render.setClip(0,0,CC.ScreenW,CC.ScreenH);
                         WarDrawMap(4,pic*2,mytype,starteft*2);
                     end
                 else
                     WarDrawMap(4,pic*2,mytype,starteft*2);
                 end
             else
-                lib.SetClip(0,0,0,0);
+                EngineAPI.render.setClip(0,0,0,0);
                 WarDrawMap(4,pic*2,mytype,starteft*2);
             end
             oldeft=starteft;
         end
 
         ShowScreen(fastdraw);
-        lib.SetClip(0,0,0,0);
+        EngineAPI.render.setClip(0,0,0,0);
 
-        local tend=lib.GetTime();
+        local tend=EngineAPI.time.getTime();
         if tend-tstart<1*CC.Frame then
             WaitFrame(1*CC.Frame-(tend-tstart));
         end
 
     end
 
-    lib.SetClip(0,0,0,0);
+    EngineAPI.render.setClip(0,0,0,0);
     WAR.Person[WAR.CurID]["贴图类型"]=0;
     WAR.Person[WAR.CurID]["贴图"]=WarCalPersonPic(WAR.CurID);
     WarSetPerson();
@@ -794,13 +794,13 @@ if HitXYNum>0 then
     local area=(clip.x2-clip.x1)*(clip.y2-clip.y1)
 
     for i=1,15 do           --显示命中的点数
-        local tstart=lib.GetTime();
+        local tstart=EngineAPI.time.getTime();
         local y_off=i*2+65;
         if fastdraw==1 and area <CC.ScreenW*CC.ScreenH/2 then
             local tmpclip={x1=clip.x1, y1=clip.y1-y_off, x2=clip.x2, y2=clip.y2-y_off};
             tmpclip=ClipRect(tmpclip);
             if tmpclip~=nil then
-                lib.SetClip(tmpclip.x1,tmpclip.y1,tmpclip.x2,tmpclip.y2);
+                EngineAPI.render.setClip(tmpclip.x1,tmpclip.y1,tmpclip.x2,tmpclip.y2);
                 WarDrawMap(0)
                 for j=0,HitXYNum-1 do
                     DrawString(clips[j].x1, clips[j].y1-y_off, HitXY[j][3],
@@ -808,7 +808,7 @@ if HitXYNum>0 then
                 end
             end
         else    --面积太大，直接重绘
-            lib.SetClip(0,0,CC.ScreenW,CC.ScreenH);
+            EngineAPI.render.setClip(0,0,CC.ScreenW,CC.ScreenH);
             WarDrawMap(0)
             for j=0,HitXYNum-1 do
                     DrawString(clips[j].x1, clips[j].y1-y_off, HitXY[j][3],
@@ -817,16 +817,16 @@ if HitXYNum>0 then
         end
 
         ShowScreen(1);
-        lib.SetClip(0,0,0,0);
+        EngineAPI.render.setClip(0,0,0,0);
 
-        local tend=lib.GetTime();
+        local tend=EngineAPI.time.getTime();
         if (tend-tstart)<CC.Frame then
             WaitFrame(CC.Frame-(tend-tstart));
         end
     end
 end
 
-    lib.SetClip(0,0,0,0);
+    EngineAPI.render.setClip(0,0,0,0);
     WarDrawMap(0);
     ShowScreen();
 end
@@ -899,7 +899,7 @@ function War_ExecuteMenu(flag,thingid)            ---执行医疗，解毒用毒
     local x1,y1=War_SelectMove();              --选择攻击对象
 
     if x1 ==nil then
-        lib.GetKey();
+        EngineAPI.input.getKey();
         Cls();
         return 0;
     else

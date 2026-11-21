@@ -5,7 +5,7 @@
 -- 所有函数仍是全局函数（`function Xxx()` 形式），调用方零改动。
 
 function WarLoadMap(mapid)      --加载战斗地图
-   lib.Debug(string.format("load war map %d",mapid));
+   EngineAPI.debug.log(string.format("load war map %d",mapid));
    lib.LoadWarMap(CC.WarMapFile[1],CC.WarMapFile[2],mapid,6,CC.WarWidth,CC.WarHeight);
 end
 

@@ -45,6 +45,22 @@ ALLOWED_DEVIATIONS = {
     "War_WugongHurtNeili":  "补 level 钳制 + 字段判空（与 HurtLife 对称）",
     "War_AutoMove":         "回溯循环补 prevI 进度守卫 + 硬上限",
     "War_EndPersonData":    "除 liveNum 补零守卫（避免 inf 污染经验）",
+    # --- 第七批：script 层 lib.* → EngineAPI.*（port-native-api-completion Task 1） ---
+    #
+    # 这 6 个函数里只有 `lib.Debug` / `lib.GetTime` / `lib.SetClip` / `lib.GetKey`
+    # / `lib.ShowSlow` 这类**已有等价契约**的调用被机械替换，逻辑一字未改：
+    #   lib.Debug      → EngineAPI.debug.log      （内部就是 lib.Debug）
+    #   lib.GetTime    → EngineAPI.time.getTime   （内部就是 lib.GetTime）
+    #   lib.SetClip    → EngineAPI.render.setClip （内部就是 lib.SetClip）
+    #   lib.GetKey     → EngineAPI.input.getKey   （内部就是 lib.GetKey）
+    #   lib.ShowSlow   → EngineAPI.render.present （忽略参数，三者等价）
+    # 实机三界面 md5 全部不变（证明零像素变化）。
+    "WarLoadMap":            "lib.Debug/GetTime/SetClip → EngineAPI.*（等价转发）",
+    "War_Manual_Sub":        "同上",
+    "War_MoveMenu":          "同上",
+    "War_FightSelectType0":  "同上",
+    "War_FightSelectType3":  "同上",
+    "War_ExecuteMenu":       "同上",
     # --- 第六批：lib.Delay → WaitFrame（port-blocking-delay Task 2） ---
     # 这 4 个函数里的 `lib.Delay(...)` 全部换成 `WaitFrame(...)`：
     # lib.Delay = love.timer.sleep（真阻塞主线程，实测 101ms）；

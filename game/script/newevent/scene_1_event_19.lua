@@ -134,12 +134,12 @@ local function Menu_Go()
 
     if r>0 then
 
-		lib.ShowSlow(50,1);
+		EngineAPI.render.present(50,1);
 		ChangeSMap(Address[r][1],Address[r][2],Address[r][3],0);       --设置新场景
 		--设置新的主地图坐标，以便从新场景正确出来。
 		ChangeMMap(JY.Scene[JY.SubScene]["外景入口X1"],JY.Scene[JY.SubScene]["外景入口Y1"]+1,0);
 
-        lib.ShowSlow(50,0);
+        EngineAPI.render.present(50,0);
     end;
 
     Cls();
