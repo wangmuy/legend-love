@@ -23,26 +23,25 @@
 `engine_web.lua`、`tests/engine_test.lua`、`tests/unit/test_engine_api.lua`
 
 **DoD**：
-- [ ] `engine_api.lua` 声明 `M.render.setDrawLoopFlag(flag)`（带注释说明用途）
-- [ ] LÖVE：转发 `lib.SetDrawLoopFlag`
-- [ ] MUD/Web：空实现（记录调用即可）
-- [ ] 测试桩：记录调用
-- [ ] 单测：4 引擎都存在（`assertNotNil`）
-- [ ] 契约数 91 → **92**（基线实测：`engine_api.lua` 当前 91 个 `M.*` 声明）
-- [ ] 全量测试零失败
-- [ ] 一个 commit
+- [x] `engine_api.lua` 声明 `M.render.setDrawLoopFlag(flag)`（带注释说明用途）
+- [x] LÖVE：转发 `lib.SetDrawLoopFlag`
+- [x] MUD/Web：空实现（记录调用即可）
+- [x] 测试桩：记录调用
+- [x] 单测：4 引擎都存在（`assertNotNil` + `testNewContractsExplicitlyImplemented` 扩项）
+- [x] 契约数 91 → **92**（基线实测：`engine_api.lua` 当前 91 个 `M.*` 声明）
+- [x] 全量测试零失败（4011）
+- [x] 一个 commit
 
 ## Task 3：`main.lua` 改调契约
 
 **Blast Radius**：`game/main.lua`
 
 **DoD**：
-- [ ] 2 处 `lib.SetDrawLoopFlag(true/false)` → `EngineAPI.render.setDrawLoopFlag(...)`
-- [ ] `main.lua:118` 的全局 `lib = require "engine-love2d.engine_love2d"` 仍保留
-      （它是入口程序持有 EngineAPI 的方式，且 `lib.init()` 需要它 ——
-      换成 `local EngineAPI` 更干净，但那是可选清理，记在 Task 6）
-- [ ] 实机截图：主菜单/地图/战斗三界面正常（present 门控生效）
-- [ ] 一个 commit
+- [x] 2 处 `lib.SetDrawLoopFlag(true/false)` → `EngineAPI.render.setDrawLoopFlag(...)`
+- [x] `main.lua:118` 的全局 `lib = require "engine-love2d.engine_love2d"` 改 `local engineAPI`
+      （入口程序不需要再持有全局 `lib`；`engineAPI.init()` 照旧）
+- [x] 实机截图：场景 `1efd2af3…` ✓ / 战斗 `6c8eb322…` ✓（present 门控生效）
+- [x] 一个 commit
 
 ## Task 4：`async_globals` 补丁点迁移
 
@@ -50,17 +49,18 @@
 `game/tests/unit/test_wait_frame.lua`
 
 **DoD**：
-- [ ] `_libDelay = lib and lib.Delay` → `_engineSleep = EngineAPI.time.sleep`
-- [ ] `lib.Delay = AsyncGlobals.lib_Delay_Async` → `EngineAPI.time.sleep = ...`
-- [ ] `lib.Delay = _libDelay` → `EngineAPI.time.sleep = _engineSleep`
-- [ ] `lib_Delay_Async` 内部：协程内走 `scheduler:waitFrame`，非协程走 `_engineSleep`
+- [x] `_libDelay = lib and lib.Delay` → `_engineSleep = EngineAPI.time.sleep`
+- [x] `lib.Delay = AsyncGlobals.lib_Delay_Async` → `EngineAPI.time.sleep = ...`
+- [x] `lib.Delay = _libDelay` → `EngineAPI.time.sleep = _engineSleep`
+- [x] `lib_Delay_Async` 内部：协程内走 `scheduler:waitFrame`，非协程走 `_engineSleep`
       （**不再**回落 `EngineAPI.time.sleep`，否则自己调自己）
-- [ ] `jymain.lua:51` 的 fallback `function(m) lib.Delay(m) end`
-      → `function(m) EngineAPI.time.sleep(m) end`
-- [ ] 单测：非协程 `WaitFrame` → 调 `EngineAPI.time.sleep`；协程内 → 0 次
-- [ ] 门禁 STEP D6 的「只允许 WaitFrame fallback」白名单同步改判据
-- [ ] 全量测试零失败
-- [ ] 一个 commit
+- [x] `jymain.lua:51` 的 fallback `function(m) lib.Delay(m) end`
+      → 闭包绑定 `EngineAPI.time.sleep`（在覆盖前取出，避免递归）
+- [x] 单测：非协程 `WaitFrame` → 调契约 1 次；协程内 → 0 次；
+      新增 `testNeverTouchesGlobalLib`（断言零 `lib.Delay` 调用）
+- [x] 门禁 STEP D3 + D6 白名单归零（负向对照已验证：加一处 `lib.Debug` → FAIL）
+- [x] 全量测试零失败（4013，比基线 +2 = 新增的 2 条断言）
+- [x] 一个 commit
 
 ## Task 5：删死变量 + 删 `_G.lib`
 

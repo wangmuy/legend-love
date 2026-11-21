@@ -86,6 +86,15 @@ function EngineAPI.render.presentAndWait(delay)
     pcall(coroutine.yield)
 end
 
+--- 帧绘制回调标志：Web 文本版无真实「帧绘制」，只记录状态
+--
+--- 为什么要实现：`game/main.lua` 的 love.draw 前后会调它；Web 不加载 main.lua，
+--- 但契约必须存在（「换引擎只需写 engine-xxx」要求 4 引擎对齐）。
+local webInDrawLoop = false
+function EngineAPI.render.setDrawLoopFlag(flag)
+    webInDrawLoop = not not flag
+end
+
 -- Compatibility stubs for JY game engine functions
 function EngineAPI.render.FillColor(x1, y1, x2, y2, color) end
 function EngineAPI.render.Cls(x1, y1, x2, y2) 

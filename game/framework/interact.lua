@@ -182,7 +182,6 @@ function Interact.trigger(mapKind, tx, ty)
         if okGS and GameStates and GameStates._enterSubScene then
             local okEnter, err = pcall(GameStates._enterSubScene, payload)
             if okEnter then return true end
-            local lib = rawget(_G, "lib")
             if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
                 EngineAPI.debug.log("Interact.trigger: enterSubScene 失败 " .. tostring(err))
             end

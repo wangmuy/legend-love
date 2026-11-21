@@ -18,7 +18,19 @@ local _ShowMenu
 local _ShowMenu2
 local _TalkEx
 local _ShowScreen
-local _libDelay
+-- 原始 EngineAPI.time.sleep（补丁前保存，补丁后还原）
+--
+-- **为什么补丁点是 time.sleep 而不是全局 lib.Delay**（port-compat-layer-removal）：
+--   `_G.lib = setmetatable(EngineAPI, {__index = lib_love})` 让 `lib` 与
+--   `EngineAPI` **是同一张表**，于是 `lib.Delay = ...` 实际往 `EngineAPI` 写了一个
+--   契约外的键 `Delay`。而 `WaitFrame` 的 fallback 恰好写成 `lib.Delay(m)` →
+--   它拿到的是**协程版**而不是阻塞退路；协程版内部又回落 `EngineAPI.time.sleep`
+--   → 阻塞。两个补丁互相抵消，port-blocking-delay 在 fallback 路径上被静默撤销。
+--
+--   现在改为直接覆盖 `EngineAPI.time.sleep`：
+--     - 协程内 → scheduler:waitFrame（协作式，不阻塞）
+--     - 非协程 → 原始 time.sleep（真阻塞，但这是唯一正确语义）
+local _engineSleep
 local _WarMain
 
 -- 替换的 DrawStrBoxWaitKey
@@ -75,14 +87,26 @@ function AsyncGlobals.TalkEx_Async(s, headid, flag)
     end
 end
 
--- 替换的 lib.Delay
-function AsyncGlobals.lib_Delay_Async(millis)
+-- 替换的 EngineAPI.time.sleep（事件脚本执行期间生效）
+--
+--   协程内：协作式等待（不阻塞主线程）
+--   非协程：调**补丁前的原始** time.sleep（真阻塞，但这是唯一正确语义）
+--
+-- **必须是 `_engineSleep` 而不是 `EngineAPI.time.sleep`**：
+--   后者此刻已被本函数覆盖，再调一次就是无限自我递归（实测可复现）。
+function AsyncGlobals.time_sleep_Async(millis)
     if EngineAPI.coroutine.isRunning() then
-        return EngineAPI.time.sleep(millis)
-    else
-        return _libDelay(millis)
+        local CS = require("framework.coroutine_scheduler")
+        -- waitFrame 在「协程存在但不是调度器托管」时会调 fallback；
+        -- fallback 必须给**原始实现**，否则这一层又会回到本函数（递归）。
+        CS.getInstance():waitFrame(millis, function(m) return _engineSleep(m) end)
+        return
     end
+    return _engineSleep(millis)
 end
+
+--- 兼容旧名字（外部若仍按 lib_Delay_Async 引用，行为一致）
+AsyncGlobals.lib_Delay_Async = AsyncGlobals.time_sleep_Async
 
 -- 替换的 ShowScreen
 function AsyncGlobals.ShowScreen_Async(flag)
@@ -112,7 +136,7 @@ function AsyncGlobals.install()
     _ShowMenu2 = _G.ShowMenu2
     _TalkEx = _G.TalkEx
     _ShowScreen = _G.ShowScreen
-    _libDelay = lib and lib.Delay
+    _engineSleep = EngineAPI.time.sleep
     _WarMain = _G.WarMain
 
     _G.DrawStrBoxWaitKey = AsyncGlobals.DrawStrBoxWaitKey_Async
@@ -123,8 +147,8 @@ function AsyncGlobals.install()
     _G.TalkEx = AsyncGlobals.TalkEx_Async
     _G.ShowScreen = AsyncGlobals.ShowScreen_Async
 
-    if lib then
-        lib.Delay = AsyncGlobals.lib_Delay_Async
+    if _engineSleep then
+        EngineAPI.time.sleep = AsyncGlobals.time_sleep_Async
     end
 
     -- 场景名提示：把 SceneNameAsync.Show 注入为全局实现。
@@ -245,8 +269,8 @@ function AsyncGlobals.uninstall()
     -- 全局上，后续 install() 保存到的「原版」就是上一个包装器，层层自包裹。
     rawset(_G, "WarMain", _WarMain)
 
-    if lib and _libDelay then
-        lib.Delay = _libDelay
+    if _engineSleep then
+        EngineAPI.time.sleep = _engineSleep
     end
 end
 

@@ -74,6 +74,11 @@ EngineAPI.render.presentAndWait = function(delay)
     logCall("render.presentAndWait", delay)
 end
 
+--- 帧绘制回调标志：MUD 无屏幕，只需记录（便于测试断言入口确实调到了契约）
+EngineAPI.render.setDrawLoopFlag = function(flag)
+    logCall("render.setDrawLoopFlag", flag)
+end
+
 --------------------------------------------------------------------
 -- sprite 模块 - loadArchive 解析尺寸但不创建纹理，draw 为空操作
 --------------------------------------------------------------------

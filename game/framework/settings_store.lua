@@ -42,7 +42,7 @@ local function engineFile()
 end
 
 local function debugLog(msg)
-    local lib = rawget(_G, "lib")
+    local EngineAPI = rawget(_G, "EngineAPI")
     if type(EngineAPI) == "table" and EngineAPI.debug
        and type(EngineAPI.debug.log) == "function" then
         pcall(EngineAPI.debug.log, msg)

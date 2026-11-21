@@ -78,6 +78,10 @@ EngineAPI.render.presentAndWait = function(delay)
     logCall("render.presentAndWait", delay)
 end
 
+EngineAPI.render.setDrawLoopFlag = function(flag)
+    logCall("render.setDrawLoopFlag", flag)
+end
+
 --------------------------------------------------------------------
 -- sprite 模块 - loadArchive 解析尺寸但不创建纹理，draw 为空操作
 --------------------------------------------------------------------

@@ -68,6 +68,17 @@ EngineAPI.render.presentAndWait = function(delay)
     lib.ShowSlow(delay)
 end
 
+--- 告知引擎「当前在帧绘制回调内」（入口程序在 love.draw 前后置位）
+--
+-- 为什么现在才补契约：原实现 `main.lua` 直接调全局 `lib.SetDrawLoopFlag`，
+-- 而 `lib` 是 `_G` 上的兼容层（port-compat-layer-removal 要删除它）。
+-- 语义逐字转发到 `lib_love.SetDrawLoopFlag`（它控制 ShowSurface 是否 present）。
+EngineAPI.render.setDrawLoopFlag = function(flag)
+    if lib.SetDrawLoopFlag then
+        lib.SetDrawLoopFlag(flag)
+    end
+end
+
 --- 取渲染目标尺寸（逻辑像素）
 --
 -- 实测（Windows 150% 缩放下）：love.graphics.getDimensions() 返回 1024×768，

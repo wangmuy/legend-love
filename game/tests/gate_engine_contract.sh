@@ -24,15 +24,17 @@ log() { echo "$*" | tee -a "$LOG"; }
 
 # ---------------------------------------- A. framework 无 lib.* 引擎调用
 log "=== STEP: A. framework 零 lib.* 绕过 ==="
-# async_globals.lua 是**主动 patch** lib.Delay 的地方（劫持原版阻塞调用），
-# 那 3 处是刻意的 patch point，不属于"绕过契约"。
+# **历史**：async_globals.lua 曾经是主动 patch lib.Delay 的地方（3 处）。
+# port-compat-layer-removal Task 4 之后补丁点已改到 `EngineAPI.time.sleep`，
+# 那 3 处不再存在。保留 `-v async_globals` 只是为了给未来可能的引擎侧特例留口子；
+# 若它长期为空，下次清理可直接删掉这条排除。
 bad_a=$(grep -rn 'lib\.[A-Za-z]' game/framework/*.lua 2>/dev/null \
         | grep -vE ':[0-9]+:[[:space:]]*--' \
         | grep -v 'framework/async_globals.lua' \
         | wc -l | tr -dc '0-9')
 [ -n "$bad_a" ] || bad_a=0
 if [ "$bad_a" -eq 0 ]; then
-    log "  [PASS] framework/ 无 lib.* 引擎调用（async_globals 的 patch point 除外）"
+    log "  [PASS] framework/ 无 lib.* 引擎调用"
 else
     log "  [FAIL] framework/ 有 $bad_a 处 lib.* 调用："
     grep -rn 'lib\.[A-Za-z]' game/framework/*.lua 2>/dev/null \
@@ -88,20 +90,21 @@ fi
 # 消费（war_async 的双轨补丁需要它：引擎内部的 DrawWarMap 走 PicLoadCache
 # → picFileCache）。见 port-sprite-native-migration Task 6 的实测结论。
 
-# ---------------------------------------- D3. script/ 无裸 lib.Delay
-log "=== STEP: D3. script/ 无裸 lib.Delay（阻塞主线程）==="
-# 判据：script/ 里每一处 `lib.Delay(` 都必须出现在 `WaitFrame` 的 fallback 里
-# （即 `function(m) lib.Delay(m) end`）。其余一律 FAIL。
+# ---------------------------------------- D3. script/ 零 lib.Delay（含 fallback）
+log "=== STEP: D3. script/ 零 lib.Delay（阻塞主线程）==="
+# 判据：script/ 里 **一处** `lib.Delay(` 都不允许。
 #
-# 为什么：`lib.Delay` = `love.timer.sleep` → **真阻塞主线程**（实测 101ms）。
-# script 层的帧率控制必须走 `WaitFrame`（协程里 waitForTime 协作式等待）。
+# 为什么比原来更严（port-compat-layer-removal Task 4）：
+#   原来允许 `WaitFrame` 的 fallback 写 `function(m) lib.Delay(m) end`。
+#   但 `_G.lib` 与 `EngineAPI` 是同一张表 → 事件期间 async_globals 把
+#   `lib.Delay` 换成协程版后，fallback 拿到的**不是阻塞退路**，协程版内部
+#   又回落 `EngineAPI.time.sleep` → 阻塞。两个补丁互相抵消。
+#   现在 fallback 直接绑定 `EngineAPI.time.sleep`（契约），所以白名单归零。
 #
 # **用 awk 不用 grep -E**：grep -E 里 `\(` 的转义会被吃掉（同类坑已踩过一次，
 # 见 gate_battle_extensibility.sh STEP J 的注释）。
 bad_d3=$(awk '
     /lib\.Delay[[:space:]]*\(/ {
-        # 允许：WaitFrame 的 fallback 写法 `function(m) lib.Delay(m) end`
-        if (match($0, /function\(m\)[[:space:]]*lib\.Delay/)) next
         # 跳过注释行
         if (match($0, /^[[:space:]]*--/)) next
         print FILENAME ":" FNR ": " $0
@@ -109,12 +112,11 @@ bad_d3=$(awk '
 ' game/script/*.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
 [ -n "$bad_d3" ] || bad_d3=0
 if [ "$bad_d3" -eq 0 ]; then
-    log "  [PASS] script/ 无裸 lib.Delay（全部走 WaitFrame）"
+    log "  [PASS] script/ 零 lib.Delay（fallback 已绑定 EngineAPI.time.sleep）"
 else
-    log "  [FAIL] script/ 仍有 $bad_d3 处裸 lib.Delay（会阻塞主线程）："
+    log "  [FAIL] script/ 仍有 $bad_d3 处 lib.Delay（会阻塞主线程）："
     awk '
         /lib\.Delay[[:space:]]*\(/ {
-            if (match($0, /function\(m\)[[:space:]]*lib\.Delay/)) next
             if (match($0, /^[[:space:]]*--/)) next
             print FILENAME ":" FNR ": " $0
         }
@@ -155,10 +157,12 @@ else
     fail=$((fail + 1))
 fi
 
-# --------------------- D6. script/ 零 lib.*（只允许 WaitFrame fallback）
+# --------------------- D6. script/ 零 lib.*（无白名单）
 log "=== STEP: D6. script/ 零 lib.* ==="
-# 判据：script/ 代码里每处 `lib.xxx(` 都必须是 `WaitFrame` 的 fallback
-# （即 `function(m) lib.Delay(m) end`）。
+# 判据：script/ 代码里 `lib.xxx(` **一处都不允许**。
+#
+# 原来允许 `WaitFrame` 的 fallback 写 `lib.Delay`；Task 4 把 fallback 改成
+# 绑定 `EngineAPI.time.sleep` 后，白名单归零（原因见 D3 的注释）。
 #
 # 为什么：`lib.*` 只在 LÖVE 存在（MUD/Web 只实现 EngineAPI，实测 MUD 缺 30/35
 # 个常用 lib.* 函数）→ 只要 script 还在用 lib.*，「换引擎只需写 engine-xxx」
@@ -167,7 +171,6 @@ log "=== STEP: D6. script/ 零 lib.* ==="
 # **用 awk 不用 grep -E**：同类转义坑已踩过两次（见 D3 与 battle gate STEP J）。
 bad_d6=$(awk '
     /lib\.[A-Za-z][A-Za-z0-9_]*[[:space:]]*\(/ {
-        if (match($0, /function\(m\)[[:space:]]*lib\.Delay/)) next
         if (match($0, /^[[:space:]]*--/)) next
         print FILENAME ":" FNR ": " $0
     }
@@ -179,7 +182,6 @@ else
     log "  [FAIL] script/ 仍有 $bad_d6 处 lib.* 调用："
     awk '
         /lib\.[A-Za-z][A-Za-z0-9_]*[[:space:]]*\(/ {
-            if (match($0, /function\(m\)[[:space:]]*lib\.Delay/)) next
             if (match($0, /^[[:space:]]*--/)) next
             print FILENAME ":" FNR ": " $0
         }

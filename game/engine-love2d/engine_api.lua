@@ -77,6 +77,24 @@ function M.render.present() end
 -- @param delay number 等待毫秒数
 function M.render.presentAndWait(delay) end
 
+--- 告知引擎「当前处于/离开了帧绘制回调」
+--
+-- **为什么这不是引擎私有钩子**：原版 LÖVE 的 `lib.SetDrawLoopFlag` 控制
+-- `ShowSurface/ShowSlow` 是否真的 `present()` —— 因为只有 `love.draw()` 内
+-- 调 `present()` 才不会闪屏。这个「我在哪」的信息只有**入口程序**知道，
+-- 所以必须由入口告诉引擎，而入口只能走契约（不能摸全局 `lib`）。
+--
+-- 语义约定：
+--   - flag = true   当前在帧绘制回调内 → `present()` 立即生效
+--   - flag = false  已离开 → `present()` 允许延后/忽略（由引擎决定）
+--   - 无屏幕概念的引擎（MUD/Web）可空实现
+--
+-- 调用方：`game/main.lua` 的 `love.draw()` 前后（LÖVE 入口）。
+-- 其它引擎入口在它自己的绘制回调前后调用同名契约即可。
+--
+-- @param flag boolean
+function M.render.setDrawLoopFlag(flag) end
+
 --------------------------------------------------------------------
 -- sprite - 精灵/纹理系统
 --------------------------------------------------------------------

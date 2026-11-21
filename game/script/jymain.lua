@@ -41,14 +41,21 @@ local TextBoxLayout = require("framework.text_box_layout")
 --
 -- **兼容非协程上下文**：`waitForTime` 在非协程里会 error，所以
 --   `CoroutineScheduler.waitFrame` 先判 `isInCoroutine()`，不在协程里就
---   退回阻塞的 `lib.Delay`（不会崩，只是那一处仍阻塞）。
+--   退回阻塞的 `EngineAPI.time.sleep`（不会崩，只是那一处仍阻塞）。
 --
 -- **为什么是全局函数而不是 local**：`script/battle/*.lua` 是全局函数定义
 -- （不是 `return { ... }` 表），它们也要用这个 helper。全局是唯一可行方式。
 -- 命名带 `WaitFrame` 前缀以免与游戏函数撞名。
 function WaitFrame(ms)
     if ms == nil or ms <= 0 then return end
-    CoroutineScheduler.getInstance():waitFrame(ms, function(m) lib.Delay(m) end)
+    -- fallback 走契约（不再摸全局 lib.Delay —— port-compat-layer-removal）
+    --
+    -- **fallback 必须是原始的 `time.sleep`，不能在闭包里再查 `EngineAPI.time.sleep`**：
+    -- 事件脚本执行期间 `async_globals` 会临时覆盖 `EngineAPI.time.sleep`，
+    -- 覆盖版内部又调 `waitFrame` → 若 fallback 再查契约就是无限递归。
+    -- 这里先取出当前实现绑定进闭包（覆盖发生在进入脚本前，取到的是原本那版）。
+    local sleep = EngineAPI.time.sleep
+    CoroutineScheduler.getInstance():waitFrame(ms, function(m) sleep(m) end)
 end
 
 --- 加载贴图档案——**同时写两套系统**

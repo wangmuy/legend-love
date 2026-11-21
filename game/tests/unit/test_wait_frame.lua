@@ -12,7 +12,11 @@
 --
 -- WaitFrame 的设计：
 --   协程里 → scheduler:waitForTime(ms/1000)（非阻塞）
---   非协程 → fallback(ms)（通常是 lib.Delay，阻塞但不崩）
+--   非协程 → fallback(ms)（= EngineAPI.time.sleep，阻塞但不崩）
+--
+-- **port-compat-layer-removal 之后 fallback 不再走全局 `lib.Delay`**：
+--   `_G.lib` 已删除，`WaitFrame` 的 fallback 闭包绑定的是
+--   `EngineAPI.time.sleep`（且在 `async_globals` 覆盖前取到的原始实现）。
 --
 -- 为什么需要这个测试：
 --   全量测试 3895 条**覆盖不到**「是否真的不阻塞」——因为测试里的 `lib.Delay`
@@ -21,7 +25,10 @@
 local TestHelper = require("tests.test_helper")
 local TestWaitFrame = {}
 
---- 装最小环境：EngineAPI（含 time/debug）+ lib（含 Delay 计数）
+-- `lib` 桩被调用的次数（>0 说明 WaitFrame 还在摸已删除的兼容层）
+local libDelayCalls = {}
+
+--- 装最小环境：EngineAPI（含 time/sleep 计数）+ lib（仅用于误用检测）
 local function installEnv(blockingDelay)
     local saved = {
         EngineAPI = rawget(_G, "EngineAPI"),
@@ -29,11 +36,19 @@ local function installEnv(blockingDelay)
         WaitFrame = rawget(_G, "WaitFrame"),
     }
     local delayCalls = {}
+    for i = #libDelayCalls, 1, -1 do libDelayCalls[i] = nil end
 
     rawset(_G, "EngineAPI", {
         time = {
             getTime = function() return 0 end,
             getTimeSeconds = function() return 0 end,
+            sleep = function(ms)
+                delayCalls[#delayCalls + 1] = ms
+                if blockingDelay and blockingDelay > 0 then
+                    local t0 = os.clock()
+                    while os.clock() - t0 < blockingDelay / 1000 do end
+                end
+            end,
         },
         debug = { log = function() end },
         coroutine = {
@@ -43,14 +58,11 @@ local function installEnv(blockingDelay)
             end,
         },
     })
+    -- `lib` 只保留一个用于「误用检测」的桩：若 WaitFrame 还会去摸它，
+    -- 下面 testWaitFrameNeverTouchesGlobalLib 会失败。
     rawset(_G, "lib", {
         Delay = function(ms)
-            delayCalls[#delayCalls + 1] = ms
-            if blockingDelay and blockingDelay > 0 then
-                -- 模拟真阻塞：忙等
-                local t0 = os.clock()
-                while os.clock() - t0 < blockingDelay / 1000 do end
-            end
+            libDelayCalls[#libDelayCalls + 1] = ms
         end,
         GetTime = function() return 0 end,
     })
@@ -76,7 +88,8 @@ local function installWaitFrame()
 
     rawset(_G, "WaitFrame", function(ms)
         if ms == nil or ms <= 0 then return end
-        s:waitFrame(ms, function(m) rawget(_G, "lib").Delay(m) end)
+        local sleep = rawget(_G, "EngineAPI").time.sleep
+        s:waitFrame(ms, function(m) sleep(m) end)
     end)
     return s
 end
@@ -105,7 +118,7 @@ function TestWaitFrame.testCoroutineDoesNotBlock()
     TestHelper.assertTrue(elapsed < 10,
         "WaitFrame(100) 在协程里应立即返回（实测 " .. string.format("%.1f", elapsed) .. "ms）")
     TestHelper.assertEquals(0, #delayCalls,
-        "协程里不应调 lib.Delay（实测 " .. #delayCalls .. " 次）")
+        "协程里不应调 time.sleep（实测 " .. #delayCalls .. " 次）")
 
     -- 推进假时钟直到恢复
     for _ = 1, 20 do
@@ -126,7 +139,7 @@ function TestWaitFrame.testOutsideCoroutineFallsBack()
 
     -- 不在任何协程里调用
     WaitFrame(50)
-    TestHelper.assertEquals(1, #delayCalls, "非协程应调 lib.Delay 1 次")
+    TestHelper.assertEquals(1, #delayCalls, "非协程应调 time.sleep 1 次")
     TestHelper.assertEquals(50, delayCalls[1], "应传原始 ms")
     restoreEnv(saved)
 end
@@ -196,7 +209,21 @@ function TestWaitFrame.testWaitFrameIsGlobal()
         "不应是 local（battle/*.lua 是全局函数定义，看不到 local）")
 end
 
--- ------------------------------------------------------------ ⑤ 调度器 API
+-- ------------------------------------------------- ⑤ 不得摸已删除的全局 lib
+
+function TestWaitFrame.testNeverTouchesGlobalLib()
+    print("\n=== Test: WaitFrame 不再摸全局 lib.Delay（兼容层已删）===")
+    local saved, delayCalls = installEnv(0)
+    local s = installWaitFrame()
+
+    WaitFrame(50)
+    TestHelper.assertEquals(1, #delayCalls, "非协程应调契约 1 次")
+    TestHelper.assertEquals(0, #libDelayCalls,
+        "不应调全局 lib.Delay（实测 " .. #libDelayCalls .. " 次）")
+    restoreEnv(saved)
+end
+
+-- ------------------------------------------------------------ ⑥ 调度器 API
 
 function TestWaitFrame.testSchedulerHasWaitFrameAndIsInCoroutine()
     print("\n=== Test: scheduler 有 isInCoroutine / waitFrame ===")
@@ -238,6 +265,7 @@ function TestWaitFrame.runAll()
     TestWaitFrame.testCoroutineDoesNotBlock()
     TestWaitFrame.testOutsideCoroutineFallsBack()
     TestWaitFrame.testZeroAndNegativeNoop()
+    TestWaitFrame.testNeverTouchesGlobalLib()
     TestWaitFrame.testScriptHasNoRawLibDelay()
     TestWaitFrame.testWaitFrameIsGlobal()
     TestWaitFrame.testSchedulerHasWaitFrameAndIsInCoroutine()

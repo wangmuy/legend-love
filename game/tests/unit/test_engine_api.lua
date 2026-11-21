@@ -24,6 +24,7 @@ function TestEngineAPI.testRenderModule()
     TestHelper.assertNotNil(EngineAPI.render.getClip, "render.getClip should exist")
     TestHelper.assertNotNil(EngineAPI.render.present, "render.present should exist")
     TestHelper.assertNotNil(EngineAPI.render.presentAndWait, "render.presentAndWait should exist")
+    TestHelper.assertNotNil(EngineAPI.render.setDrawLoopFlag, "render.setDrawLoopFlag should exist")
 end
 
 function TestEngineAPI.testSpriteModule()
@@ -134,6 +135,7 @@ function TestEngineAPI.testNewContractsExplicitlyImplemented()
     local newFns = {
         "render.getWidth", "render.getHeight", "font.measureText",
         "sprite.createFromRGBA", "sprite.createFromEncoded", "sprite.getMeta",
+        "render.setDrawLoopFlag",
     }
     -- **不 require engine_love2d**：它在模块加载期就读 love.filesystem，
     -- 而测试环境只有 TestHelper 的 mock（无 filesystem 字段）。

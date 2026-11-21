@@ -115,8 +115,10 @@ function love.load()
     require "framework.config"
     Byte = require "framework.lib_Byte"
     require "engine-love2d.lib_love"  -- 保持初始化（加载 jyconst.lua、设置 keymap 等）
-    lib = require "engine-love2d.engine_love2d"  -- EngineAPI 接口，覆盖 lib 全局变量
-    lib.init()  -- Love2D 引擎初始化（图形设置、随机种子等）
+    -- EngineAPI 接口。**不再覆盖全局 `lib`**：`_G.lib` 兼容层已由
+    -- port-compat-layer-removal 移除，入口程序与其他调用方一律走 EngineAPI。
+    local engineAPI = require "engine-love2d.engine_love2d"
+    engineAPI.init()  -- Love2D 引擎初始化（图形设置、随机种子等）
     
     -- 加载事件桥接器并初始化
     EventBridge.getInstance():init()
@@ -197,9 +199,9 @@ function love.update(dt)
 end
 
 function love.draw()
-    -- 设置标志，表示现在在 love.draw() 中
-    if lib and lib.SetDrawLoopFlag then
-        lib.SetDrawLoopFlag(true)
+    -- 设置标志，表示现在在 love.draw() 中（走契约，不再摸全局 lib）
+    if EngineAPI and EngineAPI.render and EngineAPI.render.setDrawLoopFlag then
+        EngineAPI.render.setDrawLoopFlag(true)
     end
     
     -- 通过事件桥接器渲染游戏
@@ -209,8 +211,8 @@ function love.draw()
     MenuAsync.draw()
     
     -- 清除标志
-    if lib and lib.SetDrawLoopFlag then
-        lib.SetDrawLoopFlag(false)
+    if EngineAPI and EngineAPI.render and EngineAPI.render.setDrawLoopFlag then
+        EngineAPI.render.setDrawLoopFlag(false)
     end
 
     -- 截图（调试用）
