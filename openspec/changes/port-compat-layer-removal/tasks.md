@@ -87,15 +87,19 @@
 `openspec/changes/engine-portability/change-manifest.md`
 
 **DoD**：
-- [ ] 新增 STEP I：
-      ① `_G.lib =` 只允许出现在 `game/tests/`
-      ② `lib_love.lua` 代码行零 `lib.`
-      ③ framework/script/main 零 `rawget(_G,"lib")`
-- [ ] 负向对照：往 `lib_love.lua` 加一处 `lib.Debug` → gate FAIL
-- [ ] 更新 `TODO.md`：删掉「`lib.*` 兼容层本身」条目（本轮实测推翻其前提）
-- [ ] 更新 `change-manifest.md`：把第 3 项标为已拆出
-- [ ] 全量测试 + 五门禁
-- [ ] 一个 commit
+- [x] 新增 STEP I：① 生产代码零 `_G.lib =`（tests/tools 豁免）
+      ② `lib_love.lua` 代码行零 `lib.` ③ framework/script/main 零 `rawget(_G,"lib")`
+- [x] 负向对照 3 项全部验证：加 `_G.lib =` / 加 `lib.Debug` /
+      加 `rawget(_G,"lib")` → 各自 FAIL
+- [x] 顺带修两个门禁自身缺陷：
+      ① `GREP_OPTIONS` 非空时**覆盖** `--include`（实测会把 `.js` 搜进来）
+         → 门禁开头 `GREP_OPTIONS=` 清空
+      ② `` 在 POSIX grep 下不生效（被误写成退格字符）
+         → 改 `(^|[^A-Za-z0-9_])lib\.` 这种可移植写法
+- [x] 更新 `TODO.md`（4 条遗留已立项）
+- [x] 更新 `change-manifest.md`（第二批 4 个 change + 依赖 + 过期 stub 标注）
+- [x] 全量测试 4013/0 + ENGINE_CONTRACT/INPUT_ACTIONS/BASE_MUSIC 三门禁 PASS
+- [x] 一个 commit
 
 ## 前置核实（Task 0，只读）
 

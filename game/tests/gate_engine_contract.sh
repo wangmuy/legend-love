@@ -19,8 +19,12 @@ fail=0
 
 log() { echo "$*" | tee -a "$LOG"; }
 
-# 本机 GREP_OPTIONS 含 --exclude=*.git*，会让 grep dotfile 永不命中。
-# 本门禁不 grep 任何 dotfile，全部 grep .lua 源码。
+# **必须清 GREP_OPTIONS**：本机它含 `--exclude=*.git*`（会让 grep dotfile
+# 永不命中），更坑的是它**覆盖 `--include`** —— 实测 `grep -r --include='*.lua'`
+# 在 GREP_OPTIONS 非空时会把 `.js` 也搜进来（STEP I 因此误报过一次）。
+# 清空后 `--include` 才生效。
+GREP_OPTIONS=
+export GREP_OPTIONS
 
 # ---------------------------------------- A. framework 无 lib.* 引擎调用
 log "=== STEP: A. framework 零 lib.* 绕过 ==="
@@ -309,6 +313,49 @@ for f in render_facade flow_facade game_hooks; do
         fail=$((fail + 1))
     fi
 done
+
+# ---------------------------------------- I. 兼容层彻底删除
+log     "=== STEP: I. _G.lib 兼容层已删除（port-compat-layer-removal）==="
+# 判据三项：
+#   ① 生产代码里没有 `_G.lib =`（tests/ 与 tools/ 为桩/调试脚本，豁免）
+#   ② `lib_love.lua` 代码行零 `lib.`（它用 _ENV=M + __index=_G，写 lib.xxx
+#      会经 _G 落到 _G.lib —— 那是循环依赖）
+#   ③ framework/script/main 零 `rawget(_G, "lib")`
+#
+# 为什么：`_G.lib` 与 `EngineAPI` 曾被 setmetatable 变成**同一张表**，
+# 于是 `lib.Delay = ...` 往 EngineAPI 写了一个契约外的键，
+# `WaitFrame` 的 fallback 因此拿到协程版而非阻塞退路（两个补丁互相抵消）。
+# 用 `-r --include='*.lua'`：不加引号的 `--include=*.lua` 会被 shell 展开
+# （本机 GREP_OPTIONS 里还带 --exclude 规则，实测会把 .js 也算进来）。
+bad_i1=$(grep -rn '_G.lib[[:space:]]*=' game --include='*.lua' 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--'         | grep -v 'game/tests/' | grep -v 'game/tools/'         | wc -l | tr -dc '0-9')
+[ -n "$bad_i1" ] || bad_i1=0
+if [ "$bad_i1" -eq 0 ]; then
+    log "  [PASS] 生产代码零 _G.lib 赋值"
+else
+    log "  [FAIL] 生产代码仍有 $bad_i1 处 _G.lib 赋值："
+    grep -rn '_G.lib[[:space:]]*=' game --include='*.lua' 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--'         | grep -v 'game/tests/' | grep -v 'game/tools/' | head -3 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
+bad_i2=$(grep -nE '(^|[^A-Za-z0-9_])lib\.[A-Za-z]' game/engine-love2d/lib_love.lua 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$bad_i2" ] || bad_i2=0
+if [ "$bad_i2" -eq 0 ]; then
+    log "  [PASS] lib_love.lua 代码行零 lib.*（无循环依赖）"
+else
+    log "  [FAIL] lib_love.lua 仍有 $bad_i2 处 lib.* 自引用（循环依赖）："
+    grep -nE '(^|[^A-Za-z0-9_])lib\.[A-Za-z]' game/engine-love2d/lib_love.lua 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--' | head -3 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
+bad_i3=$(grep -rn 'rawget(_G, *"lib")' game/framework/*.lua game/script/*.lua         game/script/battle/*.lua game/main.lua 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$bad_i3" ] || bad_i3=0
+if [ "$bad_i3" -eq 0 ]; then
+    log "  [PASS] framework/script/main 零 rawget(_G, \"lib\")"
+else
+    log "  [FAIL] 仍有 $bad_i3 处 rawget(_G, \"lib\")："
+    grep -rn 'rawget(_G, *"lib")' game/framework/*.lua game/script/*.lua         game/script/battle/*.lua game/main.lua 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--' | head -3 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
 
 # --------------------------------------------------------------- 汇总
 log "============================================"
