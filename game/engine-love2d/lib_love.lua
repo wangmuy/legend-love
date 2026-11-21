@@ -1418,29 +1418,29 @@ end
 -- 保存S*D*
 function SaveSMap(Sfilename, Dfilename)
     local startTime = os.clock()
-    lib.Debug("SaveSMap: start")
+    Debug("SaveSMap: start")
     
     if smap == nil then 
-        lib.Debug("SaveSMap: smap is nil, returning")
+        Debug("SaveSMap: smap is nil, returning")
         return 
     end
     
     local s_size = S_XMax*S_YMax*6*S_Num
-    lib.Debug(string.format("SaveSMap: saving %d elements to %s", s_size, Sfilename))
+    Debug(string.format("SaveSMap: saving %d elements to %s", s_size, Sfilename))
     
     Byte.SaveFromTable16(smap, Sfilename, s_size, 1, nil, true)
-    lib.Debug(string.format("SaveSMap: S file done (%.2fs)", os.clock() - startTime))
+    Debug(string.format("SaveSMap: S file done (%.2fs)", os.clock() - startTime))
     
     if dmap == nil then 
-        lib.Debug("SaveSMap: dmap is nil, returning")
+        Debug("SaveSMap: dmap is nil, returning")
         return 
     end
     
     local d_size = D_Num1*D_Num2*S_Num
-    lib.Debug(string.format("SaveSMap: saving %d elements to %s", d_size, Dfilename))
+    Debug(string.format("SaveSMap: saving %d elements to %s", d_size, Dfilename))
     
     Byte.SaveFromTable16(dmap, Dfilename, d_size, 1, nil, true)
-    lib.Debug(string.format("SaveSMap: complete (%.2fs total)", os.clock() - startTime))
+    Debug(string.format("SaveSMap: complete (%.2fs total)", os.clock() - startTime))
 end
 
 function GetS(id, x, y, level)
@@ -1700,7 +1700,7 @@ function DrawWarMap(flag, x, y, v1, v2, v3)
     end
 
     if (flag==1) or (flag==2) then -- 在地面上绘制移动范围
-        lib.Debug(string.format("DrawWarMap: flag=%d, drawing move range", flag))
+        Debug(string.format("DrawWarMap: flag=%d, drawing move range", flag))
         for j=0, 2*jend-2*jstart+CONFIG.WMapAddY do
             for i=istart,iend do
                 local i1=i+math.floor(j/2)+jstart

@@ -9,13 +9,13 @@
 **Blast Radius**：`game/engine-love2d/lib_love.lua`
 
 **DoD**：
-- [ ] 8 处 `lib.Debug(...)` → `Debug(...)`
+- [x] 8 处 `lib.Debug(...)` → `Debug(...)`
       （7 处在 `SaveSMap`：`lib_love.lua:1421/1424/1429/1432/1435/1440/1443`；
        1 处在 `DrawWarMap`：`:1703`）
-- [ ] `grep -nE '\blib\.' game/engine-love2d/lib_love.lua`（非注释）= 0
-- [ ] 全量测试零失败（4011）
-- [ ] 实机三界面 md5 不变
-- [ ] 一个 commit
+- [x] `grep -nE '\blib\.' game/engine-love2d/lib_love.lua`（非注释）= 0
+- [x] 全量测试零失败（4011）
+- [x] 实机三界面 md5 不变（场景 `1efd2af3…` ✓ / 战斗 `6c8eb322…` ✓）
+- [x] 一个 commit
 
 ## Task 2：新增契约 `render.setDrawLoopFlag(flag)`（4 引擎）
 
