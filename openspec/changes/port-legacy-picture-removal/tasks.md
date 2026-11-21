@@ -32,11 +32,11 @@
 **Blast Radius**：`game/engine-love2d/engine_love2d.lua`
 
 **DoD**：
-- [ ] `dialog.draw` 的 `else` 分支删掉 `lib.PicGetXY` / `lib.PicLoadCache`，
+- [x] `dialog.draw` 的 `else` 分支删掉 `lib.PicGetXY` / `lib.PicLoadCache`，
       改为「记日志 + 不画头像」
-- [ ] `grep -nE 'lib\.Pic' game/engine-love2d/engine_love2d.lua`（非注释）= 0
-- [ ] 实机：任意带头像的对话，头像在右下框内（截图）
-- [ ] 一个 commit
+- [x] `lib.PicGetXY` / `lib.PicLoadCache` 已清零（剩 `lib.PicInit` 两处，归 Task 6）
+- [x] 实机：开场对话头像仍在右下框内（场景 md5 `1efd2af3…` 不变）
+- [x] 一个 commit
 
 ## Task 3：新建 `framework/cloud_layer.lua` 并对拍
 

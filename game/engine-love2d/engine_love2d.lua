@@ -1066,11 +1066,17 @@ EngineAPI.dialog.draw = function(spec, layout)
             local offY = (DLG_PICH - h) / 2
             SA.draw(1, layout.headId * 2, hb.x + 5 + offX, hb.y + 5 + offY, 0x1)
         else
-            -- 逃生舱：SpriteAtlas 不可用时退回旧路径（会读 picFileCache）
-            local w, h = lib.PicGetXY(1, layout.headId * 2)
-            local offX = (DLG_PICW - (w or 0)) / 2
-            local offY = (DLG_PICH - (h or 0)) / 2
-            lib.PicLoadCache(1, layout.headId * 2, hb.x + 5 + offX, hb.y + 5 + offY, 1)
+            -- **显式降级：不画头像**（port-legacy-picture-removal Task 2）
+            --
+            -- 原来这里退回 `lib.PicGetXY` / `lib.PicLoadCache`（读 picFileCache）。
+            -- 那条链已随旧贴图子系统一起拆除，且退回它只会掩盖
+            -- 「framework 模块缺失」这个真问题（换引擎时看起来「还能跑」，
+            -- 实际仍要重写 RLE 解码）。
+            -- 宁可少一个头像也要让失败可见。
+            if EngineAPI.debug and EngineAPI.debug.log then
+                EngineAPI.debug.log("dialog.draw: framework.sprite_atlas unavailable, "
+                                    .. "skipping head picture (headId=" .. tostring(layout.headId) .. ")")
+            end
         end
     end
 
