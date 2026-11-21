@@ -369,6 +369,18 @@ function M.map.getSceneSize() end
 -- （`LoadWarMap` 时赋值），framework 拿不到。
 function M.map.getBattleSize() end
 
+--- 加载云层贴图并初始化（`lib.CloudLoadAndInit`）
+--
+-- **为什么这归引擎**：云的像素要做**逐像素调色板烘焙**
+-- （`CloudBakeImage`，`lib_love.lua:1255` → `love.image.newImageData`），
+-- 属 sprite 子系统，不是 map 投影逻辑。
+--
+-- 位置更新（`map.tickClouds`）是纯游戏逻辑，绘制（`map.drawClouds`）归引擎，
+-- 三者分工：loadClouds（加载+烘焙）/ tickClouds（位置）/ drawClouds（贴图）。
+--
+-- @param idxFile, grpFile string 云贴图容器
+function M.map.loadClouds(idxFile, grpFile) end
+
 --- 绘制云层
 --
 -- 云的位置更新是纯游戏逻辑（`tickClouds`），但**云的像素归引擎**：

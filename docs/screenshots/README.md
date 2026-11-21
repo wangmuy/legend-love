@@ -39,7 +39,28 @@ lovec game --shot=s3 --frame=1400 --battle=4 \
 |------|------|---------|-----|
 | `battle-start.png` | 战斗（胡斐 vs 敌人） | `--shot=… --frame=250 --battle=4` | `6c8eb32217839a7c6c30eed8ed9c6be5` |
 | `scene-intro-house.png` | 开场对话（主角家） | `--shot=… --frame=1400 --keys=return,down,return,return,space,space,space,space,space` | `1efd2af3a9ecfce48b89ef14b9a14338` |
-| `main-map-after-walk.png` | 对话推进后 | `--shot=… --frame=2000 --keys=…（见上）+space×8` | `36fd32b0c398058de77e4c6016e873e1bbf98e6bdd981d48f883ca90292db89b` |
+| `main-map-after-walk.png` | 对话推进后（**有云层**） | `--shot=… --frame=2000 --keys=…（见上）+space×8` | ⚠️ **不稳定**，当前存档为 `a83715fe…`（见下） |
+
+### ⚠️ 主地图的 md5 **不稳定**：云层是随机的
+
+`lib.CloudCreateOnSide` 用 `math.random` 生成 60 朵云的
+`Picnum` / `Positionx` / `Positiony` / `Alpha` / `mixR/G/B`（`lib_love.lua:1265-1287`）：
+
+```lua
+c.Picnum   = math.random(0, cloudPicAmount - 1)
+c.Alpha    = 10 + math.random(0, 49)
+c.Positionx = math.random(0, CLOUD_WORLD_X - 1)
+```
+
+而且 `JYMainAdapter.init` 里有 `math.randomseed(os.time())` —— **每次启动不同**。
+
+⇒ **主地图不能用 md5 当基线**。它的正确验证方式是：
+
+1. **目视**：地图/建筑/主角全部正常渲染（截图作为记录，不是基线）
+2. **场景与战斗的 md5**：这两个界面无云层，md5 稳定，是硬判据
+
+（我一度把某次随机的主地图 md5 写成基线，改 `CloudLoadAndInit` 时
+md5 变了就误以为有回归 —— 实际只是云的随机位置不同。）
 
 ### 为什么这三张
 

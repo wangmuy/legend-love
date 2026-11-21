@@ -315,6 +315,11 @@ EngineAPI.map.getSceneSize = function()
     return { w = CC.SWidth or 64, h = CC.SHeight or 64 }
 end
 
+EngineAPI.map.loadClouds = function(idxFile, grpFile)
+    -- 云贴图需要逐像素调色板烘焙（CloudBakeImage），属引擎的 sprite 子系统
+    lib.CloudLoadAndInit(idxFile, grpFile)
+end
+
 EngineAPI.map.getBattleSize = function()
     if lib.GetBattleSize then return lib.GetBattleSize() end
     return { w = 64, h = 64 }

@@ -49,17 +49,52 @@
 
 ---
 
-## Task 2：新增 `map.loadClouds` 契约
+## Task 2：新增 `map.loadClouds` 契约 —— **完成**
 
-**Blast Radius**：`engine_api.lua`、4 个引擎实现
+**Blast Radius**：`engine_api.lua`、4 个引擎实现、`script/jymain.lua`
+
+### 为什么云的加载归引擎
+
+云的像素要做**逐像素调色板烘焙**（`CloudBakeImage`，`lib_love.lua:1255`
+→ `love.image.newImageData`），属 sprite 子系统，不是 map 投影逻辑。
+
+三者分工：
+
+| 契约 | 职责 | 归属 |
+|------|------|------|
+| `map.loadClouds(idx, grp)` | 加载容器 + 逐像素烘焙 | 引擎（sprite 子系统） |
+| `map.tickClouds()` | 位置更新（纯时间驱动） | 引擎（已有） |
+| `map.drawClouds(mx, my)` | 贴图绘制 | 引擎（已有） |
+
+契约数 88 → **89**。
 
 **DoD**：
-- [ ] `map.loadClouds(idxFile, grpFile)` 契约（4 引擎）
-- [ ] LÖVE 实现 = `lib.CloudLoadAndInit`（它内部逐像素烘焙，属 sprite 子系统）
-- [ ] MUD/Web 空实现
-- [ ] 契约数 88 → **89**
-- [ ] 单测：4 引擎都有
-- [ ] 一个 commit
+- [x] `map.loadClouds(idxFile, grpFile)` 契约（4 引擎）
+- [x] LÖVE 实现 = `lib.CloudLoadAndInit`
+- [x] MUD/Web 空实现
+- [x] `script/jymain.lua:439` 的 `lib.CloudLoadAndInit` → `EngineAPI.map.loadClouds`
+- [x] 单测：4 引擎都有
+- [x] 四版本全量测试零失败（4011/0）
+
+### ⚠️ 顺带发现一个验证方法的坑：主地图 md5 **不能当基线**
+
+改 `CloudLoadAndInit` 后主地图 md5 从 `36fd32b0…` 变成 `a83715fe…`，
+我一度以为是回归。实际是**云的位置每次启动都不同**：
+
+```lua
+-- lib.CloudCreateOnSide（lib_love.lua:1265-1287）
+c.Picnum   = math.random(0, cloudPicAmount - 1)
+c.Alpha    = 10 + math.random(0, 49)
+c.Positionx = math.random(0, CLOUD_WORLD_X - 1)
+-- JYMainAdapter.init: math.randomseed(os.time())
+```
+
+⇒ **只有无随机元素的界面能用 md5 当硬基线**：
+- 场景（主角家对话）`1efd2af3…` ✓
+- 战斗 `6c8eb322…` ✓
+- 主地图 ✗（云随机）—— 只能目视
+
+已在 `docs/screenshots/README.md` 写清这一点。
 
 ---
 

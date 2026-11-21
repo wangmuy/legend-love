@@ -213,6 +213,10 @@ EngineAPI.map.getSceneSize = function()
     return { w = 64, h = 64 }
 end
 
+EngineAPI.map.loadClouds = function(idxFile, grpFile)
+    logCall("map.loadClouds", idxFile, grpFile)
+end
+
 EngineAPI.map.getBattleSize = function()
     logCall("map.getBattleSize")
     return { w = 64, h = 64 }

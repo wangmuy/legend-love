@@ -436,7 +436,7 @@ function Init_MMap()   --初始化主地图数据
 
     -- 主地图飘云（原版 kys_engine.pas:ReadTiles 加载 cloud.idx/grp，
     -- kys_main.pas 初始化 60 朵云）。文件缺失时 PicLoadFile 静默跳过，无云不报错。
-    lib.CloudLoadAndInit(CC.CloudPicFile[1],CC.CloudPicFile[2]);
+    EngineAPI.map.loadClouds(CC.CloudPicFile[1],CC.CloudPicFile[2]);
 
     JY.EnterSceneXY=nil;         --设为空，强制重新生成场景入口数据。防止有事件更改了场景入口。
     JY.oldMMapX=-1;
