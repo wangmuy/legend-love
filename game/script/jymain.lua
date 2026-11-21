@@ -229,7 +229,7 @@ function JY_Main_sub()        --真正的游戏主程序入口
     -- （原来这里是 lib.PicInit(CC.PaletteFile)；本行在死代码 JY_Main_sub 里，
     --   但为保持一致也删掉，避免"两处都在加载调色板"的误解）
 
-    lib.PlayMPEG(CONFIG.DataPath .. "start.mpg",VK_ESCAPE);
+    EngineAPI.audio.playVideo(CONFIG.DataPath .. "start.mpg",VK_ESCAPE);
 
     Cls();
 
@@ -292,7 +292,8 @@ function JY_Main_sub()        --真正的游戏主程序入口
     elseif menuReturn == 3 then
         return ;
     end
-    lib.LoadPicture("",0,0);
+    -- 清空整图缓存（原 `lib.LoadPicture("",0,0)` 的隐式副作用）
+    EngineAPI.sprite.clearPictureCache();
     EngineAPI.input.getKey();
     Game_Cycle();
 end
@@ -405,7 +406,7 @@ function Game_Cycle()       --游戏主循环
 
             Init_MMap();
 
-            lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],GetMyPic());
+            EngineAPI.map.drawMain(JY.Base["人X"],JY.Base["人Y"],GetMyPic());
             EngineAPI.render.present();
         elseif JY.Status==GAME_MMAP then
             Game_MMap();
@@ -425,7 +426,7 @@ end
 
 
 function Init_MMap()   --初始化主地图数据
-    lib.LoadMMap(CC.MMapFile[1],CC.MMapFile[2],CC.MMapFile[3],
+    EngineAPI.map.loadMain(CC.MMapFile[1],CC.MMapFile[2],CC.MMapFile[3],
             CC.MMapFile[4],CC.MMapFile[5],CC.MWidth,CC.MHeight,JY.Base["人X"],JY.Base["人Y"]);
 
     LoadArchiveBoth(CC.MMAPPicFile[1],CC.MMAPPicFile[2],0,{paletteFile=CC.PaletteFile});
@@ -483,14 +484,14 @@ function Game_MMap()      --主地图
 
     JY.SubScene=CanEnterScene(x,y);   --判断是否进入子场景
 
-    if lib.GetMMap(x,y,3)==0 and lib.GetMMap(x,y,4)==0 then     --没有建筑，可以到达
+    if EngineAPI.map.getTile(x,y,3)==0 and EngineAPI.map.getTile(x,y,4)==0 then     --没有建筑，可以到达
         JY.Base["人X"]=x;
         JY.Base["人Y"]=y;
     end
     JY.Base["人X"]=limitX(JY.Base["人X"],10,CC.MWidth-10);           --限制坐标不能超出范围
     JY.Base["人Y"]=limitX(JY.Base["人Y"],10,CC.MHeight-10);
 
-    if CC.MMapBoat[lib.GetMMap(JY.Base["人X"],JY.Base["人Y"],0)]==1 then
+    if CC.MMapBoat[EngineAPI.map.getTile(JY.Base["人X"],JY.Base["人Y"],0)]==1 then
         JY.Base["乘船"]=1;
     else
         JY.Base["乘船"]=0;
@@ -504,15 +505,15 @@ function Game_MMap()      --主地图
                 local rr=ClipRect(Cal_PicClip(0,0,JY.oldMMapPic,0,0,0,pic,0));
                 if rr~=nil then
                     EngineAPI.render.setClip(rr.x1,rr.y1,rr.x2,rr.y2);
-                    lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],pic);             --显示主地图
+                    EngineAPI.map.drawMain(JY.Base["人X"],JY.Base["人Y"],pic);             --显示主地图
                 end
             end
         else
             EngineAPI.render.setClip(0,0,CC.ScreenW,CC.ScreenH);
-            lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],pic);             --显示主地图
+            EngineAPI.map.drawMain(JY.Base["人X"],JY.Base["人Y"],pic);             --显示主地图
         end
     else  --全部显示
-        lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],pic);             --显示主地图
+        EngineAPI.map.drawMain(JY.Base["人X"],JY.Base["人Y"],pic);             --显示主地图
     end
 
     if CC.ShowXY==1 then
@@ -528,7 +529,7 @@ function Game_MMap()      --主地图
 
     if JY.SubScene >= 0 then          --进入子场景
         CleanMemory();
-        lib.UnloadMMap();
+        EngineAPI.map.unload();
             EngineAPI.render.present()
 
         JY.Status=GAME_SMAP;
@@ -1503,7 +1504,7 @@ function Game_SMap()         --场景处理主函数
         JY.oldSMapX=-1;
         JY.oldSMapY=-1;
 
-        lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],GetMyPic());
+        EngineAPI.map.drawMain(JY.Base["人X"],JY.Base["人Y"],GetMyPic());
         EngineAPI.render.present()
         EngineAPI.input.getKey();
         return;
@@ -1974,7 +1975,7 @@ function LoadRecord(id)       -- 读取游戏进度
 
     end
 
-    lib.LoadSMap(sFile,CC.TempS_Filename,JY.SceneNum,CC.SWidth,CC.SHeight,dFile,CC.DNum,11);
+    EngineAPI.map.loadScene(sFile,CC.TempS_Filename,JY.SceneNum,CC.SWidth,CC.SHeight,dFile,CC.DNum,11);
     collectgarbage();
 
     EngineAPI.debug.log(string.format("Loadrecord time=%d",EngineAPI.time.getTime()-t1));
@@ -2027,7 +2028,7 @@ function SaveRecord(id)         -- 写游戏进度
     Byte.savefile(JY.Data_Shop,CC.R_GRPFilename[id],idx[5],CC.ShopSize*JY.ShopNum);
 
     EngineAPI.debug.log("SaveRecord: calling SaveSMap")
-    lib.SaveSMap(CC.S_Filename[id],CC.D_Filename[id]);
+    EngineAPI.map.saveScene(CC.S_Filename[id],CC.D_Filename[id]);
 
     -- MOD 存档覆盖表：把本次会话中修改过的字符串写入 rN.ovr
     do
@@ -2056,12 +2057,12 @@ end
 
 --读S×数据, (x,y) 坐标，level 层 0-5
 function GetS(id,x,y,level)       --读S×数据
-    return lib.GetS(id,x,y,level);
+    return EngineAPI.map.getSceneTile(id,x,y,level);
 end
 
 --写S×
 function SetS(id,x,y,level,v)       --写S×
-    lib.SetS(id,x,y,level,v);
+    EngineAPI.map.setSceneTile(id,x,y,level,v);
 end
 
 --读D*
@@ -2069,12 +2070,12 @@ end
 --id D*编号
 --要读第几个数据, 0-10
 function GetD(Sceneid,id,i)          --读D*
-    return lib.GetD(Sceneid,id,i);
+    return EngineAPI.map.getSceneEventData(Sceneid,id,i);
 end
 
 --写D×
 function SetD(Sceneid,id,i,v)         --写D×
-    lib.SetD(Sceneid,id,i,v);
+    EngineAPI.map.setSceneEventData(Sceneid,id,i,v);
 end
 
 --从数据的结构中翻译数据
@@ -2317,7 +2318,7 @@ function PlayMIDI(id)             --播放midi
         return ;
     end
     if id>=0 then
-        lib.PlayMIDI(string.format(CC.MIDIFile,id+1));
+        EngineAPI.audio.playMusic(string.format(CC.MIDIFile,id+1));
     end
 end
 
@@ -2327,7 +2328,7 @@ function PlayWavAtk(id)             --播放音效atk***
         return ;
     end
     if id>=0 then
-        lib.PlayWAV(string.format(CC.ATKFile,id));
+        EngineAPI.audio.playSFX(string.format(CC.ATKFile,id));
     end
 end
 
@@ -2337,7 +2338,7 @@ function PlayWavE(id)              --播放音效e**
         return ;
     end
     if id>=0 then
-        lib.PlayWAV(string.format(CC.EFile,id));
+        EngineAPI.audio.playSFX(string.format(CC.EFile,id));
     end
 end
 
@@ -2349,7 +2350,7 @@ function ShowScreen(flag)              --刷新屏幕显示
         if flag==nil then
             flag=0;
           end
-        lib.ShowSurface(flag);
+        EngineAPI.render.present();
     end
 end
 
@@ -3074,16 +3075,16 @@ function Cls(x1,y1,x2,y2)                    --清除屏幕
 
     if JY.Status==GAME_START then
         EngineAPI.render.fillRect(0,0,0,0,0);
-        lib.LoadPicture(CC.FirstFile,-1,-1);
+        EngineAPI.sprite.drawPictureFile(CC.FirstFile,-1,-1);
     elseif JY.Status==GAME_MMAP then
-        lib.DrawMMap(JY.Base["人X"],JY.Base["人Y"],GetMyPic());             --显示主地图
+        EngineAPI.map.drawMain(JY.Base["人X"],JY.Base["人Y"],GetMyPic());             --显示主地图
     elseif JY.Status==GAME_SMAP then
         DrawSMap();
     elseif JY.Status==GAME_WMAP then
         WarDrawMap(0);
     elseif JY.Status==GAME_DEAD then
         EngineAPI.render.fillRect(0,0,0,0,0);
-        lib.LoadPicture(CC.DeadFile,-1,-1);
+        EngineAPI.sprite.drawPictureFile(CC.DeadFile,-1,-1);
     end
     EngineAPI.render.setClip(0,0,0,0);
 end
@@ -4419,7 +4420,7 @@ function instruct_62(id1,startnum1,endnum1,id2,startnum2,endnum2)      --播放�
 
       --此处应该插入正规的片尾动画。这里暂时用图片代替
 
-      lib.LoadPicture(CONFIG.PicturePath .."end.png",-1,-1);
+      EngineAPI.sprite.drawPictureFile(CONFIG.PicturePath .."end.png",-1,-1);
       ShowScreen();
       PlayMIDI(24);
       WaitFrame(5000);

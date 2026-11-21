@@ -6,21 +6,21 @@
 
 function WarLoadMap(mapid)      --加载战斗地图
    EngineAPI.debug.log(string.format("load war map %d",mapid));
-   lib.LoadWarMap(CC.WarMapFile[1],CC.WarMapFile[2],mapid,6,CC.WarWidth,CC.WarHeight);
+   EngineAPI.map.loadBattle(CC.WarMapFile[1],CC.WarMapFile[2],mapid,6,CC.WarWidth,CC.WarHeight);
 end
 
 function GetWarMap(x,y,level)   --取战斗地图数据
-     return lib.GetWarMap(x,y,level);
+     return EngineAPI.map.getBattleTile(x,y,level);
 end
 
 function SetWarMap(x,y,level,v)  --存战斗地图数据
-     lib.SetWarMap(x,y,level,v);
+     EngineAPI.map.setBattleTile(x,y,level,v);
 end
 
 --设置某层为给定值
 
 function CleanWarMap(level,v)
-    lib.CleanWarMap(level,v);
+    EngineAPI.map.clearBattleTile(level,v);
 end
 
 

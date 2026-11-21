@@ -205,6 +205,20 @@ function M.sprite.drawPictureFile(filename, x, y, opts) end
 -- @return boolean 是否真的绘制了
 function M.sprite.drawHandle(handle, x, y, flags, alpha) end
 
+--- 清空「按文件名缓存的整图」缓存（对应 `lib.LoadPicture("")` 的隐式副作用）
+--
+-- **为什么需要独立契约**：`lib.LoadPicture` 文件名传空串时不是"什么都不画"，
+-- 而是 `pictureCache = {}`（**清空整图缓存**）。
+--
+-- `script/jymain.lua:295` 正是靠这个副作用清掉上一屏：
+-- ```lua
+-- lib.LoadPicture("", 0, 0)
+-- ```
+--
+-- 而 `sprite.drawPictureFile` 对空文件名只 `return false`（**不清缓存**），
+-- 两者语义不同 → 不能机械替换。所以把「清缓存」独立成契约。
+function M.sprite.clearPictureCache() end
+
 --- 绘制一个纹理句柄（染色版）
 --
 -- @param handle table

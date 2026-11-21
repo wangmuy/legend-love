@@ -67,6 +67,32 @@ local function installLibStubs()
         warMapLayers[mapKey(x, y, layer)] = v
     end
 
+    -- **同时 stub EngineAPI.map 的战斗 tile 契约**：
+    -- `port-native-api-completion` 把 `battle_data.lua` 的
+    -- `lib.LoadWarMap/GetWarMap/SetWarMap/CleanWarMap` 换成了
+    -- `EngineAPI.map.loadBattle/getBattleTile/setBattleTile/clearBattleTile`。
+    -- 只 stub `lib.*` 会让 `SetWarMap` 报 "attempt to call field 'setBattleTile' (a nil value)"。
+    local EA = rawget(_G, "EngineAPI")
+    if EA and EA.map then
+        EA.map.loadBattle = function(idxFile, grpFile, mapId, num, w, h)
+            resetWarMap()
+        end
+        EA.map.getBattleTile = function(x, y, layer)
+            return warMapLayers[mapKey(x, y, layer)] or 0
+        end
+        EA.map.setBattleTile = function(x, y, layer, v)
+            warMapLayers[mapKey(x, y, layer)] = v
+        end
+        EA.map.clearBattleTile = function(layer, v)
+            for i = 0, MAP_W - 1 do
+                for j = 0, MAP_H - 1 do
+                    warMapLayers[mapKey(i, j, layer)] = v
+                end
+            end
+        end
+        EA.map.getBattleSize = function() return { w = MAP_W, h = MAP_H } end
+    end
+
     L.CleanWarMap = function(layer, v)
         for i = 0, MAP_W - 1 do
             for j = 0, MAP_H - 1 do

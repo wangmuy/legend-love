@@ -167,9 +167,15 @@ function TestModResources.testAllsinbkOnlyInDefinitionAndCall()
     local unexpected = 0
     for _, h in ipairs(hits) do
         local t = h.text
-        -- 允许：常量定义、LoadSMap 调用实参传递、注释
+        -- 允许：常量定义、LoadSMap/map.loadScene 调用实参传递、注释
+        --
+        -- **`map.loadScene` 也要允许**：`port-native-api-completion` 把
+        -- `lib.LoadSMap(...)` 换成了 `EngineAPI.map.loadScene(...)`
+        -- （同一个死参数 `CC.TempS_Filename` 仍原样作为第 2 实参传下去）。
+        -- 这条断言原本只认 `LoadSMap(` 字面 → 迁移后误报。
         local isDef = t:find("TempS_Filename%s*=") ~= nil
         local isCall = t:find("LoadSMap%s*%(") ~= nil
+            or t:find("loadScene%s*%(") ~= nil
         local isComment = t:match("^%s*%-%-") ~= nil
         if not (isDef or isCall or isComment) then
             unexpected = unexpected + 1

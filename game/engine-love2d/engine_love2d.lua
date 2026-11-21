@@ -213,6 +213,11 @@ end
 -- handle 结构由 createFromRGBA/createFromEncoded 产生：
 --   { img=löve Image, w=, h=, xoff=, yoff= }
 -- 引擎不需要知道这个纹理来自 .idx/.grp 还是 PNG 图集。
+EngineAPI.sprite.clearPictureCache = function()
+    -- 对应 lib.LoadPicture("") 的隐式副作用：清空按文件名缓存的整图
+    lib.ClearPictureCache()
+end
+
 EngineAPI.sprite.drawHandle = function(handle, x, y, flags, alpha)
     if type(handle) ~= "table" or not handle.img then return false end
     flags = flags or 0

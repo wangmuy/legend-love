@@ -208,6 +208,8 @@ function EngineAPI.map.getSceneSize()
     return { w = 64, h = 64 }
 end
 
+function EngineAPI.sprite.clearPictureCache() end
+
 function EngineAPI.map.loadClouds(idxFile, grpFile) end
 
 function EngineAPI.map.getBattleSize()

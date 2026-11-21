@@ -45,6 +45,18 @@ ALLOWED_DEVIATIONS = {
     "War_WugongHurtNeili":  "补 level 钳制 + 字段判空（与 HurtLife 对称）",
     "War_AutoMove":         "回溯循环补 prevI 进度守卫 + 硬上限",
     "War_EndPersonData":    "除 liveNum 补零守卫（避免 inf 污染经验）",
+    # --- 第八批：battle_data 的 4 个地图 API（D Task 3） ---
+    # `script/battle/battle_data.lua` 的 4 个包装函数把
+    # `lib.LoadWarMap/GetWarMap/SetWarMap/CleanWarMap` 换成了
+    # `EngineAPI.map.loadBattle/getBattleTile/setBattleTile/clearBattleTile`。
+    # 两者签名逐位一致（实测），逻辑零改动：
+    #   lib.GetWarMap(x,y,level)      ↔ map.getBattleTile(x,y,layer)
+    #   lib.SetWarMap(x,y,level,v)    ↔ map.setBattleTile(x,y,layer,v)
+    #   lib.CleanWarMap(level,v)      ↔ map.clearBattleTile(layer,v)
+    # 实机战斗截图 md5 `6c8eb322…` 不变。
+    "GetWarMap":   "lib.GetWarMap → EngineAPI.map.getBattleTile（签名一致）",
+    "SetWarMap":   "lib.SetWarMap → EngineAPI.map.setBattleTile（签名一致）",
+    "CleanWarMap": "lib.CleanWarMap → EngineAPI.map.clearBattleTile（签名一致）",
     # --- 第七批：script 层 lib.* → EngineAPI.*（port-native-api-completion Task 1） ---
     #
     # 这 6 个函数里只有 `lib.Debug` / `lib.GetTime` / `lib.SetClip` / `lib.GetKey`

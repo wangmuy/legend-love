@@ -661,6 +661,11 @@ function LoadPicture(filename, x, y)
     end
 end
 
+-- 清空整图缓存（对应 EngineAPI.sprite.clearPictureCache）
+function ClearPictureCache()
+    pictureCache = {}
+end
+
 local currentMusic = nil
 
 -- ---------------------------------------------------------------------------

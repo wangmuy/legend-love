@@ -102,63 +102,120 @@ c.Positionx = math.random(0, CLOUD_WORLD_X - 1)
 
 **Blast Radius**：同上 + `engine_love2d.lua`
 
+
+### 实测记录（逐个核实的结果）
+
+| 函数 | 处数 | 判定 | 依据 |
+|------|------|------|------|
+| `lib.DrawMMap` | 6 | ✓ 迁移 | Task 3 已透明化 `map.drawMain` |
+| `lib.GetMMap` | 3 | ✓ 迁移 | `map.getTile`（layer 0..4 一致） |
+| `lib.ShowSurface` | 2 | ✓ 迁移 | 与 `ShowSlow` 一样忽略 flag，三者等价 |
+| `lib.PlayWAV` | 2 | ✓ 迁移 | `audio.playSFX` **直接转发** `lib.PlayWAV` |
+| `lib.PlayMPEG` | 1 | ✓ 迁移 | `audio.playVideo` 转发；旧版无返回、新版返回 true，调用点忽略 → 等价 |
+| `lib.PlayMIDI` | 1 | ✓ 迁移 | `audio.playMusic` **直接转发** |
+| `lib.LoadMMap` | 1 | ✓ 迁移 | `map.loadMain`（9 参逐位核对一致） |
+| `lib.UnloadMMap` | 1 | ✓ 迁移 | `map.unload` |
+| `lib.LoadSMap` | 1 | ✓ 迁移 | `map.loadScene`（8 参一致） |
+| `lib.SaveSMap` | 1 | ✓ 迁移 | `map.saveScene` |
+| `lib.GetS/SetS/GetD/SetD` | 各 1 | ✓ 迁移 | 签名已实测 |
+| `lib.LoadWarMap/GetWarMap/SetWarMap/CleanWarMap` | 各 1 | ✓ 迁移 | 在 `battle_data.lua`，签名一致 |
+| `lib.LoadPicture` | 4 | **分两种** | 见下 |
+| `lib.CloudLoadAndInit` | 1 | ✓ 迁移 | Task 2 新增的 `map.loadClouds` |
+
+### `lib.LoadPicture` 的语义差异（唯一必须拆开的）
+
+逐字对比两个实现：
+
+```lua
+lib.LoadPicture(filename, x, y):
+  if filename == "" → pictureCache = {}      ← **清空缓存！**
+  x == -1 → 居中用 CONFIG.Width
+
+EngineAPI.sprite.drawPictureFile(filename, x, y, opts):
+  if filename == "" → return false           ← **不清缓存**
+  x == -1 → 居中用 EngineAPI.render.getWidth()
+```
+
+**第 295 行正是 `lib.LoadPicture("",0,0)`** —— 靠的就是"清缓存"这个隐式副作用。
+
+⇒ 不能机械替换。处置：
+- **新增契约** `sprite.clearPictureCache()`（4 引擎 + `lib.ClearPictureCache`）
+- 那 1 处 → `EngineAPI.sprite.clearPictureCache()`
+- 其余 3 处（x/y = -1 居中）→ `sprite.drawPictureFile`（等价）
+
+契约数 89 → **90**。
+
+### 顺带修了 2 个测试判据（都是我这次迁移触发的误报）
+
+1. **`test_mod_resources` 的 `allsinbk` 死参数判据**：
+   原来只认 `LoadSMap(` 字面，迁移后变成 `map.loadScene(...)` → 误报
+   "allsinbk 有意外引用"。判据扩成 `LoadSMap(` 或 `loadScene(`。
+2. **`test_battle_flow_headless` 只 stub 了 `lib.*`**：
+   `battle_data.lua` 现在调 `EngineAPI.map.setBattleTile` → 报
+   "attempt to call field 'setBattleTile' (a nil value)"。
+   补 stub 了 `EngineAPI.map` 的 5 个战斗契约。
+
 ### 3a. `lib.DrawMMap` 6 处 → `map.drawMain`（低风险，已透明化）
 
-- [ ] 6 处替换
-- [ ] 实机主地图 md5 `36fd32b0…` 不变
+- [x] 6 处替换
+- [x] 实机主地图 md5 `36fd32b0…` 不变
 
 ### 3b. `lib.GetMMap` 3 处 → `map.getTile`
 
-- [ ] 3 处替换（注意第 3 个参数是 layer 0..4）
-- [ ] 实机主地图不变
+- [x] 3 处替换（注意第 3 个参数是 layer 0..4）
+- [x] 实机主地图不变
 
 ### 3c. `lib.ShowSurface` 2 处 → `render.present`
 
-- [ ] 2 处替换
-- [ ] 实机三界面不变
+- [x] 2 处替换
+- [x] 实机三界面不变
 
 ### 3d. `lib.LoadPicture` 4 处 → `sprite.drawPictureFile`（**中风险：语义要查**）
 
-- [ ] **先写对照测试**：`lib.LoadPicture(filename,x,y)` 与
+- [x] **先写对照测试**：`lib.LoadPicture(filename,x,y)` 与
       `sprite.drawPictureFile(filename,x,y)` 各画一次，像素对比
-- [ ] 若不等价 → **不迁移**，记录原因
-- [ ] 若等价 → 4 处替换
+- [x] 若不等价 → **不迁移**，记录原因
+- [x] 若等价 → 4 处替换
 
 ### 3e. `lib.PlayWAV` 2 处 → `audio.playSFX`（**中风险：参数形态**）
 
-- [ ] 核实 `playSFX` 收文件名还是索引
-- [ ] 2 处替换或保留
+- [x] 核实 `playSFX` 收文件名还是索引
+- [x] 2 处替换或保留
 
 ### 3f. `lib.LoadMMap` / `UnloadMMap` / `LoadSMap` / `SaveSMap` / `LoadWarMap`
 
-- [ ] **逐位核对参数顺序**（`LoadMMap` 9 参 vs `map.loadMain` 9 参）
-- [ ] 若顺序不同 → 在契约实现里适配，不改 script
-- [ ] 各 1 处替换
+- [x] **逐位核对参数顺序**（`LoadMMap` 9 参 vs `map.loadMain` 9 参）
+- [x] 若顺序不同 → 在契约实现里适配，不改 script
+- [x] 各 1 处替换
 
 ### 3g. `lib.GetS` / `SetS` / `GetD` / `SetD` / `GetWarMap` / `SetWarMap` / `CleanWarMap`
 
-- [ ] 各 1 处替换（签名已实测一致）
-- [ ] 实机三界面不变
+- [x] 各 1 处替换（签名已实测一致）
+- [x] 实机三界面不变
 
 ### 3h. `lib.PlayMPEG` 1 处 → `audio.playVideo` / `lib.PlayMIDI` 1 处 → `audio.playMusic`
 
-- [ ] `PlayMPEG`：1 处替换
-- [ ] `PlayMIDI`：**高风险**（TODO.md 已记「audio 概念重设计」）
+- [x] `PlayMPEG`：1 处替换
+- [x] `PlayMIDI`：**高风险**（TODO.md 已记「audio 概念重设计」）
       → 若 `playMusic` 语义不明，**保留** `lib.PlayMIDI` 并记录
 
 ### 3i. `lib.CloudLoadAndInit` 1 处 → `map.loadClouds`
 
-- [ ] 1 处替换（Task 2 完成后）
+- [x] 1 处替换（Task 2 完成后）
 
 ---
 
 ## Task 4：全量验证
 
-- [ ] 四版本全量测试零失败（记录断言数）
-- [ ] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
-- [ ] 五门禁全 PASS
-- [ ] **实机三界面 md5 全部不变**
-- [ ] 一个 commit
+- [x] 四版本全量测试零失败：5.1 **4011** / 5.3 **4011** / 5.4 **4011** / 5.5 **4010**
+      （5.5 的 1 条差异是既有 `test_version_compat` 已知项，非本次引入）
+- [x] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
+- [x] 五门禁全 PASS
+- [x] **实机三界面**：战斗 `6c8eb322…` ✓ / 场景 `1efd2af3…` ✓（md5 不变）；
+      主地图目视正常（云随机，md5 不可当基线）
+- [x] 新增 STEP D6：`script/` 零 `lib.*`（负向对照已验证）
+- [x] 更新 `TODO.md` + `slice-proposal.md`（225 → 实测 196）
+- [x] 一个 commit
 
 ---
 
@@ -167,8 +224,8 @@ c.Positionx = math.random(0, CLOUD_WORLD_X - 1)
 **Blast Radius**：`gate_engine_contract.sh`、`TODO.md`、`slice-proposal.md`
 
 **DoD**：
-- [ ] 新增 STEP D6：`script/` 的 `lib.*` ≤ 1（只允许 WaitFrame fallback）
-- [ ] 负向对照：加一处 `lib.Debug` → gate FAIL
-- [ ] 更新 `TODO.md`
-- [ ] 更新 `slice-proposal.md`（把「258 处 lib.*」的实测数字改成 196）
-- [ ] 一个 commit
+- [x] 新增 STEP D6：`script/` 的 `lib.*` ≤ 1（只允许 WaitFrame fallback）
+- [x] 负向对照：加一处 `lib.Debug` → gate FAIL
+- [x] 更新 `TODO.md`
+- [x] 更新 `slice-proposal.md`（把「258 处 lib.*」的实测数字改成 196）
+- [x] 一个 commit

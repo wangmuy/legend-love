@@ -150,7 +150,7 @@ parent_epic: null
   3. `lib.LoadMMap/LoadSMap/LoadWarMap` 一并透明化
   - **这是删 `lib_love.LoadPic` 119 行 + 摘掉 `war_async` 双轨补丁的唯一前提**
 - **Depends On**: `port-contract-pruning`（同改 engine_api）
-- **Status**: [ ] Created
+- **Status**: [x] Archived / Complete（port-map-render-native）
 
 ### Change: port-native-api-completion
 
@@ -158,7 +158,7 @@ parent_epic: null
 - **Responsibility**: 迁 191 处有 EngineAPI 等价物的 + 补 34 处无等价物的契约
   （`map.setTile` 等），最后删 `lib.*` 兼容层
 - **Depends On**: `port-map-render-native`（否则 `DrawMMap/DrawSMap` 会重复劳动）
-- **Status**: [ ] Created
+- **Status**: [x] Archived / Complete（port-native-api-completion）
 
 ---
 

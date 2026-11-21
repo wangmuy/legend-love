@@ -18,7 +18,7 @@ local function Menu_Sale()
 
 	Cls();
     DrawStrBox(CC.MainSubMenuX,CC.MainSubMenuY,"请选择您要当掉的物品",C_WHITE,CC.DefaultFont);
-    lib.ShowSurface();
+    EngineAPI.render.present();
 	WaitFrame(500);
 
 	local thing={};

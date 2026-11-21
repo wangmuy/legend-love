@@ -145,7 +145,9 @@ port-battle-robustness       5 Task 组 / 41 checkbox    WarLoad 错误码 + WAR
 port-contract-pruning        5 Task 组 / 21 checkbox    删除 3 个无用契约（79→76）（✓ Complete）
 port-blocking-delay          4 Task 组 / 37 checkbox    waitForTime 真等待 + 阻塞消除（批 1 ✓，批 2 待做）
 port-map-render-native      约 12-15 Task              map 绘制契约透明化（未启动）
-port-native-api-completion  约 30-40 Task              225 处 lib.* 迁移（未启动）
+port-native-api-completion  5 Task 组 / 47 checkbox    **196 处** lib.* → EngineAPI（✓ Complete）
+                                                       实测只剩 1 处（WaitFrame fallback）
+                                                       早期估的 225/258 含 oldevent 重复统计
 ```
 
 ## Affected Domains

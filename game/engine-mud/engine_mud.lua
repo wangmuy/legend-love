@@ -213,6 +213,10 @@ EngineAPI.map.getSceneSize = function()
     return { w = 64, h = 64 }
 end
 
+EngineAPI.sprite.clearPictureCache = function()
+    logCall("sprite.clearPictureCache")
+end
+
 EngineAPI.map.loadClouds = function(idxFile, grpFile)
     logCall("map.loadClouds", idxFile, grpFile)
 end

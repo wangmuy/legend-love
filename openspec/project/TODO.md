@@ -142,3 +142,13 @@
 - [ ] **`ENGINE_API_DESIGN.md` 与代码同步**
   - 现状：`AGENTS.md:62` 写"实现 EngineAPI 全部 59 个函数"，实际 64 个
   - `engine-portability` 的 change 1 会修正计数，但该文档整体内容可能已过时
+
+- [x] ~~**script 层 196 处 lib.* → EngineAPI**~~ —— **已完成**（`port-native-api-completion`）
+  - 实测规模：**196 处 / 29 函数**（早期估的 258 含 oldevent 脚本重复统计）
+  - 结果：**只剩 1 处**（`WaitFrame` 内部的 `lib.Delay` fallback，非协程上下文退路）
+  - 新增 2 个契约：`map.loadClouds`（云层加载+烘焙）、`sprite.clearPictureCache`
+    （`lib.LoadPicture("")` 的隐式副作用）→ 契约数 88 → **90**
+  - **`.idx/.grp` 现在对引擎彻底不透明**：`framework/sprite_decoder.lua` 解容器，
+    引擎只收 handle；`lib_love.lua` 的 `LoadPic` RLE 解码**只剩兼容层用途**
+  - 顺带修 2 个测试判据误报（`allsinbk` 死参数只认 `LoadSMap(`、
+    `test_battle_flow_headless` 只 stub `lib.*` 没 stub `EngineAPI.map`）

@@ -155,6 +155,38 @@ else
     fail=$((fail + 1))
 fi
 
+# --------------------- D6. script/ 零 lib.*（只允许 WaitFrame fallback）
+log "=== STEP: D6. script/ 零 lib.* ==="
+# 判据：script/ 代码里每处 `lib.xxx(` 都必须是 `WaitFrame` 的 fallback
+# （即 `function(m) lib.Delay(m) end`）。
+#
+# 为什么：`lib.*` 只在 LÖVE 存在（MUD/Web 只实现 EngineAPI，实测 MUD 缺 30/35
+# 个常用 lib.* 函数）→ 只要 script 还在用 lib.*，「换引擎只需写 engine-xxx」
+# 就不成立。
+#
+# **用 awk 不用 grep -E**：同类转义坑已踩过两次（见 D3 与 battle gate STEP J）。
+bad_d6=$(awk '
+    /lib\.[A-Za-z][A-Za-z0-9_]*[[:space:]]*\(/ {
+        if (match($0, /function\(m\)[[:space:]]*lib\.Delay/)) next
+        if (match($0, /^[[:space:]]*--/)) next
+        print FILENAME ":" FNR ": " $0
+    }
+' game/script/jymain.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null | wc -l | tr -dc '0-9')
+[ -n "$bad_d6" ] || bad_d6=0
+if [ "$bad_d6" -eq 0 ]; then
+    log "  [PASS] script/ 零 lib.*（全部走 EngineAPI）"
+else
+    log "  [FAIL] script/ 仍有 $bad_d6 处 lib.* 调用："
+    awk '
+        /lib\.[A-Za-z][A-Za-z0-9_]*[[:space:]]*\(/ {
+            if (match($0, /function\(m\)[[:space:]]*lib\.Delay/)) next
+            if (match($0, /^[[:space:]]*--/)) next
+            print FILENAME ":" FNR ": " $0
+        }
+    ' game/script/jymain.lua game/script/battle/*.lua game/script/newevent/*.lua 2>/dev/null       | head -5 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
 # --------------------- D5. map_render 零 love.* 且零 picFileCache
 log "=== STEP: D5. map_render 零引擎细节 ==="
 # 判据两项：
