@@ -4,8 +4,8 @@ parent_epic: null
 ---
 # Change Manifest: engine-portability — 引擎可移植性硬化
 
-> 本 slice 统辖 3 个子 change，均位于 `openspec/changes/` 下与 slice 同级
-> （符合本仓既有 `mouse-slice1` 的组织方式）。
+> 本 slice 统辖 **14 个**子 change（第一批 10 个已 Complete，第二批 4 个 Not Started），
+> 均位于 `openspec/changes/` 下与 slice 同级（符合本仓既有 `mouse-slice1` 的组织方式）。
 
 ## Change Assignments
 
@@ -162,6 +162,81 @@ parent_epic: null
 
 ---
 
+## 第二批：slice 收尾留下的 4 项（2026-11-21 实测后新增）
+
+> 收尾时记的 4 项「不在 slice 范围」的遗留，本轮逐项实测后**前提全部修正**，
+> 各自独立成 change。原陈述与实测结论的对照见每项下方。
+
+### Change: port-compat-layer-removal
+
+- **Scope**: engine + framework + 入口（5 处消费者 + 1 个新契约 + 3 个门禁判据）
+- **Responsibility**:
+  1. `lib_love.lua` 的 **8 处 `lib.Debug`** → 本地 `Debug`（消除循环依赖）
+  2. 新增契约 `render.setDrawLoopFlag(flag)`（4 引擎），`main.lua` 改调它
+  3. `async_globals` 的 Delay 补丁点从 `lib.Delay` 改到 `EngineAPI.time.sleep`
+     （修活体缺陷：`_G.lib` 与 `EngineAPI` 同表 → 补丁写进契约外的键 `Delay`）
+  4. `jymain.lua:51` 的 `WaitFrame` fallback → `EngineAPI.time.sleep`
+  5. 删 2 处死变量（`interact.lua:185` / `settings_store.lua:45`）
+  6. 删 3 个引擎的 `_G.lib = ...`
+  7. 门禁 STEP I（`_G.lib` 只允许在 `tests/`）
+- **前提修正**：slice 记的是「oldevent 脚本依赖 `lib.*`（约 2000 个数据文件）」。
+  **实测 27808 个事件脚本（1018 基础 + 26790 MOD）零 `lib.` 引用**，
+  调用面恰好是 `instruct_0..67`（67 个）→ 该前提不成立。
+- **Depends On**: `port-native-api-completion`（script 已零 `lib.*`）
+- **Status**: [ ] Not Started
+
+### Change: port-legacy-picture-removal
+
+- **Scope**: engine + framework（425 行旧贴图子系统 + 3 个逃生舱 + 190 行云子系统搬家）
+- **Responsibility**:
+  1. 删 3 个死契约 `sprite.draw` / `sprite.drawTinted` / `sprite.loadArchive`
+     （**实测 0 处消费者**）
+  2. dialog 头像逃逸舱改显式降级（删 2 处 `lib.PicGetXY/PicLoadCache`）
+  3. 新建 `framework/cloud_layer.lua`：云解码（复用 `SpriteDecoder`）+ 烘焙 +
+     60 朵漂移 + 坐标公式。**实测 cloud.grp 9 帧对拍 9/9 一致**
+  4. 3 个地图绘制逃生舱改显式 `error`（不再静默回退旧实现）
+  5. 删 `lib_love` 的 425 行（`LoadPic` 119 行 RLE + `PicInit/PicLoadFile/PicGetXY/
+     PicLoadCache/DrawPicTinted/LoadPicture/ClearPictureCache/picFileCache`）
+  6. 调色板改由 `SpriteDecoder.loadPalette` 加载
+  7. 修 `clearPictureCache` 清错表（清 `lib_love.pictureCache` 而非 `_picCache`）
+- **前提修正**：slice 记的是「要删 `LoadPic` 得先改旧事件脚本的调用方式」。
+  **实测事件脚本零 `lib.`**；真正阻塞的是 3 个死契约 + dialog 逃逸舱 + 云子系统。
+- **Depends On**: `port-compat-layer-removal`
+- **Status**: [ ] Not Started
+
+### Change: port-audio-semantics
+
+- **Scope**: engine + script（audio 语义定案 + 1 个新契约）
+- **Responsibility**:
+  1. `playSequence(id)` 收窄为**只收编号**，扩展名候选 `{ogg, mid, mp3}` + `sound/`
+     回落写进契约注释
+  2. `playMusic(filename)` 收窄为**只收完整文件名**（不推测扩展名）
+  3. 新增 `app.setMusicTemplate(template, startOffset)`（引擎不再读 `CC.*`）
+  4. `CC.MIDIFile` 去扩展名；`JYMainAdapter.init` 注册模板
+  5. `PlayMIDI` 的 `EnableMusic==0` 分支改调 `stopMusic()`（修活体缺陷）
+  6. `playVideo` 返回真实结果（无能力/文件缺失 → `false`，不再无条件 `true`）
+- **前提修正**：slice 记的是「语义需先定（filename vs 索引）」。本轮定案：
+  **两个契约各管一半**，且把 `id+1` 偏移提升为 `setMusicTemplate` 的显式参数。
+- **Depends On**: `port-native-api-completion`
+- **Status**: [ ] Not Started
+
+### Change: port-ui-screens-verification
+
+- **Scope**: framework + docs（`framework/status_page.lua` + 4 张实机基线）
+- **Responsibility**:
+  1. 归档物品菜单 / 物品格 / 人物状态 3 张实机基线（**本轮已捕获**）
+  2. 补存档界面基线（**须在主地图**：`GAME_SMAP` 下「系统」置灰是原版行为）
+  3. 新建 `framework/status_page.lua`：`ShowPersonStatus_sub` 的 27 处绘制搬 framework
+  4. 门禁 STEP F 白名单补 4 个 script 全局（`ShowPersonStatus_sub` 等）
+  5. `docs/screenshots/README.md` 标注三类判据（逐字节/依赖存档/不稳定）
+- **前提修正**：slice 记的是「`Menu_Thing` / `ShowPersonStatus` 在事件驱动下不可达」。
+  **实测三个里两个可达**（物品菜单、物品格、人物状态均已截图）；
+  存档不可达是**原版行为**，需在主地图验证。
+- **Depends On**: 无（可独立开工；建议排在 `port-legacy-picture-removal` 之后回归基线）
+- **Status**: [ ] Not Started
+
+---
+
 ## 依赖图
 
 ```
@@ -205,11 +280,40 @@ parent_epic: null
 - change 1 **必须**先于 change 2（先有契约才能解耦）
 - change 3 与 1/2 无硬依赖，但**同改 `game_states.lua`** → 建议顺序执行
 
+### 第二批（2026-11-21 新增）的依赖
+
+```
+  ┌────────────────────────────────────────┐
+  │ port-compat-layer-removal               │
+  │  删 _G.lib + 1 新契约 + 修 Delay 补丁点   │
+  └──────────────────┬─────────────────────┘
+                     │（必须先删兼容层，否则旧贴图删除会崩）
+                     ▼
+  ┌────────────────────────────────────────┐
+  │ port-legacy-picture-removal             │
+  │  删 425 行旧贴图 + 云搬 framework        │
+  └────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────┐
+  │ port-audio-semantics                    │
+  │  定案 playSequence/playMusic + 修开关     │
+  └────────────────────────────────────────┘
+
+  ┌────────────────────────────────────────┐
+  │ port-ui-screens-verification            │
+  │  4 张界面基线 + status_page 解耦          │
+  └────────────────────────────────────────┘
+```
+
+- `port-legacy-picture-removal` **必须**在 `port-compat-layer-removal` 之后：
+  前者要删 `lib_love` 的 425 行，而 `lib_love` 里有 8 处 `lib.Debug` 依赖 `_G.lib`
+- `port-audio-semantics` / `port-ui-screens-verification` 与上面两条无硬依赖，可并行
+
 ---
 
 ## Shared Contract Stubs
 
-以下是三个 change 之间的接口契约。**签名一经确定不得随意改动。**
+以下是 change 之间的接口契约。**签名一经确定不得随意改动。**
 
 ### change 1 → change 2 的契约（facade 依赖）
 
@@ -233,6 +337,12 @@ EngineAPI.debug.log(...)
 EngineAPI.sprite.draw(archiveId, frameId, x, y, flags, alpha)
 -- frameId 是**不透明整数**，语义由引擎的 loadArchive 定义
 ```
+
+> **⚠️ 已被 `port-legacy-picture-removal` 取代（2026-11-21 实测）**：
+> `sprite.draw` / `sprite.loadArchive` 在 framework/script 里**零调用**
+> （`port-native-api-migration` 已把 script 全迁到 `SpriteAtlas`）。
+> 动画实际走 `SpriteAtlas.draw` → `sprite.drawHandle(handle, …)`。
+> 上面这条 stub 仅作历史记录，**新代码不得再调 `sprite.draw`**。
 
 ### change 1 的资产解码契约（多格式核心）
 
@@ -293,6 +403,11 @@ grep -rn 'require("engine' game/framework/*.lua | wc -l                     # �
 _G.lib = setmetatable(EngineAPI, { __index = {} })   -- 空回退，任何绕过都会崩
 ```
 
+> **⚠️ 该 stub 已过期（2026-11-21）**：`port-compat-layer-removal` 会把
+> `_G.lib` 整个删掉，所以「空回退」这个构造不再需要 —— 正确验法是
+> **根本不建 `_G.lib`**，直接跑 framework/script，任何 `lib.*` 引用会立刻
+> `attempt to index nil`。见该 change 的 spec REQ-CLR-1。
+
 然后在它上面跑：
 - `framework/` 模块加载（无 nil 调用崩溃）
 - 菜单构建与点击（`menu_state_machine`）
@@ -341,4 +456,8 @@ gate_ascii.sh             # 既有
 
 ## Slice 完成判定
 
-slice 在 3 个 change 全部 archived 后标记 `status: done` 并移入 `archive/`。
+slice 在 **14 个** change 全部 archived 后标记 `status: done` 并移入 `archive/`。
+
+当前进度：第一批 10 个已 Complete；第二批 4 个（`port-compat-layer-removal` /
+`port-legacy-picture-removal` / `port-audio-semantics` /
+`port-ui-screens-verification`）Not Started。

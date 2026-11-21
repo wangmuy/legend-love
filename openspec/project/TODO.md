@@ -21,12 +21,16 @@
   - 触发条件：有真实的中文输入需求（当前该分支无业务调用方）
   - 预估：2 个 change（契约 + 各引擎实现；IME 必须真机验证）
 
-- [ ] **audio 概念重设计**
-  - 现状：契约是 `playMusic(filename)`；实际用法是 `PlayMIDI(0)`（索引号）
-    + `PlayMPEG(path, VK_ESCAPE)`（带中断键的视频）
-  - 后果：契约与实际用法完全不匹配，framework 绕开契约直接用 lib
-  - 必须先定语义：音乐是"按名字选"还是"按编号选"？MPEG 算音频还是视频？
-  - 预估：1 个 change，但需先做语义决策，不能直接写代码
+- [x] ~~**audio 概念重设计**~~ → **已立项 `port-audio-semantics`**（2026-11-21）
+  - 语义已定案（见该 change 的 design ADR-PORT-022/023/024）：
+    - `playSequence(id)` = 按**游戏音乐编号**播（引擎按 `{ogg, mid, mp3}` 候选 +
+      `sound/` 回落）
+    - `playMusic(filename)` = 按**完整文件名**播（不推测扩展名）
+    - 编号 → 文件名的模板由 `app.setMusicTemplate(template, startOffset)` 显式注册
+      （引擎不再读 `CC.*`）
+  - 顺带修两个活体缺陷：
+    - `JY.EnableMusic == 0` 时只「不播」，已在播的 BGM 不会停
+    - `playVideo` 无条件返回 `true`（实际 `start.mpg` 不存在，从未播成功过）
 
 - [ ] **绘制原语扩展**
   - 现状：render 只有 7 个原语
@@ -94,7 +98,7 @@
   - **顺带修了 3 个静默失败**：`map_render` 全局函数被严格 `_G` 拒绝、
     `drawScene` 零消费者、`dialog.draw` 头像路径读 `picFileCache`
 
-- [ ] **（已作废）原 `map.drawBattle` 透明化条目**
+- [x] ~~**（已作废）原 `map.drawBattle` 透明化条目**~~ —— **已完成 + 后续立项**
 
   > **B 之后的新增前提**：`port-blocking-delay` 完成后，`WaitFrame` 依赖
   > `CoroutineScheduler:waitFrame`，而 `lib.Delay` 仍作为非协程 fallback 存在。
@@ -119,6 +123,34 @@
   - 预估：独立 change（涉及 3 个地图绘制契约 + 战斗/主图/场景三个界面实机验证）
   - **教训**：「全量测试绿」不等于「可以移除代码」。回归验证（改前改后对比）
     和移除性验证（删掉后单独跑）是两件不同的事 —— 后者必须实机。
+  - **2026-11-21 实测修正**：`map.drawBattle` 已透明化（`port-map-render-native` ✓），
+    但 `lib_love.LoadPic` 的 119 行**仍在**，真正的阻塞不是「事件脚本用 `lib.*`」
+    （实测 27808 个脚本零 `lib.*`），而是：
+    ① 3 个死契约（`sprite.draw`/`drawTinted`/`loadArchive`，实测 0 消费者）
+    ② dialog 头像的 2 处 `lib.PicGetXY/PicLoadCache` 逃逸舱
+    ③ 云子系统 190 行（解码可复用 `SpriteDecoder`，实测 9 帧对拍一致）
+    → 已立项 `port-legacy-picture-removal`
+
+- [x] ~~**`lib.*` 兼容层本身（`_G.lib`）**~~ —— **已立项 `port-compat-layer-removal`**（2026-11-21）
+  - 原判断：「oldevent 脚本依赖它（约 2000 个数据文件）」
+  - **实测推翻**：`game/script/oldevent/`（1018）+ `game/mods/*/script/oldevent/`
+    （26790）共 **27808 个事件脚本零 `lib.`**；调用面恰好是 `instruct_0..67`
+  - 真实消费者只有 5 类：`main.lua` 的 `SetDrawLoopFlag`、`async_globals` 的
+    `lib.Delay` 补丁点、`WaitFrame` 的 fallback、`lib_love` 自身 8 处 `lib.Debug`、
+    2 处死变量
+  - **`_G.lib` 与 `EngineAPI` 是同一张表** ⇒ `lib.Delay = ...` 往 `EngineAPI`
+    写了契约外的键 `Delay`，`WaitFrame` 的 fallback 因此拿到协程版而不是阻塞版
+  - 该 change 顺带新增契约 `render.setDrawLoopFlag`
+
+- [x] ~~**实机未覆盖的界面**~~ → **已立项 `port-ui-screens-verification`**（2026-11-21）
+  - 原判断：「物品栏、人物状态、存档界面 —— 路径已迁移但未截图验证；
+    `Menu_Thing` / `ShowPersonStatus` 在事件驱动下不可达」
+  - **实测推翻**：物品菜单 / 物品格 / 人物状态**三个都可达且已实机捕获**
+    （`docs/screenshots/item-menu.png` / `item-grid.png` / `person-status.png`）
+  - 存档界面在 `GAME_SMAP` **不可达是原版行为**（主菜单「系统」置灰，
+    `jymain_async.lua:47-48`）→ 必须在主地图验证
+  - 该 change 顺带补 gate STEP F 漏掉的 4 个 script 全局
+    （`ShowPersonStatus_sub` 等，其内部仍有 26 处 `DrawString`）
 
 ## 涌现想法（执行过程中产生，不打断当前 slice）
 
@@ -149,6 +181,8 @@
   - 新增 2 个契约：`map.loadClouds`（云层加载+烘焙）、`sprite.clearPictureCache`
     （`lib.LoadPicture("")` 的隐式副作用）→ 契约数 88 → **90**
   - **`.idx/.grp` 现在对引擎彻底不透明**：`framework/sprite_decoder.lua` 解容器，
-    引擎只收 handle；`lib_love.lua` 的 `LoadPic` RLE 解码**只剩兼容层用途**
+    引擎只收 handle；`lib_love.lua` 的 `LoadPic` RLE 解码**只剩 3 个死契约的入口**
+    （`sprite.draw`/`drawTinted`/`loadArchive` 实测 0 消费者）
+    → 由 `port-legacy-picture-removal` 拆除
   - 顺带修 2 个测试判据误报（`allsinbk` 死参数只认 `LoadSMap(`、
     `test_battle_flow_headless` 只 stub `lib.*` 没 stub `EngineAPI.map`）

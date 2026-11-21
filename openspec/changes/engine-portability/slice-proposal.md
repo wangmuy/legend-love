@@ -17,12 +17,15 @@ abandoned:
 ```
 本仓 54 个 change 直接挂在 changes/ 下，只有 2 个挂在 epic 下
 既有 epic 规模：allmods 17 个 slice、web-mud 6 个 slice、mouse 3 个 slice
-本 slice：1 个 slice 统 3 个 change —— 低于 epic 门槛，高于单 change 容量
+本 slice：1 个 slice 统 14 个 change（第一批 10 已完成 + 第二批 4 个）
 ```
 
-三个子 change 合计 **约 377 处调用点改动**（超过 `audio-settings` 的 88 任务），
+第一批子 change 合计 **约 377 处调用点改动**（超过 `audio-settings` 的 88 任务），
 所以不能塞进单个 change；但它们**同属一条技术主线**（消除 framework 对
-LÖVE 的隐式依赖），所以需要一层统辖，而不是 3 个互不相识的 change。
+LÖVE 的隐式依赖），所以需要一层统辖，而不是各自为政的 change。
+
+第二批 4 项是收尾实测后拉回的遗留（前提全部被推翻或改写），
+体量小于第一批，但共同点是「都是**隐式回退/未验证**，会让 slice DoD 靠运气成立」。
 
 > 若执行过程中范围显著扩张（例如决定实际移植 Godot），
 > 应重新评估升为 epic（`/mvp:evaluate-scale`）。
@@ -32,9 +35,13 @@ LÖVE 的隐式依赖），所以需要一层统辖，而不是 3 个互不相�
 Standalone vertical slice。
 
 引擎可移植性硬化目前是一个有明确终点的工程：
-契约补齐 → 解耦 → 动画。三项完成后，framework 即达到「换引擎只需写
-`engine-xxx/`」的目标。若将来出现第二批缺口（resize / IME / audio 重设计），
-届时再考虑升 epic（见 `openspec/project/TODO.md`）。
+契约补齐 → 解耦 → 动画 → **清旧账（第二批 4 项）**。
+前 10 个 change 完成后，framework 即达到「换引擎只需写 `engine-xxx/`」的目标；
+第二批（`port-compat-layer-removal` / `port-legacy-picture-removal` /
+`port-audio-semantics` / `port-ui-screens-verification`）清掉收尾留下的
+隐式回退与未验证界面，使该目标**可被机器验证**（`_G.lib` 不存在时脚本不崩）。
+若将来出现第三批缺口（resize / IME），届时再考虑升 epic
+（见 `openspec/project/TODO.md`）。
 
 ## Slice Type
 
@@ -89,20 +96,29 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 ```
 ✗ resize 事件处理      → openspec/project/TODO.md
 ✗ IME 中文输入         → openspec/project/TODO.md（需真机验证）
-✗ audio 概念重设计     → openspec/project/TODO.md（playMusic(filename)
-                          vs PlayMIDI(索引) 需先定语义）
 ✗ 绘制原语扩展（circle/line/polygon/旋转/缩放）→ TODO.md（无消费方）
 ✗ 资产格式转换（.grp → SpriteFrames/Flipbook）→ 独立 epic
 ✗ 实际写 Godot/Unreal 引擎实现 → 本 slice 只消除契约缺口，不写新引擎
 ✗ 战斗系统的玩法改造 → 归 `battle-extensibility`（本 slice 第 4 个子 change）
-✗ 其余 24 个 `lib.*` 函数的迁移（258 处调用 / 35 函数）→ **本 slice 明确排除**
-   实测：script 层用 258 处 `lib.*`，其中只有 23 个有 EngineAPI 等价物，
-   11 个无等价物（GetD/SetD/GetS/SetS/CleanWarMap/...），且 `map.setTile` 契约不存在。
-   消除它需要 30-40 Task，比本 slice 现有 5 个 change 的总和还大 → 独立评估
-✗ 27 个死契约的清理（audio 6 / map 6 / input 4 / sprite 2 / ...）→ 同上
 ✗ 触摸/手柄的进一步扩展 → 归 input-action-layer 后续
 ✗ 存档格式迁移 → 与引擎无关，不受影响
 ```
+
+### 曾明确排除、2026-11-21 实测后被拉回 slice 的 4 项
+
+原 slice 把下面 4 项排除在外，理由是「前置不存在 / 范围太大 / 语义未定」。
+本轮逐项实测后，**前提全部修正**，各自独立成 change（第二批）：
+
+| 原排除项 | 原理由 | 实测结论 |
+|---------|-------|---------|
+| `lib.*` 兼容层本身 | 「oldevent 脚本依赖它（约 2000 个数据文件）」 | **27808 个事件脚本零 `lib.`**；调用面只有 `instruct_0..67` → `port-compat-layer-removal` |
+| `lib_love.LoadPic` 119 行 | 「要删得先改旧事件脚本的调用方式」 | 事件脚本无需改；阻塞的是 3 个死契约 + dialog 逃逸舱 + 云子系统 → `port-legacy-picture-removal` |
+| audio 概念重设计 | 「`playMusic(filename)` vs `PlayMIDI(索引)` 语义需先定」 | 已定案：两个契约各管一半 + `app.setMusicTemplate` 显式注册 `id+1` 偏移 → `port-audio-semantics` |
+| 物品栏 / 人物状态 / 存档界面 | 「`Menu_Thing` / `ShowPersonStatus` 在事件驱动下不可达」 | **物品菜单/物品格/人物状态三个都已实机捕获**；存档只在 `GAME_SMAP` 不可达（原版行为）→ `port-ui-screens-verification` |
+
+> 这 4 项的共同点：原陈述都是**未实测的推断**。本轮每条都做了可复现的
+> 扫描或实机截图，结论写进各 change 的 proposal / design。
+
 
 ## Acceptance Criteria
 
@@ -110,7 +126,7 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 
 #### Scenario: framework 里零引擎绕过
 
-- **GIVEN** 3 个 change 全部完成
+- **GIVEN** 14 个 change 全部完成
 - **WHEN** 执行 `grep -rn 'lib\.' game/framework/*.lua`（排除注释行）
 - **THEN** 命中数 = 0
 
@@ -136,19 +152,29 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 每个子 change 的 DoD 见其 `tasks.md`：
 
 ```
-port-contract-completeness   14 Task 组 / 82 checkbox   契约完整化 + 解码搬家 + 多格式 + 修虚拟手柄（✓ Complete）
+port-contract-completeness   14 Task 组 / 87 checkbox   契约完整化 + 解码搬家 + 多格式 + 修虚拟手柄（✓ Complete）
 port-script-decoupling       7 Task 组 / 49 checkbox    绘制/流程/游戏逻辑解耦（✓ Complete）
 port-sprite-animation        7 Task 组 / 38 checkbox    sprite 动画时间驱动（✓ Complete）
-battle-extensibility         8 Task 组 / 51 checkbox    战斗流程抽成可覆盖策略模块（✓ Complete）
-port-sprite-native-migration 7 Task 组 / 55 checkbox    SpriteAtlas PNG 修复 + script 层零 lib.Pic*（✓ Complete）
+battle-extensibility         8 Task 组 / 74 checkbox    战斗流程抽成可覆盖策略模块（✓ Complete）
+port-sprite-native-migration 7 Task 组 / 57 checkbox    SpriteAtlas PNG 修复 + script 层零 lib.Pic*（✓ Complete）
 port-battle-robustness       5 Task 组 / 41 checkbox    WarLoad 错误码 + WAR.Person 容量（✓ Complete）
-port-contract-pruning        5 Task 组 / 21 checkbox    删除 3 个无用契约（79→76）（✓ Complete）
-port-blocking-delay          4 Task 组 / 37 checkbox    waitForTime 真等待 + 阻塞消除（批 1 ✓，批 2 待做）
-port-map-render-native      约 12-15 Task              map 绘制契约透明化（未启动）
-port-native-api-completion  5 Task 组 / 47 checkbox    **196 处** lib.* → EngineAPI（✓ Complete）
+port-contract-pruning        5 Task 组 / 24 checkbox    删除 3 个无用契约（79→76）（✓ Complete）
+port-blocking-delay          4 Task 组 / 42 checkbox    waitForTime 真等待 + 阻塞消除（批 1 + 批 2 均 ✓）
+port-map-render-native       7 Task 组 / 74 checkbox    map 绘制契约透明化（✓ Complete）
+port-native-api-completion   5 Task 组 / 45 checkbox    **196 处** lib.* → EngineAPI（✓ Complete）
                                                        实测只剩 1 处（WaitFrame fallback）
                                                        早期估的 225/258 含 oldevent 重复统计
+
+── 第二批（2026-11-21 实测后新增，全部 Not Started）────────────────
+port-compat-layer-removal    7 Task 组                删 _G.lib + 1 新契约 + 修 Delay 补丁点
+port-legacy-picture-removal  8 Task 组                删 425 行旧贴图 + 云搬 framework
+port-audio-semantics         7 Task 组                定案 playSequence/playMusic + 修开关
+port-ui-screens-verification 6 Task 组                4 张界面基线 + status_page 解耦
 ```
+
+> **注**：第二批 4 项的前提均由 2026-11-21 实测**推翻或改写**，
+> 详见 `change-manifest.md` 的「第二批」小节与各 change 的 proposal。
+
 
 ## Affected Domains
 
@@ -229,7 +255,7 @@ Godot/Unreal 的动画播放器**都绑死各自资产管线**。
 79 行里只有"采样一个精灵画到屏幕"是引擎特性。
 现有 `map.drawMain(px, py, pic)` 契约粒度太粗，是它成为 dead contract 的根因。
 
-## 为什么是 3 个 change（而不是 1 个）
+## 为什么第一批拆成 3 个 change（而不是 1 个）
 
 ```
 契约补齐   46 + 191 = 237 处调用改动
@@ -243,10 +269,30 @@ sprite 动画          约 12 处 + 新模块
 单 change 塞 377 处调用会重演 epic 文档已记录的风险：
 「中间任何一点卡住，整个 change 无法 archive，已完成价值被锁死」。
 
-三个 change 的价值递进：
+第一批三个 change 的价值递进：
 
 ```
 change 1 完成 → 游戏照常跑，接新引擎不再靠猜（无用户价值）
 change 2 完成 → framework 不再反向依赖 script（无用户价值）
 change 3 完成 → 动画可按时间驱动、可换帧率（**有用户价值**）
+```
+
+## 为什么第二批再拆 4 个 change
+
+第一批完成后，DoD 的 4 条「零」靠 3 个**未实测的推断**撑着：
+
+```
+「事件脚本依赖 lib.*」        → 实测 27808 个脚本零 lib.*
+「LoadPic 删不掉」            → 实测 3 个死契约 + 逃逸舱 + 云是真正阻塞
+「audio 语义需先定」          → 已定案（两契约 + 模板注册）
+「三个界面不可达」            → 实测 3 个里 2 个可达（已截图）
+```
+
+所以第二批的目标不是加功能，而是**把 DoD 从「推断成立」变成「机器可验证」**：
+
+```
+port-compat-layer-removal → 删 _G.lib，脚本不再靠回退兜底
+port-legacy-picture-removal → 删 425 行旧贴图，引擎真的只剩 2 个上传契约
+port-audio-semantics → 契约描述与实践一致（不再靠引擎猜）
+port-ui-screens-verification → 未验证界面变成有基线
 ```
