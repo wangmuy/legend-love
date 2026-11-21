@@ -138,7 +138,7 @@ parent_epic: null
   2. 修 `timeSource` 构造时绑定 → 动态解析（否则测试 stub 后假时钟推不动）
   3. `instruct_30` 等 7 个函数的阻塞 `lib.Delay` 处置（批 2，未完成）
 - **Depends On**: 无
-- **Status**: [ ] Implemented 部分（批 1 完成，批 2 待做：26 处 lib.Delay）
+- **Status**: [x] Archived / Complete（批 1 + 批 2 都完成，26 处 lib.Delay → WaitFrame）
 
 ### Change: port-map-render-native
 
