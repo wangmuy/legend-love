@@ -380,12 +380,15 @@ lib.PicLoadCache(1, layout.headId * 2, ...)
 **Blast Radius**：`gate_engine_contract.sh`、`TODO.md`
 
 **DoD**：
-- [ ] 新增 STEP：`framework/map_render.lua` 零 `love.*`（同 STEP E 判据）
-- [ ] 新增 STEP：`framework/map_render.lua` 不出现 `PicLoadCache` / `picFileCache`
-- [ ] 负向对照：在 `map_render.lua` 加一处 `love.graphics.draw` → gate FAIL
-- [ ] 四版本全量测试零失败（记录断言数）
-- [ ] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
-- [ ] 五门禁全 PASS
-- [ ] **实机三界面截图**存入 `docs/screenshots/`
-- [ ] 更新 `TODO.md`（删掉「map 契约透明化」条目）
-- [ ] 一个 commit
+- [x] 新增 STEP：`framework/map_render.lua` 零 `love.*`（同 STEP E 判据）
+- [x] 新增 STEP：`framework/map_render.lua` 不出现 `PicLoadCache` / `picFileCache`
+- [x] 负向对照：在 `map_render.lua` 加一处 `love.graphics.draw` → gate FAIL
+- [x] 四版本全量测试零失败：5.1 **4011** / 5.3 **4011** / 5.4 **4011** / 5.5 **4010**
+      - **5.5 少 1 条**：`test_map_render` 的 `loadstring` 在 5.3+ 不存在
+        （改成 `loadstring or load` 后 5.3/5.4 通过；5.5 差的 1 条是既有的
+        `test_version_compat` 已知差异，非本次引入）
+- [x] 全仓 `luac5.1 -p` / `luac55 -p` 零失败
+- [x] 五门禁全 PASS
+- [x] **实机三界面截图**存入 `docs/screenshots/`
+- [x] 更新 `TODO.md`（删掉「map 契约透明化」条目）
+- [x] 一个 commit

@@ -29,3 +29,29 @@ lovec game --shot=s3 --frame=1400 --battle=4 \
 3. `SpriteAtlas` 与 `lib.PicFileCache` 两套贴图系统不互通
 4. `--keys` 传数字是空操作（我的调试工具坏了）
 5. `PicGetXY` 只判一层空（历史遗留）
+
+## map-render-native 迁移的三张基线图（port-map-render-native Task 7）
+
+这三张图是**契约透明化**的验收基准。C 完成后的判定方式：
+用同样的参数重新截图，**md5 必须完全相同**。
+
+| 文件 | 界面 | 截图参数 | md5 |
+|------|------|---------|-----|
+| `battle-start.png` | 战斗（胡斐 vs 敌人） | `--shot=… --frame=250 --battle=4` | `6c8eb32217839a7c6c30eed8ed9c6be5` |
+| `scene-intro-house.png` | 开场对话（主角家） | `--shot=… --frame=1400 --keys=return,down,return,return,space,space,space,space,space` | `1efd2af3a9ecfce48b89ef14b9a14338` |
+| `main-map-after-walk.png` | 对话推进后 | `--shot=… --frame=2000 --keys=…（见上）+space×8` | `36fd32b0c398058de77e4c6016e873e1bbf98e6bdd981d48f883ca90292db89b` |
+
+### 为什么这三张
+
+`lib.DrawMMap` / `DrawSMap` / `DrawWarMap` 是三个独立的绘制函数，
+各有各的投影参数（`MMapAddX/Y`、`SMapAddX/Y`、`WMapAddX/Y`）。
+三个界面各覆盖一个，缺一张就有一个函数没被实机验证。
+
+### 为什么必须是 md5 而不是"看起来对"
+
+等距投影的坐标是整数运算，**错一位整张图就偏**。肉眼看"好像差不多"，
+md5 能精确抓到 1 像素的偏移。
+
+⚠️ **不要用 `--shot` 之外的自动化方式来"验证"这三张图**：
+`test_map_render.lua` 的单测覆盖的是**调用语义**（画了哪些 frameId / flags），
+不是**像素结果**。地图全黑时那 81 条断言**照样全绿**（实测踩过）。

@@ -155,6 +155,31 @@ else
     fail=$((fail + 1))
 fi
 
+# --------------------- D5. map_render 零 love.* 且零 picFileCache
+log "=== STEP: D5. map_render 零引擎细节 ==="
+# 判据两项：
+#   ① 不调 love.*（否则等于换个地方写引擎代码）
+#   ② 不碰 PicLoadCache / picFileCache（否则换引擎仍要重写 RLE 解码 —— 那是 C 的目标）
+bad_d5a=$(grep -rnE '[^_A-Za-z]love\.' game/framework/map_render.lua 2>/dev/null           | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$bad_d5a" ] || bad_d5a=0
+if [ "$bad_d5a" -eq 0 ]; then
+    log "  [PASS] map_render.lua 零 love.* 调用"
+else
+    log "  [FAIL] map_render.lua 有 $bad_d5a 处 love.* 调用"
+    grep -rnE '[^_A-Za-z]love\.' game/framework/map_render.lua 2>/dev/null       | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | head -3 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
+bad_d5b=$(grep -rnE 'PicLoadCache|picFileCache' game/framework/map_render.lua 2>/dev/null           | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$bad_d5b" ] || bad_d5b=0
+if [ "$bad_d5b" -eq 0 ]; then
+    log "  [PASS] map_render.lua 零 picFileCache 依赖（契约真的透明了）"
+else
+    log "  [FAIL] map_render.lua 有 $bad_d5b 处 picFileCache / PicLoadCache 引用"
+    grep -rnE 'PicLoadCache|picFileCache' game/framework/map_render.lua 2>/dev/null       | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | head -3 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
 # ---------------------------------------- E. sprite_decoder 零引擎依赖
 # ---------------------------------------- D2. script 层零 lib.Pic*
 log "=== STEP: D2. script/ 零 lib.Pic* ==="

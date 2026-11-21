@@ -84,7 +84,17 @@
   - **结果：`script/` 全仓 `lib.Pic*` = 0**（gate 新增 STEP D2 硬断言）
   - **但 `lib_love.lua` 的 `LoadPic` 119 行删不掉** —— 见下一条
 
-- [ ] **`map.drawBattle` 契约透明化（删掉 `lib_love.LoadPic` 的真正前提）**
+- [x] ~~**`map.drawBattle` 契约透明化**~~ —— **已完成**（`port-map-render-native`）
+  - 3 个地图绘制契约（`drawMain`/`drawScene`/`drawBattle`）全部改走
+    `framework/map_render.lua`（363 行投影逻辑搬进 framework）
+  - `war_async` 的双轨补丁与 `LoadArchiveBoth` 的双写**已摘除**
+  - 三界面实机截图逐字节相同（md5 见 `docs/screenshots/README.md`）
+  - **新增 4 个契约**：`render.getClip` / `map.getSceneSize` /
+    `map.getBattleSize` / `map.drawClouds`（+ 8 个 map 读写，共 88）
+  - **顺带修了 3 个静默失败**：`map_render` 全局函数被严格 `_G` 拒绝、
+    `drawScene` 零消费者、`dialog.draw` 头像路径读 `picFileCache`
+
+- [ ] **（已作废）原 `map.drawBattle` 透明化条目**
 
   > **B 之后的新增前提**：`port-blocking-delay` 完成后，`WaitFrame` 依赖
   > `CoroutineScheduler:waitFrame`，而 `lib.Delay` 仍作为非协程 fallback 存在。

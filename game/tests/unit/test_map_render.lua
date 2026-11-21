@@ -124,7 +124,11 @@ local function loadLegacySort(tiles)
     TestHelper.assertNotNil(st, "应找到 lib.BuildingSort")
     local en = src:find("\nfunction ", st + 10)
     local body = src:sub(st, (en or (#src + 1)) - 1)
-    local chunk = assert(loadstring(body))
+    -- **跨版本**：Lua 5.1 有 `loadstring`，5.2+ 改名为 `load`（5.3/5.4/5.5 都没有
+    -- `loadstring`）→ 直接用 `loadstring` 会在 5.3+ 报
+    -- "attempt to call a nil value (global 'loadstring')"。
+    local loader = loadstring or load
+    local chunk = assert(loader(body))
     chunk()
     return rawget(_G, "BuildingSort")
 end
