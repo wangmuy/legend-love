@@ -103,7 +103,9 @@
 
 ## 前置核实（Task 0，只读）
 
-- [ ] `grep 'lib\.' game/engine-mud/engine_mud.lua game/engine-web/engine_web.lua`（非注释）
-      确认两引擎自身不依赖全局 `lib`
-- [ ] 确认 `tests/engine_test.lua:621` / `tests/test_helper.lua:274` 的 `_G.lib`
-      是「测试桩模拟」而非被测代码需要
+- [x] `grep 'lib\.' game/engine-mud/engine_mud.lua game/engine-web/engine_web.lua`（非注释）
+      确认两引擎自身不依赖全局 `lib`（实测：MUD 0 处；Web 只有 `_G.lib =` 定义本身）
+- [x] 确认 `tests/engine_test.lua:625` / `tests/test_helper.lua:274` 的 `_G.lib`
+      是「测试桩模拟」而非被测代码需要：**是**（`test_helper.mockLib()` 给
+      老套件提供 `Debug/GetKey/Delay/Cls` 桩；引擎测试桩同理）。
+      按 change 的 spec 保留（`REQ-CLR-1` 的 Out of Scope）。
