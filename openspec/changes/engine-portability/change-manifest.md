@@ -219,8 +219,10 @@ parent_epic: null
   6. `playVideo` 返回真实结果（无能力/文件缺失 → `false`，不再无条件 `true`）
 - **前提修正**：slice 记的是「语义需先定（filename vs 索引）」。本轮定案：
   **两个契约各管一半**，且把 `id+1` 偏移提升为 `setMusicTemplate` 的显式参数。
+- **结果**：契约数 89 → 90；全量 4111/0；`gate_run_mod` GATE_PASS（20 MOD）；
+  顺带修 3 个活体缺陷（关音乐不停 / playVideo 永真 / 模板带扩展名）
 - **Depends On**: `port-native-api-completion`
-- **Status**: [ ] Not Started
+- **Status**: [x] Archived / Complete（port-audio-semantics）
 
 ### Change: port-ui-screens-verification
 
