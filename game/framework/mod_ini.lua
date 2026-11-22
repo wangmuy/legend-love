@@ -19,7 +19,43 @@ local ModIni = {}
 -- ============================================================
 
 -- 读取文本文件内容；失败返回 nil, err
+--
+-- **为什么优先走 EngineAPI.file.read**（change: framework-io-portability）：
+--   `mods/<slug>/kysmod.ini` 是**游戏资产**，运行时住在 .love 包 / APK 的
+--   assets 里，只有 `love.filesystem`（→ EngineAPI.file）认这些路径。
+--   直接 `io.open` 在开发模式下碰巧能读到，但打包成 .love / APK 后
+--   CWD 不是源码目录 → 读不到，表现为「MOD 的 ini 覆盖静默失效」。
+--   换到 Godot/Unreal 时 io.open 更是完全不存在（只能走引擎的 FileAccess）。
+--
+-- **为什么必须保留 io.open 兜底**：
+--   纯 Lua 单测 / tools 脚本没有 EngineAPI.file（也不该为此造一个）；
+--   某些测试只塞了局部 EngineAPI（如 `{time={...}}`）。
+--   兜底分支在契约实现后永不执行 → 不影响运行时行为，只保证测试环境可用。
 function ModIni.readFile(path)
+    -- ① 引擎契约优先
+    local api = rawget(_G, "EngineAPI")
+    if type(api) == "table" and type(api.file) == "table"
+        and type(api.file.read) == "function" then
+        -- pcall：契约实现异常（缺 love.filesystem 等）时不能让 MOD 加载崩掉；
+        -- 拿不到字符串就落到下面的 stdlib 兜底（与改造前行为一致）。
+        local ok, content, err2 = pcall(api.file.read, path)
+        if ok and type(content) == "string" then
+            return content
+        end
+        if ok and content == nil then
+            -- 契约明确「读不到」：仍尝试 io.open 一次（纯 Lua 路径下的救命分支，
+            -- 例如 mock 的 read 只认某个白名单），失败时把两边的错误都说清楚。
+            local f2 = io.open(path, "rb")
+            if f2 then
+                local c2 = f2:read("*a")
+                f2:close()
+                return c2
+            end
+            return nil, err2 or ("cannot read " .. tostring(path))
+        end
+    end
+
+    -- ② stdlib 兜底（纯 Lua 测试环境）
     local f, err = io.open(path, "rb")
     if not f then
         return nil, err or ("cannot open " .. tostring(path))

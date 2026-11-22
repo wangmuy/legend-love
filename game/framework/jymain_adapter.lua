@@ -24,6 +24,12 @@ local AudioSettings = require("framework.audio_settings")
 local AudioMenu = require("framework.audio_menu")
 local MouseMenu = require("framework.mouse_menu")
 
+-- 时钟（墙上时间 / 随机种子）：framework 唯一读 os.time / os.date 的地方
+--
+-- 必须在**文件顶部** require：下方的 init 在装上严格 _G metatable 之后才跑，
+-- 那时再 require 任何模块都会因为读未声明全局而抛错。
+local Clock = require("framework.clock")
+
 -- 游戏初始化标志
 local isInitialized = false
 local initCoroutine = nil
@@ -180,7 +186,19 @@ function JYMainAdapter.initCoroutine()
     
     EngineAPI.debug.log("JY_Main start.")
     
-    math.randomseed(os.time())
+    -- 随机数种子：优先 EngineAPI.time.getTimeSeconds（换引擎后零 os.time）
+    --
+    -- 为什么不能直接写 `math.randomseed(os.time())`：
+    --   os.time 是 Lua 标准库，Godot/Unreal 上不存在。种子属于引擎能力
+    --   （时间来源），所以走 Clock.randomSeed()：契约优先、os.time 兜底。
+    --
+    -- 为什么种子取毫秒而不是秒：getTimeSeconds 是**单调计时**（LÖVE 的
+    -- love.timer.getTime），初始化时恒为 0.x → 取整永远 0，每次启动随机
+    -- 序列都一样。Clock 里按毫秒取整（熵 ×1000）。详见 framework/clock.lua。
+    --
+    -- 确定性测试：stub EngineAPI.time.getTimeSeconds 即可控制种子；
+    -- 完全没有 EngineAPI 时仍退回 os.time()（与改造前逐字一致）。
+    math.randomseed(Clock.randomSeed())
     
     EngineAPI.input.enableKeyRepeat(CONFIG.KeyRepeatDelay, CONFIG.KeyRepeatInterval)
     

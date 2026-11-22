@@ -412,6 +412,27 @@ EngineAPI.time.getTimeSeconds = function()
     return os.clock()
 end
 
+-- 本地墙上时间格式化（framework-io-portability）
+--
+-- 测试桩必须**可注入**：定时/存档时间戳的确定性断言只能靠固定串。
+--   EngineAPI.time.setNow(fixedString)  固定返回值（nil = 恢复 os.date）
+-- 默认行为与 LÖVE 一致（os.date），保证既有调用方零回归。
+local _fixedNow = nil
+
+EngineAPI.time.setNow = function(value)
+    logCall("time.setNow", value)
+    _fixedNow = value
+end
+
+EngineAPI.time.formatNow = function(fmt)
+    logCall("time.formatNow", fmt)
+    if type(_fixedNow) == "string" then return _fixedNow end
+    fmt = fmt or "%Y-%m-%d %H:%M"
+    local ok, s = pcall(os.date, fmt)
+    if ok and type(s) == "string" then return s end
+    return ""
+end
+
 --------------------------------------------------------------------
 -- file 模块 - 正常实现
 --------------------------------------------------------------------

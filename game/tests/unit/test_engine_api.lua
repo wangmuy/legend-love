@@ -138,6 +138,8 @@ function TestEngineAPI.testNewContractsExplicitlyImplemented()
         "sprite.createFromRGBA", "sprite.createFromEncoded", "sprite.getMeta",
         "render.setDrawLoopFlag",
         "app.setMusicTemplate",
+        -- framework-io-portability：本地墙上时间格式化（存档/日志时间戳）
+        "time.formatNow",
     }
     -- **不 require engine_love2d**：它在模块加载期就读 love.filesystem，
     -- 而测试环境只有 TestHelper 的 mock（无 filesystem 字段）。
@@ -249,6 +251,10 @@ function TestEngineAPI.testTimeModule()
     TestHelper.assertNotNil(EngineAPI.time, "time module should exist")
     TestHelper.assertNotNil(EngineAPI.time.sleep, "time.sleep should exist")
     TestHelper.assertNotNil(EngineAPI.time.getTime, "time.getTime should exist")
+    TestHelper.assertNotNil(EngineAPI.time.getTimeSeconds, "time.getTimeSeconds should exist")
+    -- framework-io-portability：本地墙上时间（getTimeSeconds 是单调计时，
+    -- 不是纪元秒，算不出真实日期 → 日期格式化必须由引擎提供）
+    TestHelper.assertNotNil(EngineAPI.time.formatNow, "time.formatNow should exist")
 end
 
 function TestEngineAPI.testFileModule()

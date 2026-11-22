@@ -383,6 +383,18 @@ EngineAPI.time.getTime = function()
     return os.clock() * 1000
 end
 
+-- 本地墙上时间格式化（framework-io-portability）
+--
+-- 与 getTime 的区别：getTime 是**单调计时**（os.clock，进程/CPU 起算），
+-- 不是纪元秒 → 算不出真实日期。日期格式化只能由引擎提供，见
+-- engine_api.lua 的 time.formatNow。MUD 跑在宿主 Lua 上，直接用 os.date。
+EngineAPI.time.formatNow = function(fmt)
+    fmt = fmt or "%Y-%m-%d %H:%M"
+    local ok, s = pcall(os.date, fmt)
+    if ok and type(s) == "string" then return s end
+    return ""
+end
+
 --------------------------------------------------------------------
 -- file 模块 - 正常实现
 --------------------------------------------------------------------

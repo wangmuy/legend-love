@@ -729,6 +729,18 @@ EngineAPI.time.getTimeSeconds = function()
     return love.timer.getTime()
 end
 
+-- 本地墙上时间格式化（framework-io-portability）
+--
+-- 与 getTimeSeconds 的区别必须记住：后者是**单调计时**（进程启动起算），
+-- 不是纪元秒 → 不能拿来算日期。本地日期在 LÖVE 上就是 os.date（LuaJIT
+-- 自带的标准库，跨平台一致）。
+EngineAPI.time.formatNow = function(fmt)
+    fmt = fmt or "%Y-%m-%d %H:%M"
+    local ok, s = pcall(os.date, fmt)
+    if ok and type(s) == "string" then return s end
+    return ""
+end
+
 -- file 模块（直接使用 love.filesystem，不委托 lib_file）
 EngineAPI.file.open = function(filename, mode)
     if love and love.filesystem and love.filesystem.newFile then
