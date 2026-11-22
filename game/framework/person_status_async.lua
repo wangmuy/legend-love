@@ -19,6 +19,9 @@ local pendingStatusAction = nil
 -- 状态页总数（与 ShowPersonStatus 的 pagenum 一致）
 local PAGE_NUM = 2
 
+-- 前向声明：`draw()` 在定义之后才用到它（Lua 的 local 必须先声明）
+local ShowStatusPageDirect
+
 -- 每页对应的「热区」——目前整块状态框都算下一页热区
 PersonStatusAsync.PAGE_NUM = PAGE_NUM
 
@@ -159,16 +162,12 @@ end
 --
 -- @return table { dx=, dy=, w=, h= }
 function PersonStatusAsync.layout()
-    local size = CC.DefaultFont
-    local rowPix = CC.PersonStateRowPixel or 1
-    local w = 18 * size + 15
-    local h = 13 * (size + rowPix) + 10
-    return {
-        dx = (CC.ScreenW - w) / 2,
-        dy = (CC.ScreenH - h) / 2,
-        w = w,
-        h = h,
-    }
+    -- 几何公式**唯一来源**是 `StatusPage.layout`（同一份代码同时用于绘制
+    -- 与鼠标命中 —— 各写一份必然漂移，这正是本条注释存在的原因）
+    local StatusPage = require("framework.status_page")
+    local L = StatusPage.layout(CC.DefaultFont, CC.PersonStateRowPixel,
+                                CC.ScreenW, CC.ScreenH)
+    return { dx = L.dx, dy = L.dy, w = L.w, h = L.h }
 end
 
 --- 点击状态框 → 翻下一页（循环）
@@ -204,19 +203,66 @@ function PersonStatusAsync.draw()
     if not currentStatus then
         return
     end
-    
-    if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
-        EngineAPI.debug.log("PersonStatusAsync.draw: drawing status for personId=" .. tostring(currentStatus.personId))
-    end
-    
+
     local id = currentStatus.personId
     local page = currentStatus.page
-    
+
     if id >= 0 then
-        -- 调用原有的状态绘制函数
-        ShowPersonStatus_sub(id, page)
+        -- **不再调 script 全局 `ShowPersonStatus_sub`**（port-ui-screens-verification
+        -- Task 3）：那是 framework → script → 全局绘制的反向依赖，且 gate
+        -- STEP F 的白名单没盖住它，等于 DoD 靠漏判成立。
+        -- 现在直接调 `framework/status_page.lua`（只经 RenderFacade）。
+        ShowStatusPageDirect(id, page)
     end
 end
+
+--- 组装 ctx 并调 `StatusPage.draw`（**框架内唯一的绘制入口**）
+--
+-- JY/CC 的读取留在这里（本模块本来就管状态数据），
+-- `status_page.lua` 只负责怎么画。
+ShowStatusPageDirect = function(id, page)
+    local StatusPage = require("framework.status_page")
+    local p = JY.Person[id]
+    local CC = rawget(_G, "CC") or {}
+    local Thing, Wugong = JY.Thing, JY.Wugong
+
+    local headMeta = nil
+    local drawHead = nil
+    do
+        local okSA, SA = pcall(require, "framework.sprite_atlas")
+        if okSA and SA and SA.getMeta then
+            local m = SA.getMeta(1, p["头像代号"] * 2)
+            if m then headMeta = { w = m.w, h = m.h } end
+            drawHead = function(x, y) SA.draw(1, p["头像代号"] * 2, x, y, 0x1) end
+        end
+    end
+
+    StatusPage.draw({
+        person     = p,
+        size       = CC.DefaultFont,
+        rowPixel   = CC.PersonStateRowPixel,
+        screenW    = CC.ScreenW,
+        screenH    = CC.ScreenH,
+        levelCap   = CC.Level,
+        expTable   = CC.Exp,
+        colors     = { white = rawget(_G, "C_WHITE"), gold = rawget(_G, "C_GOLD"),
+                       orange = rawget(_G, "C_ORANGE"), red = rawget(_G, "C_RED") },
+        rgb        = rawget(_G, "RGB"),
+        headMeta   = headMeta,
+        drawHead   = drawHead,
+        thingName  = function(tid) return Thing[tid] and Thing[tid]["名称"] end,
+        thingBonus = function(tid)
+            local t = Thing[tid]
+            if not t then return nil end
+            return { attack = t["加攻击力"], defense = t["加防御力"],
+                     qinggong = t["加轻功"] }
+        end,
+        wugongName = function(wid) return Wugong[wid] and Wugong[wid]["名称"] end,
+        trainNeedExp = rawget(_G, "TrainNeedExp"),
+    }, id, page)
+end
+
+PersonStatusAsync.ShowStatusPageDirect = ShowStatusPageDirect
 
 -- 模块导出
 return PersonStatusAsync

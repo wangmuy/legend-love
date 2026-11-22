@@ -939,172 +939,43 @@ end
 --id 人物编号
 --page 显示页数，目前共两页
 function ShowPersonStatus_sub(id,page)    --显示人物状态页面
-    local size=CC.DefaultFont;    --字体大小
-    local p=JY.Person[id];
-    local width=18*size+15;             --18个汉字字符宽
-    local h=size+CC.PersonStateRowPixel;
-    local height=13*h+10;                --12个汉字字符高
-    local dx=(CC.ScreenW-width)/2;
-    local dy=(CC.ScreenH-height)/2;
-
-    local i=1;
-    local x1,y1,x2;
-
-    DrawBox(dx,dy,dx+width,dy+height,C_WHITE);
-
-    x1=dx+5;
-    y1=dy+5;
-    x2=4*size;
-    -- 迁移（Task 5）：PicGetXY → getMeta（table），PicLoadCache → draw（flag 0x1）
-    local headMeta = SpriteAtlas.getMeta(1, p["头像代号"]*2);
-    local headw = headMeta and headMeta.w or 0;
-    local headh = headMeta and headMeta.h or 0;
-    local headx=(width/2-headw)/2;
-    local heady=(h*6-headh)/2;
-
-
-    SpriteAtlas.draw(1, p["头像代号"]*2, x1+headx, y1+heady, 0x1);
-    i=6;
-    DrawString(x1,y1+h*i,p["姓名"],C_WHITE,size);
-    DrawString(x1+10*size/2,y1+h*i,string.format("%3d",p["等级"]),C_GOLD,size);
-    DrawString(x1+13*size/2,y1+h*i,"级",C_ORANGE,size);
-
-    local function DrawAttrib(str,color1,color2,v)    --定义内部函数
-        v=v or 0;
-        DrawString(x1,y1+h*i,str,color1,size);
-        DrawString(x1+x2,y1+h*i,string.format("%5d",p[str]+v),color2,size);
-        i=i+1;
-    end
-
-if page==1 then
-    local color;              --显示生命和最大值，根据受伤和中毒显示不同颜色
-    if p["受伤程度"]<33 then
-        color =RGB(236,200,40);
-    elseif p["受伤程度"]<66 then
-        color=RGB(244,128,32);
-    else
-        color=RGB(232,32,44);
-    end
-    i=i+1;
-    DrawString(x1,y1+h*i,"生命",C_ORANGE,size);
-    DrawString(x1+2*size,y1+h*i,string.format("%5d",p["生命"]),color,size);
-    DrawString(x1+9*size/2,y1+h*i,"/",C_GOLD,size);
-
-    if p["中毒程度"]==0 then
-        color =RGB(252,148,16);
-    elseif p["中毒程度"]<50 then
-        color=RGB(120,208,88);
-    else
-        color=RGB(56,136,36);
-    end
-    DrawString(x1+5*size,y1+h*i,string.format("%5s",p["生命最大值"]),color,size);
-
-    i=i+1;              --显示内力和最大值，根据内力性质显示不同颜色
-    if p["内力性质"]==0 then
-        color=RGB(208,152,208);
-    elseif p["内力性质"]==1 then
-        color=RGB(236,200,40);
-    else
-        color=RGB(236,236,236);
-    end
-    DrawString(x1,y1+h*i,"内力",C_ORANGE,size);
-    DrawString(x1+2*size,y1+h*i,string.format("%5d/%5d",p["内力"],p["内力最大值"]),color,size);
-
-    i=i+1;
-    DrawAttrib("体力",C_ORANGE,C_GOLD)
-    DrawAttrib("经验",C_ORANGE,C_GOLD)
-    local tmp;
-    if p["等级"] >=CC.Level then
-        tmp="=";
-    else
-        tmp=string.format("%5d",CC.Exp[p["等级"]]);
-    end
-
-    DrawString(x1,y1+h*i,"升级",C_ORANGE,size);
-    DrawString(x1+x2,y1+h*i,tmp,C_GOLD,size);
-
-    local tmp1,tmp2,tmp3=0,0,0;
-    if p["武器"]>-1 then
-        tmp1=tmp1+JY.Thing[p["武器"]]["加攻击力"];
-        tmp2=tmp2+JY.Thing[p["武器"]]["加防御力"];
-        tmp3=tmp3+JY.Thing[p["武器"]]["加轻功"];
-    end
-    if p["防具"]>-1 then
-        tmp1=tmp1+JY.Thing[p["防具"]]["加攻击力"];
-        tmp2=tmp2+JY.Thing[p["防具"]]["加防御力"];
-        tmp3=tmp3+JY.Thing[p["防具"]]["加轻功"];
-    end
-
-    i=i+1;
-    DrawString(x1,y1+h*i,"左右键翻页，上下键查看其它队友",C_RED,size);
-
-
-    i=0;
-    x1=dx+width/2;
-    DrawAttrib("攻击力",C_WHITE,C_GOLD,tmp1);
-    DrawAttrib("防御力",C_WHITE,C_GOLD,tmp2);
-    DrawAttrib("轻功",C_WHITE,C_GOLD,tmp3);
-
-    DrawAttrib("医疗能力",C_WHITE,C_GOLD);
-    DrawAttrib("用毒能力",C_WHITE,C_GOLD);
-    DrawAttrib("解毒能力",C_WHITE,C_GOLD);
-
-
-    DrawAttrib("拳掌功夫",C_WHITE,C_GOLD);
-    DrawAttrib("御剑能力",C_WHITE,C_GOLD);
-    DrawAttrib("耍刀技巧",C_WHITE,C_GOLD);
-    DrawAttrib("特殊兵器",C_WHITE,C_GOLD);
-    DrawAttrib("暗器技巧",C_WHITE,C_GOLD);
-    DrawAttrib("资质",C_WHITE,C_GOLD);
-
-elseif page==2 then
-    i=i+1;
-    DrawString(x1,y1+h*i,"武器:",C_ORANGE,size);
-    if p["武器"]>-1 then
-        DrawString(x1+size*3,y1+h*i,JY.Thing[p["武器"]]["名称"],C_GOLD,size);
-    end
-    i=i+1;
-    DrawString(x1,y1+h*i,"防具:",C_ORANGE,size);
-    if p["防具"]>-1 then
-        DrawString(x1+size*3,y1+h*i,JY.Thing[p["防具"]]["名称"],C_GOLD,size);
-    end
-    i=i+1;
-    DrawString(x1,y1+h*i,"修炼物品",C_ORANGE,size);
-    local thingid=p["修炼物品"];
-    if thingid>0 then
-        i=i+1;
-        DrawString(x1+size,y1+h*i,JY.Thing[thingid]["名称"],C_GOLD,size);
-        i=i+1;
-        local n=TrainNeedExp(id);
-        if n <math.huge then
-            DrawString(x1+size,y1+h*i,string.format("%5d/%5d",p["修炼点数"],n),C_GOLD,size);
-        else
-            DrawString(x1+size,y1+h*i,string.format("%5d/===",p["修炼点数"]),C_GOLD,size);
-        end
-    else
-        i=i+2;
-    end
-
-    i=i+1;
-    DrawString(x1,y1+h*i,"左右键翻页，上下键查看其它队友",C_RED,size);
-
-    i=0;
-    x1=dx+width/2;
-    DrawString(x1,y1+h*i,"所会功夫",C_ORANGE,size);
-    for j=1,10 do
-        i=i+1
-        local wugong=p["武功" .. j];
-        if wugong > 0 then
-            local level=math.modf(p["武功等级" .. j] / 100)+1;
-            DrawString(x1+size,y1+h*i,string.format("%s",JY.Wugong[wugong]["名称"]),C_GOLD,size);
-            DrawString(x1+size*7,y1+h*i,string.format("%2d",level),C_WHITE,size);
-        end
-    end
-
+    -- **薄包装**（port-ui-screens-verification Task 3）：
+    -- 26 处 DrawString + 1 处 DrawBox 已搬进 `framework/status_page.lua`
+    -- （只调 RenderFacade）。这里保留全局名，因为
+    -- `War_StatusMenu` 等老路径仍可能调它，且 script 层已有大量调用点。
+    --
+    -- 组装 ctx：所有 JY/CC/JY.Thing/JY.Wugong 读取都留在 script（游戏逻辑），
+    -- status_page 只负责怎么画。
+    local StatusPage = require("framework.status_page")
+    local p = JY.Person[id]
+    StatusPage.draw({
+        person     = p,
+        size       = CC.DefaultFont,
+        rowPixel   = CC.PersonStateRowPixel,
+        screenW    = CC.ScreenW,
+        screenH    = CC.ScreenH,
+        levelCap   = CC.Level,
+        expTable   = CC.Exp,
+        colors     = { white = C_WHITE, gold = C_GOLD, orange = C_ORANGE, red = C_RED },
+        rgb        = RGB,
+        headMeta   = (function()
+            local m = SpriteAtlas.getMeta(1, p["头像代号"] * 2)
+            return m and { w = m.w, h = m.h } or nil
+        end)(),
+        drawHead   = function(x, y)
+            SpriteAtlas.draw(1, p["头像代号"] * 2, x, y, 0x1)
+        end,
+        thingName  = function(tid) return JY.Thing[tid] and JY.Thing[tid]["名称"] end,
+        thingBonus = function(tid)
+            local t = JY.Thing[tid]
+            if not t then return nil end
+            return { attack = t["加攻击力"], defense = t["加防御力"],
+                     qinggong = t["加轻功"] }
+        end,
+        wugongName = function(wid) return JY.Wugong[wid] and JY.Wugong[wid]["名称"] end,
+        trainNeedExp = TrainNeedExp,
+    }, id, page)
 end
-
-end
-
 
 --计算人物修炼成功需要的点数
 --id 人物id
