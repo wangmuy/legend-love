@@ -85,6 +85,17 @@
     假装加载调色板
   - 新增 gate STEP J 锁死（负向对照已验证）
 
+- [x] ~~**复审计发现的 3 个「靠漏判通过」**~~ —— **已完成**（2026-11-22）
+  1. `playSequence` 的 number 语义只改了 LÖVE，MUD/Web/测试桩仍是旧形态
+     → 新引擎抄 MUD 会继承错误语义。已补齐 4 引擎。
+  2. `mod_data` 还有 **2 处真主路径** io.open（readActiveFile / WarRecordCount）
+     → APK 内资源 io.open 静默失败 = MOD 永不激活且不报错。已改 EngineAPI 优先。
+  3. `test_engine_conformance` 的「引擎完整性」检查**是空转的**：
+     3 个引擎都 `require("engine-love2d.engine_api")` → **同一张表**，
+     engine_api 的空桩让 `mod[mod][fn] == nil` 永假。
+     实测 MUD 缺 7 个契约照样 PASS。已改源码级检查，顺带补 MUD 7 个 +
+     测试桩 3 个缺口。
+
 - [x] ~~**入口/生命周期没有契约**~~ —— **已完成**（`port-engine-boot`，2026-11-22）
   - 实测：`engine_api.lua` 90 个契约里**没有一个** load/update/draw/quit；
     147 行装配序列只在 `main.lua` 的 `love.load()` 里
