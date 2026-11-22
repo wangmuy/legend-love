@@ -34,6 +34,12 @@ function SetGlobalConst()
 	-- 但从未定义（Lua 里 key==nil 恒 false → 退格静默失效）。补齐定义。
 	VK_BACKSPACE=8
 
+	-- ⚠️ 下面 4 个是 **SDL2 keycode**（0x4000_00xx 高区），不是 Windows VK。
+	-- 名字沿用 DirectX 的 VK 前缀是历史遗留（原版从 Windows 移植来）。
+	--
+	-- 归一化要求见 `engine_api.lua` 的 `input.getKey` 契约：
+	-- 引擎必须把宿主键码转成这一套，否则方向键判定会静默失效。
+	-- 迁移方向：新代码用 `EngineAPI.input.pollAction()`（返回 "ui.up" 等动作名）。
 	SDLK_UP=1073741906
 	SDLK_DOWN=1073741905
 	SDLK_LEFT=1073741904

@@ -100,6 +100,59 @@ created: 2026-11-17
 **代价与缓解**：framework 必须认识物理 scancode。用**平台无关 scancode**
 （LÖVE 的 `scancode` 字符串、Godot 的物理键位常量）而非 VK 整数，可接受。
 
+### ADR-2b：迁移期 `getKey()` 必须写死「返回 SDL2 keycode」
+
+**Context**（2026-11-22 复核补充）：
+
+原 design 在 ADR-2 里说「framework 必须认识物理 scancode」，但**没有把这条
+写进 `engine_api.lua` 的 `getKey()` 契约**。契约当时只有一行：
+
+```lua
+--- 获取按键（非阻塞）
+-- @return number 按键码，-1 表示无按键
+function M.input.getKey() end
+```
+
+「按键码」是什么体系？没写。而实际值是**混杂两套**：
+
+```lua
+VK_ESCAPE = 27          -- ASCII
+VK_RETURN = 13          -- ASCII
+VK_UP     = 1073741906  -- 0x40000052 = SDLK_UP（SDL2 keycode 高区）
+```
+
+这正是 SDL2 的设计（`SDLK_*` 对可打印字符 = ASCII），但**新引擎作者不知道**。
+
+**实测风险**：Godot 的 `KEY_UP = 4194320`、Unreal 的 `EKeys::Up` 都不等于
+`1073741906`。若引擎实现直接返回原生值：
+
+- 方向键判定**全部失效**
+- **不会报错**（Lua 里 nil/不等的比较是合法表达式）
+- 表现是「按了没反应」—— 有输入、无异常、行为静默错误
+
+**Decision**：
+
+在 `engine_api.lua` 的 `input.getKey` / `waitForKey` 契约里**写死**：
+
+1. 返回值 **必须**是 SDL2 keycode（可打印字符 = ASCII，功能键 = `0x4000_00xx`）
+2. 给出 4 个宿主的映射对照表（LÖVE / Godot / Unreal / Web）
+3. 明确「不做归一化的后果」= 静默失效
+
+同时在 `script/jyconst.lua` 的 `SDLK_*` 定义处加交叉引用注释。
+
+**Alternatives**：
+
+- **改契约返回字符串**（`"up"` / `"return"`）：更干净，但 114 处消费者要比对
+  常量，改动量等于把 Task 5 提前做完 —— 而 Task 5 尚未做。
+- **加归一化辅助函数**（`EngineAPI.input.vkFromNative(code)`）：多一个契约，
+  且引擎实现仍要知道目标值。不如直接把目标值写进契约。
+
+**Consequences**：
+
+- ✅ 新引擎作者不会再踩「静默失效」
+- ✅ 与 Task 5 的迁移方向一致（`pollAction` 返回动作字符串，彻底无键码问题）
+- ⚠️ 契约变长了（从 2 行到 ~50 行）—— 但这正是「新引擎作者的必读文档」该有的位置
+
 ### ADR-3：事件携带 provenance，废弃 `synthetic` 脏标记
 
 **Context**：现有 `enqueueKeyEvent(VK_SPACE)` 把「鼠标点击」伪装成「空格键」，

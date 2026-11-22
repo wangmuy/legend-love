@@ -259,6 +259,30 @@ getVector(id) -> { x, y, magnitude, angle } | nil
 - **WHEN** 玩家在设置菜单关闭虚拟手柄
 - **THEN** 虚拟手柄不再绘制，也不再产出动作事件
 
+### Requirement: REQ-IAL-10b 迁移期 `getKey()` 返回 SDL2 keycode
+
+迁移期内（Task 5 未完成前），`EngineAPI.input.getKey()` 与 `waitForKey()`
+SHALL 返回 **SDL2 keycode**：可打印字符用 ASCII 值，功能键用 `0x4000_00xx` 高区。
+契约 SHALL 为每个宿主给出一行映射对照（LÖVE / Godot / Unreal / Web）。
+
+#### Scenario: Godot 实现必须转换方向键
+
+- **GIVEN** Godot 的原生方向键常量是 `KEY_UP = 4194320`
+- **WHEN** 用户在 Godot 实现里按上键，`getKey()` 返回 `4194320`
+- **THEN** 所有 `keypress == VK_UP` 的比较 SHALL 为 false（静默失效）
+- **AND** 正确实现 SHALL 把它转成 `1073741906`（SDLK_UP）
+
+#### Scenario: 契约文档必须写明后果
+
+- **WHEN** 阅读 `engine_api.lua` 的 `input.getKey` 注释
+- **THEN** SHALL 能看到「不做归一化 = 方向键静默失效，不报错」的警告
+- **AND** SHALL 能看到 4 个宿主的对照表
+
+#### Scenario: jyconst 有交叉引用
+
+- **WHEN** 阅读 `script/jyconst.lua` 的 `SDLK_UP` 定义处
+- **THEN** SHALL 看到指向 `engine_api.lua` 归一化要求的注释
+
 ### Requirement: REQ-IAL-11 迁移期行为逐帧等价
 
 迁移完成后，同一份输入序列产生的事件序列 SHALL 与迁移前**逐帧等价**：

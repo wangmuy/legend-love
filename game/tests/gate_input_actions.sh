@@ -126,7 +126,10 @@ fi
 # ------------------------ F. 业务代码不得引用未定义的 VK_* 常量
 log "=== STEP: F. 无未定义 VK 常量 ==="
 undef=0
-for vk in $(grep -roh 'VK_[A-Z0-9_]*' game/framework/*.lua game/script/*.lua 2>/dev/null | sort -u); do
+# **用 `+` 不用 `*`**：`VK_` 后面必须至少有一个字符才算引用。
+# 原写法 `VK_[A-Z0-9_]*` 会把注释里的 `VK_*` 通配写法抓成「未定义常量 VK_」
+# —— 实测踩过（2026-11-22 自己写注释时触发的假阳性）。
+for vk in $(grep -rohE 'VK_[A-Z0-9_]+' game/framework/*.lua game/script/*.lua 2>/dev/null | sort -u); do
     if ! grep -q "$vk *=" game/script/jyconst.lua 2>/dev/null; then
         log "  [FAIL] $vk 被引用但 jyconst.lua 未定义（比较恒 false，静默失效）"
         undef=$((undef + 1))
@@ -135,6 +138,37 @@ done
 if [ "$undef" -eq 0 ]; then
     log "  [PASS] 所有引用的 VK_* 都有定义"
 else
+    fail=$((fail + 1))
+fi
+
+
+# ------------------------ F2. getKey 的键码归一化契约必须写明
+# **背景**（2026-11-22 复核）：契约原本只有一行 `@return number 按键码` ——
+# 没说什么体系的码。而实际值是「ASCII + SDL2 keycode 高区」混杂。
+# Godot 的 KEY_UP=4194320、Unreal 的 EKeys::Up 都不等于 1073741906，
+# 直接返回原生值 → 方向键判定全部失效，且**不报错**（Lua 比较不抛异常）。
+log "--- F2. getKey 键码归一化契约 ---"
+EAPI="game/engine-love2d/engine_api.lua"
+if grep -q 'SDL2 keycode' "$EAPI" 2>/dev/null; then
+    log "  [PASS] engine_api.lua 写明 getKey 返回 SDL2 keycode"
+else
+    log "  [FAIL] engine_api.lua 未写明 getKey 的键码体系（新引擎会静默失效）"
+    fail=$((fail + 1))
+fi
+# 4 个宿主的映射对照必须都在（LÖVE/Godot/Unreal/Web）
+for host in "LÖVE" "Godot" "Unreal" "Web"; do
+    if grep -q "$host" "$EAPI" 2>/dev/null; then
+        log "  [PASS] 契约含 $host 的映射对照"
+    else
+        log "  [FAIL] 契约缺 $host 的键码映射对照"
+        fail=$((fail + 1))
+    fi
+done
+# jyconst 必须交叉引用（否则读常量的人不知道归一化要求）
+if grep -q 'input.getKey` 契约' game/script/jyconst.lua 2>/dev/null    || grep -q 'engine_api.lua.*input.getKey' game/script/jyconst.lua 2>/dev/null; then
+    log "  [PASS] jyconst.lua 的 SDLK_* 处有交叉引用"
+else
+    log "  [FAIL] jyconst.lua 缺交叉引用（读常量的人看不到归一化要求）"
     fail=$((fail + 1))
 fi
 

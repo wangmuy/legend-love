@@ -155,6 +155,38 @@ tools/render-base-music.sh     （音频）
 **最终 DoD**：`grep -c 'VK_'` 在 `framework/` + `script/`（除 `jyconst.lua` 定义处）
 = 0。
 
+**⚠️ 2026-11-22 复核：本 Task 实际一行未做。**
+
+上面那 7 批**一个 checkbox 都没有** —— 所以它在进度统计里完全不可见
+（27/31 全是 Task 1/2/3/6/7/8/9 的）。实测：
+
+```
+$ grep -rn 'VK_' game/framework/*.lua game/script/*.lua game/script/battle/*.lua     | grep -v jyconst.lua | wc -l
+114
+```
+
+分布：`script/jymain.lua` 32、`battle_flow_coroutines.lua` 18、
+`game_states.lua` 11、`menu_state_machine.lua` 11、`async_dialog.lua` 11、
+`item_async.lua` 6、`battle_flow.lua` 6、`person_status_async.lua` 5、
+`jymain_adapter.lua` 5、`battle_action.lua` 4、`input_manager.lua` 2、
+`battle_mouse.lua` 2、其余各 1。
+
+按 `VK_*` 常量分类：`VK_ESCAPE` 19、`VK_DOWN` 19、`VK_UP` 18、`VK_RETURN` 18、
+`VK_SPACE` 16、`VK_RIGHT` 15、`VK_LEFT` 15、`VK_Y`/`VK_N`/`VK_BACKSPACE` 各 1。
+**每个都有对应的语义动作**（`VK_Y→jy.y`、`VK_N→jy.n`、其余 `ui.*`），
+所以迁移在技术上没有障碍，纯粹是没做。
+
+- [ ] 批 1 `framework/game_states.lua`（11 处）
+- [ ] 批 2 `framework/menu_state_machine.lua`（11 处）
+- [ ] 批 3 `framework/async_dialog.lua`（11 处，含 `>=32 and <=126` 改 `ui.text`）
+- [ ] 批 4 `framework/talk_async.lua` / `scene_name_async.lua`
+- [ ] 批 5 `framework/item_async.lua` / `person_status_async.lua`（11 处）
+- [ ] 批 6 `framework/war_async.lua` / `input_async.lua` / `battle_mouse.lua`
+- [ ] 批 7 `script/jymain.lua`（32 处）+ `script/battle/`（28 处）
+- [ ] 最终 DoD：上述 `grep` 归零
+- [ ] `gate_input_actions.sh` 补断言：`framework/`+`script/` 的 VK 引用 = 0
+      （**现在只查「VK 是否已定义」，不查「是否已迁移」** —— 所以 114 处不影响门禁）
+
 ## Task 6 — 虚拟手柄
 
 - [x] 新建 `framework/virtual_pad.lua`：

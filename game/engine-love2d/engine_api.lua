@@ -610,12 +610,61 @@ function M.map.drawBattle(flag, x, y, v1, v2, v3) end
 M.input = {}
 
 --- 获取按键（非阻塞）
--- @return number 按键码，-1 表示无按键
+--
+-- # ⚠️ 键码归一化约定（新引擎实现者必读）
+--
+-- **返回值必须是 SDL2 keycode**，不是宿主原生的键码。理由与具体值见下：
+--
+-- 现有消费者全部拿它跟 `VK_*` 常量比较（`script/jyconst.lua`，
+-- 共 10 个：`VK_ESCAPE/Y/N/SPACE/RETURN/BACKSPACE/UP/DOWN/LEFT/RIGHT`），
+-- 而这些常量的实际取值是**混杂的两套体系**：
+--
+-- ```lua
+-- VK_ESCAPE = 27          -- ASCII
+-- VK_RETURN = 13          -- ASCII
+-- VK_SPACE  = 32          -- ASCII
+-- VK_Y      = 121         -- ASCII
+-- VK_UP     = 1073741906  -- 0x40000052 = SDLK_UP（SDL2 keycode 高区）
+-- VK_DOWN   = 1073741905
+-- VK_LEFT   = 1073741904
+-- VK_RIGHT  = 1073741903
+-- ```
+--
+-- 换句话说：**可打印字符与功能键走 ASCII，方向键走 SDL keycode 高区**。
+-- 这正是 SDL2 的设计（`SDLK_*` 对可打印字符 = ASCII 值）。
+--
+-- ## 各引擎的映射对照（实现时必须转换，不能直接返回原生值）
+--
+-- | 宿主 | 原生键码 | 转换为 |
+-- |---|---|---|
+-- | LÖVE 11.5 | `keypressed(key, scancode)` 的 **key 是字符串** | `baseKeyMap` 查表（已实现） |
+-- | Godot 4 | `KEY_UP = 4194320`（位掩码） | 查表转成 `1073741906` |
+-- | Unreal | `EKeys::Up`（FKey 结构） | 查表转成 `1073741906` |
+-- | Web | `KeyboardEvent.keyCode`（已废弃但可用） | 方向键 38/40/37/39 → 需转成 SDL 高区 |
+--
+-- **不做归一化的后果**：Godot 返回 `4194320`，与 `VK_UP = 1073741906` 不等
+-- → 方向键判定**全部失效**，且**不会报错**，表现是「按了没反应」。
+-- 这是最难查的一类缺陷（有输入、无异常、行为静默错误）。
+--
+-- ## 迁移方向
+--
+-- `getKey()` 正在被 `pollAction()`（语义动作）取代 —— 见
+-- `openspec/changes/input-action-layer/`。**新代码应该用 `pollAction()`**，
+-- 它返回动作字符串（`"ui.up"`），不存在跨引擎键码问题。
+--
+-- `getKey()` 在迁移期保留，因为还有调用点在用（实测 29 处）。
+-- 但**新引擎实现仍必须实现它**，且必须做上面的归一化。
+--
+-- @return number SDL2 风格的键码（见上），-1 表示无按键
 function M.input.getKey() end
 
---- 等待按键
+--- 等待按键（**yieldable**）
+--
+-- 返回值语义与归一化要求**与 `getKey()` 完全相同**（SDL2 keycode）。
+-- 实现上通常是「挂起协程直到有键」，但最终交付给调用方的仍是同一个键码体系。
+--
 -- @yieldable
--- @return number 按键码
+-- @return number SDL2 风格的键码（同 getKey）
 function M.input.waitForKey() end
 
 --- 设置按键重复
@@ -993,6 +1042,41 @@ function M.font.measureText(str, size, fontName) end
 M.dialog = {}
 
 --- 排版计算（纯函数，不绘制、不阻塞、不写全局状态）
+--
+-- # ⚠️ 不要自己写一套排版（新引擎实现者必读）
+--
+-- 「换行 / 框宽 / 行高 / 锚点 / 分页」这些算法**已经在 framework 里实现好了**：
+--
+--   `framework/dialog_layout.lua` —— 换行、框宽、裁剪（零引擎依赖，318 行）
+--   `framework/text_box_layout.lua` —— 文本宽度、列对齐
+--
+-- 引擎实现的 `dialog.measure` 应该**只做两件事**：
+--
+--   1. 提供字体度量回调给 `DialogLayout`（`emWidthFn` = 一段文本多少像素宽）
+--   2. 把 `DialogLayout.layoutText(...)` 的结果原样返回
+--
+-- LÖVE 的实现只有 ~15 行有效代码（`engine_love2d.lua` 的
+-- `EngineAPI.dialog.measure`），因为算法全在 framework：
+--
+-- ```lua
+-- EngineAPI.dialog.measure = function(spec)
+--     local DialogLayout = require("framework.dialog_layout")
+--     return DialogLayout.layoutText(spec, {
+--         emWidth = function(str, size)                  -- ← 唯一引擎相关部分
+--             local font = EngineAPI.font.get(nil, size)
+--             return font and font:getWidth(str) or nil
+--         end,
+--         fontHeight = function(size) ... end,
+--     })
+-- end
+-- ```
+--
+-- **为什么强调这一点**：如果每个引擎自己写排版，4 个引擎 = 4 套换行规则
+-- → 同一个对话框在不同引擎上断行位置不同 → 玩家看到不同的对话分页。
+-- 这类「看起来只是排版」的差异极难在 code review 里发现。
+--
+-- ## 返回值的含义（全部由 DialogLayout 决定，引擎不得改动）
+--
 -- @param spec table 对话描述
 --   text    string 对话文本，`*` 为强制断行符
 --   headId  number 头像编号，-1 表示不显示
@@ -1007,7 +1091,15 @@ M.dialog = {}
 --   textBox     table  { x, y, w, h } 对话框
 function M.dialog.measure(spec) end
 
---- 绘制对话（只能在 love.draw() 内调用）
+--- 绘制对话（**必须在帧绘制回调内**调用，见 `render.beginFrame`）
+--
+-- 实现要求：
+--   · 只按 `layout` 里给定的坐标画（**不要重新计算排版** —— 那会与
+--     `measure` 的结果不一致，表现为「框和文字错位」）
+--   · `layout.headBox` 存在时画头像（走 `sprite.drawHandle`，见 sprite 段）
+--   · 绘制原语用 `render.text` / `render.fillRect` / `render.rectOutline`
+--   · 不得在自己内部调 `render.present()`（那是 `Boot.draw` 的事）
+--
 -- @param spec table 与 measure 相同的对话描述
 -- @param layout table measure 的返回值
 function M.dialog.draw(spec, layout) end
