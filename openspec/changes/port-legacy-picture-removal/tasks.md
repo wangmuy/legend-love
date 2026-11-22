@@ -78,12 +78,14 @@
 **Blast Radius**：`game/engine-love2d/engine_love2d.lua`
 
 **DoD**：
-- [ ] `drawMain/drawScene/drawBattle` 的 fallback 分支改为
+- [x] `drawMain/drawScene/drawBattle` 的 fallback 分支改为
       `EngineAPI.debug.log(...)` + `error("framework.map_render missing: " .. tostring(err))`
-- [ ] 删 `lib.DrawMMap/DrawSMap/DrawWarMap` 的调用
-- [ ] 单测：把 `map_render` 改名后调用 `map.drawMain` → 抛错
-- [ ] 实机三界面正常（无回归）
-- [ ] 一个 commit
+      （三个契约统一走局部 `mapRender()` helper）
+- [x] 删 `lib.DrawMMap/DrawSMap/DrawWarMap` 的调用（代码行 0 处）
+- [x] 单测 `test_map_render_missing.lua`（13 条）：源码级断言「不再调旧实现」
+      + 三个契约都必须先取 `mapRender()`（缺失即抛错）
+- [x] 实机三界面正常（场景 `1efd2af3…` / 战斗 `6c8eb322…` md5 不变）
+- [x] 一个 commit
 
 ## Task 6：删 `lib_love` 旧贴图子系统（最大一步）
 

@@ -391,72 +391,56 @@ EngineAPI.map.clearBattleTile = function(layer, value)
 end
 
 
---- 主地图绘制 —— **改走 framework/map_render.lua**
+--- 三个地图绘制契约 —— 全部转发 `framework/map_render.lua`
 --
--- 原实现是 `lib.DrawMMap`（79 行，住在引擎里），它是 `.idx/.grp` **不透明**的：
--- 内部经 `JY_LoadPic` = `PicLoadCache` 读 `picFileCache`，新引擎要重写整套
--- RLE 解码 + 档案缓存才能实现这个契约。
+-- 原实现是 `lib.DrawMMap/DrawSMap/DrawWarMap`（363 行，住在引擎里），
+-- `.idx/.grp` **不透明**：内部经 `JY_LoadPic` = `PicLoadCache` 读 `picFileCache`，
+-- 新引擎要重写整套 RLE 解码 + 档案缓存才能实现这些契约。
 --
--- 现在：投影数学住 `framework/map_render.lua`（用 `sprite.drawHandle` 画已解好的
--- handle），引擎不再持有等距投影逻辑。
+-- 现在投影数学住 framework（用 `sprite.drawHandle` 画已解好的 handle），
+-- 引擎不再持有等距投影逻辑。
 --
--- `lib.DrawMMap` **保留**（`lib.*` 兼容层仍有人用），只是本契约不再转发它。
---
--- 逃生舱：若 `framework.map_render` 加载失败（打包时漏文件），回退到旧实现
--- 而不是画空白 —— 静默丢失整张地图比回退更糟。
+-- **逃生舱已改为显式失败**（port-legacy-picture-removal Task 5）：
+--   原来 framework 模块缺失时回退 `lib.DrawMMap/DrawSMap/DrawWarMap`。
+--   但旧实现的 `PicLoadCache` flag 位语义与新 `drawHandle` **不同**
+--   （为此专门修过 drawHandle 的互斥判断），静默回退会产生
+--   「有点不对但不崩」的画面，比崩溃更难定位。
+--   这个 fallback 掩盖的真问题是「`.love` 打包漏了 map_render.lua」——
+--   应该立刻报错。
+local function mapRender()
+    local ok, MR = pcall(require, "framework.map_render")
+    if ok and MR then return MR end
+    local msg = "framework.map_render missing (packaging bug?): " .. tostring(MR)
+    if EngineAPI.debug and EngineAPI.debug.log then
+        EngineAPI.debug.log("map.draw*: " .. msg)
+    end
+    error(msg, 2)
+end
+
+--- 主地图绘制
 EngineAPI.map.drawMain = function(playerX, playerY, playerPic)
-    local ok, MR = pcall(require, "framework.map_render")
-    if ok and MR and MR.drawMain then
-        MR.drawMain(playerX, playerY, playerPic)
-        return
-    end
-    if EngineAPI.debug and EngineAPI.debug.log then
-        EngineAPI.debug.log("map.drawMain: framework.map_render unavailable, "
-                            .. "falling back to lib.DrawMMap")
-    end
-    lib.DrawMMap(playerX, playerY, playerPic)
+    local MR = mapRender()
+    if not MR.drawMain then error("map_render.drawMain missing", 2) end
+    MR.drawMain(playerX, playerY, playerPic)
 end
 
---- 场景地图绘制 —— **改走 framework/map_render.lua**
---
--- 原实现 `lib.DrawSMap`（79 行）住在引擎里且 .idx/.grp 不透明。
--- 现在投影数学住 framework，引擎只提供 tile 数据与 handle 绘制。
---
--- 逃生舱：framework 模块缺失时回退旧实现（静默丢整张场景地图比回退更糟）。
+--- 场景地图绘制
 EngineAPI.map.drawScene = function(sceneId, x, y, offX, offY, playerPic)
-    local ok, MR = pcall(require, "framework.map_render")
-    if ok and MR and MR.drawScene then
-        MR.drawScene(sceneId, x, y, offX, offY, playerPic)
-        return
-    end
-    if EngineAPI.debug and EngineAPI.debug.log then
-        EngineAPI.debug.log("map.drawScene: framework.map_render unavailable, "
-                            .. "falling back to lib.DrawSMap")
-    end
-    lib.DrawSMap(sceneId, x, y, offX, offY, playerPic)
+    local MR = mapRender()
+    if not MR.drawScene then error("map_render.drawScene missing", 2) end
+    MR.drawScene(sceneId, x, y, offX, offY, playerPic)
 end
 
---- 战斗地图绘制 —— **改走 framework/map_render.lua**
---
--- 原实现 `lib.DrawWarMap`（122 行）住在引擎里且 .idx/.grp 不透明。
+--- 战斗地图绘制
 --
 -- **注意 flag=1/2 的语义**：原实现传 `JY_LoadPic(0, 0, x, y, 2+4, 128)` ——
 -- 即「变黑 + alpha」，在 `PicLoadCache` 里两者**独立**生效（半透明黑高亮）。
 -- 为此同步修了 `sprite.drawHandle` 的位判断（原来用 elseif 链互斥，
 -- 会把移动范围画成不透明黑块）。
---
--- 逃生舱：framework 模块缺失时回退旧实现。
 EngineAPI.map.drawBattle = function(flag, x, y, v1, v2, v3)
-    local ok, MR = pcall(require, "framework.map_render")
-    if ok and MR and MR.drawBattle then
-        MR.drawBattle(flag, x, y, v1, v2, v3)
-        return
-    end
-    if EngineAPI.debug and EngineAPI.debug.log then
-        EngineAPI.debug.log("map.drawBattle: framework.map_render unavailable, "
-                            .. "falling back to lib.DrawWarMap")
-    end
-    lib.DrawWarMap(flag, x, y, v1, v2, v3)
+    local MR = mapRender()
+    if not MR.drawBattle then error("map_render.drawBattle missing", 2) end
+    MR.drawBattle(flag, x, y, v1, v2, v3)
 end
 
 -- input 模块
