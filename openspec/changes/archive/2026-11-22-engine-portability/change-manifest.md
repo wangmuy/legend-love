@@ -655,10 +655,10 @@ gate_ascii.sh             # 既有
 
 ## Slice 完成判定
 
-**16 个 change 全部 archived（2026-11-22）** → 本 slice 已标记 `status: done` 并移入 `archive/`。
+**17 个 change 全部 archived（2026-11-23）** → 本 slice 已标记 `status: done` 并移入 `archive/`。
 
-第二批 4 个 / 第三批 2 个的实测结论见各自 change（均已归档到
-`openspec/changes/archive/2026-11-22-*`）。
+第二批 4 个 / 第三批 2 个 / 第四批 1 个的实测结论见各自 change（均已归档到
+`openspec/changes/archive/2026-11-2*-*`）。
 
 ### 最终验收数据（第三批归档时）
 

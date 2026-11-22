@@ -17,7 +17,7 @@ abandoned:
 ```
 本仓 54 个 change 直接挂在 changes/ 下，只有 2 个挂在 epic 下
 既有 epic 规模：allmods 17 个 slice、web-mud 6 个 slice、mouse 3 个 slice
-本 slice：1 个 slice 统 16 个 change（第一批 10 + 第二批 4 + 第三批 2）
+本 slice：1 个 slice 统 17 个 change（第一批 10 + 第二批 4 + 第三批 2 + 第四批 1）
 ```
 
 第一批子 change 合计 **约 377 处调用点改动**（超过 `audio-settings` 的 88 任务），
@@ -128,7 +128,7 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 
 #### Scenario: framework 里零引擎绕过
 
-- **GIVEN** 16 个 change 全部完成
+- **GIVEN** 17 个 change 全部完成
 - **WHEN** 执行 `grep -rn 'lib\.' game/framework/*.lua`（排除注释行）
 - **THEN** 命中数 = 0
 
@@ -193,6 +193,24 @@ port-conformance-hardening     5 Task 组 / 22 checkbox  playSequence 对齐 + c
 >
 > 三者共同模式：**有检查、有文档，但没有一个真正检查到目标**。
 > 这比功能缺陷更危险 —— 它让"看起来完成了"的东西在换引擎时成批暴露。
+
+── 第四批（2026-11-23 移植可行性审计后新增）──────────────────────────
+port-render-batching           6 Task 组 / 58 checkbox  绘制批处理契约 + RenderBatch 薄层（✓ Complete）
+
+> **第四批的由来**：第三批归档后再问「现在真换引擎，还差什么」，
+> 实测出三个缺口，其中两个已修（键码归一化 → 补进 `input-action-layer`；
+> dialog 注释 → 直接改契约），只剩**批处理**需要新契约：
+>
+> | 缺口 | 处理 |
+> |---|---|
+> | 键码归一化无契约（隐含 SDL keycode） | 补进 `input-action-layer`（ADR-2b + REQ-IAL-10b + gate STEP F2）|
+> | `dialog.measure` 要引擎复刻 40 行排版 | 直接改契约注释（指明用 `framework/dialog_layout.lua`）|
+> | **每帧约 2900 次 `drawHandle` 无批处理通路** | **本批新 change** |
+>
+> 实测数据：主地图一帧 `drawMain` = **2896 次**（复测 2926，随裁剪区浮动），
+> 且几乎全部来自 `drawMain`。LÖVE 的隐式批处理让它流畅，但 **Unreal 的
+> HUD `DrawTile` 每次是独立 draw call → 很可能掉帧**，而契约里没有任何
+> 优化入口 —— 想优化的引擎无处可插。
 
 
 ## Affected Domains
