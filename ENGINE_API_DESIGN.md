@@ -160,4 +160,6 @@ oldevent 脚本短期内不需要修改。长期来看，可以：
 | `EngineAPI.sprite.draw()` | 入渲染队列，立即返回 |
 | `EngineAPI.audio.playMusic()` | 触发即忘 |
 | `EngineAPI.file.open()` | 同步 I/O |
+| `EngineAPI.file.read()` | 同步 I/O |
+| `EngineAPI.time.formatNow(fmt)` | 本地墙上时间格式化（存档/日志时间戳；`getTimeSeconds` 是单调计时，不能算日期） |
 | `EngineAPI.debug.log()` | 立即输出 |

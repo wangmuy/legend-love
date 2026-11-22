@@ -65,6 +65,7 @@
 | `lib_Byte.lua` | ✅ 使用中 | 二进制数据工具，提供字节序转换、16位/8位数据表读写 |
 | `lib_file.lua` | ✅ 使用中 | 文件操作封装，提供跨平台的文件读写接口 |
 | `lib_log.lua` | ✅ 使用中 | 日志工具，提供 Debug/Debugt/JY_Error 函数 |
+| `clock.lua` | ✅ 使用中 | 墙上时钟（本地日期时间 / 随机种子）：EngineAPI.time.formatNow 优先，os.date/os.time 兜底 |
 | `luabit.lua` | ✅ 使用中 | LuaBit 位运算库（Lua 5.1 兼容） |
 | `perf_log.lua` | ✅ 使用中 | 性能日志模块 |
 | `config.lua` | ✅ 使用中 | 游戏配置文件，定义 CONFIG 表 |

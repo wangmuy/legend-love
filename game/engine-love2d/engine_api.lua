@@ -846,6 +846,31 @@ function M.time.getTime() end
 -- @return number 秒
 function M.time.getTimeSeconds() end
 
+--- 取「本地墙上时间」并格式化（存档时间戳 / 日志时间戳）
+--
+-- **为什么必须在契约里，而不是让 framework 用 getTimeSeconds 自己算**：
+--   `getTimeSeconds` 的语义是**单调计时**（LÖVE 是 love.timer.getTime()，
+--   起点为进程启动；MUD/Web/Test 是 os.clock()，起点近似 CPU 时间）。
+--   两者都**不是 Unix 纪元秒**，拿它做 Y-M-D 会得到 1970-01-01 之类的
+--   假日期，而且每次启动都一样 —— 存档里的「死亡时间」会变成明显错误的数据。
+--
+--   「本地日期时间」的来源（os.date / Time.get_datetime_dict_from_system /
+--   FDateTime::Now）是**平台能力**，只有引擎知道，所以必须走契约。
+--
+-- 实现约定（4 引擎均已实现）：
+--   love2d → os.date(fmt)
+--   mud    → os.date(fmt)（文本引擎跑在宿主 Lua 上，语义一致）
+--   web    → os.date(fmt)（Fengari 提供标准库；取不到时返回 ""）
+--   test   → os.date(fmt)，并支持 time.setNow() 注入固定串便于确定性断言
+--
+-- 任何实现都**不得**抛错；无法产出时返回 ""，调用方按「无时间戳」降级。
+--
+-- 调用方：framework/clock.lua（framework 唯一读墙上时间的地方）。
+--
+-- @param fmt string|nil os.date 风格格式串，默认 "%Y-%m-%d %H:%M"
+-- @return string 本地时间字符串；不可用时返回 ""
+function M.time.formatNow(fmt) end
+
 --------------------------------------------------------------------
 -- file - 文件系统
 --------------------------------------------------------------------

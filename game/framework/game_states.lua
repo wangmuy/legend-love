@@ -23,6 +23,9 @@ local MouseMenu = require("framework.mouse_menu")
 local Settings = require("framework.settings")
 local Interact = require("framework.interact")
 
+-- 墙上时钟（存档时间戳）：契约优先 + os.date 兜底，见 framework/clock.lua
+local Clock = require("framework.clock")
+
 -- 游戏状态处理器表
 local handlers = {}
 
@@ -1003,7 +1006,13 @@ handlers["GAME_DEAD"] = {
         GameHooks.playMIDI(0)
         JY.DeadScreen = {
             name = JY.Person[0]["姓名"],
-            datetime = os.date("%Y-%m-%d %H:%M")
+            -- 死亡时间戳：走 Clock（EngineAPI.time.formatNow 优先，os.date 兜底）
+            --
+            -- 为什么改：原来直接 `os.date("%Y-%m-%d %H:%M")`，os.date 是
+            -- Lua 标准库，Godot/Unreal 上没有 → 换引擎后这里会直接崩。
+            -- 时间戳是「平台能力」（本地日期时间），必须由引擎提供。
+            -- 格式与改造前逐字一致，展示零回归。
+            datetime = Clock.formatNow("%Y-%m-%d %H:%M")
         }
     end,
     

@@ -386,6 +386,20 @@ function EngineAPI.time.getTimeSeconds()
     return os.clock()
 end
 
+-- 本地墙上时间格式化（framework-io-portability）
+--
+-- 与 getTimeSeconds 的区别：后者是**单调计时**（os.clock），不是纪元秒，
+-- 算不出真实日期。Fengari（浏览器里的 Lua VM）提供标准库 os.date，
+-- 因此这里直接用它；某些受限运行环境裁掉了 os.date 时返回 ""，
+-- 调用方（framework/clock.lua）会按「无时间戳」降级，不崩。
+function EngineAPI.time.formatNow(fmt)
+    fmt = fmt or "%Y-%m-%d %H:%M"
+    if type(os) ~= "table" or type(os.date) ~= "function" then return "" end
+    local ok, s = pcall(os.date, fmt)
+    if ok and type(s) == "string" then return s end
+    return ""
+end
+
 --------------------------------------------------------------------------------
 -- file - initDataSource based read-only file system
 --------------------------------------------------------------------------------
