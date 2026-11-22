@@ -119,7 +119,7 @@ lovec game --shot=person-status --frame=5600       --keys=${PREFIX%,},escape,dow
 **不能当 md5 基线**，只能断言「有框、有两列、有头像、有底部提示」。
 （与主地图同一类问题，见上面「主地图的 md5 不稳定」小节。）
 
-### 存档界面：必须在主地图（本轮未捕获）
+### 存档界面：必须在主地图（已捕获）
 
 主菜单的「系统」项在 `GAME_SMAP` 下被置灰（**原版行为**，
 `framework/jymain_async.lua:47-48` 与 `script/jymain.lua:770-773` 逐字一致）：
@@ -131,5 +131,19 @@ if JY.Status == GAME_SMAP then
 end
 ```
 
-⇒ 在开场小场景里怎么按键都到不了存档界面。要验证必须先走出屋子回主地图。
-该项由 `port-ui-screens-verification` 的 Task 2 负责补图。
+⇒ 在开场小场景里怎么按键都到不了存档界面。要验证必须先**回主地图**。
+
+**加了调试入口 `--mmap=<x>,<y>`**（`main.lua`，仅调试用）：走
+`LoadRecord(0)` → 改主角坐标 → 切 `GAME_MMAP`，并先清掉启动菜单协程
+（否则 `showStartMenuCoroutine` 的菜单会和后续注入按键「抢」同一个按键，
+实测表现为「按 6 次 down + return 却落在读取进度」）。
+
+| 文件 | 界面 | 判据类型 | 复现命令 |
+|------|------|---------|---------|
+| `save-menu.png` | 主地图上的「保存进度」三槽菜单 | **逐字节稳定** | `lovec game --shot=save-menu --frame=1200 --mmap=150,150 --keys=escape,down,down,down,down,down,return,down,return` |
+
+md5 参考：`73f3b78ae63f03f1e334f41cd94cef67`
+
+> 该图的 md5 稳定（无随机数、无存档依赖：它画的是三个**空槽**菜单）；
+> 但**位置**依赖 `--mmap` 给的坐标（不同坐标下主地图背景不同）。
+> 所以「md5 相同」的前提是**同一坐标 + 同一按键序列**。

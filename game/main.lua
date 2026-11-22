@@ -69,6 +69,15 @@ local _shotFrameCount = 0
 -- 走 LoadRecord(0) + WarMainCoroutine，跳过"新游戏"的属性选择菜单
 -- （那个菜单要玩家按键，无头环境过不去）。
 local _AUTO_BATTLE = nil
+-- 直接进主地图（--mmap=<x>,<y>）：截图模式用来验证**只在 GAME_MMAP 可达**的界面。
+--
+-- 为什么需要它（port-ui-screens-verification Task 2）：
+--   存档/读档入口在主菜单的「系统」里，而「系统」在 GAME_SMAP 下被置灰
+--   （**原版行为**，jymain_async.lua:47-48）。开场出生点在小场景里，
+--   用 `--keys` 走位出屋子既不稳定（遇敌/门位随存档变），也无法在
+--   CI 里复现。所以给一个调试入口：LoadRecord(0) → 直接把坐标改成主地图
+--   坐标 → 切到 GAME_MMAP。生产路径不受影响（只有带这个参数才走）。
+local _AUTO_MMAP = nil
 -- 自动按键脚本（--keys=return,return,down,down,...）：截图模式推进战斗流程。
 --
 -- **值必须是按键名字（字符串），不是 keycode**：
@@ -101,6 +110,8 @@ function love.load()
             if fr then _SHOT_FRAME = tonumber(fr) end
             local bat = a:match("^%-%-battle=(%d+)")
             if bat then _AUTO_BATTLE = tonumber(bat) end
+            local mm = a:match("^%-%-mmap=(%d+),(%d+)")
+            if mm then _AUTO_MMAP = { tonumber(a:match("=(%d+),")), tonumber(a:match(",(%d+)$")) } end
             local ks = a:match("^%-%-keys=([%w_,]+)")
             if ks then
                 _AUTO_KEYS = {}
@@ -128,6 +139,46 @@ function love.load()
     
     -- 初始化游戏（事件驱动版本）
     JYMainAdapter.init()
+
+    -- 直接进主地图（--mmap=x,y，仅调试用）—— 必须先于 --battle 判断
+    if _AUTO_MMAP then
+        local scheduler = require("framework.coroutine_scheduler").getInstance()
+        local EventBridge = require("framework.event_bridge")
+        local GameStates = require("framework.game_states")
+        scheduler:create(function()
+            if rawget(_G, "LoadRecord") then LoadRecord(0) end
+            -- **必须先关掉启动菜单协程**：JYMainAdapter.init 会起
+            -- showStartMenuCoroutine，它的 ShowMenuCoroutine 一直挂在
+            -- waitKey 上。若不清理，之后注入的 ESC/方向键会被**两个**菜单
+            -- 同时消费 —— 实测表现为「按 6 次 down + return 却落在读取进度」。
+            pcall(function()
+                local MenuAsync = require("framework.menu_async")
+                MenuAsync.clear()
+                local IM = require("framework.input_manager")
+                if IM then IM.disableInput = false end
+            end)
+            local JY = rawget(_G, "JY")
+            if JY then
+                JY.Base["人X"] = _AUTO_MMAP[1]
+                JY.Base["人Y"] = _AUTO_MMAP[2]
+                JY.Base["人X1"] = _AUTO_MMAP[1]
+                JY.Base["人Y1"] = _AUTO_MMAP[2]
+                JY.Base["人方向"] = 0
+                JY.MyPic = 2501
+                JY.oldMMapX = -1
+                JY.oldMMapY = -1
+            end
+            -- 走与 GAME_SMAP → GAME_MMAP 完全相同的入口（getStateId + switchState），
+            -- 这样 enter 回调（Init_MMap）会正常执行。
+            local id = (GameStates and GameStates.getStateId
+                        and GameStates.getStateId("GAME_MMAP")) or 2
+            EventBridge.getInstance():switchState(id)
+            pcall(function()
+                love.filesystem.write("__mmap_ok.txt",
+                    "mmap=" .. tostring(_AUTO_MMAP[1]) .. "," .. tostring(_AUTO_MMAP[2]))
+            end)
+        end, "auto_mmap")
+    end
 
     -- 自动进战斗（--battle=<warid>，仅调试用）
     if _AUTO_BATTLE then

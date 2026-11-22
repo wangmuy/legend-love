@@ -271,7 +271,12 @@ log "=== STEP: F. framework 不调 script 全局 ==="
 #
 # 为什么必须用 lookbehind：`local _z = Cls()` 这种形态里 Cls 前面是空格，
 # 用「前面不能是某些字符」的黑名单必然漏（实测漏判过）。
-script_globals='DrawString|DrawBox|DrawStrBox|DrawStrBoxYesNo|DrawStrBoxWaitKey|Cls|ShowScreen|ShowMenu|ShowMenu2|WaitKey|TalkEx|GetMyPic|AddMyCurrentPic|SceneCanPass|PlayMIDI|PlayMPEG|FillColor|DrawRect'
+# port-ui-screens-verification Task 5：白名单**扩了 4 个**。
+# 原来只查 8 组「直接调绘制原语」的形态，于是
+# `person_status_async.draw() → ShowPersonStatus_sub(id, page)` 这类
+# 「framework 调 script 的另一层封装」逃过了检查 ——
+# DoD（framework 零 script 全局）是靠漏判成立的。
+script_globals='DrawString|DrawBox|DrawStrBox|DrawStrBoxYesNo|DrawStrBoxWaitKey|Cls|ShowScreen|ShowMenu|ShowMenu2|WaitKey|TalkEx|GetMyPic|AddMyCurrentPic|SceneCanPass|PlayMIDI|PlayMPEG|FillColor|DrawRect|ShowPersonStatus_sub|ShowPersonStatus|SelectTeamMenu|Menu_Thing'
 F_CHECK=$(grep -rPn "(?<![.:])\b($script_globals)\(" game/framework/*.lua 2>/dev/null \
       | grep -vP ':(?!.*\bCls\b)[0-9]+:\s*(local )?function ' \
       | grep -vP '(^|:)[0-9]+:\s*--' \
@@ -379,6 +384,20 @@ if [ "$bad_j2" -ge 3 ]; then
     log "  [PASS] 三个 map 绘制契约都先取 mapRender()（缺失即抛错）"
 else
     log "  [FAIL] map 绘制契约未全部走 mapRender()（实测 $bad_j2 处，应 >= 3）"
+    fail=$((fail + 1))
+fi
+
+# ---------------------------------------- K. status_page 纯度
+log "=== STEP: K. framework/status_page.lua 零引擎细节 ==="
+# 判据：它只调 RenderFacade —— 不得直接 love.* / require engine-* / 读 JY.*
+bad_k1=$(grep -nE '[^_A-Za-z]love\.' game/framework/status_page.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$bad_k1" ] || bad_k1=0
+bad_k2=$(grep -n 'require("engine' game/framework/status_page.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$bad_k2" ] || bad_k2=0
+if [ "$bad_k1" -eq 0 ] && [ "$bad_k2" -eq 0 ]; then
+    log "  [PASS] status_page.lua 零 love.* / 零 require engine-*"
+else
+    log "  [FAIL] status_page.lua 有 $bad_k1 处 love.* / $bad_k2 处 require engine-*"
     fail=$((fail + 1))
 fi
 
