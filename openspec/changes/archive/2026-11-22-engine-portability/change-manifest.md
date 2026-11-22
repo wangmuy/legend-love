@@ -4,11 +4,11 @@ parent_epic: null
 ---
 # Change Manifest: engine-portability — 引擎可移植性硬化
 
-> 本 slice 统辖 **17 个**子 change（**全部 Complete**：第一批 10 + 第二批 4 + 第三批 3），
+> 本 slice 统辖 **16 个**子 change（**全部 Complete**：第一批 10 + 第二批 4 + 第三批 2），
 > 均位于 `openspec/changes/` 下与 slice 同级（符合本仓既有 `mouse-slice1` 的组织方式）。
 >
 > **第三批（2026-11-22 复审计后新增）**：`port-engine-boot` +
-> `port-conformance-hardening` + 本 slice 归档前补的 nil 安全修复。
+> `port-conformance-hardening`（含 nil 安全修复，不是独立 change）。
 > 它们不是"又发现一堆待办"，而是**独立复审计**（不看 DoD、只看"换引擎真能跑吗"）
 > 挖出的「断言存在但检查不到目标」类缺陷 —— 详见各 change 的 proposal。
 
@@ -348,7 +348,7 @@ parent_epic: null
 
 ## 第三批：独立复审计挖出的「靠漏判通过」（2026-11-22）
 
-> 14 个 change 全部归档后，做了一次**不看 DoD 的独立复审计** ——
+> 第二批 14 个 change 全部归档后，做了一次**不看 DoD 的独立复审计** ——
 > 只问一个问题：「现在真换一个引擎，能跑起来吗？」
 >
 > 结果发现 **3 个「断言存在、但检查不到目标」**的既有缺陷。它们不是功能
@@ -555,9 +555,9 @@ gate_ascii.sh             # 既有
 
 ## Slice 完成判定
 
-**17 个 change 全部 archived（2026-11-22）** → 本 slice 已标记 `status: done` 并移入 `archive/`。
+**16 个 change 全部 archived（2026-11-22）** → 本 slice 已标记 `status: done` 并移入 `archive/`。
 
-第二批 4 个 / 第三批 3 个的实测结论见各自 change（均已归档到
+第二批 4 个 / 第三批 2 个的实测结论见各自 change（均已归档到
 `openspec/changes/archive/2026-11-22-*`）。
 
 ### 最终验收数据（第三批归档时）

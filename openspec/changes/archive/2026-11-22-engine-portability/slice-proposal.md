@@ -17,7 +17,7 @@ abandoned:
 ```
 本仓 54 个 change 直接挂在 changes/ 下，只有 2 个挂在 epic 下
 既有 epic 规模：allmods 17 个 slice、web-mud 6 个 slice、mouse 3 个 slice
-本 slice：1 个 slice 统 17 个 change（第一批 10 + 第二批 4 + 第三批 3）
+本 slice：1 个 slice 统 16 个 change（第一批 10 + 第二批 4 + 第三批 2）
 ```
 
 第一批子 change 合计 **约 377 处调用点改动**（超过 `audio-settings` 的 88 任务），
@@ -128,7 +128,7 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 
 #### Scenario: framework 里零引擎绕过
 
-- **GIVEN** 17 个 change 全部完成
+- **GIVEN** 16 个 change 全部完成
 - **WHEN** 执行 `grep -rn 'lib\.' game/framework/*.lua`（排除注释行）
 - **THEN** 命中数 = 0
 
@@ -181,7 +181,7 @@ port-ui-screens-verification 6 Task 组 / 30 checkbox   4 张界面基线 + stat
 port-engine-boot               7 Task 组 / 40 checkbox  95 契约 + boot.lua + 4 行入口（✓ Complete）
 port-conformance-hardening     5 Task 组 / 22 checkbox  playSequence 对齐 + conformance 判据重写（✓ Complete）
 
-> **第三批的由来**：14 个 change 全部归档后，做了一次**不看 DoD 的独立复审计**
+> **第三批的由来**：第二批 14 个 change 全部归档后，做了一次**不看 DoD 的独立复审计**
 > —— 只问「现在真换一个引擎，能跑起来吗」。结果挖出 3 个
 > **「断言存在但检查不到目标」** 的缺陷（不是功能缺陷，是验证缺陷）：
 >
