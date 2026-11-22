@@ -348,8 +348,11 @@ function EngineAPI.audio.setMusicVolume(value)
     webMusicVolume = tonumber(value) or webMusicVolume
 end
 
-function EngineAPI.audio.playSequence(filenameOrId, opts)
-    return true
+-- 按游戏音乐编号播放：与 LÖVE 同语义（只收 number；Web 文本版无音频）
+function EngineAPI.audio.playSequence(id, opts)
+    if type(id) ~= "number" then return false end
+    if id < 0 then return false end
+    return false          -- Web 无音频
 end
 
 -- 播放视频：Web 文本版无视频能力 → 如实返回 false（port-audio-semantics）

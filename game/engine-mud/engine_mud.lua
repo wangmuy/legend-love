@@ -373,9 +373,16 @@ EngineAPI.audio.stopMusic = function()
     logCall("audio.stopMusic")
 end
 
-EngineAPI.audio.playSequence = function(filenameOrId, opts)
-    logCall("audio.playSequence")
-    return true
+--- 按游戏音乐编号播放（port-audio-semantics 的语义必须 4 引擎一致）
+--
+-- **只收 number**：收字符串说明调用方走错了契约（应改用 playMusic）。
+-- MUD 无音频，但仍然要如实返回 false —— 「无能力」和「参数错」要能区分，
+-- 否则调用方无法判断该不该重试。
+EngineAPI.audio.playSequence = function(id, opts)
+    logCall("audio.playSequence", id)
+    if type(id) ~= "number" then return false end
+    if id < 0 then return false end
+    return false          -- MUD 无音频
 end
 
 --- 播放视频：MUD 无视频能力 → 如实返回 false（port-audio-semantics）

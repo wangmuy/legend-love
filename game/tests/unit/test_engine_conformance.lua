@@ -208,6 +208,62 @@ end
 
 -- ------------------------------------------------------------ 音频契约
 
+--- 4 引擎的 playSequence 语义必须一致（port-audio-semantics 的漏洞修复）
+--
+-- **背景**：`port-audio-semantics` 把 `playSequence` 收窄成「只收 number」，
+-- 但当时**只改了 LÖVE** —— MUD/Web/测试桩仍是 `playSequence(filenameOrId)`
+-- 无条件 `return true`。而「新引擎作者会抄哪个引擎？」的答案是：多半抄
+-- MUD（它是最简参考实现）。于是这个漏洞会直接传染给 Godot/Unreal。
+--
+-- **为什么必须用源码级断言，不能 require 后调**（实测踩到）：
+--   `engine_mud.lua` / `tests/engine_test.lua` / `engine_love2d.lua` 都
+--   直接 `local EngineAPI = require("engine-love2d.engine_api")` —— 拿到的是
+--   **同一张表**。所以：
+--     · `mud.audio == test.audio == engine_api.audio` 全为 true
+--     · 后加载的引擎会**覆盖**先加载的（实测：破坏 MUD 后先 require MUD
+--       返回 true，但 test_runner 里先 require 了测试桩，于是读到的仍是
+--       测试桩的实现 → 断言全 PASS，负向对照抓不到）
+--
+--   这与 `test_engine_api.lua` 里「不能只靠 engine_api 空桩继承」用源码断言
+--   是同一个理由。Web 是唯一例外（它自己 `local EngineAPI = {}`）。
+function TestEngineConformance.testPlaySequenceSemanticsAligned()
+    print("\n=== Test: playSequence 只收 number（4 引擎源码级）===")
+    local files = {
+        { name = "LOVE", path = "engine-love2d/engine_love2d.lua" },
+        { name = "MUD",  path = "engine-mud/engine_mud.lua" },
+        { name = "Web",  path = "engine-web/engine_web.lua" },
+        { name = "Test", path = "tests/engine_test.lua" },
+    }
+    for _, f in ipairs(files) do
+        local fh = io.open(f.path, "r")
+        if not fh then fh = io.open("../game/" .. f.path, "r") end
+        TestHelper.assertNotNil(fh, f.name .. " 源码应可读: " .. f.path)
+        if fh then
+            local src = fh:read("*a"); fh:close()
+            local start = src:find("audio.playSequence", 1, true)
+            TestHelper.assertNotNil(start, f.name .. " 应有 audio.playSequence")
+            if start then
+                local body = src:sub(start, (src:find("\nend", start) or (start + 800)))
+                TestHelper.assertNotNil(body:find('type(id) ~= "number"', 1, true),
+                    f.name .. ".playSequence 必须有 number 类型守卫")
+                TestHelper.assertNotNil(body:find("id < 0", 1, true),
+                    f.name .. ".playSequence 必须拒绝负数 id")
+                TestHelper.assertNil(body:find("filenameOrId", 1, true),
+                    f.name .. ".playSequence 不得再有 filenameOrId（旧语义）")
+                -- 「不得 return true」只对有/无音频能力区分：
+                --   LÖVE  真播 → true 是正确结果
+                --   Test  桩记录调用 → true（代表「调用被接受」）
+                --   MUD/Web 明确无音频 → 必须 false，否则「无能力」与
+                --           「参数错」无法区分，调用方无法决定是否重试
+                if f.name == "MUD" or f.name == "Web" then
+                    TestHelper.assertNil(body:find("return true", 1, true),
+                        f.name .. ".playSequence 无音频能力时不得返回 true")
+                end
+            end
+        end
+    end
+end
+
 function TestEngineConformance.testAudioPlayVideoContract()
     print("\n=== Test: playVideo 在所有引擎返回 boolean ===")
     for _, e in ipairs({
@@ -261,6 +317,7 @@ function TestEngineConformance.runAll()
     TestEngineConformance.testCreateFromEncodedContract()
     TestEngineConformance.testGetMetaContract()
     TestEngineConformance.testMapGetTileSentinel()
+    TestEngineConformance.testPlaySequenceSemanticsAligned()
     TestEngineConformance.testAudioPlayVideoContract()
     TestEngineConformance.testMissingImplWouldBeDetected()
 

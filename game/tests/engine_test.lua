@@ -379,9 +379,15 @@ EngineAPI.audio.stopMusic = function()
     logCall("audio.stopMusic")
 end
 
-EngineAPI.audio.playSequence = function(filenameOrId, opts)
-    logCall("audio.playSequence")
-    return true
+--- 按游戏音乐编号播放（与 LÖVE 同语义：只收 number）
+--
+-- **测试桩也要守契约**：否则别的引擎抄测试桩就会实现出错误语义
+-- （这正是 port-audio-semantics 留下的漏洞 —— 当时只改了 LÖVE）。
+EngineAPI.audio.playSequence = function(id, opts)
+    logCall("audio.playSequence", id)
+    if type(id) ~= "number" then return false end
+    if id < 0 then return false end
+    return true           -- 测试桩记完即算「播放成功」
 end
 
 -- 播放视频：测试桩无视频能力 → 返回 false（与 LÖVE 实现一致）
