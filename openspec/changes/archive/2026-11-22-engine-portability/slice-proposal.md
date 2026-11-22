@@ -17,7 +17,7 @@ abandoned:
 ```
 本仓 54 个 change 直接挂在 changes/ 下，只有 2 个挂在 epic 下
 既有 epic 规模：allmods 17 个 slice、web-mud 6 个 slice、mouse 3 个 slice
-本 slice：1 个 slice 统 14 个 change（第一批 10 已完成 + 第二批 4 个）
+本 slice：1 个 slice 统 17 个 change（第一批 10 + 第二批 4 + 第三批 3）
 ```
 
 第一批子 change 合计 **约 377 处调用点改动**（超过 `audio-settings` 的 88 任务），
@@ -40,7 +40,9 @@ Standalone vertical slice。
 第二批（`port-compat-layer-removal` / `port-legacy-picture-removal` /
 `port-audio-semantics` / `port-ui-screens-verification`）清掉收尾留下的
 隐式回退与未验证界面，使该目标**可被机器验证**（`_G.lib` 不存在时脚本不崩）。
-若将来出现第三批缺口（resize / IME），届时再考虑升 epic
+**第三批已出现并完成**（2026-11-22）：不是 resize / IME 这类功能缺口，
+而是独立复审计挖出的 3 个「验证缺陷」（见下方第三批小节）。
+若将来再出现功能缺口（resize / IME），届时考虑升 epic
 （见 `openspec/project/TODO.md`）。
 
 ## Slice Type
@@ -126,7 +128,7 @@ sprite 子系统 5 函数 0 调用（0%）   map 子系统 7 函数 0 调用（0
 
 #### Scenario: framework 里零引擎绕过
 
-- **GIVEN** 14 个 change 全部完成
+- **GIVEN** 17 个 change 全部完成
 - **WHEN** 执行 `grep -rn 'lib\.' game/framework/*.lua`（排除注释行）
 - **THEN** 命中数 = 0
 
@@ -174,6 +176,23 @@ port-ui-screens-verification 6 Task 组 / 30 checkbox   4 张界面基线 + stat
 
 > **注**：第二批 4 项的前提均由 2026-11-21 实测**推翻或改写**，
 > 详见 `change-manifest.md` 的「第二批」小节与各 change 的 proposal。
+
+── 第三批（2026-11-22 独立复审计后新增）────────────────────────────
+port-engine-boot               7 Task 组 / 40 checkbox  95 契约 + boot.lua + 4 行入口（✓ Complete）
+port-conformance-hardening     5 Task 组 / 22 checkbox  playSequence 对齐 + conformance 判据重写（✓ Complete）
+
+> **第三批的由来**：14 个 change 全部归档后，做了一次**不看 DoD 的独立复审计**
+> —— 只问「现在真换一个引擎，能跑起来吗」。结果挖出 3 个
+> **「断言存在但检查不到目标」** 的缺陷（不是功能缺陷，是验证缺陷）：
+>
+> | # | 缺陷 | 实测证据 |
+> |---|---|---|
+> | 1 | `playSequence` 的 number 语义只改了 LÖVE | MUD/Web/测试桩仍是 `playSequence(filenameOrId) → return true` |
+> | 2 | `mod_data` 还有 2 处真主路径 `io.open` | `readActiveFile` / `WarRecordCount` 无契约兜底 |
+> | 3 | conformance 的「引擎完整性」检查**空转** | MUD 实缺 7 个契约，断言照样 PASS |
+>
+> 三者共同模式：**有检查、有文档，但没有一个真正检查到目标**。
+> 这比功能缺陷更危险 —— 它让"看起来完成了"的东西在换引擎时成批暴露。
 
 
 ## Affected Domains

@@ -4,8 +4,13 @@ parent_epic: null
 ---
 # Change Manifest: engine-portability — 引擎可移植性硬化
 
-> 本 slice 统辖 **14 个**子 change（**全部 Complete**：第一批 10 + 第二批 4），
+> 本 slice 统辖 **17 个**子 change（**全部 Complete**：第一批 10 + 第二批 4 + 第三批 3），
 > 均位于 `openspec/changes/` 下与 slice 同级（符合本仓既有 `mouse-slice1` 的组织方式）。
+>
+> **第三批（2026-11-22 复审计后新增）**：`port-engine-boot` +
+> `port-conformance-hardening` + 本 slice 归档前补的 nil 安全修复。
+> 它们不是"又发现一堆待办"，而是**独立复审计**（不看 DoD、只看"换引擎真能跑吗"）
+> 挖出的「断言存在但检查不到目标」类缺陷 —— 详见各 change 的 proposal。
 
 ## Change Assignments
 
@@ -312,9 +317,96 @@ parent_epic: null
   └────────────────────────────────────────┘
 ```
 
+### 第三批（2026-11-22 复审计后新增）的依赖
+
+```
+  ┌────────────────────────────────────────────┐
+  │ port-engine-boot                            │
+  │  95 契约 + boot.lua + 4 行入口 + 6 处 io      │
+  │  （装配知识从 main.lua 搬进 framework）        │
+  └──────────────────┬─────────────────────────┘
+                     │（本 change 补了 4 处 io，
+                     │  hardening 再补漏掉的 2 处）
+                     ▼
+  ┌────────────────────────────────────────────┐
+  │ port-conformance-hardening                  │
+  │  playSequence 4 引擎对齐 + conformance 判据   │
+  │  从「查表」改「源码级」+ nil 安全              │
+  └────────────────────────────────────────────┘
+```
+
+- `port-conformance-hardening` **必须**在 `port-engine-boot` 之后：
+  它的审计基线是 boot 交付后的状态（95 契约、4 引擎、6 处 io）
+- 两者与第二批无硬依赖，但都**依赖第二批的结论**（尤其是
+  `port-audio-semantics` 的 `playSequence` 语义定义）
+
 - `port-legacy-picture-removal` **必须**在 `port-compat-layer-removal` 之后：
   前者要删 `lib_love` 的 425 行，而 `lib_love` 里有 8 处 `lib.Debug` 依赖 `_G.lib`
 - `port-audio-semantics` / `port-ui-screens-verification` 与上面两条无硬依赖，可并行
+
+---
+
+## 第三批：独立复审计挖出的「靠漏判通过」（2026-11-22）
+
+> 14 个 change 全部归档后，做了一次**不看 DoD 的独立复审计** ——
+> 只问一个问题：「现在真换一个引擎，能跑起来吗？」
+>
+> 结果发现 **3 个「断言存在、但检查不到目标」**的既有缺陷。它们不是功能
+> 缺陷，是**验证缺陷** —— 比功能缺陷更危险，因为会让"看起来完成了"的
+> 东西在换引擎时成批暴露。
+
+### Change: port-engine-boot
+
+- **Scope**: engine（5 个新契约）+ framework（boot/require_aliases/clock）+
+  入口变薄 + 4 处主路径 io/os + 门禁
+- **Responsibility**:
+  1. 新增 5 个契约（90 → 95）：`app.install(runtime)` / `app.requestQuit` /
+     `render.beginFrame` / `render.endFrame` / `time.formatNow`
+  2. 新增 `framework/boot.lua`：把 147 行装配序列从 `main.lua` 搬进 framework
+  3. 新增 `framework/require_aliases.lua`：5 个裸名别名的唯一来源
+     （MUD/测试桩此前**完全没有** → 跑不了 script 层）
+  4. 新增 `framework/clock.lua`：4 处主路径 io/os 收进契约
+  5. 入口从「自己装配」变成 4 行转发（`Boot.install/update/draw/quit`）
+  6. 门禁新增 STEP F2（缝合层白名单）+ STEP L（新引擎清单存在性）
+- **实测**：模拟 Godot 宿主（无 love / 无 lib / 只实现契约）
+  `app.install → update×3 → draw×3 → requestQuit → quit` 全部 OK
+- **Depends On**: 无（承接 `port-audio-semantics` 的 `time.formatNow` 讨论结论）
+- **Status**: [x] Archived / Complete（port-engine-boot，全量 4271/0）
+
+### Change: port-conformance-hardening
+
+- **Scope**: 3 引擎语义对齐 + framework 2 处 io + conformance 判据重写 + nil 安全
+- **Responsibility**:
+  1. **`playSequence` 的 number 语义只改了 LÖVE** → MUD/Web/测试桩补齐。
+     危险点：新引擎作者会抄最简参考实现（MUD），错误语义直接传染
+  2. **`mod_data` 还有 2 处真主路径 io.open**（`readActiveFile` /
+     `WarRecordCount`）→ APK 内 `io.open` 静默失败 = MOD 永不激活且不报错
+  3. **conformance 的「引擎完整性」检查是空转的**：3 个引擎都
+     `require("engine-love2d.engine_api")` → 同一张表，engine_api 的空桩让
+     `mod[mod][fn] == nil` 永假。实测 MUD 缺 7 个契约照样 PASS
+  4. 顺带：`GameHooks.getMyPicOr(fallback)`（注入点返回 nil 是合法语义，
+     但直接赋给 `JY.MyPic` 会让下游 `mypic * 2` 崩）+ `JY.CurrentD >= 0`
+     的 2 处缺失守卫
+- **结果**：4 引擎源码级完整度全部 0 缺；全量 4328/0
+- **Depends On**: `port-engine-boot`（承接它漏掉的 2 处 io）
+- **Status**: [x] Archived / Complete（port-conformance-hardening）
+
+### 为什么单独成 change 而不是"补两个 commit"
+
+三项修复涉及 **3 个引擎 + 1 个 framework 模块 + 2 个测试套件 + 1 个新测试**，
+且每一处都需要**负向对照验证**（破坏它 → 断言必须 FAIL）。这些验证
+过程如果不写进 spec，下次审计时同样查不出来。所以它们值得一份 spec。
+
+### 第三批对 slice 结论的影响
+
+| 维度 | 第二批后 | 第三批后 |
+|---|---|---|
+| 契约数 | 90 | **95** |
+| 引擎入口 | 147 行装配（需抄） | **4 行转发**（`Boot.*`） |
+| 4 引擎完整度 | 未真校验（空转断言） | **源码级 0 缺** |
+| framework 主路径 io | 4 处已改（漏 2 处） | **6 处全改 + 兜底** |
+| 门禁 STEP | A–K | **A–L**（+F2 白名单、+L 清单） |
+
 
 ---
 
@@ -463,6 +555,20 @@ gate_ascii.sh             # 既有
 
 ## Slice 完成判定
 
-**14 个 change 全部 archived（2026-11-22）** → 本 slice 可标记 `status: done` 并移入 `archive/`。
+**17 个 change 全部 archived（2026-11-22）** → 本 slice 已标记 `status: done` 并移入 `archive/`。
 
-第二批 4 个的实测结论见各自 change（均已归档到 `openspec/changes/archive/2026-11-22-*`）。
+第二批 4 个 / 第三批 3 个的实测结论见各自 change（均已归档到
+`openspec/changes/archive/2026-11-22-*`）。
+
+### 最终验收数据（第三批归档时）
+
+```
+契约总数                 95 个 / 15 个模块
+framework 四条红线        love.* 0 / require engine-* 0 / lib.* 0 / 调 script 全局 0
+4 引擎源码级完整度        全部 0 缺（LOVE/MUD/Web/Test）
+全量测试                 4328 / 4328 通过
+门禁                     A–L 全部 PASS
+双版本 luac              5.1 / 5.5 零失败
+实机 md5                 场景 1efd2af3… / 战斗 6c8eb322… 不变
+最小第三引擎宿主          10 项验收全过（无 love / 无 lib，只实现契约）
+```
