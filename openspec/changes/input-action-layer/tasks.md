@@ -183,9 +183,13 @@ $ grep -rn 'VK_' game/framework/*.lua game/script/*.lua game/script/battle/*.lua
 - [ ] 批 5 `framework/item_async.lua` / `person_status_async.lua`（11 处）
 - [ ] 批 6 `framework/war_async.lua` / `input_async.lua` / `battle_mouse.lua`
 - [ ] 批 7 `script/jymain.lua`（32 处）+ `script/battle/`（28 处）
+- [x] **迁移期的键码归一化契约**（2026-11-22 补，ADR-2b / REQ-IAL-10b）：
+      `getKey`/`waitForKey` 写死「返回 SDL2 keycode」+ 4 宿主映射表；
+      `jyconst.lua` 交叉引用；`gate_input_actions.sh` STEP F2（6 条断言）
 - [ ] 最终 DoD：上述 `grep` 归零
 - [ ] `gate_input_actions.sh` 补断言：`framework/`+`script/` 的 VK 引用 = 0
-      （**现在只查「VK 是否已定义」，不查「是否已迁移」** —— 所以 114 处不影响门禁）
+      （**现在只查「VK 是否已定义」+「归一化契约是否存在」，
+       不查「是否已迁移」** —— 所以 114 处不影响门禁）
 
 ## Task 6 — 虚拟手柄
 
