@@ -1,10 +1,10 @@
 ---
-status: active
+status: done
 parent_epic: null
 ---
 # Change Manifest: engine-portability — 引擎可移植性硬化
 
-> 本 slice 统辖 **14 个**子 change（第一批 10 个已 Complete，第二批 4 个 Not Started），
+> 本 slice 统辖 **14 个**子 change（**全部 Complete**：第一批 10 + 第二批 4），
 > 均位于 `openspec/changes/` 下与 slice 同级（符合本仓既有 `mouse-slice1` 的组织方式）。
 
 ## Change Assignments
@@ -236,8 +236,11 @@ parent_epic: null
 - **前提修正**：slice 记的是「`Menu_Thing` / `ShowPersonStatus` 在事件驱动下不可达」。
   **实测三个里两个可达**（物品菜单、物品格、人物状态均已截图）；
   存档不可达是**原版行为**，需在主地图验证。
+- **结果**：4 张基线全部归档（含 save-menu）；新增 `--mmap` 调试入口；
+  `framework/status_page.lua` 拆出（26 处 DrawString 搬家）；
+  gate STEP F 白名单补 4 个 + 新增 STEP K
 - **Depends On**: 无（可独立开工；建议排在 `port-legacy-picture-removal` 之后回归基线）
-- **Status**: [ ] Not Started
+- **Status**: [x] Archived / Complete（port-ui-screens-verification）
 
 ---
 
@@ -460,8 +463,6 @@ gate_ascii.sh             # 既有
 
 ## Slice 完成判定
 
-slice 在 **14 个** change 全部 archived 后标记 `status: done` 并移入 `archive/`。
+**14 个 change 全部 archived（2026-11-22）** → 本 slice 可标记 `status: done` 并移入 `archive/`。
 
-当前进度：第一批 10 个已 Complete；第二批 4 个（`port-compat-layer-removal` /
-`port-legacy-picture-removal` / `port-audio-semantics` /
-`port-ui-screens-verification`）Not Started。
+第二批 4 个的实测结论见各自 change（均已归档到 `openspec/changes/archive/2026-11-22-*`）。

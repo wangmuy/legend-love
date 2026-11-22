@@ -1,5 +1,5 @@
 ---
-status: active
+status: done
 parent_epic: null
 abandoned:
   reason: ""
@@ -165,11 +165,11 @@ port-native-api-completion   5 Task 组 / 45 checkbox    **196 处** lib.* → E
                                                        实测只剩 1 处（WaitFrame fallback）
                                                        早期估的 225/258 含 oldevent 重复统计
 
-── 第二批（2026-11-21 实测后新增，全部 Not Started）────────────────
-port-compat-layer-removal    7 Task 组                删 _G.lib + 1 新契约 + 修 Delay 补丁点
-port-legacy-picture-removal  8 Task 组                删 425 行旧贴图 + 云搬 framework
-port-audio-semantics         7 Task 组                定案 playSequence/playMusic + 修开关
-port-ui-screens-verification 6 Task 组                4 张界面基线 + status_page 解耦
+── 第二批（2026-11-21 立项，2026-11-22 全部完成）──────────────────
+port-compat-layer-removal    7 Task 组 / 43 checkbox   删 _G.lib + render.setDrawLoopFlag（✓ Complete）
+port-legacy-picture-removal  8 Task 组 / 54 checkbox   删 920 行旧贴图 + 云搬 framework（✓ Complete）
+port-audio-semantics         7 Task 组 / 38 checkbox   定案 playSequence/playMusic（✓ Complete）
+port-ui-screens-verification 6 Task 组 / 30 checkbox   4 张界面基线 + status_page 解耦（✓ Complete）
 ```
 
 > **注**：第二批 4 项的前提均由 2026-11-21 实测**推翻或改写**，

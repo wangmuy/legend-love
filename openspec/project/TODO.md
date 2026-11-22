@@ -151,7 +151,12 @@
     写了契约外的键 `Delay`，`WaitFrame` 的 fallback 因此拿到协程版而不是阻塞版
   - 该 change 顺带新增契约 `render.setDrawLoopFlag`
 
-- [x] ~~**实机未覆盖的界面**~~ → **已立项 `port-ui-screens-verification`**（2026-11-21）
+- [x] ~~**实机未覆盖的界面**~~ → **已完成 `port-ui-screens-verification`**（2026-11-22）
+  - 4 张基线全部归档：`item-menu` / `item-grid` / `person-status` / `save-menu`
+  - 新增 `--mmap=<x>,<y>` 调试入口（存档入口只在主地图可达）
+  - `framework/status_page.lua` 拆出（26 处 DrawString 搬 framework）
+  - gate STEP F 白名单补 4 个 + 新增 STEP K
+  - 原判断「`Menu_Thing` / `ShowPersonStatus` 在事件驱动下不可达」**被实测推翻**
   - 原判断：「物品栏、人物状态、存档界面 —— 路径已迁移但未截图验证；
     `Menu_Thing` / `ShowPersonStatus` 在事件驱动下不可达」
   - **实测推翻**：物品菜单 / 物品格 / 人物状态**三个都可达且已实机捕获**
