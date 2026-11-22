@@ -225,6 +225,8 @@
         'framework/luabit.lua',
         'framework/config.lua',
         'framework/script_loader.lua',
+        // 裸名 require 别名唯一注册处：jymain.lua 的 require "lib_file" 依赖它
+        'framework/require_aliases.lua',
     ];
 
     const engineFiles = [

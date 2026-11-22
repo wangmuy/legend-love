@@ -1,7 +1,16 @@
--- engine_test.lua
+-- engine_mud.lua
 -- 命令行测试引擎 - 实现 EngineAPI 接口
 -- 所有渲染/音频为空操作，输入返回预设值
 -- 用于 CI/CD 和单元测试，无需显示器
+
+-- 裸名 require 别名（script/jymain.lua:15-16 的 `require "lib_file"` 等）：
+-- 注册逻辑的唯一来源是 framework/require_aliases.lua。
+--
+-- **为什么 MUD 引擎也必须有**：MUD 引擎原先完全没有这段注册，所以它
+-- 根本跑不了 script 层 —— 一旦入口 require jymain 就死在
+-- `module 'lib_file' not found`。契约里现在把「require 别名模块」
+-- 写进了新引擎实现清单（见 engine_api.lua），这是四个引擎的共同前提。
+require("framework.require_aliases")
 
 local EngineAPI = require("engine-love2d.engine_api")
 

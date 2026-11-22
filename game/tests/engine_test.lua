@@ -3,6 +3,15 @@
 -- 所有渲染/音频为空操作，输入返回预设值
 -- 用于 CI/CD 和单元测试，无需显示器
 
+-- 裸名 require 别名（script/jymain.lua:15-16 的 `require "lib_file"` 等）：
+-- 注册逻辑的唯一来源是 framework/require_aliases.lua（幂等，可重复 require）。
+--
+-- 测试桩也要注册：`tests.engine_test` 是「引擎实现」之一，
+-- 与 engine_mud / engine_web 并列跑 conformance 检查；
+-- 一旦有测试用本桩去跑 script 层（如 headless 引导），
+-- 少了这条就会死在 `module 'lib_file' not found`。
+require("framework.require_aliases")
+
 local EngineAPI = require("engine-love2d.engine_api")
 
 -- 调用日志

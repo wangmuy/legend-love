@@ -2,24 +2,11 @@
 -- Love2D 引擎实现 - 实现 EngineAPI 接口
 -- 内部委托给 lib_love.lua 的现有实现
 
--- 原版游戏脚本以裸名 require 框架模块（如 require "lib_file"），
--- 而 Love2D 只能解析 framework.xxx 点号路径，因此为这些裸名注册别名。
--- 与 engine-web/web_game_bridge.lua 的裸名别名机制保持一致。
+-- 裸名 require 别名（script/jymain.lua:15-16 等老写法依赖它们）：
+-- 注册逻辑的**唯一来源**是 framework/require_aliases.lua，本引擎不再自己抄一份。
 -- 必须在 main.lua 加载 script/jymain.lua 之前完成（本模块先于其被 require）。
-local frameworkAliases = {
-    lib_file = true,
-    script_loader = true,
-    coroutine_scheduler = true,
-    war_async = true,
-    event_executor = true,
-}
-for bareName in pairs(frameworkAliases) do
-    if not package.preload[bareName] then
-        package.preload[bareName] = function()
-            return require("framework." .. bareName)
-        end
-    end
-end
+-- 必须放在最前面：晚于任何可能触发 script 加载的 require 都可能来不及。
+require("framework.require_aliases")
 
 local EngineAPI = require("engine-love2d.engine_api")
 local lib = require("engine-love2d.lib_love")

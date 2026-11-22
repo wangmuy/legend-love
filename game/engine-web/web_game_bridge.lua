@@ -76,11 +76,16 @@ _G.FrameworkSources = _G.FrameworkSources or {}
 function _G.registerFrameworkModule(name, source)
     _G.FrameworkSources[name] = source
 
-    -- 注册模块加载器。框架模块统一以 framework.* 前缀注册，
-    -- 但原版游戏脚本（jymain.lua / jymodify.lua 等）会以顶层裸名 require
-    -- （例如 require "lib_file"、require "script_loader"、require("coroutine_scheduler")），
-    -- 因此除 framework.* 外还需为对应裸名注册同一加载器，
-    -- 否则 require 会落入 fengari 的 HTTP module 搜索 → 404 → "Framework init FAILED"。
+    -- 注册模块加载器。框架模块统一以 framework.* 前缀注册（web 环境下模块源
+    -- 由 JS 侧 fetch 后传进来，package.preload 是唯一入口）。
+    --
+    -- **裸名别名不在这里注册**：`require "lib_file"` / `require "script_loader"`
+    -- 这类老写法统一由 `framework/require_aliases.lua` 负责
+    -- （见 engine_api.lua 的「新引擎实现清单」第 2 条）。
+    --
+    -- 为什么集中到那里：本函数原来**为每个 framework 模块**顺手注册同名裸名，
+    -- 于是 web 的别名集合（26 个）与 LÖVE 的（5 个）不一致 —— 换个引擎就少一批。
+    -- 而且它只能覆盖「经本函数注册」的模块，非 web 引擎没有这条路径。
     local function makeLoader(regName)
         return function()
             local fn, err = load(source, "@" .. regName)
@@ -98,13 +103,6 @@ function _G.registerFrameworkModule(name, source)
     end
 
     package.preload[name] = makeLoader(name)
-
-    -- 注册裸名别名（如 framework.lib_file → lib_file），供原版脚本顶层 require 使用。
-    -- 仅在裸名尚未注册时添加，避免覆盖其它模块。
-    local moduleName = name:match("^framework%.(.+)$")
-    if moduleName and not package.preload[moduleName] then
-        package.preload[moduleName] = makeLoader(moduleName)
-    end
 end
 
 -- Slice 4: Web MUD 版 instruct 函数（供 oldevent 脚本使用）
@@ -1201,6 +1199,17 @@ local lastDrawState = nil
 function _G.initWebFramework()
     -- 0. 先加载 config 确保 CONFIG 全局变量存在
     require("framework.config")
+
+    -- 0b. 裸名 require 别名（统一来源，见 framework/require_aliases.lua）
+    --
+    -- **必须早于下面 script/jymain.lua 的加载**：jymain.lua 头部有
+    -- `require "lib_file"` / `require "script_loader"` 两条裸名 require，
+    -- 别名未就绪时脚本会加载失败（web 端表现为 "Framework init FAILED"）。
+    --
+    -- 为什么不在 engine_web.lua 顶部 require：web 的模块装载顺序是
+    -- 「引擎文件 → framework 模块（registerFrameworkModule 逐个注册）→ script」，
+    -- 引擎文件执行时 framework.* 还不在 package.preload 里，此时 require 会失败。
+    require("framework.require_aliases")
 
     -- 初始化 __quiet 标志（必须在 setmetatable(_G) 之前存在）
     _G.__quiet = false

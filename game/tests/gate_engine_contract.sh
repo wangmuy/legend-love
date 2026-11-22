@@ -302,19 +302,24 @@ log "=== STEP: F2. framework 里允许 require script 的模块必须显式登�
 #   `port-ui-screens-verification` 发现过的那类问题（DoD 靠漏判成立，
 #   实际依赖方向已经反了却没人知道）。
 #
-# 判据只看**真的 require 了 script 模块**的形态（`require "script.xxx"` 或
-# `require(CONFIG.ScriptPath .. "xxx")`），不看「出现 ScriptPath 字样」——
-# `config.lua` 只是**定义** ScriptPath 常量，不是消费它。
-# 当前合法的两处：
-#   - boot.lua      → require(CONFIG.ScriptPath .. "jymain")  装配层
-#   - war_async.lua → require "script.battle.*"（战斗协程住 script，MOD 可覆盖）
+# 判据只看**代码行**里真的 require 了 script 模块的形态。
+#
+# **必须排除注释行**：实测 `require_aliases.lua:14` 的说明文字里就写着
+# `require(CONFIG.ScriptPath .. "jymain")` 当反例 —— 纯 grep 会误判。
+# 用 awk 逐行判断「非注释且命中」才计入（比 grep -vE 链更直白）。
 allow_script='boot|war_async'
-F2_CHECK=$(grep -rln -e 'require *("script\.' -e 'require *"script\.' \
-        -e 'require *(scriptPath *\.\.' -e 'require *(CONFIG\.ScriptPath' \
-        game/framework/*.lua 2>/dev/null \
-    | xargs -r -n1 basename 2>/dev/null \
-    | sed 's/\.lua$//' \
-    | grep -vE "^($allow_script)$" || true)
+F2_CHECK=$(for f in game/framework/*.lua; do
+    if awk '
+        /^[[:space:]]*--/ { next }
+        /require[[:space:]]*\(?[[:space:]]*"script\./ { found=1 }
+        /require[[:space:]]*\(?[[:space:]]*scriptPath[[:space:]]*\.\./ { found=1 }
+        /require[[:space:]]*\(?[[:space:]]*CONFIG\.ScriptPath/ { found=1 }
+        END { exit(found ? 0 : 1) }
+    ' "$f" 2>/dev/null; then
+        basename "$f" .lua
+    fi
+done | grep -vE "^($allow_script)$" || true)
+
 n_f2=$(printf '%s' "$F2_CHECK" | grep -c . || true)
 [ -n "$n_f2" ] || n_f2=0
 if [ "$n_f2" -eq 0 ]; then
@@ -445,6 +450,31 @@ if [ "$bad_k1" -eq 0 ] && [ "$bad_k2" -eq 0 ]; then
     log "  [PASS] status_page.lua 零 love.* / 零 require engine-*"
 else
     log "  [FAIL] status_page.lua 有 $bad_k1 处 love.* / $bad_k2 处 require engine-*"
+    fail=$((fail + 1))
+fi
+
+# ------------------- L. 新引擎实现清单（Checklist）写在契约文件里
+log "=== STEP: L. engine_api.lua 含「新引擎实现清单」 ==="
+# 判据：契约文件里必须有这一节。
+#
+# 为什么用门禁锁文档：这段清单是「换引擎只需写 engine-xxx」的**唯一**书面
+# 依据，白名单式约定（EngineAPI.init / require_aliases / CONFIG/CC/Byte 全局 /
+# 启动序列 / dt 单位 / 绘制回调边界）全部在这里。误删之后代码仍能跑，
+# 但下一个人按契约实现新引擎会一路踩坑 —— 而且踩的是「跑起来才崩」的坑。
+#
+# 用 grep -F（固定串）：中文标题里没有正则特殊字符，固定串匹配最稳。
+if grep -qF '新引擎实现清单' game/engine-love2d/engine_api.lua 2>/dev/null; then
+    log "  [PASS] engine_api.lua 含「新引擎实现清单」章节"
+else
+    log "  [FAIL] engine_api.lua 缺「新引擎实现清单」章节（新引擎作者的唯一书面依据）"
+    fail=$((fail + 1))
+fi
+
+# 同章必须点到裸名别名的唯一注册处（清单第 2 条）
+if grep -qF 'framework.require_aliases' game/engine-love2d/engine_api.lua 2>/dev/null; then
+    log "  [PASS] 清单写明 require framework.require_aliases（裸名别名依赖）"
+else
+    log "  [FAIL] 清单未提 framework.require_aliases（script 层裸名 require 会崩）"
     fail=$((fail + 1))
 fi
 

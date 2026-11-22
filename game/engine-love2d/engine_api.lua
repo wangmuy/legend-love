@@ -4,6 +4,118 @@
 --
 -- @yieldable 标记表示该函数可能触发 coroutine.yield()
 -- 非 @yieldable 函数入队后立即返回，不会阻塞
+--
+-- ============================================================================
+-- ## 新引擎实现清单（Checklist）
+-- ============================================================================
+--
+-- 目标：换引擎**只需**写 `game/engine-xxx/engine_xxx.lua` +
+-- 一个入口文件；`game/framework/` 与 `game/script/` 零改动。
+--
+-- 下面每一条都是实测缺了就崩（不是风格建议）。按顺序做完即可跑起来。
+--
+-- ### 1. 实现本文件声明的全部契约函数（当前 90 个）
+--
+--   以 `grep -cE '^function M\.' game/engine-love2d/engine_api.lua` 为准
+--   （新增契约时同步更新这里）。现有 4 个实现可作为参考：
+--   `engine-love2d/engine_love2d.lua`（完整）、`engine-mud/engine_mud.lua`、
+--   `engine-web/engine_web.lua`、`tests/engine_test.lua`（测试桩）。
+--
+--   漏实现的后果：`tests/unit/test_engine_conformance.lua` 会逐个列出缺项；
+--   运行期则是「走到那个功能才崩」，比启动就崩更难排查。
+--
+-- ### 2. `require("framework.require_aliases")` —— 裸名 require 别名
+--
+--   **script 层依赖它，不是可选项**：`script/jymain.lua:15-16` 用的是裸名
+--   `require "lib_file"` / `require "script_loader"`。这些裸名能被解析，
+--   全靠 `framework/require_aliases.lua` 往 `package.preload` 注册的别名。
+--
+--   本模块被 require 时会**自动**调用 `install()`（幂等、不覆盖已有条目），
+--   所以「require 一次」就够。注册处必须**早于** `require(... .. "jymain")`。
+--
+--   历史教训：这段注册原来只写在 LÖVE 引擎实现里，契约与文档都没提。
+--   照契约新写一个「Godot 宿主」时，启动就死在
+--   `module 'lib_file' not found`，而且报错点在 script 层，
+--   排查方向会先跑偏到脚本上。
+--
+-- ### 3. 提供 `EngineAPI.init()`（**隐式约定，未在本文件声明**）
+--
+--   ★ 这是历史遗留：入口程序（`game/main.lua` 的 `love.load`）会调
+--   `engineAPI.init()`，但本契约文件里**没有** `M.init()` 声明。
+--   4 个引擎都各自实现了它（LÖVE：图形设置 + 随机种子；MUD/Test：空函数）。
+--
+--   新引擎**必须**提供一个（哪怕是 `function EngineAPI.init() end`），
+--   否则入口第一行就 nil 调用崩。
+--
+--   已知取舍：把它补成正式契约 `M.init()` 需要 4 个引擎同步改动，
+--   收益只是「契约完整度」；本次只在清单里注明隐式约定。
+--
+-- ### 4. 提供 3 个全局：`CONFIG` / `CC` / `Byte`
+--
+--   | 全局 | 来源 | 谁写 |
+--   |---|---|---|
+--   | `CONFIG` | `framework/config.lua`（模块内直接写全局 `CONFIG={}`）| `require "framework.config"` |
+--   | `CC`     | `script/jyconst.lua`（`CC={}` 由 jymain 的引导流程装配）| 加载 script 后 |
+--   | `Byte`   | `framework/lib_Byte.lua` | 入口 `Byte = require "framework.lib_Byte"` |
+--
+--   注意 `Byte` 必须由**入口显式赋值**（模块不写全局），
+--   `script/jymain.lua` 有多处直接用 `Byte.*`。
+--
+-- ### 5. 启动序列（照 `game/main.lua` 的 `love.load` 提炼，顺序不可换）
+--
+--   ```lua
+--   require "framework.config"                    -- ① CONFIG 全局
+--   Byte = require "framework.lib_Byte"           -- ② Byte 全局
+--   require "engine-xxx.engine_xxx"               -- ③ 你的引擎（内部 require require_aliases）
+--   EngineAPI.init()                              -- ④ 隐式约定，见第 3 条
+--   EventBridge.getInstance():init()              -- ⑤ 事件桥接器
+--   require(CONFIG.ScriptPath .. "jymain")        -- ⑥ 游戏主逻辑（裸名别名必须已就绪）
+--   JYMainAdapter.init()                          -- ⑦ 装配动画/hooks/起始菜单
+--   ```
+--
+--   ③ 之前不能碰 script；⑥ 之前必须已完成 ②③（`require_aliases` 尤其重要）。
+--
+-- ### 6. 每帧顺序（update / draw 各三步，顺序有意义）
+--
+--   每帧更新：
+--   ```lua
+--   JYMainAdapter.update(dt)              -- 游戏适配器（动画、自动移动）
+--   EventBridge.getInstance():update(dt)  -- 输入 → 状态机 → 协程
+--   MenuAsync.update(dt)                  -- 异步菜单
+--   ```
+--
+--   每帧绘制（**必须在宿主的帧绘制回调内**）：
+--   ```lua
+--   render.setDrawLoopFlag(true)          -- 进入帧绘制（见第 8 条的坑）
+--   EventBridge.getInstance():draw()      -- 当前状态的全部绘制
+--   MenuAsync.draw()                      -- 活动菜单
+--   render.setDrawLoopFlag(false)         -- 离开帧绘制
+--   ```
+--
+-- ### 7. `dt` 单位 = **秒**
+--
+--   `EngineAPI.time.*`、`JYMainAdapter.update(dt)`、`EventBridge:update(dt)`、
+--   `SpriteAnim.update(dt)`、`MenuAsync.update(dt)` 全部以秒为单位。
+--   LÖVE 的 `love.update(dt)`、Godot 的 `_process(delta)`、
+--   Unreal 的 `DeltaSeconds` 都是秒 —— 直接透传即可。
+--
+--   **不要传毫秒**：`time.sleep` / `getTime` 那一组才是毫秒
+--   （`presentAndWait(50)`、`AutoMove` 的 50ms 步进间隔）。
+--   两者混用会让动画快 1000 倍或几乎不动，且不报错。
+--
+-- ### 8. `render.*` 必须在帧绘制回调内调用
+--
+--   本抽象层是**立即模式**：framework 每帧从头重画整幅画面
+--   （`EventBridge:draw()` 里几百次 `render.text/fillRect/...`），
+--   没有保留模式的节点树。所以「什么时候可以画」必须由宿主显式告诉引擎
+--   —— 这就是 `render.setDrawLoopFlag(true/false)`（见 `M.render.setDrawLoopFlag`）。
+--
+--   **Godot 的坑**：`CanvasItem.draw_string()` 在 `_draw()` 之外调用
+--   **不报错、不警告**，只是什么都不画；表现为「游戏在跑、逻辑正常、屏幕全黑」。
+--   Unreal 的 `UCanvas` 同理只能在 `DrawHUD()` 内用。
+--   无屏幕引擎（MUD/Web）两者都可空实现。
+--
+-- ============================================================================
 
 local M = {}
 
