@@ -95,6 +95,15 @@ function EngineAPI.render.setDrawLoopFlag(flag)
     webInDrawLoop = not not flag
 end
 
+-- 帧绘制回调边界（port-engine-boot）：语义同 setDrawLoopFlag，但成对、不错向
+function EngineAPI.render.beginFrame()
+    webInDrawLoop = true
+end
+
+function EngineAPI.render.endFrame()
+    webInDrawLoop = false
+end
+
 -- Compatibility stubs for JY game engine functions
 function EngineAPI.render.FillColor(x1, y1, x2, y2, color) end
 function EngineAPI.render.Cls(x1, y1, x2, y2) 
@@ -583,6 +592,22 @@ EngineAPI.app = {}
 
 function EngineAPI.app.toggleFullscreen()
     return false          -- Web 无原生全屏切换（可用 element.requestFullscreen）
+end
+
+-- 装好运行时（port-engine-boot）：Web 的启动在 web_game_bridge.lua 里，
+-- 但契约必须存在且可用 —— 否则「4 引擎对齐」这条 DoD 是假的。
+function EngineAPI.app.install(runtimeTable)
+    local ok, Boot = pcall(require, "framework.boot")
+    if not ok or not Boot then return false end
+    return Boot.install(runtimeTable)
+end
+
+function EngineAPI.app.requestQuit()
+    local ok, Boot = pcall(require, "framework.boot")
+    if ok and Boot and type(Boot.requestQuit) == "function" then
+        return Boot.requestQuit()
+    end
+    return false
 end
 
 -- 音乐模板注册（port-audio-semantics）：Web 文本版无音频，只记录

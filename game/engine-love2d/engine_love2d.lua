@@ -79,6 +79,24 @@ EngineAPI.render.setDrawLoopFlag = function(flag)
     end
 end
 
+--- 进入帧绘制回调（port-engine-boot Task 2）
+--
+-- 与 `setDrawLoopFlag(true)` 等价，但**语义更明确**：新入口应该调
+-- `beginFrame()`/`endFrame()` 这一对，而不是传 boolean 给同一个函数
+-- （传反了就是一个跨帧的绘制状态泄漏，且不会报错）。
+EngineAPI.render.beginFrame = function()
+    if lib.SetDrawLoopFlag then
+        lib.SetDrawLoopFlag(true)
+    end
+end
+
+--- 离开帧绘制回调
+EngineAPI.render.endFrame = function()
+    if lib.SetDrawLoopFlag then
+        lib.SetDrawLoopFlag(false)
+    end
+end
+
 --- 取渲染目标尺寸（逻辑像素）
 --
 -- 实测（Windows 150% 缩放下）：love.graphics.getDimensions() 返回 1024×768，
@@ -1249,6 +1267,31 @@ EngineAPI.init = function()
 end
 
 EngineAPI.app = EngineAPI.app or {}
+
+--- 装好运行时（转发到 framework/boot）—— 新引擎只需要这一个契约
+--
+-- LÖVE 自己也可以直接 require("framework.boot").install(...)；
+-- 这个契约存在的意义是让宿主能走 EngineAPI 统一入口（MUD/Web 也能用）。
+EngineAPI.app.install = function(runtimeTable)
+    local ok, Boot = pcall(require, "framework.boot")
+    if not ok or not Boot then
+        if EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("app.install: framework.boot missing: " .. tostring(Boot))
+        end
+        return false
+    end
+    return Boot.install(runtimeTable)
+end
+
+--- 请求退出：转发到 framework/boot 的宿主钩子（再降级到本引擎的 app.quit）
+EngineAPI.app.requestQuit = function()
+    local ok, Boot = pcall(require, "framework.boot")
+    if ok and Boot and type(Boot.requestQuit) == "function" then
+        return Boot.requestQuit()
+    end
+    return false
+end
+
 EngineAPI.app.toggleFullscreen = function()
     lib.FullScreen()
     return true

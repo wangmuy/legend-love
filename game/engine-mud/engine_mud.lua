@@ -79,6 +79,15 @@ EngineAPI.render.setDrawLoopFlag = function(flag)
     logCall("render.setDrawLoopFlag", flag)
 end
 
+--- 帧绘制回调边界（MUD 无屏幕，只记录 —— 便于测试断言入口调到了契约）
+EngineAPI.render.beginFrame = function()
+    logCall("render.beginFrame")
+end
+
+EngineAPI.render.endFrame = function()
+    logCall("render.endFrame")
+end
+
 --------------------------------------------------------------------
 -- sprite 模块 - 只保留 createFromRGBA/drawHandle 等格式透明契约
 --------------------------------------------------------------------
@@ -205,6 +214,24 @@ EngineAPI.app = EngineAPI.app or {}
 EngineAPI.app.toggleFullscreen = function()
     logCall("app.toggleFullscreen")
     return false          -- MUD 无图形
+end
+
+--- 装好运行时（MUD 也走同一条启动链 —— 这本身是个可执行文档：
+--- 「换引擎要做什么」在 MUD 里看得最清楚，因为它没有任何图形特例）
+EngineAPI.app.install = function(runtimeTable)
+    logCall("app.install")
+    local ok, Boot = pcall(require, "framework.boot")
+    if not ok or not Boot then return false end
+    return Boot.install(runtimeTable)
+end
+
+EngineAPI.app.requestQuit = function()
+    logCall("app.requestQuit")
+    local ok, Boot = pcall(require, "framework.boot")
+    if ok and Boot and type(Boot.requestQuit) == "function" then
+        return Boot.requestQuit()
+    end
+    return false
 end
 
 --- 音乐模板注册（port-audio-semantics）：MUD 无音频，只记录便于回读

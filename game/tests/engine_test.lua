@@ -82,6 +82,14 @@ EngineAPI.render.setDrawLoopFlag = function(flag)
     logCall("render.setDrawLoopFlag", flag)
 end
 
+EngineAPI.render.beginFrame = function()
+    logCall("render.beginFrame")
+end
+
+EngineAPI.render.endFrame = function()
+    logCall("render.endFrame")
+end
+
 --------------------------------------------------------------------
 -- sprite 模块 - 只保留 createFromRGBA/drawHandle 等格式透明契约
 --------------------------------------------------------------------
@@ -619,6 +627,22 @@ EngineAPI.app.toggleFullscreen = function()
 end
 EngineAPI.app.quit = function()
     logCall("app.quit")
+end
+
+EngineAPI.app.install = function(runtimeTable)
+    logCall("app.install")
+    local ok, Boot = pcall(require, "framework.boot")
+    if not ok or not Boot then return false end
+    return Boot.install(runtimeTable)
+end
+
+EngineAPI.app.requestQuit = function()
+    logCall("app.requestQuit")
+    local ok, Boot = pcall(require, "framework.boot")
+    if ok and Boot and type(Boot.requestQuit) == "function" then
+        return Boot.requestQuit()
+    end
+    return false
 end
 
 EngineAPI.app.setMusicTemplate = function(template, startOffset)

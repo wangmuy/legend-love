@@ -140,10 +140,22 @@ end
 
 | 文件 | 界面 | 判据类型 | 复现命令 |
 |------|------|---------|---------|
-| `save-menu.png` | 主地图上的「保存进度」三槽菜单 | **逐字节稳定** | `lovec game --shot=save-menu --frame=1200 --mmap=150,150 --keys=escape,down,down,down,down,down,return,down,return` |
+| `save-menu.png` | 主地图上的「保存进度」三槽菜单 | ⚠️ **不稳定**（背景是主地图，含随机云） | `lovec game --shot=save-menu --frame=1200 --mmap=150,150 --keys=escape,down,down,down,down,down,return,down,return` |
 
-md5 参考：`73f3b78ae63f03f1e334f41cd94cef67`
+**⚠️ 判据更正（2026-11-22 实测）**：最初把这张图标成「逐字节稳定」是**错的**。
+保存菜单画在主地图之上，而主地图每帧**随机生成云**：
 
-> 该图的 md5 稳定（无随机数、无存档依赖：它画的是三个**空槽**菜单）；
-> 但**位置**依赖 `--mmap` 给的坐标（不同坐标下主地图背景不同）。
-> 所以「md5 相同」的前提是**同一坐标 + 同一按键序列**。
+```lua
+-- game/framework/cloud_layer.lua:245-247
+c.Picnum = (picAmount > 0) and math.random(0, picAmount - 1) or 0
+c.Alpha  = 10 + math.random(0, 49)
+c.mixR   = math.random(0, 255)
+```
+
+连拍两次实测 md5 不同（`af65113e…` / `3ccdacef…`）。
+**只能目视 + 结构断言**（三个「进度一/二/三」槽 + 高亮框 + 位置正确），
+md5 仅作记录。这与「主地图 md5 不稳定」是同一个根因。
+
+> 顺带还有一个**与引擎无关但会影响判据**的因素：`--mmap` 的坐标决定了
+> 背景是山还是海（不同坐标画出的地形完全不同）。所以即使关掉云，
+> 「md5 相同」的前提也只能是**同一坐标 + 同一按键序列**。

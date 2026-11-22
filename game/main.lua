@@ -1,10 +1,17 @@
--- 金庸群侠传 Love2D 完全事件驱动架构主入口
--- 重构后的标准Love2D回调实现
+-- 金庸群侠传 Love2D 入口
+--
+-- **本文件现在只做三件事**（change: port-engine-boot）：
+--   ① 把 LÖVE 的回调**翻译**成 framework/boot.lua 的 4 个入口
+--      （install / update / draw / quit）
+--   ② 处理截图与自动按键这两个**调试设施**（不属于生产启动路径）
+--   ③ 把 LÖVE 独有的宿主能力（`love.event.quit` / 截屏）作为 runtime 传进去
+--
+-- 以前这里写着 147 行「装配游戏」的步骤（require config → 设 Byte →
+-- require jymain → JYMainAdapter.init → ...）。那段知识已经搬进
+-- `framework/boot.lua`，于是**任何**引擎的入口都只剩下面这 4 个转发。
+-- 这是本文件存在的意义：证明「换引擎只需写 engine-xxx + 一个薄入口」。
 
--- 全局模块引用
-local EventBridge = require("framework.event_bridge")
-local MenuAsync = require("framework.menu_async")
-local JYMainAdapter = require("framework.jymain_adapter")
+local Boot = require("framework.boot")
 
 -- 注册 Love2D 按键回调
 function love.keypressed(key, scancode, isrepeat)
@@ -122,23 +129,36 @@ function love.load()
         end
     end
 
-    -- 加载配置
-    require "framework.config"
-    Byte = require "framework.lib_Byte"
-    require "engine-love2d.lib_love"  -- 保持初始化（加载 jyconst.lua、设置 keymap 等）
-    -- EngineAPI 接口。**不再覆盖全局 `lib`**：`_G.lib` 兼容层已由
-    -- port-compat-layer-removal 移除，入口程序与其他调用方一律走 EngineAPI。
-    local engineAPI = require "engine-love2d.engine_love2d"
-    engineAPI.init()  -- Love2D 引擎初始化（图形设置、随机种子等）
-    
-    -- 加载事件桥接器并初始化
-    EventBridge.getInstance():init()
+    -- 引擎实现（必须在这之前 require，因为它会算好 EngineAPI 的 94 个函数）
+    require "engine-love2d.lib_love"   -- 保持初始化（加载 jyconst.lua、设置 keymap 等）
+    require "engine-love2d.engine_love2d"
 
-    -- 加载游戏主逻辑
-    require(CONFIG.ScriptPath .. "jymain")
-    
-    -- 初始化游戏（事件驱动版本）
-    JYMainAdapter.init()
+    -- **启动装配交给 framework**（change: port-engine-boot）
+    --
+    -- Boot.install 里做的事（顺序固定，见 framework/boot.lua 头注释）：
+    --   framework.config → Byte → require_aliases → EngineAPI.init
+    --   → EventBridge:init → require jymain → JYMainAdapter.init
+    --
+    -- runtime 里传的是**只有 LÖVE 宿主知道**的能力：
+    --   quit  → love.event.quit()（Godot 是 get_tree().quit()）
+    --   onError → 写进 __crash.txt（各引擎的错误上报机制都不同）
+    local okBoot = Boot.install({
+        quit = function()
+            love.event.quit()
+            return true
+        end,
+        onError = function(err)
+            pcall(function()
+                love.filesystem.write("__crash.txt",
+                    debug.traceback(tostring(err), 2))
+            end)
+        end,
+    })
+    if not okBoot then
+        pcall(function()
+            love.filesystem.write("__boot_fail.txt", "Boot.install returned false")
+        end)
+    end
 
     -- 直接进主地图（--mmap=x,y，仅调试用）—— 必须先于 --battle 判断
     if _AUTO_MMAP then
@@ -239,32 +259,14 @@ function love.update(dt)
         end
     end
 
-    -- 更新游戏适配器
-    JYMainAdapter.update(dt)
-    
-    -- 通过事件桥接器更新游戏逻辑
-    EventBridge.getInstance():update(dt)
-    
-    -- 更新异步菜单
-    MenuAsync.update(dt)
+    -- 游戏逻辑推进（顺序写死在 framework/boot.lua 里，见其注释）
+    Boot.update(dt)
 end
 
 function love.draw()
-    -- 设置标志，表示现在在 love.draw() 中（走契约，不再摸全局 lib）
-    if EngineAPI and EngineAPI.render and EngineAPI.render.setDrawLoopFlag then
-        EngineAPI.render.setDrawLoopFlag(true)
-    end
-    
-    -- 通过事件桥接器渲染游戏
-    EventBridge.getInstance():draw()
-    
-    -- 渲染异步菜单
-    MenuAsync.draw()
-    
-    -- 清除标志
-    if EngineAPI and EngineAPI.render and EngineAPI.render.setDrawLoopFlag then
-        EngineAPI.render.setDrawLoopFlag(false)
-    end
+    -- 绘制边界 + 两条渲染链都在 Boot.draw 里（它内部用 beginFrame/endFrame
+    -- 夹住，且保证出错时 endFrame 一定被调用）
+    Boot.draw()
 
     -- 截图（调试用）
     if _SHOT_MODE then
@@ -283,12 +285,6 @@ function love.draw()
 end
 
 function love.quit()
-    -- 清理资源
-    if EventBridge then
-        EventBridge.getInstance():reset()
-    end
-    if JYMainAdapter then
-        JYMainAdapter.reset()
-    end
+    Boot.quit()
     return false
 end

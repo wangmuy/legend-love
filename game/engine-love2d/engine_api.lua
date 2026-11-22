@@ -93,7 +93,63 @@ function M.render.presentAndWait(delay) end
 -- 其它引擎入口在它自己的绘制回调前后调用同名契约即可。
 --
 -- @param flag boolean
+--
+-- @deprecated 请改用 `beginFrame()` / `endFrame()`（语义更明确、不会传反）。
+--   两个新契约出现后，本函数的**唯一正确实现**是转发：
+--   ```lua
+--   EngineAPI.render.setDrawLoopFlag = function(flag)
+--       if flag then EngineAPI.render.beginFrame()
+--       else EngineAPI.render.endFrame() end
+--   end
+--   ```
+--   保留它只是为了让旧入口/旧测试继续工作，不再是推荐写法。
 function M.render.setDrawLoopFlag(flag) end
+
+--- 进入帧绘制回调（**所有绘制调用的边界起点**）
+--
+-- ★ 这是本契约文件里**唯一带强制约束的调用时机**，新引擎实现者必读：
+--
+--   本引擎抽象层是**立即模式**（immediate mode）：framework 每帧把整幅画面
+--   从头重画一遍（`EventBridge:draw()` 里调几百次 `render.text/fillRect/...`），
+--   **没有**保留模式（retained mode）的节点树/控件对象。
+--
+--   于是「什么时候可以画」这件事必须由宿主（host）显式告诉引擎：
+--
+--   | 引擎 | 帧绘制回调 | 立即模式可用性 |
+--   |---|---|---|
+--   | LÖVE  | `love.draw()` | ✔ 直接可用 |
+--   | Godot | `CanvasItem._draw()` | ✔ 必须在 `_draw()` 内，**在外面调 `draw_*` 会静默无效** |
+--   | Unreal| `AHUD::DrawHUD()` / `UCanvas` | ✔ 同上 |
+--   | Web   | `requestAnimationFrame` 回调 | ✔ |
+--   | MUD   | 无屏幕，空实现 | — |
+--
+--   **Godot 的坑**：`draw_string()` 在 `_draw()` 之外调用不报错、不警告，
+--   只是什么都不画。若宿主忘了调 `beginFrame()` 或忘了包在 `_draw()` 里，
+--   表现是「游戏逻辑在跑但屏幕全黑」——极难定位。所以这个契约存在。
+--
+-- 引擎实现应做的事（按需）：
+--   - 打开绘制批次 / 绑定渲染目标 / 置「现在允许绘制」标志
+--   - LÖVE 实现里它同时置 `drawLoop = true`（`present()` 才敢真刷屏）
+--
+-- 调用方：`framework/boot.lua` 的 `Boot.draw()`（**推荐**）；
+--        或各引擎自己的入口绘制回调前后。
+--
+-- @see M.render.endFrame
+function M.render.beginFrame() end
+
+--- 离开帧绘制回调（**所有绘制调用的边界终点**）
+--
+-- 与 `beginFrame()` 成对出现，必须在同一帧内调用（即使中间出错也要退出）。
+-- 引擎实现应做的事（按需）：
+--   - 结束绘制批次 / `present()` / 解开渲染目标 / 清「允许绘制」标志
+--   - LÖVE 实现里它同时置 `drawLoop = false`
+--
+-- **为什么不用 `pcall` 包住**：吞掉绘制异常会让「黑屏但无报错」更难查。
+-- framework 侧的 `Boot.draw()` 用 `pcall` 只是为了保证 `endFrame()`
+-- 一定被调用（否则引擎的绘制状态会跨帧泄漏），错误仍会记日志。
+--
+-- @see M.render.beginFrame
+function M.render.endFrame() end
 
 --------------------------------------------------------------------
 -- sprite - 精灵/纹理系统
@@ -862,6 +918,64 @@ M.app = {}
 
 --- 退出游戏
 function M.app.quit() end
+
+--- 装好整个运行时（**新引擎唯一必须实现的「启动」契约**）
+--
+-- 这个函数把「引擎实现好 90 个契约之后，怎么把它们串成一个能跑的游戏」
+-- 这段知识从入口程序搬进了 framework。以前的状况是：启动序列写在
+-- `game/main.lua` 的 `love.load()` 里（147 行，含 6 个必需步骤和顺序），
+-- 新引擎作者必须逐行读那个文件才能知道该做什么 —— 而这些知识
+-- **一条都不在本契约文件里**。
+--
+-- ## 实现要求
+--
+-- LÖVE 之外的所有引擎可以**直接空实现**（`function M.app.install() end`），
+-- 因为真正的工作在 `framework/boot.lua` 里：
+--
+--   1. `require "framework.config"`（加载 CONFIG）
+--   2. `Byte = require "framework.lib_Byte"`
+--   3. 调 `EngineAPI.init()`（**历史隐式契约**，见下方说明）
+--   4. `EventBridge.getInstance():init()`
+--   5. `require(CONFIG.ScriptPath .. "jymain")`（加载游戏逻辑与 CC）
+--   6. `JYMainAdapter.init()`
+--   7. 把宿主提供的钩子存起来（淡入淡出、截图、退出等）
+--
+-- ## 参数 runtime：宿主能力（**不是**引擎契约的一部分）
+--
+-- 有些能力只有宿主知道（比如「退出整个应用」在 Godot 是
+-- `get_tree().quit()`，在 LÖVE 是 `love.event.quit()`）。它们**不**该
+-- 变成 90 个引擎契约里的新条目，而应由宿主以表的形式传进来：
+--
+-- ```lua
+-- EngineAPI.app.install({
+--     quit           = function() ... end,   -- 退出应用
+--     onError        = function(msg) ... end,-- 致命错误（可选）
+--     assetDir       = "...",                -- 资源根（可选，默认 "game/"）
+--     requestFullscreen = function() ... end,-- 全屏切换（可选）
+-- })
+-- ```
+--
+-- 未提供的钩子一律降级（记日志、不抛错）—— 这样最小宿主（MUD / 测试桩）
+-- 只要传一个空表就能跑。
+--
+-- ## 关于 `EngineAPI.init()`
+--
+-- 它在 `engine_api.lua` 里**曾经没有声明**（历史遗留），但 LÖVE / MUD /
+-- 测试桩三个引擎都实现了，入口程序也一直在调。本契约引入后，
+-- `app.install` 会替调用方调它，所以新引擎仍需要提供 `init`
+-- （可以是空实现）。见 `framework/boot.lua` 的 `Boot.install`。
+--
+-- @param runtime table|nil 宿主能力表（见上；nil 等价于空表）
+-- @return boolean 是否启动成功（失败时已记日志，调用方别再抛）
+function M.app.install(runtime) end
+
+--- 宿主能力：退出应用（`app.install` 传入的钩子，供 framework 内部调用）
+--
+-- 有了这个契约，`framework` 里就不用 `pcall(function() <某个引擎的退出函数> end)`
+-- 式地猜了。未注册时返回 false（不抛错）。
+--
+-- @return boolean 是否真的触发了退出
+function M.app.requestQuit() end
 
 --- 注册音乐文件名模板（游戏启动时调用一次）
 --

@@ -138,6 +138,10 @@ function TestEngineAPI.testNewContractsExplicitlyImplemented()
         "sprite.createFromRGBA", "sprite.createFromEncoded", "sprite.getMeta",
         "render.setDrawLoopFlag",
         "app.setMusicTemplate",
+        "app.install",
+        "app.requestQuit",
+        "render.beginFrame",
+        "render.endFrame",
     }
     -- **不 require engine_love2d**：它在模块加载期就读 love.filesystem，
     -- 而测试环境只有 TestHelper 的 mock（无 filesystem 字段）。
