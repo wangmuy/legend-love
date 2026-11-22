@@ -92,7 +92,9 @@ local function enterSubScene(subScene)
     local newState = getStateId("GAME_SMAP")
     JY.MmapMusic = -1
 
-    JY.MyPic = GameHooks.getMyPic()
+    -- 用 getMyPicOr：hook 未注册时保留当前 JY.MyPic，**不要写成 nil**
+    -- （nil 会让下游 `mypic * 2` 崩，见 game_hooks.lua 的说明）
+    JY.MyPic = GameHooks.getMyPicOr(JY.MyPic)
     JY.Base["人X1"] = JY.Scene[subScene]["入口X"]
     JY.Base["人Y1"] = JY.Scene[subScene]["入口Y"]
 
@@ -330,7 +332,7 @@ function stepAutoMoveSMAP()
     local _eventRunning = JY.CurrentD ~= nil and JY.CurrentD >= 0
     if not JY.AnimationState.active and not _talkActive
         and not _eventRunning then
-        JY.MyPic = GameHooks.getMyPic()
+        JY.MyPic = GameHooks.getMyPicOr(JY.MyPic)
     end
     DtoSMap()
 
@@ -496,7 +498,8 @@ handlers["GAME_MMAP"] = {
     
     -- 每帧渲染
     draw = function()
-        local pic = GameHooks.getMyPic()
+        -- 用 getMyPicOr：drawMain 内部 `mypic * 2` 不接受 nil
+        local pic = GameHooks.getMyPicOr(JY.MyPic)
         
         -- 在 Love2D 中，每一帧都需要重新绘制整个屏幕
         -- 原来的 FastShowScreen 优化在 SDL 中有效，但在 Love2D 中会导致黑屏
@@ -762,7 +765,10 @@ handlers["GAME_SMAP"] = {
         -- 原版 Game_SMap 是阻塞式，事件执行时主循环不轮询按键。事件驱动下若不冻结，
         -- 玩家连按的方向键会让主角在对话期间移动（甚至走进路过事件实体），
         -- 空格键会触发面向 tile 的事件，破坏强制流程并污染 JY.CurrentD/MyPic。
-        if keypress ~= -1 and not (JY and JY.CurrentD >= 0) then
+        -- `JY.CurrentD >= 0` 的 nil 防护：CurrentD 可能尚未初始化
+        -- （测试环境 / 早期初始化顺序），此时 `>=` 会抛 "compare number with nil"
+        local _eventRunning2 = JY.CurrentD ~= nil and JY.CurrentD >= 0
+        if keypress ~= -1 and not _eventRunning2 then
             JY.MyTick = 0
             if keypress == VK_ESCAPE then
                 startMenuCoroutine()
@@ -827,8 +833,13 @@ handlers["GAME_SMAP"] = {
         --      条件 2 失效、卧姿仍会被覆盖；对话显示中贴图必须保持不变，故以
         --      currentTalk 为第二道闸。
         local _talkActive = TalkAsync.getCurrentTalk() ~= nil
-        if not JY.AnimationState.active and not _talkActive and not (JY and JY.CurrentD >= 0) then
-            JY.MyPic = GameHooks.getMyPic()
+        -- **两处 nil 隐患，必须同时防**（与 [330] 的 SMAP 自动移动路径逐字一致）：
+        --   ① `JY.CurrentD >= 0` 在 CurrentD 为 nil 时 → "compare number with nil"
+        --      （既有代码就是这么写的；测试环境 / 部分初始化顺序下 CurrentD 是 nil）
+        --   ② `JY.MyPic = getMyPic()` 在 hook 未注册时赋 nil → 下游 `mypic * 2` 崩
+        local _eventRunning = JY.CurrentD ~= nil and JY.CurrentD >= 0
+        if not JY.AnimationState.active and not _talkActive and not _eventRunning then
+            JY.MyPic = GameHooks.getMyPicOr(JY.MyPic)
         end
         DtoSMap()
         
@@ -892,7 +903,8 @@ handlers["GAME_FIRSTMMAP"] = {
         
         Init_MMap()
         
-        EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], GameHooks.getMyPic())
+        EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"],
+            GameHooks.getMyPicOr(JY.MyPic))
         EngineAPI.render.present()
     end,
     
@@ -908,8 +920,8 @@ handlers["GAME_FIRSTMMAP"] = {
     end,
     
     draw = function()
-        -- 绘制主地图
-        local pic = GameHooks.getMyPic()
+        -- 绘制主地图（pic 为 nil 会让 map_render 的 `mypic * 2` 崩）
+        local pic = GameHooks.getMyPicOr(JY.MyPic)
         EngineAPI.map.drawMain(JY.Base["人X"], JY.Base["人Y"], pic)
         -- 在 Love2D 中，love.draw() 结束时会自动调用 present()
         -- ShowScreen(0)

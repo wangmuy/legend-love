@@ -1339,7 +1339,7 @@ function JYMainAdapter.startNewGame(menux)
     -- 原版语义：阻塞式事件结束后 MyPic 保持事件最后设置的状态（691 末尾 instruct_40(0)
     -- 已把主角转为站立方向0）。不能恢复成 CC.NewPersonPic(3445,卧姿)——那会让刚起身的
     -- 主角多显示一帧卧姿；GetMyPic() 与下一帧 GAME_SMAP.update 的计算一致，无跳变。
-    JY.MyPic = GameHooks.getMyPic()
+    JY.MyPic = GameHooks.getMyPicOr(JY.MyPic)
     EngineAPI.debug.log("startNewGame: updated MyPic to " .. tostring(JY.MyPic) .. " after NewGameEvent")
     PerfLog.finish(tAll)
 end

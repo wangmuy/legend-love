@@ -169,8 +169,8 @@ function Interact.trigger(mapKind, tx, ty)
         -- 与键盘路径一致：先重算贴图，再进场景
         -- 改走 GameHooks（原先 pcall(GetMyPic) 直接依赖 script 全局）
         local GameHooks = require("framework.game_hooks")
-        local pic = GameHooks.getMyPic()
-        if pic ~= nil then JY.MyPic = pic end
+        -- getMyPicOr：未注册时保留当前值（原写法 `if pic ~= nil` 等价，但统一入口）
+        JY.MyPic = GameHooks.getMyPicOr(JY.MyPic)
         JY.MmapMusic = -1
         JY.SubScene = payload
 

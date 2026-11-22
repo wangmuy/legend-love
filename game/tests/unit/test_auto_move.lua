@@ -448,6 +448,27 @@ local function setupMoveEnv(mapKind)
     rawset(_G, "SceneCanPass", function() return true end)
     rawset(_G, "CanEnterScene", function() return -1 end)
 
+    -- **必须注册 GameHooks**（本套件独立可跑的关键）
+    --
+    -- `framework` 通过 `GameHooks` 注入点调 GetMyPic，而不是直接摸 script 全局
+    -- （port-script-decoupling 的分层）。真实运行时由
+    -- `jymain_adapter.initCoroutine` 注册；本套件不跑那个初始化，
+    -- 所以这里要手动注册 —— 否则 `getMyPicOr(fallback)` 永远走 fallback。
+    --
+    -- **历史**：没有这一步时，`JY.MyPic = getMyPic()` 会赋 nil，下一个断言
+    -- `JY.MyPic >= 2501` 就抛 "attempt to compare number with nil"。
+    -- 全量跑不暴露（`mod_boot` 先跑、注册了 hook），单模块跑必崩 —— 典型的
+    -- 「只在特定执行顺序下炸」缺陷。现在由 `GameHooks.getMyPicOr` 兜住 nil，
+    -- 同时本套件也补上注册，让两种跑法行为一致。
+    do
+        local GameHooks = require("framework.game_hooks")
+        GameHooks.register({
+            getMyPic        = rawget(_G, "GetMyPic"),
+            addMyCurrentPic = rawget(_G, "AddMyCurrentPic"),
+            sceneCanPass    = rawget(_G, "SceneCanPass"),
+        })
+    end
+
     package.loaded["framework.auto_move"] = nil
     package.loaded["framework.game_states"] = nil
     return require("framework.auto_move"), require("framework.game_states"), saved
@@ -457,6 +478,10 @@ local function restoreMoveEnv(saved)
     for k, v in pairs(saved) do
         if k ~= "TalkAsync" then rawset(_G, k, v) end
     end
+    -- 清掉本套件注册的 hook，避免泄漏到后续套件
+    pcall(function()
+        require("framework.game_hooks").clear()
+    end)
 end
 
 function TestAutoMove.testSMAPUpdatesDirection()

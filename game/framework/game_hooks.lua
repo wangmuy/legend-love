@@ -125,6 +125,32 @@ function GameHooks.getMyPic()
     return nil
 end
 
+--- 取主角贴图编号，**未注册时返回 fallback**（赋值场景必须用它）
+--
+-- 为什么需要这个包装（而不是调用方写 `if v then ... end`）：
+--
+--   `getMyPic()` 返回 nil 是**合法的**——它表示"没有注入实现"（见上方
+--   「未注册时的行为」）。但把它直接赋给 `JY.MyPic` 会让后续所有算术崩：
+--
+--   ```lua
+--   JY.MyPic = GameHooks.getMyPic()          -- nil
+--   EngineAPI.map.drawMain(x, y, JY.MyPic)   -- buildingSort: mypic * 2 → 崩
+--   ```
+--
+--   实测踩过（`test_auto_move.lua` 单模块运行时）：
+--     `attempt to compare number with nil`，而全量跑时不暴露
+--     —— 因为 `mod_boot` 先跑、注册了 hook。这类"只在特定执行顺序下崩"
+--     的缺陷最难查，所以统一收敛到一个函数。
+--
+-- @param fallback number|nil 未注册时用这个（通常是 `JY.MyPic` 的当前值，
+--        或 `CC.MyStartPic`）
+-- @return number|nil fallback 本身也可能是 nil（仍由调用方决定怎么处理）
+function GameHooks.getMyPicOr(fallback)
+    local v = GameHooks.getMyPic()
+    if type(v) == "number" then return v end
+    return fallback
+end
+
 --- 推进主角走路动画帧
 -- @return boolean 是否真的执行了
 function GameHooks.addMyCurrentPic()
