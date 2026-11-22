@@ -84,6 +84,45 @@ EngineAPI.render.endFrame = function()
     end
 end
 
+--- 开始一个绘制批次（**本引擎明确返回 false = 不做真批处理**）
+--
+-- 为什么 LÖVE 先不做（port-render-batching 的取舍，见 design.md ADR-2）：
+--
+--   ① **LÖVE 已经有隐式批处理**：同纹理的连续 `draw` 在 `love.graphics` 内部
+--      会合批成少量 GL draw call。实测本游戏主地图一帧约 2900 次 `drawHandle`
+--      在 LÖVE 下是流畅的 —— 也就是说这里做真批处理**换不来可感知收益**。
+--   ② **真批处理要动 `drawHandle` 的实现**：`love.graphics.newSpriteBatch`
+--      要求「同一张 atlas 纹理 + 固定顶点格式」，而 `drawHandle` 现在支持
+--      任意 handle（RLE 解出的 Image / PNG 的 Image / 未来 Quad），
+--      还带 flags（黑化/白化/alpha）与 tinted 变体 —— 每个 flag 组合都是
+--      一条不同的 SpriteBatch 或需要换 shader。
+--   ③ **生命周期管理**：SpriteBatch 要跟 atlas 的加载/卸载/重载（MOD 切换）
+--      同步，还要在 flags 变化时 flush。这是**真风险**（画错 > 画慢），
+--      而本 change 的目标只是「把口子留出来」。
+--
+-- 所以：函数必须存在、必须返回 boolean（契约完整性），但返回 false。
+-- 调用方（`framework/render_batch.lua`）会因此走原来的逐次绘制路径，
+-- 渲染输出与改造前**逐字节一致**。将来若真要做，只需把这里改成
+-- 返回 true + 在 endBatch 里提交，调用方**一行都不用动**。
+--
+-- @param kind string|nil "tile" | "text" | "shape"
+-- @return boolean 恒为 false（本引擎无批处理能力）
+EngineAPI.render.beginBatch = function(kind)
+    -- **显式忽略 kind**：不做批处理时它没有意义，但形参必须保留（契约签名）。
+    -- 用 `local _ = kind` 而不是删掉形参，避免下一任实现者以为可以省。
+    local _ = kind
+    return false
+end
+
+--- 结束当前批次（LÖVE 恒为无害空操作）
+--
+-- 为什么仍然实现：契约要求「即使 beginBatch 返回 false，endBatch 也可以是
+-- 无害空操作」—— 调用方的 `RenderBatch.wrap` 用 pcall 保证成对调用，
+-- 引擎侧必须能接受「没开过批次就 end」。
+EngineAPI.render.endBatch = function()
+    -- 无批处理状态可清，故意留空
+end
+
 --- 取渲染目标尺寸（逻辑像素）
 --
 -- 实测（Windows 150% 缩放下）：love.graphics.getDimensions() 返回 1024×768，

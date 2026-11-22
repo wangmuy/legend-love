@@ -112,6 +112,19 @@ function EngineAPI.render.endFrame()
     webInDrawLoop = false
 end
 
+--- 开始绘制批次：Web 文本终端没有 GPU 批次，恒返回 false（port-render-batching）
+--
+--- 为什么不返回 true：Web 的「绘制」是往终端写字符且做了坐标去重，
+-- 根本没有可合并的 draw call —— 声称支持会让调用方以为拿到了优化，
+-- 实际什么都没变。返回 false 才是诚实的能力声明。
+function EngineAPI.render.beginBatch(kind)
+    return false
+end
+
+--- 结束绘制批次：Web 无批次状态，无害空操作
+function EngineAPI.render.endBatch()
+end
+
 -- Compatibility stubs for JY game engine functions
 function EngineAPI.render.FillColor(x1, y1, x2, y2, color) end
 function EngineAPI.render.Cls(x1, y1, x2, y2) 

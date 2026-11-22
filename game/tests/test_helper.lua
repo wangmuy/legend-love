@@ -375,6 +375,12 @@ function TestHelper.mockEngineAPI()
             text = function() end,
             getWidth = function() return 1024 end,
             getHeight = function() return 768 end,
+            -- 绘制批处理契约（change: port-render-batching）
+            -- mock 引擎**明确不支持**：返回 false 让 RenderBatch 走逐次绘制降级，
+            -- 这样所有用本 mock 的测试（map_render 等）看到的绘制序列与
+            -- 加批处理之前逐条相同 —— 「不得破坏现有行为」的底线。
+            beginBatch = function(kind) return false end,
+            endBatch = function() end,
         },
         -- sprite 段：Task 4b/4c 之后 framework 会用到
         sprite = {
