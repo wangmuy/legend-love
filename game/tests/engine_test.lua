@@ -99,6 +99,26 @@ EngineAPI.render.endFrame = function()
     logCall("render.endFrame")
 end
 
+--- 开始绘制批次：测试桩默认**不支持**（恒 false），与 LÖVE/MUD/Web 一致
+--
+-- 为什么要留一个可注入的开关 `EngineAPI.render._batchSupported`：
+-- `tests/unit/test_render_batch.lua` 需要同时验证「引擎支持」与「引擎不支持」
+-- 两条路径。默认 false 保证其它既有测试（map_render 等）看到的绘制调用序列
+-- 与加批处理之前**逐条相同** —— 这是「不破坏现有行为」的底线。
+--
+-- 注意：**不要**把它默认设成 true。那会让 map_render 的既有断言
+-- （逐条 `_handleDraws` 计数）跨过 begin/end 语义，掩盖真实回归。
+EngineAPI.render._batchSupported = false
+
+EngineAPI.render.beginBatch = function(kind)
+    logCall("render.beginBatch", kind)
+    return EngineAPI.render._batchSupported and true or false
+end
+
+EngineAPI.render.endBatch = function()
+    logCall("render.endBatch")
+end
+
 --------------------------------------------------------------------
 -- dialog 模块（port-engine-boot 复审计补漏）
 --

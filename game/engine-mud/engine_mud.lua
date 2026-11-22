@@ -97,6 +97,22 @@ EngineAPI.render.endFrame = function()
     logCall("render.endFrame")
 end
 
+--- 开始绘制批次：MUD 无屏幕、无 GPU 批次，恒返回 false（port-render-batching）
+--
+-- 为什么必须存在且返回 false：契约要求「不支持时必须显式说不支持」，
+-- 调用方据此继续逐次绘制。MUD 是最小参考实现（新引擎作者会抄它），
+-- 所以这里返回 false 的语义必须写清楚 —— 不能返回 nil（= 真假不明），
+-- 更不能返回 true（= 假装支持，批处理永远不提交）。
+EngineAPI.render.beginBatch = function(kind)
+    logCall("render.beginBatch", kind)
+    return false
+end
+
+--- 结束绘制批次：MUD 无批次可提交，无害空操作
+EngineAPI.render.endBatch = function()
+    logCall("render.endBatch")
+end
+
 --------------------------------------------------------------------
 -- sprite 模块 - 只保留 createFromRGBA/drawHandle 等格式透明契约
 --------------------------------------------------------------------

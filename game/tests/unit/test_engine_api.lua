@@ -25,6 +25,9 @@ function TestEngineAPI.testRenderModule()
     TestHelper.assertNotNil(EngineAPI.render.present, "render.present should exist")
     TestHelper.assertNotNil(EngineAPI.render.presentAndWait, "render.presentAndWait should exist")
     TestHelper.assertNotNil(EngineAPI.render.setDrawLoopFlag, "render.setDrawLoopFlag should exist")
+    -- 绘制批处理契约（port-render-batching）：成对存在，且**必须返回 boolean**
+    TestHelper.assertNotNil(EngineAPI.render.beginBatch, "render.beginBatch should exist")
+    TestHelper.assertNotNil(EngineAPI.render.endBatch, "render.endBatch should exist")
 end
 
 function TestEngineAPI.testSpriteModule()
@@ -144,6 +147,11 @@ function TestEngineAPI.testNewContractsExplicitlyImplemented()
         "render.endFrame",
         -- framework-io-portability：本地墙上时间格式化（存档/日志时间戳）
         "time.formatNow",
+        -- port-render-batching：绘制批次边界（4 引擎都必须显式实现，
+        -- 不能靠 engine_api 空桩继承 —— 空桩返回 nil，「真假不明」会通过
+        -- `if entered then` 的判断）
+        "render.beginBatch",
+        "render.endBatch",
     }
     -- **不 require engine_love2d**：它在模块加载期就读 love.filesystem，
     -- 而测试环境只有 TestHelper 的 mock（无 filesystem 字段）。

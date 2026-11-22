@@ -29,6 +29,11 @@
 -- 抽成契约反而要每个引擎自己定义映射，是多引擎分歧的源头。
 
 local Bit = require("framework.lib_bit")
+-- **批处理薄层**（change: port-render-batching）：只调 EngineAPI.render.beginBatch /
+-- endBatch，不做任何引擎细节。放在模块顶部静态 require 而不是 draw 时 lazy require ——
+-- 它是本模块的**正常依赖**，缺失应当立刻炸（而不是被 pcall(require) 吞成半坏状态，
+-- 那样表现是「地图画了但没有任何批次边界」，很难发现）。
+local RenderBatch = require("framework.render_batch")
 
 local MapRender = {}
 
@@ -277,38 +282,55 @@ function MapRender.drawMain(x, y, mypic)
     MapRender.buildingSort(x, y, mypic)
     EngineAPI.render.fillRect(0, 0, 0, 0, 0)
 
-    for j = 0, 2 * jend - 2 * jstart + CONFIG.MMapAddY do
-        for i = istart, iend do
-            local i1 = i + math.floor(j / 2) + jstart
-            local j1 = -i + math.floor(j / 2) + j % 2 + jstart
+    -- **批处理包住「瓦片两层 + 建筑层」**（change: port-render-batching）
+    --
+    -- 为什么只包这三段：它们是同一帧里唯一的「同质大量绘制」——
+    -- 实测主地图一帧 **约 2900 次 `sprite.drawHandle`**（复测 2926；480×480 等距地图，
+    -- 视野内每格 0/1 两层 + 建筑层）。云层不在里面：它走 `map.drawClouds`，
+    -- 是引擎侧的独立子系统（自己管烘焙与漂移），包进来反而会把批次边界
+    -- 交给另一个模块决定。
+    --
+    -- 为什么用 `wrap` 而不是手写 begin/finish：`wrap` 用 pcall 保证
+    -- **即使这三段里抛错也会调 finish**。批次状态属于引擎，跨帧泄漏会让
+    -- 下一帧的绘制落进上一帧的批次 → 画面错位/闪烁但不报错（比崩溃难查）。
+    --
+    -- **引擎不支持时零影响**：`wrap` 检测到 begin 返回 false 就**直接执行**
+    -- fn，不发 begin/end、不改变任何绘制调用 —— 渲染输出与改造前逐字节一致
+    -- （实机截图 md5 已验证）。这就是「批处理是纯优化」的落地方式。
+    RenderBatch.wrap("tile", function()
+        for j = 0, 2 * jend - 2 * jstart + CONFIG.MMapAddY do
+            for i = istart, iend do
+                local i1 = i + math.floor(j / 2) + jstart
+                local j1 = -i + math.floor(j / 2) + j % 2 + jstart
 
-            local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
-            local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
-            if (x + i1) >= 0 and (x + i1) < CC.MWidth and (y + j1) >= 0 and (y + j1) < CC.MHeight then
-                local picnum = EngineAPI.map.getTile(x + i1, y + j1, 0)
-                if picnum > 0 then
-                    drawTile(picnum, x1, y1)
-                end
-                picnum = EngineAPI.map.getTile(x + i1, y + j1, 1)
-                if picnum > 0 then
-                    drawTile(picnum, x1, y1)
+                local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+                local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+                if (x + i1) >= 0 and (x + i1) < CC.MWidth and (y + j1) >= 0 and (y + j1) < CC.MHeight then
+                    local picnum = EngineAPI.map.getTile(x + i1, y + j1, 0)
+                    if picnum > 0 then
+                        drawTile(picnum, x1, y1)
+                    end
+                    picnum = EngineAPI.map.getTile(x + i1, y + j1, 1)
+                    if picnum > 0 then
+                        drawTile(picnum, x1, y1)
+                    end
                 end
             end
         end
-    end
 
-    -- 建筑层（见上方 ① 的说明）
-    for i = 0, buildNumber - 1 do
-        local idxi = i + 1
-        local i1 = buildList[idxi].x - x
-        local j1 = buildList[idxi].y - y
-        local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
-        local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
-        local picnum = buildList[idxi].num
-        if picnum > 0 then
-            drawTile(picnum, x1, y1)
+        -- 建筑层（见上方 ① 的说明）
+        for i = 0, buildNumber - 1 do
+            local idxi = i + 1
+            local i1 = buildList[idxi].x - x
+            local j1 = buildList[idxi].y - y
+            local x1 = CONFIG.XScale * (i1 - j1) + math.floor(CONFIG.Width / 2)
+            local y1 = CONFIG.YScale * (i1 + j1) + math.floor(CONFIG.Height / 2)
+            local picnum = buildList[idxi].num
+            if picnum > 0 then
+                drawTile(picnum, x1, y1)
+            end
         end
-    end
+    end)
 
     -- 云层（见上方 ② 的说明）
     if EngineAPI.map.drawClouds then

@@ -4,13 +4,19 @@ parent_epic: null
 ---
 # Change Manifest: engine-portability — 引擎可移植性硬化
 
-> 本 slice 统辖 **16 个**子 change（**全部 Complete**：第一批 10 + 第二批 4 + 第三批 2），
+> 本 slice 统辖 **17 个**子 change（第一批 10 + 第二批 4 + 第三批 2 **均已归档** +
+> 第四批 1：`port-render-batching` **实现完成、待归档**），
 > 均位于 `openspec/changes/` 下与 slice 同级（符合本仓既有 `mouse-slice1` 的组织方式）。
 >
 > **第三批（2026-11-22 复审计后新增）**：`port-engine-boot` +
 > `port-conformance-hardening`（含 nil 安全修复，不是独立 change）。
 > 它们不是"又发现一堆待办"，而是**独立复审计**（不看 DoD、只看"换引擎真能跑吗"）
 > 挖出的「断言存在但检查不到目标」类缺陷 —— 详见各 change 的 proposal。
+>
+> **第四批（2026-11-22 性能视角新增）**：`port-render-batching`。
+> 前三批解决的是「**能不能**换引擎」（可移植性），这一批解决的是
+> 「换了之后**跑得动吗**」（可运行速度）—— 主地图一帧约 2900 次
+> `sprite.drawHandle`，在 Unreal 的 HUD 上每次都是独立 draw call。
 
 ## Change Assignments
 
@@ -410,7 +416,101 @@ parent_epic: null
 
 ---
 
-## Shared Contract Stubs
+## 第四批：绘制批处理契约（2026-11-22）
+
+> 前三批的验收口径是「换引擎**能不能**跑起来」（契约齐、源码级 0 缺、4 行入口）。
+> 这一批换了个问题：**换了之后跑得动吗**。
+>
+> 实测发现主地图一帧 `drawMain` 发出 **约 2900 次 `sprite.drawHandle`**
+> （复测 2926；480×480 等距地图，视野内每格 0/1 两层 + 建筑层）。三个目标引擎
+> 的代价差别是数量级的：
+>
+> | 引擎 | 约 2900 次 drawHandle 的实际代价 |
+> |---|---|
+> | LÖVE (OpenGL) | 同纹理连续 draw 有**隐式批处理** → 实测流畅 |
+> | Godot 4 (`draw_texture_rect`) | 每帧重建约 2900 个绘制命令 → 可行 |
+> | Unreal (HUD `DrawTile`) | **每次独立 draw call** → 很可能掉帧 |
+>
+> 而当时的契约里**没有任何批处理机制** —— 想批处理的引擎没有入口，
+> 调用方也无法表达「这一堆是同类绘制」。
+
+### Change: port-render-batching
+
+- **Repository**: this repo
+- **Scope**: engine（2 个新契约 × 4 引擎）+ framework（1 个新模块 + 1 个调用点）+
+  测试（1 个新套件）+ 文档
+- **Responsibility**:
+  1. **新增 2 个契约（95 → 97）**：`render.beginBatch(kind) → boolean` /
+     `render.endBatch()`
+     - **`false` = 引擎不支持 → 调用方照常逐次 `drawHandle`**（这是核心语义）
+     - 批次内 `drawHandle` 语义不变（引擎可攒可立即画，调用方无感知）
+     - **明确禁止嵌套**（内层 begin 返回 false，外层批次保持有效）
+  2. **新增 `framework/render_batch.lua`**（零 `love.*`）：
+     `begin` / `finish` / `wrap` / `isSupported` / `reset` / `isActive`。
+     `wrap` 用 `pcall` 保证 **`finish` 一定执行**（fn 抛错也执行），错误原样重抛。
+     引擎能力探测结论**缓存**（不支持的引擎每帧只被问一次）。
+  3. **`map_render.drawMain` 接入**：把「瓦片两层 + 建筑层」包进
+     `RenderBatch.wrap("tile", ...)`。**云层不包**（引擎侧独立子系统）。
+  4. **4 引擎都返回 `false`**：LÖVE 不做真批处理（隐式批处理已够好；
+     真批处理要改 `drawHandle` 的 atlas 绑定 + SpriteBatch 生命周期，
+     见 `port-render-batching/design.md` ADR-RB-2）；MUD/Web/测试桩无 GPU。
+  5. **新增 `test_render_batch.lua`**（45 断言）：支持/不支持/抛错/嵌套/缺契约
+     五条路径 + `drawMain` 集成（begin 是第一个事件、end 是最后一个）。
+  6. **行为零变化**：4 引擎全返回 false → 降级路径 → 绘制序列逐条相同 →
+     实机 md5 `1efd2af3a9ecfce48b89ef14b9a14338` 不变。
+- **Depends On**: `port-map-render-native`（约 2900 次调用的来源）+
+  `port-engine-boot`（`beginFrame/endFrame` 边界，批次必须落在其内部）
+- **Status**: [x] Complete / 待归档（全量 4370/0；change 目录仍在
+  `openspec/changes/port-render-batching/`，下次归档批次随 `openspec-archive` 移入 `archive/`）
+
+### 第四批对 slice 结论的影响
+
+| 维度 | 第三批后 | 第四批后 |
+|---|---|---|
+| 契约数 | 95 | **97** |
+| 可移植性（能换引擎吗） | 4 引擎源码级 0 缺 | **不变** |
+| 可运行速度（换了跑得动吗） | 无批处理口子 | **有契约 + 调用点 + 降级保证** |
+| 主地图 drawHandle | 约 2900 次/帧，无表达方式 | 约 2900 次/帧，**可声明为同类批次** |
+| 行为影响 | — | **零**（4 引擎全 false，md5 不变） |
+
+### 第四批的依赖
+
+```
+  ┌──────────────────────────────────────────────┐
+  │ port-map-render-native                        │
+  │  投影 + 可见瓦片循环搬进 framework             │
+  │  （约 2900 次 drawHandle 就是它产生的）         │
+  └──────────────────┬───────────────────────────┘
+                     │（没有它就无从谈批次边界）
+                     ▼
+  ┌──────────────────────────────────────────────┐
+  │ port-engine-boot                              │
+  │  render.beginFrame/endFrame 绘制边界           │
+  └──────────────────┬───────────────────────────┘
+                     │（批次必须落在帧边界内部）
+                     ▼
+  ┌──────────────────────────────────────────────┐
+  │ port-render-batching                          │
+  │  beginBatch/endBatch + RenderBatch 薄层        │
+  │  4 引擎返回 false（只留口子，不做真批处理）     │
+  └──────────────────┬───────────────────────────┘
+                     │（未来：填真批处理）
+                     ▼
+             ┌───────────────────────────┐
+             │ （未立项）LÖVE/Godot/Unreal │
+             │  引擎侧真批处理              │
+             └───────────────────────────┘
+```
+
+- 与第三批**无冲突**：`port-engine-boot` 加的是 `beginFrame/endFrame`（帧边界），
+  本 change 加的是 `beginBatch/endBatch`（批次边界），两者是**包含关系**
+  —— 批次必须在帧内。契约段位置也在 `endFrame` 之后、`sprite` 段之前。
+- 与 `port-conformance-hardening` 的**判据联动**：它把「4 引擎完整性」改成
+  **源码级**检查。本 change 新增 2 个契约后，那套检查必须仍然报 0 缺
+  —— 这也是「4 个引擎都必须**显式**实现（不能靠 `engine_api` 空桩继承）」
+  这条硬要求的来源。
+
+
 
 以下是 change 之间的接口契约。**签名一经确定不得随意改动。**
 
