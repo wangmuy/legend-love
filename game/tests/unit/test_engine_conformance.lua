@@ -37,30 +37,64 @@ end
 
 -- ------------------------------------------------------------ 完整性
 
+--- 引擎完整性：**源码级**检查（不能 require 后查表）
+--
+-- **这条断言原本是空转的（2026-11-22 复审计发现）**：
+--
+--   ```lua
+--   local ok, mod = pcall(require, e.path)
+--   for _, d in ipairs(contract) do
+--       if mod[d.mod][d.fn] == nil then missing[...] = ... end
+--   end
+--   ```
+--
+--   看起来对，但 `engine_mud.lua` / `tests/engine_test.lua` /
+--   `engine_love2d.lua` 都做 `local EngineAPI = require("engine-love2d.engine_api")`
+--   —— 拿到的是**同一张表**，而 `engine_api.lua` 已经为每个契约声明了空桩
+--   （`function M.file.read(...) end`）。于是 `mod[d.mod][d.fn]` 永远不是 nil。
+--
+--   实测证据：MUD 曾经实缺 7 个契约（file.read/write/lines/openFile/
+--   createDirectory、app.quit、time.getTimeSeconds），这条断言照样 PASS。
+--   而且空桩返回 nil，等于「调用成功但什么也没干」—— 最难查的那种。
+--
+-- **改法**：删掉"查表"思路，改为读源码找 `EngineAPI.file.read = function`
+-- 或 `function EngineAPI.file.read(` 两种形态（与 `test_engine_api.lua`
+-- 的 `newFns` 检查同一手法）。
 function TestEngineConformance.testAllEnginesImplementAllContracts()
-    print("\n=== Test: 3 引擎实现全部契约函数 ===")
+    print("\n=== Test: 4 引擎源码级实现全部契约 ===")
     local contract = readContract()
     TestHelper.assertNotNil(contract, "应能读到 engine_api.lua")
-    TestHelper.assertTrue(#contract >= 70,
-        "契约应有 70+ 个函数，实测 " .. #contract)
+    TestHelper.assertTrue(#contract >= 90,
+        "契约应有 90+ 个函数，实测 " .. #contract)
+
+    local function readSrc(rel)
+        for _, p in ipairs({ rel, "game/" .. rel, "../game/" .. rel }) do
+            local f = io.open(p, "rb")
+            if f then local c = f:read("*a"); f:close(); return c end
+        end
+        return nil
+    end
 
     local engines = {
-        { name = "MUD",  path = "engine-mud.engine_mud" },
-        { name = "Web",  path = "engine-web.engine_web" },
-        { name = "Test", path = "tests.engine_test" },
+        { name = "LOVE", path = "engine-love2d/engine_love2d.lua" },
+        { name = "MUD",  path = "engine-mud/engine_mud.lua" },
+        { name = "Web",  path = "engine-web/engine_web.lua" },
+        { name = "Test", path = "tests/engine_test.lua" },
     }
     for _, e in ipairs(engines) do
-        local ok, mod = pcall(require, e.path)
-        TestHelper.assertTrue(ok, e.name .. " 应能加载: " .. tostring(mod))
-        if ok and mod then
+        local src = readSrc(e.path)
+        TestHelper.assertNotNil(src, e.name .. " 源码应可读: " .. e.path)
+        if src then
             local missing = {}
             for _, d in ipairs(contract) do
-                if mod[d.mod] == nil or mod[d.mod][d.fn] == nil then
+                local pat1 = "EngineAPI%." .. d.mod .. "%." .. d.fn .. "%s*=%s*function"
+                local pat2 = "function EngineAPI%." .. d.mod .. "%." .. d.fn .. "%("
+                if not (src:find(pat1) or src:find(pat2)) then
                     missing[#missing + 1] = d.mod .. "." .. d.fn
                 end
             end
             TestHelper.assertEquals(0, #missing,
-                e.name .. " 缺 " .. #missing .. " 个契约函数"
+                e.name .. " 缺 " .. #missing .. " 个契约实现"
                 .. (#missing > 0 and (": " .. table.concat(missing, ", ")) or ""))
         end
     end

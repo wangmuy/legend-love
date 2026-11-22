@@ -100,6 +100,37 @@ EngineAPI.render.endFrame = function()
 end
 
 --------------------------------------------------------------------
+-- dialog 模块（port-engine-boot 复审计补漏）
+--
+-- 测试桩此前缺 dialog.measure / dialog.draw / dialog.clear 三个 ——
+-- 靠 engine_api.lua 的空桩继承，而空桩返回 nil，等于「调用成功但什么也没干」。
+-- 这条空洞由**源码级** conformance 检查发现（原来的查表式检查是空转的，
+-- 因为测试桩与 engine_api 是同一张表）。
+--------------------------------------------------------------------
+
+EngineAPI.dialog = {}
+
+EngineAPI.dialog.measure = function(spec)
+    logCall("dialog.measure", spec and spec.text, spec and spec.flag)
+    -- 桩不做真实排版；返回最小合法 layout 供调用方继续
+    local text = (spec and spec.text) or ""
+    return {
+        width = #text * (spec and spec.size or 24),
+        height = (spec and spec.size or 24) + 8,
+        lineHeight = (spec and spec.size or 24),
+        lines = { text },
+    }
+end
+
+EngineAPI.dialog.draw = function(spec, layout)
+    logCall("dialog.draw", spec and spec.text, layout and layout.width)
+end
+
+EngineAPI.dialog.clear = function()
+    logCall("dialog.clear")
+end
+
+--------------------------------------------------------------------
 -- sprite 模块 - 只保留 createFromRGBA/drawHandle 等格式透明契约
 --------------------------------------------------------------------
 

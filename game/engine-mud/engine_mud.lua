@@ -225,6 +225,12 @@ EngineAPI.app.toggleFullscreen = function()
     return false          -- MUD 无图形
 end
 
+--- 退出（MUD 是命令行宿主：设标志，由 main 循环读取）
+EngineAPI.app.quit = function()
+    logCall("app.quit")
+    EngineAPI.app._quitRequested = true
+end
+
 --- 装好运行时（MUD 也走同一条启动链 —— 这本身是个可执行文档：
 --- 「换引擎要做什么」在 MUD 里看得最清楚，因为它没有任何图形特例）
 EngineAPI.app.install = function(runtimeTable)
@@ -484,6 +490,65 @@ EngineAPI.file.getInfo = function(filename)
 end
 
 -- 目录存在性 / 列举：MUD 引擎跑在终端，直接用宿主文件系统的跨平台原语
+--- 读整个文件（MUD 是「纯 Lua 参考实现」，用 io 完全合适）
+--
+-- **为什么 MUD 必须实现全部 file 契约**：它是新引擎作者的**参考样板**。
+-- 实测（2026-11-22 复审计）：MUD 此前缺 7 个契约（app.quit / file.read /
+-- file.write / file.createDirectory / file.lines / file.openFile /
+-- time.getTimeSeconds），全靠 engine_api.lua 的空桩继承 ——
+-- 而空桩返回 nil，等于「调用成功但什么也没干」。
+--
+-- 更糟的是**测试也没抓到**：`test_engine_conformance` 用
+-- `require` 后查 `mod[mod][fn] == nil`，但 MUD 与 engine_api 是
+-- **同一张表**（都 `local EngineAPI = require("engine-love2d.engine_api")`），
+-- 所以它永远查不出缺失 —— 这条断言是空转的（另有 task 修）。
+EngineAPI.file.read = function(filename)
+    logCall("file.read", filename)
+    local f = io.open(filename, "rb")
+    if not f then return nil end
+    local content = f:read("*a")
+    f:close()
+    return content
+end
+
+EngineAPI.file.write = function(filename, content, mode)
+    logCall("file.write", filename, mode)
+    local m = (mode == "a" or mode == "ab") and "ab" or "wb"
+    local f = io.open(filename, m)
+    if not f then return false end
+    f:write(content or "")
+    f:close()
+    return true
+end
+
+EngineAPI.file.openFile = function(filename, mode)
+    logCall("file.openFile", filename, mode)
+    return io.open(filename, mode or "rb")
+end
+
+--- 逐行迭代（返回迭代器；取不到文件时返回 nil）
+EngineAPI.file.lines = function(filename)
+    logCall("file.lines", filename)
+    local f = io.open(filename, "r")
+    if not f then return nil end
+    return function()
+        local line = f:read("*l")
+        if line == nil then f:close() end
+        return line
+    end
+end
+
+--- 建目录（MUD 无跨平台 API；两种 shell 语法都试）
+EngineAPI.file.createDirectory = function(dirpath)
+    logCall("file.createDirectory", dirpath)
+    if type(dirpath) ~= "string" or dirpath == "" then return false end
+    local safe = dirpath:gsub('"', "")
+    local r1 = os.execute('mkdir "' .. safe .. '" 2>NUL')
+    if r1 == 0 or r1 == true then return true end
+    local r2 = os.execute('mkdir -p "' .. safe .. '" 2>/dev/null')
+    return (r2 == 0 or r2 == true)
+end
+
 EngineAPI.file.directoryExists = function(dirpath)
     logCall("file.directoryExists", dirpath)
     local ok, Fs = pcall(require, "framework.fs_compat")
@@ -595,6 +660,12 @@ _G.EngineAPI = EngineAPI
 
 -- system 模块（REQ-MS1-1）：MUD 引擎无平台概念
 EngineAPI.system = EngineAPI.system or {}
+--- 单调计时（秒）。MUD 用 os.clock —— 与 LÖVE 的 love.timer.getTime 同语义
+--- （从进程启动算起，**不是** Unix 纪元秒；拿它算日期只会得到 1970-01-01）
+EngineAPI.time.getTimeSeconds = function()
+    return os.clock()
+end
+
 EngineAPI.system.getOS = function()
     return "unknown"
 end
