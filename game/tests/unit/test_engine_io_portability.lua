@@ -391,6 +391,88 @@ function TestPortability.testFormatNowBehaviorAcrossEngines()
         "setNow(nil) 后恢复真实 os.date 行为")
 end
 
+-- ============================================================
+-- ⑨ mod_data.readActiveFile：EngineAPI.file.read 优先
+--    （port-engine-boot 复审计补漏的第 1 处）
+-- ============================================================
+
+function TestPortability.testModDataReadActivePrefersEngineAPI()
+    print("\n=== Test: ModData.readActiveFile 优先 EngineAPI.file.read ===")
+    package.loaded["framework.mod_data"] = nil
+    local ModData = require("framework.mod_data")
+
+    local counts, restore = spyStdlib()
+    withEngineAPI({
+        file = {
+            read = function(path) return "mingdong" end,
+            exists = function() return true end,
+        },
+    }, function()
+        local c = ModData.readActiveFile()
+        TestHelper.assertEquals("mingdong", c, "应取到契约返回的内容")
+        TestHelper.assertEquals(0, counts.ioOpen,
+            "EngineAPI.file.read 可用时不得调 io.open（实测 " .. counts.ioOpen .. " 次）")
+    end)
+    restore()
+    package.loaded["framework.mod_data"] = nil
+end
+
+function TestPortability.testModDataReadActiveFallsBack()
+    print("\n=== Test: ModData.readActiveFile 无契约时回退 io.open ===")
+    package.loaded["framework.mod_data"] = nil
+    local ModData = require("framework.mod_data")
+
+    local counts, restore = spyStdlib()
+    withEngineAPI(nil, function()
+        -- 文件不存在 → 返回 nil；关键是它**试过** io.open（兜底分支活着）
+        local c = ModData.readActiveFile()
+        TestHelper.assertEquals(nil, c, "文件不存在应返回 nil")
+        TestHelper.assertEquals(1, counts.ioOpen,
+            "无契约时必须走 io.open 兜底（实测 " .. counts.ioOpen .. " 次）")
+    end)
+    restore()
+    package.loaded["framework.mod_data"] = nil
+end
+
+-- ============================================================
+-- ⑩ mod_data.WarRecordCount：EngineAPI.file.getSize 优先
+--    （第 2 处）
+-- ============================================================
+
+function TestPortability.testWarRecordCountPrefersEngineAPI()
+    print("\n=== Test: ModData.WarRecordCount 优先 EngineAPI.file.getSize ===")
+    package.loaded["framework.mod_data"] = nil
+    local ModData = require("framework.mod_data")
+
+    local counts, restore = spyStdlib()
+    withEngineAPI({
+        file = { getSize = function(path) return 1024 end },
+    }, function()
+        local n = ModData.WarRecordCount("data/war.sta", 128)
+        TestHelper.assertEquals(8, n, "1024 / 128 应为 8")
+        TestHelper.assertEquals(0, counts.ioOpen,
+            "EngineAPI.file.getSize 可用时不得调 io.open（实测 " .. counts.ioOpen .. " 次）")
+    end)
+    restore()
+    package.loaded["framework.mod_data"] = nil
+end
+
+function TestPortability.testWarRecordCountFallsBack()
+    print("\n=== Test: ModData.WarRecordCount 无契约时回退 io.open ===")
+    package.loaded["framework.mod_data"] = nil
+    local ModData = require("framework.mod_data")
+
+    local counts, restore = spyStdlib()
+    withEngineAPI(nil, function()
+        local n = ModData.WarRecordCount("data/nonexistent.bin", 128)
+        TestHelper.assertEquals(nil, n, "文件不存在应返回 nil")
+        TestHelper.assertEquals(1, counts.ioOpen,
+            "无契约时必须走 io.open 兜底（实测 " .. counts.ioOpen .. " 次）")
+    end)
+    restore()
+    package.loaded["framework.mod_data"] = nil
+end
+
 function TestPortability.runAll()
     print("\n" .. string.rep("=", 60))
     print("framework 主路径零 stdlib IO/时间（framework-io-portability）")
@@ -405,6 +487,10 @@ function TestPortability.runAll()
     TestPortability.testClockFormatNowPrefersContract()
     TestPortability.testClockFormatNowFallsBack()
     TestPortability.testClockFormatNowNeverThrows()
+    TestPortability.testModDataReadActivePrefersEngineAPI()
+    TestPortability.testModDataReadActiveFallsBack()
+    TestPortability.testWarRecordCountPrefersEngineAPI()
+    TestPortability.testWarRecordCountFallsBack()
     TestPortability.testGameStatesTimestampUsesClock()
     TestPortability.testLibLogTimestampUsesClock()
     TestPortability.testLibLogDegradesToDash()

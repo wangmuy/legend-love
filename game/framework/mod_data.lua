@@ -117,7 +117,20 @@ function ModData.listDir(dir, pattern)
 end
 
 -- 读取 active_mod.txt 内容；失败返回 nil
+--
+-- **改成 EngineAPI 优先**（port-engine-boot Task 6 漏的两处之一）：
+--   `.love` 打包 / Android 下资源只在 love.filesystem 里，`io.open` 看不见 ——
+--   所以主路径必须先问契约。纯 Lua 测试环境没有 EngineAPI.file 时才回退
+--   `io.open`（这条兜底必须保留，否则 tool/测试全挂）。
 function ModData.readActiveFile()
+    local api = rawget(_G, "EngineAPI")
+    if type(api) == "table" and type(api.file) == "table"
+        and type(api.file.read) == "function" then
+        local ok, content = pcall(api.file.read, ModData.ACTIVE_FILE)
+        if ok and type(content) == "string" then return content end
+        -- 契约说「读不到」时不要立刻返回 nil：这个文件在测试里常被
+        -- mock 成只认某个白名单，仍给 stdlib 一次机会（行为与改造前一致）。
+    end
     local f = io.open(ModData.ACTIVE_FILE, "rb")
     if not f then return nil end
     local content = f:read("*a")
@@ -772,6 +785,16 @@ end
 function ModData.WarRecordCount(warFile, recordSize)
     if type(warFile) ~= "string" or type(recordSize) ~= "number" or recordSize <= 0 then
         return nil
+    end
+    -- **EngineAPI 优先**（同上）：只问「文件多大」，用 file.getSize 最直接
+    -- （不需要真的打开；Android 上 io.open 压根打不开 APK 内资源）。
+    local api = rawget(_G, "EngineAPI")
+    if type(api) == "table" and type(api.file) == "table"
+        and type(api.file.getSize) == "function" then
+        local ok, size = pcall(api.file.getSize, warFile)
+        if ok and type(size) == "number" and size > 0 then
+            return math.floor(size / recordSize)
+        end
     end
     local f = io.open(warFile, "rb")
     if not f then return nil end
