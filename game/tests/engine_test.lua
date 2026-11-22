@@ -367,9 +367,10 @@ EngineAPI.audio.playSequence = function(filenameOrId, opts)
     return true
 end
 
+-- 播放视频：测试桩无视频能力 → 返回 false（与 LÖVE 实现一致）
 EngineAPI.audio.playVideo = function(filename, skipKey)
     logCall("audio.playVideo", filename)
-    return true
+    return false
 end
 
 -- 音量（REQ-VOL-1）：测试引擎记录调用并保存状态，
@@ -618,6 +619,17 @@ EngineAPI.app.toggleFullscreen = function()
 end
 EngineAPI.app.quit = function()
     logCall("app.quit")
+end
+
+EngineAPI.app.setMusicTemplate = function(template, startOffset)
+    logCall("app.setMusicTemplate", template, startOffset)
+    EngineAPI.app._musicTemplate = (type(template) == "string" and template ~= "")
+        and template or nil
+    EngineAPI.app._musicStartOffset = tonumber(startOffset) or 0
+end
+
+EngineAPI.app.getMusicTemplate = function()
+    return EngineAPI.app._musicTemplate, EngineAPI.app._musicStartOffset
 end
 
 ---------------------------------------------------------------------

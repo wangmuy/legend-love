@@ -555,8 +555,29 @@ function M.input.getTouches() end
 --------------------------------------------------------------------
 M.audio = {}
 
---- 播放背景音乐（流式）
--- @param filename string 音乐文件路径
+-- ┌──────────────────────┬──────────────────────────┬─────────────────────┐
+-- │ 你想做什么            │ 用哪个契约                │ 由谁负责            │
+-- ├──────────────────────┼──────────────────────────┼─────────────────────┤
+-- │ 播游戏的 BGM（编号）   │ audio.playSequence(id)   │ 模板+候选+sound 回落 │
+-- │ 播一个已知的完整文件   │ audio.playMusic(filename)│ 只做 newSource       │
+-- │ 播音效                │ audio.playSFX(filename)  │ 只做 newSource       │
+-- │ 停止音乐              │ audio.stopMusic()        │ 释放当前 source      │
+-- │ 播开场视频            │ audio.playVideo(...)     │ 视频优先，无能力回 false│
+-- └──────────────────────┴──────────────────────────┴─────────────────────┘
+--
+-- **反例（实测踩过）**：script 层用 `playMusic(string.format(CC.MIDIFile, id+1))`
+-- 播 BGM。看似可行，但把「模板 / 偏移 / 扩展名候选 / sound 回落」四件事
+-- 全留在了调用方看不见的地方 —— 换引擎时新实现只能靠猜。
+
+--- 播放背景音乐（流式，**按完整文件名**）
+--
+-- 语义：filename 是**已经拼好的路径**（含扩展名）。本契约
+-- **SHALL NOT** 做扩展名推测，也 **SHALL NOT** 做 `sound/` 回落。
+--
+-- 游戏内 BGM 请走 `playSequence(id)`（它才有模板 + 候选 + 回落语义）；
+-- `playMusic` 面向工具/测试/未来的剧情音效。
+--
+-- @param filename string 完整音乐文件路径（含扩展名）
 function M.audio.playMusic(filename) end
 
 --- 播放音效（静态）
@@ -566,23 +587,40 @@ function M.audio.playSFX(filename) end
 --- 停止音乐
 function M.audio.stopMusic() end
 
---- 播放序列音频（按索引，不是文件名）
+--- 按**游戏音乐编号**播放（不是文件名）
 --
--- 与 playMusic(filename) 的区别：原版 `lib.PlayMIDI(CC.MIDIFile, id+1)`
--- 是按**索引**在资源清单里选，不是按文件名。两者语义不同，
--- 所以拆成两个函数而不是强行合一个。
+-- 引擎 SHALL 依次做四件事（全部原在 `lib_love.PlayMIDI` 里，现在进契约）：
+--   1. 取 `app.setMusicTemplate` 注册的模板与偏移，
+--      拼出 stem = `string.format(template, id + startOffset)`
+--   2. 按 `{.ogg, .mid, .mp3}` 顺序找存在的候选（顺序见 setMusicTemplate）
+--   3. 都找不到 → 回落「打包内置 `sound/` 下的同名文件」
+--      （背景：MOD 引用的音乐编号可能多于它实际带的曲目，
+--        例如 BookCalamity 引用到 51 但只带 0..23；没有回落会比改造前更差）
+--   4. 循环播放
 --
--- @param id number 序列编号（负数表示停止）
--- @param opts table|nil { loop=true }（默认循环）
+-- **只收 number**：收字符串说明调用方走错了契约（应改用 `playMusic`），
+-- 实现 SHALL 记日志并返回 false，不得静默当文件名用。
+--
+-- @param id number 游戏音乐编号（负数/模板未注册 → 不播，返回 false）
+-- @return boolean 是否真的开始播放
 function M.audio.playSequence(id, opts) end
 
 --- 播放视频（MPEG 等）
 --
+-- **语义**：引擎 SHALL 尝试真视频播放；无视频能力时 SHALL 回退音频路径
+-- （多半失败，但不得抛错），并明确返回 `false`。
+--
 -- 中断键语义：原版 `lib.PlayMPEG(path, VK_ESCAPE)` 的第二个参数是
--- 「按这个键可跳过」。引擎实现必须支持跳过，否则玩家会被卡住。
+-- 「按这个键可跳过」。
+--
+-- **返回值语义**（修了一个错）：真视频播完 = `true`；
+-- 被跳过 / 无视频能力 / 文件缺失 = `false`。
+-- 原 LÖVE 实现无条件 `return true`，而 `game/data/start.mpg` 根本不存在
+-- （实测 `find` 零命中）—— 等于永远在上报「播成功了」。
 --
 -- @param filename string 视频路径
 -- @param skipKey number|nil 跳过键的 VK 码
+-- @return boolean 是否完整播放
 -- @return boolean 是否完整播放（false = 被跳过）
 function M.audio.playVideo(filename, skipKey) end
 
@@ -824,6 +862,24 @@ M.app = {}
 
 --- 退出游戏
 function M.app.quit() end
+
+--- 注册音乐文件名模板（游戏启动时调用一次）
+--
+-- **为什么必须有这个契约**：原版 `PlayMIDI(id)` 内部把 id 变成文件名，
+-- 而「模板 + id 偏移」是**游戏资产约定**（`CC.MIDIFile = "sound/game%02d"`，
+-- 且 MOD 构建期把 `music/<id>.mid` 改名为 `game<id+1>.mid` → 偏移 = 1）。
+-- 这三件事（模板、偏移、扩展名候选）如果不进契约，每个新引擎都要自己发现。
+--
+-- 传进来的模板 **SHALL NOT 含扩展名**：
+--   引擎自己按 `{.ogg, .mid, .mp3}` 顺序找候选（顺序与原 lib_love 一致，
+--   `.ogg` 优先是因为它是 SoundFont 渲染版，音质最好；`.mid` 只作兜底）。
+--   模板带扩展名会让「哪些部分是模板、哪些是候选」变得无法判断。
+--
+-- 调用方：`JYMainAdapter.init`（必须在第一次 `PlayMIDI` 之前）。
+--
+-- @param template string printf 风格模板，如 "sound/game%02d"（不含扩展名）
+-- @param startOffset number id → 模板参数的偏移（实测游戏用 1）
+function M.app.setMusicTemplate(template, startOffset) end
 
 --- 切换全屏/窗口模式（对应 `lib.FullScreen`）
 --

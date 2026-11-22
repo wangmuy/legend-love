@@ -596,8 +596,41 @@ EngineAPI.input.getTouches = function()
 end
 
 -- audio 模块
+--
+-- 两个播放契约的职责边界（port-audio-semantics ADR-PORT-022）：
+--   playSequence(id)      按**游戏音乐编号**播 —— 模板 + 扩展名候选 + sound/ 回落
+--   playMusic(filename)   按**完整文件名**播 —— 不推测、不回落
+--
+-- 引擎不再读 `CC.*`（那是游戏常量表）：模板与偏移由
+-- `app.setMusicTemplate` 在启动时显式注册。
+
+local musicTemplate, musicStartOffset = nil, 0
+
+--- 注册音乐模板（启动时由 JYMainAdapter.init 调用）
+EngineAPI.app = EngineAPI.app or {}
+EngineAPI.app.setMusicTemplate = function(template, startOffset)
+    musicTemplate = (type(template) == "string" and template ~= "") and template or nil
+    musicStartOffset = tonumber(startOffset) or 0
+end
+
+--- 供测试/调试读取当前模板
+EngineAPI.app.getMusicTemplate = function()
+    return musicTemplate, musicStartOffset
+end
+
+--- 播放完整文件名的音乐（不推测扩展名、不回落）
+--
+-- `lib.PlayMIDI` 会做「裸文件名补 SoundPath + 扩展名候选 + sound/ 回落」，
+-- 那是 `playSequence` 的语义，不该泄漏到这里。
 EngineAPI.audio.playMusic = function(filename)
-    lib.PlayMIDI(filename)
+    if type(filename) ~= "string" or filename == "" then return false end
+    if not (love and love.audio) then return false end
+    local ok, err = pcall(lib.PlayMusicFile, filename)
+    if not ok then
+        EngineAPI.debug.log("audio.playMusic failed: " .. tostring(err))
+        return false
+    end
+    return true
 end
 
 EngineAPI.audio.playSFX = function(filename)
@@ -608,30 +641,61 @@ EngineAPI.audio.stopMusic = function()
     lib.PlayMIDI("")
 end
 
---- 播放序列音频（按索引 → 文件名由引擎按 CC.MIDIFile 模板生成）
+--- 按游戏音乐编号播放（模板 + {ogg,mid,mp3} 候选 + sound/ 回落 + 循环）
 --
--- 注意：这里不做 CC.MIDIFile 的拼接 —— 那是**游戏层知道的事**
--- （CC 是游戏常量）。调用方传**已拼好的文件名**或 id 都合法，
--- 但契约要求传文件名（见下方实现选择）。
---
--- 实现选择：与 playMusic(filename) 同一条路径。
--- 原版 lib.PlayMIDI 收的就是文件名（jymain.lua:2250 已拼好）。
-EngineAPI.audio.playSequence = function(filenameOrId, opts)
-    if type(filenameOrId) == "string" then
-        lib.PlayMIDI(filenameOrId)
-        return true
+-- 只收 number：收字符串说明调用方走错了契约（应改用 playMusic），
+-- 记日志并返回 false —— 不静默当文件名用（那是原实现的兼容分支，
+-- 正是它让「两个契约语义重叠」长期没被发现）。
+EngineAPI.audio.playSequence = function(id, opts)
+    if type(id) ~= "number" then
+        if EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("audio.playSequence: expected number id, got "
+                                .. type(id) .. " (use playMusic for filenames)")
+        end
+        return false
     end
-    return false
+    if id < 0 then return false end
+    if not musicTemplate then
+        if EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("audio.playSequence: music template not registered "
+                                .. "(app.setMusicTemplate)")
+        end
+        return false
+    end
+    local ok, stem = pcall(string.format, musicTemplate, id + musicStartOffset)
+    if not ok or type(stem) ~= "string" then
+        if EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("audio.playSequence: bad template " .. tostring(musicTemplate))
+        end
+        return false
+    end
+    -- lib.PlayMIDI 负责：扩展名候选 → sound/ 回落 → newSource → 循环 → 音量
+    lib.PlayMIDI(stem)
+    return true
 end
 
---- 播放视频（原版 PlayMPEG 只是 PlayMIDI 的别名，无真实视频渲染）
+--- 播放视频
 --
--- 实测：lib_love.lua:879 `function PlayMPEG(filename) PlayMIDI(filename) end`
--- 即整个项目从没真正播过 MPEG —— 它只是把 .mpg 当音频载入。
--- 所以契约照实实现：走音频路径，返回 true。
+-- 现状（实测）：整个项目 **没有**真视频能力 ——
+--   `game/data/start.mpg` 不存在（find 零命中），
+--   `lib.PlayMPEG` 只是 `PlayMIDI` 的别名（把 .mpg 当音频载入）。
+-- 所以契约照实实现：走音频路径，并**如实返回 false**
+-- （原实现无条件 return true，等于永远上报「播成功了」）。
+--
+-- 文件缺失时不抛错、不阻塞 —— 视频是可选能力。
 EngineAPI.audio.playVideo = function(filename, skipKey)
+    if type(filename) ~= "string" or filename == "" then return false end
+    if not (love and love.filesystem and love.filesystem.getInfo) then return false end
+    local okInfo, info = pcall(love.filesystem.getInfo, filename)
+    if not okInfo or not info then
+        if EngineAPI.debug and EngineAPI.debug.log then
+            EngineAPI.debug.log("audio.playVideo: asset missing, skipped: " .. filename)
+        end
+        return false
+    end
+    -- 无视频能力 → 尝试当音频播（多半失败，lib 内部已 pcall）
     lib.PlayMPEG(filename)
-    return true
+    return false
 end
 
 -- 音量（REQ-VOL-1 / REQ-VOL-2）：量程 0-128，增益线性 value/128。

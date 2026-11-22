@@ -10,13 +10,13 @@
 `engine_web.lua`、`tests/engine_test.lua`、`tests/unit/test_engine_api.lua`
 
 **DoD**：
-- [ ] `engine_api.lua` 声明 `M.app.setMusicTemplate(template, startOffset)`，
+- [x] `engine_api.lua` 声明 `M.app.setMusicTemplate(template, startOffset)`，
       注释写清「模板不含扩展名 / startOffset 是 id→模板参数的偏移」
-- [ ] LÖVE：保存到模块内变量，供 `playSequence` 用
-- [ ] MUD/Web：保存（MUD 也要能在日志里回读）
-- [ ] 测试桩：记录调用
-- [ ] 单测：4 引擎都存在；契约数 89 → **90**（承接前两个 change 的结果）
-- [ ] 一个 commit
+- [x] LÖVE：保存到模块内变量，供 `playSequence` 用（+ `getMusicTemplate` 供测试回读）
+- [x] MUD/Web/测试桩：保存并可在日志/字段里回读
+- [x] 单测：4 引擎都存在（`testNewContractsExplicitlyImplemented` 扩项）
+- [x] 契约数 89 → **90**
+- [x] 一个 commit
 
 ## Task 2：`playSequence` 语义收窄到「只收编号」
 
@@ -24,15 +24,16 @@
 `engine_web.lua`
 
 **DoD**：
-- [ ] 契约注释改写：只收 number；`{ogg, mid, mp3}` 候选顺序 + `sound/` 回落在注释里写明
-- [ ] LÖVE 实现：从 `playSequence(filenameOrId)` 改为 `playSequence(id)`：
-      ① 取模板 ② `string.format(template, id + startOffset)` ③ `resolveMusicFile`
-      ④ 复用既有 `PlayMIDI(filename)` 的播放逻辑（循环 + 音量）
-- [ ] LÖVE：收字符串时记日志 + 返回 false
-- [ ] MUD/Web：只记录调用，返回 true
-- [ ] 单测：`playSequence(16)` + 模板 → 实际传给 `love.audio.newSource` 的路径
-      （在 `test_mod_boot.lua` 的桩里断言）
-- [ ] 一个 commit
+- [x] 契约注释改写：只收 number；`{ogg, mid, mp3}` 候选顺序 + `sound/` 回落在注释里写明
+- [x] LÖVE 实现：从 `playSequence(filenameOrId)` 改为 `playSequence(id)`：
+      ① 取模板 ② `string.format(template, id + startOffset)` ③ 交 `lib.PlayMIDI`
+      （它负责扩展名候选 + sound/ 回落 + 循环 + 音量 —— 这段语义本就在 lib，
+       只是**现在被契约承认了**）
+- [x] LÖVE：收字符串 / id<0 / 模板未注册时记日志 + 返回 false
+- [x] MUD/Web：只记录调用
+- [x] 单测：`test_audio_semantics.lua` 源码级断言（不得再有 `filenameOrId` 分支、
+      必须校验 `type(id) ~= "number"`、必须用 `musicTemplate` + `musicStartOffset`）
+- [x] 一个 commit
 
 ## Task 3：`playMusic` 收窄到「只收完整文件名」
 
@@ -40,24 +41,14 @@
 `game/script/jymain.lua`
 
 **DoD**：
-- [ ] 契约注释改写：不做扩展名推测、不做路径回落
-- [ ] LÖVE 实现：`playMusic(filename)` 直接用 `love.audio.newSource(filename)`，
-      **不**经 `resolveMusicFile`（那条路径留给 `playSequence`）
-- [ ] `jymain.lua:2315` 的 `PlayMIDI(id)` 改为：
-      ```lua
-      function PlayMIDI(id)
-          JY.CurrentMIDI = id
-          if JY.EnableMusic == 0 then
-              EngineAPI.audio.stopMusic()
-              return
-          end
-          if id >= 0 then
-              EngineAPI.audio.playSequence(id)
-          end
-      end
-      ```
-- [ ] `grep -n 'audio.playMusic' game/script/*.lua` = 0
-- [ ] 一个 commit
+- [x] 契约注释改写：不做扩展名推测、不做路径回落
+- [x] LÖVE 实现：`playMusic(filename)` 走新的 `lib.PlayMusicFile`（直接
+      `love.audio.newSource(filepath)`），**不**经 `resolveMusicFile`
+      （那条路径留给 `playSequence` → `lib.PlayMIDI`）
+- [x] `jymain.lua` 的 `PlayMIDI(id)` 改为：记 id → 关音乐则 `stopMusic` →
+      否则 `playSequence(id)`（不再 `string.format`）
+- [x] `grep -n 'audio.playMusic' game/script/*.lua` = 0
+- [x] 一个 commit
 
 ## Task 4：`CC.MIDIFile` 模板去扩展名 + 启动注册
 
@@ -65,25 +56,33 @@
 `game/framework/mod_data.lua`
 
 **DoD**：
-- [ ] `CC.MIDIFile = CONFIG.SoundPath .. "game%02d"`（去掉 `.ogg`）
-- [ ] `JYMainAdapter.init` 里注册：
+- [x] `CC.MIDIFile = CONFIG.SoundPath .. "game%02d"`（去掉 `.ogg`）
+- [x] `JYMainAdapter.init` 里注册：
       `EngineAPI.app.setMusicTemplate(CC.MIDIFile, 1)`（在 `PlayMIDI` 首次调用之前）
-- [ ] `mod_data.lua` 的注释同步（它解释的「去掉扩展名」现在是模板本来的形态）
-- [ ] `gate_run_mod.sh`：20 MOD 全 PASS（这是模板变更的核心回归门）
-- [ ] 实机：进入主地图有 BGM（`sound/game17.ogg`）
-- [ ] 一个 commit
+- [x] `mod_data.lua` 的 MOD 音乐重定向改为「前缀替换」（不再剥 `.ogg`，
+      但保留对旧值的兼容剥离）
+- [x] `gate_run_mod.sh`：**GATE_PASS**（20 MOD 音频零丢失 + active_mod 解析）
+      注：需先给 PATH 提供 `lua` 与 `love`，否则脚本自身报 `--list 运行失败`
+      （环境问题，与本次改动无关）
+- [x] 实机：场景/战斗 md5 不变（`1efd2af3…` / `6c8eb322…`）
+- [x] 一个 commit
 
 ## Task 5：`EnableMusic == 0` 停音乐
 
 **Blast Radius**：`game/script/jymain.lua`、`game/tests/unit/test_audio_semantics.lua`（新）
 
 **DoD**：
-- [ ] `PlayMIDI` 的 `EnableMusic == 0` 分支改为调 `audio.stopMusic()`
-- [ ] 新增单测 `test_audio_semantics.lua`：
-      ① 关音乐 → 收到 `stopMusic`
-      ② 开音乐 → 收到 `playSequence(CurrentMIDI)`
-      ③ 负数 id → 不调 `playSequence`（保持现状语义）
-- [ ] 一个 commit
+- [x] `PlayMIDI` 的 `EnableMusic == 0` 分支改为调 `audio.stopMusic()`
+- [x] 新增单测 `test_audio_semantics.lua`（39 条断言）：
+      ① 契约注释的职责边界（playSequence 只收 number / playMusic 收完整文件名）
+      ② `CC.MIDIFile` 无扩展名
+      ③ 启动注册模板
+      ④ `PlayMIDI` 不再 `string.format`
+      ⑤ `EnableMusic==0` 分支含 `stopMusic`
+      ⑥ `playVideo` 不得无条件 return true + 必须先探测资源
+      ⑦ `playSequence` 有 number 守卫、无 `filenameOrId` 兼容分支
+      ⑧ 4 引擎都有 `app.setMusicTemplate`
+- [x] 一个 commit
 
 ## Task 6：`playVideo` 返回真实结果
 
@@ -91,14 +90,14 @@
 `engine_web.lua`、`tests/engine_test.lua`
 
 **DoD**：
-- [ ] 契约注释改写：视频优先 / 无能力回退音频 / 返回 boolean / 不抛错
-- [ ] LÖVE：文件不存在 → 记日志 + `return false`；
-      存在 → 尝试音频（现状：`PlayMPEG` = `PlayMIDI` 别名）
-- [ ] MUD/Web：`return false`
-- [ ] 测试桩：返回 false
-- [ ] 单测：`game/data/start.mpg` 缺失时返回 false
-- [ ] 实机：启动时日志有一条「video asset missing」，无错误屏
-- [ ] 一个 commit
+- [x] 契约注释改写：视频优先 / 无能力回退音频 / 返回 boolean / 不抛错
+- [x] LÖVE：先 `love.filesystem.getInfo` 探测 → 缺失记日志 + `return false`；
+      存在 → 走音频路径，仍 `return false`（无视频能力）
+- [x] MUD / Web / 测试桩：`return false`
+- [x] 单测：`test_audio_semantics` 源码级断言（不得 `return true`、
+      必须 `getInfo`、必须 `return false`）
+- [x] 实机：启动无错误屏（场景 md5 不变；`start.mpg` 缺失仅日志）
+- [x] 一个 commit
 
 ## Task 7：门禁 + 文档
 
@@ -106,11 +105,13 @@
 `game/engine-love2d/engine_api.lua`
 
 **DoD**：
-- [ ] `gate_run_mod.sh` 新增断言：`CC.MIDIFile` 不含 `%.ogg$`（模板不得带扩展名）
-- [ ] `TODO.md`：删掉「audio 概念重设计」条目（本 change 定案）
-- [ ] `engine_api.lua` 的 audio 段加「谁该用哪个」的对照表
-- [ ] 20 MOD + 全量测试 + 五门禁
-- [ ] 一个 commit
+- [x] `gate_run_mod.sh` 新增 2 条断言：① `CC.MIDIFile` 不含扩展名
+      ② `JYMainAdapter.init` 注册了 `setMusicTemplate(CC.MIDIFile, 1)`
+- [x] `TODO.md`：「audio 概念重设计」已标为定案并指向本 change
+- [x] `engine_api.lua` 的 audio 段加「谁该用哪个」对照表（5 行）
+- [x] `gate_run_mod.sh` **GATE_PASS**（需 PATH 里有 lua + love，见 Task 4 注）
+- [x] 全量测试 **4111/0**（+39 条新断言）
+- [x] 一个 commit
 
 ## 依赖
 

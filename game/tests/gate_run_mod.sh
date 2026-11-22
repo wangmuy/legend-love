@@ -162,6 +162,30 @@ case "$ORDER" in
         log "  [PASS] .mid 不是第一优先" ;;
 esac
 
+# port-audio-semantics：CC.MIDIFile 是**不含扩展名**的模板
+# （模板带扩展名会让「模板 vs 候选」的边界无法判断 —— 引擎按
+#  {.ogg,.mid,.mp3} 找候选，模板里再写 .ogg 就自相矛盾）
+log "=== STEP: CC.MIDIFile 模板不含扩展名 ==="
+MIDITPL="$(grep -o 'CC\.MIDIFile=CONFIG\.SoundPath \.\. "[^"]*"' game/script/jyconst.lua | head -1)"
+case "$MIDITPL" in
+    *'.ogg"'*|*'.mid"'*|*'.mp3"'*)
+        log "  [FAIL] CC.MIDIFile 带扩展名: $MIDITPL"
+        fail=$((fail + 1)) ;;
+    *'game%02d"'*)
+        log "  [PASS] CC.MIDIFile = sound/game%02d（无扩展名）" ;;
+    *)
+        log "  [FAIL] CC.MIDIFile 形态异常: $MIDITPL"
+        fail=$((fail + 1)) ;;
+esac
+
+# 启动时必须注册模板，否则 playSequence(id) 无法拼路径
+if grep -q 'setMusicTemplate(CC.MIDIFile, 1)' game/framework/jymain_adapter.lua; then
+    log "  [PASS] JYMainAdapter.init 注册 setMusicTemplate(CC.MIDIFile, 1)"
+else
+    log "  [FAIL] 启动未注册音乐模板"
+    fail=$((fail + 1))
+fi
+
 log "=== STEP: mod_build 保留已渲染 ogg ==="
 if grep -q 'preservedOgg' game/tools/mod_build.lua; then
     log "  [PASS] 存在 preservedOgg 保护"

@@ -188,6 +188,15 @@ function JYMainAdapter.initCoroutine()
     
     EngineAPI.sprite.initSprites(CC.PaletteFile)
 
+    -- 注册音乐文件名模板（port-audio-semantics）
+    --
+    -- 必须在第一次 PlayMIDI 之前。模板**不含扩展名**（引擎按
+    -- {ogg, mid, mp3} 找候选），偏移 = 1（MOD 构建期把 music/<id>.mid
+    -- 改名为 game<id+1>.mid；原版 jymain.PlayMIDI 也是 %02d, id+1）。
+    if EngineAPI.app and EngineAPI.app.setMusicTemplate then
+        EngineAPI.app.setMusicTemplate(CC.MIDIFile, 1)
+    end
+
     -- 定义走路动画序列（port-sprite-animation）
     --
     -- 必须在 CC 就绪后调（animation_defs 不在模块加载期读 CC）。

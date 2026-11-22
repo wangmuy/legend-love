@@ -2319,13 +2319,20 @@ function AddPersonAttrib(id,str,value)            --增加人物属性
 end
 
 --播放midi
+--
+-- port-audio-semantics：本函数只做「游戏侧判断」，不再拼文件名。
+--   ① 记下当前 id（关音乐后恢复要用）
+--   ② 音乐开关关闭时**停止正在播的 BGM**（原实现只 return，
+--      已在播的音乐会继续 —— 存档里的 EnableMusic=0 因此形同虚设）
+--   ③ 否则交给 `playSequence(id)`：模板 + 扩展名候选 + sound/ 回落全在引擎
 function PlayMIDI(id)             --播放midi
     JY.CurrentMIDI=id;
     if JY.EnableMusic==0 then
+        EngineAPI.audio.stopMusic();
         return ;
     end
     if id>=0 then
-        EngineAPI.audio.playMusic(string.format(CC.MIDIFile,id+1));
+        EngineAPI.audio.playSequence(id);
     end
 end
 

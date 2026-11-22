@@ -129,7 +129,11 @@ function SetGlobalConst()
    CC.CloudPicFile={CONFIG.DataPath .. "cloud.idx",CONFIG.DataPath .. "cloud.grp"};
 
 
-    CC.MIDIFile=CONFIG.SoundPath .. "game%02d.ogg";
+   -- 音乐文件名模板（port-audio-semantics）：**不含扩展名**。
+   -- 引擎按 {.ogg, .mid, .mp3} 顺序找候选，并由 app.setMusicTemplate 注册
+   -- 「id + startOffset」的偏移（实测游戏用 +1：MOD 构建期把 music/<id>.mid
+   -- 改名为 game<id+1>.mid）。
+   CC.MIDIFile=CONFIG.SoundPath .. "game%02d";
    CC.ATKFile=CONFIG.SoundPath .. "atk%02d.wav";
    CC.EFile=CONFIG.SoundPath .. "e%02d.wav";
 

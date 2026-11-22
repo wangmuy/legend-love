@@ -488,24 +488,28 @@ function ModData.RewriteConstants(CC, CONFIG)
     -- REQ-MIDI-2: MOD 自带 MIDI 音乐直接播放（不经 OGG 转换）
     -- ========================================================
     -- 20/20 MOD 的 music/ 只有 .mid（无 .ogg），上面的 ogg 分支永不触发。
-    -- 这里把 MIDIFile 重定向到 mods/<slug>/music/ 并**去掉扩展名**：
-    -- CC.MIDIFile 原值 "sound/game%02d.ogg" 去掉末 4 字符（".ogg"）得到
-    -- "sound/game%02d"，拼接后为 "mods/<slug>/music/game%02d"，由
-    -- lib.PlayMIDI 按 .ogg -> .mid -> .mp3 顺序补全后缀。
+    -- 这里把 MIDIFile 重定向到 mods/<slug>/music/。
+    --
+    -- **模板已不含扩展名**（port-audio-semantics）：CC.MIDIFile 现在是
+    -- "sound/game%02d"，所以这里不再需要「去掉 .ogg」那一步 —— 换成前缀
+    -- 即可得到 "mods/<slug>/music/game%02d"，由引擎按
+    -- .ogg -> .mid -> .mp3 顺序补全后缀（`app.setMusicTemplate` 的契约）。
+    --
+    -- 兼容旧值：若 CC.MIDIFile 仍带 ".ogg"（外部脚本覆盖），先剥掉再拼。
     --
     -- 为什么把 .mid 重命名为 game<NN>.mid（而不是保留 <n>.mid）：
-    --   引擎传的是 id+1（jymain.lua:2162 的 PlayMIDI(id) -> %02d, id+1），
+    --   编号偏移是 +1（`app.setMusicTemplate(CC.MIDIFile, 1)`），
     --   而 MOD 源文件是 music/<id>.mid（实测 <id> 命中 94.6% vs <id+1> 90.5%
     --   且多个 MOD 存在 music/0.mid，若按 id+1 会取到 -1.mid，不可能），
-    --   于 是构建期把 <id>.mid 改名为 game<id+1>.mid，运行时无需额外映射。
+    --   于是构建期把 <id>.mid 改名为 game<id+1>.mid，运行时无需额外映射。
     local modMusicDir = ModData.MODS_DIR .. slug .. "/" .. ModData.MUSIC_DIR
-    if type(CC.MIDIFile) == "string"
-        and CC.MIDIFile:sub(1, #soundPrefix) == soundPrefix
-        and CC.MIDIFile:match("%.ogg$")
-        and ModData.dirExists(modMusicDir)
+    local stem = nil
+    if type(CC.MIDIFile) == "string" and CC.MIDIFile:sub(1, #soundPrefix) == soundPrefix then
+        stem = CC.MIDIFile:sub(#soundPrefix + 1):gsub("%.ogg$", "")
+    end
+    if stem and ModData.dirExists(modMusicDir)
         and #ModData.listDir(modMusicDir, "^game%d+%.mid$") > 0
     then
-        local stem = CC.MIDIFile:sub(#soundPrefix + 1):gsub("%.ogg$", "")
         CC.MIDIFile = modMusicDir .. stem
         if ModData.Log then
             ModData.Log(string.format("[ModData] MIDIFile -> %s{ogg,mid,mp3}", CC.MIDIFile))

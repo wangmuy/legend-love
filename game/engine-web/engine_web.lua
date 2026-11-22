@@ -335,8 +335,9 @@ function EngineAPI.audio.playSequence(filenameOrId, opts)
     return true
 end
 
+-- 播放视频：Web 文本版无视频能力 → 如实返回 false（port-audio-semantics）
 function EngineAPI.audio.playVideo(filename, skipKey)
-    return true
+    return false
 end
 
 function EngineAPI.audio.getMusicVolume()
@@ -582,6 +583,17 @@ EngineAPI.app = {}
 
 function EngineAPI.app.toggleFullscreen()
     return false          -- Web 无原生全屏切换（可用 element.requestFullscreen）
+end
+
+-- 音乐模板注册（port-audio-semantics）：Web 文本版无音频，只记录
+function EngineAPI.app.setMusicTemplate(template, startOffset)
+    EngineAPI.app._musicTemplate = (type(template) == "string" and template ~= "")
+        and template or nil
+    EngineAPI.app._musicStartOffset = tonumber(startOffset) or 0
+end
+
+function EngineAPI.app.getMusicTemplate()
+    return EngineAPI.app._musicTemplate, EngineAPI.app._musicStartOffset
 end
 
 --------------------------------------------------------------------------------

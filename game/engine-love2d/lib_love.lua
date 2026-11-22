@@ -422,23 +422,38 @@ function PlayMIDI(filename)
     end
     filepath = resolveMusicFile(filepath)
     Debug("PlayMIDI: filepath=" .. filepath)
-    
+
+    -- 真正播放的那一段（扩展名推测与回落已在上面完成）
+    return PlayMusicFile(filepath)
+end
+
+--- 播放**已确定的**音乐文件路径（不做任何猜测）
+--
+-- 供 `EngineAPI.audio.playMusic(filename)` 用：契约层已声明它收完整文件名，
+-- 所以这里不能走 `resolveMusicFile`（那会偷偷补扩展名或回落 sound/）。
+--
+-- @param filepath string 完整路径
+-- @return boolean 是否成功开始播放
+function PlayMusicFile(filepath)
+    if not love.audio then return false end
+    if type(filepath) ~= "string" or filepath == "" then return false end
+
     local success, source_or_err = pcall(love.audio.newSource, filepath, "stream")
     if not success then
-        Debug("PlayMIDI error: " .. tostring(source_or_err))
+        Debug("PlayMusicFile error: " .. tostring(source_or_err))
+        return false
     end
-    if success then
-        if currentMusic then
-            currentMusic:stop()
-        end
-        currentMusic = source_or_err
-        currentMusic:setLooping(true)
-        -- 拉：新 source 必须应用当前音乐音量，否则只有第一次生效
-        if currentMusic.setVolume then
-            pcall(currentMusic.setVolume, currentMusic, toGain(musicVolume))
-        end
-        currentMusic:play()
+    if currentMusic then
+        currentMusic:stop()
     end
+    currentMusic = source_or_err
+    currentMusic:setLooping(true)
+    -- 拉：新 source 必须应用当前音乐音量，否则只有第一次生效
+    if currentMusic.setVolume then
+        pcall(currentMusic.setVolume, currentMusic, toGain(musicVolume))
+    end
+    currentMusic:play()
+    return true
 end
 
 function PlayWAV(filename)

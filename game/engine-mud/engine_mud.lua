@@ -207,6 +207,18 @@ EngineAPI.app.toggleFullscreen = function()
     return false          -- MUD 无图形
 end
 
+--- 音乐模板注册（port-audio-semantics）：MUD 无音频，只记录便于回读
+EngineAPI.app.setMusicTemplate = function(template, startOffset)
+    logCall("app.setMusicTemplate", template, startOffset)
+    EngineAPI.app._musicTemplate = (type(template) == "string" and template ~= "")
+        and template or nil
+    EngineAPI.app._musicStartOffset = tonumber(startOffset) or 0
+end
+
+EngineAPI.app.getMusicTemplate = function()
+    return EngineAPI.app._musicTemplate, EngineAPI.app._musicStartOffset
+end
+
 EngineAPI.sprite.clearPictureCache = function()
     logCall("sprite.clearPictureCache")
 end
@@ -330,9 +342,10 @@ EngineAPI.audio.playSequence = function(filenameOrId, opts)
     return true
 end
 
+--- 播放视频：MUD 无视频能力 → 如实返回 false（port-audio-semantics）
 EngineAPI.audio.playVideo = function(filename, skipKey)
     logCall("audio.playVideo", filename)
-    return true
+    return false
 end
 
 -- 音量（REQ-VOL-1）：MUD 引擎无音频，4 个函数为 no-op 但保留状态，
