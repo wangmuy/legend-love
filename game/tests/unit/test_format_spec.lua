@@ -255,7 +255,7 @@ function T.testConsumerSymbolsResolve()
     -- 每项: { 标注名, 文件, 必须出现的源码片段, 是否要求是导出符号 }
     -- 最后一项 kdef 是构建期 local 函数，不要求导出（consumer 标注已显式声明 build-time/local）
     local symbols = {
-        { "lib_love.PicLoadFile", "engine-love2d/lib_love.lua", "function PicLoadFile", true },
+        { "framework.sprite_atlas.loadArchive", "framework/sprite_atlas.lua", "function SpriteAtlas.loadArchive", true },
         { "jymain.ReadTalk",      "script/jymain.lua",          "ReadTalk",              true },
         { "lib_love.LoadSMap",    "engine-love2d/lib_love.lua", "function LoadSMap",     true },
         { "lib_love.LoadWarMap",  "engine-love2d/lib_love.lua", "function LoadWarMap",   true },

@@ -18,9 +18,9 @@
 --         且 buildList 每帧越长（长跑内存只增不减）。
 --
 -- 本套件用「排序签名」+「绘制次序」两条独立判据锁定修复：
---   判据 1：BuildingSort 在 8 个坐标上的 (x,y,num) 序列签名，
+--   判据 1：buildingSort 在 8 个坐标上的 (x,y,num) 序列签名，
 --           与 mainmap.c 逐字移植得到的期望值完全一致；
---   判据 2：#buildList 多帧重复排序后保持不变（不再无限增长）；
+--   判据 2：同一坐标反复排序后条目数不变（不再无限增长）；
 --   判据 3：DrawMMap 实际发出的绘制序列里，主角出现在 build 层的
 --           排序位置（而不是最后一位），且该位置之后仍有建筑被绘制。
 --
@@ -108,26 +108,49 @@ local function buildStubPicFile()
     }, frameOf
 end
 
-local Lib      -- lib_love 模块
+local Lib      -- lib_love 模块（只用它读地图数据：LoadMMap / GetMMap）
+local MR       -- framework/map_render 模块（排序 + 绘制）
 local frameOf  -- picnum -> {w,h,xoff,yoff}
 
+--- 装环境
+--
+-- **port-legacy-picture-removal 之后的两点变化**：
+--   ① `lib.BuildingSort` / `lib.DrawMMap` / `lib.picFileCache` 已删除
+--      → 排序与绘制改走 `framework/map_render.lua`
+--      （`buildingSort` / `buildingAt` / `drawMain`）
+--   ② `map_render` 只通过 EngineAPI 契约取地图数据与画 handle
+--      → 需要一个**私有**最小的 EngineAPI 桩（getTile/setTile/render/sprite）
+--
+-- `lib_love.LoadMMap` / `GetMMap` 仍然存在（它们只读 map 数据文件，
+-- 不碰旧贴图子系统），继续用它读真实数据 —— 这样期望值（EXPECTED）不变。
 local function bootEngine()
     if not harnessReady then
         require("tests.mod_boot_harness").setup()
         harnessReady = true
     end
 
-    love.graphics.draw = function(img, x, y)
-        if img and img.pic then draws[#draws + 1] = { pic = img.pic, x = x, y = y } end
+    -- 真实 mmap 帧头 → 假 handle 的几何（不解 RLE，几百帧太慢）
+    local offs, grpData = readFrameTable()
+    local function frameHeader(picnum)
+        local slot = math.floor(picnum / 2)
+        local a = 0
+        if slot >= 1 then a = offs[slot] end
+        local b = offs[slot + 1] or #grpData
+        local buf = grpData:sub(a + 1, b)
+        if #buf < 8 then return nil end
+        local w = buf:byte(1) + buf:byte(2) * 256
+        local h = buf:byte(3) + buf:byte(4) * 256
+        local xo = buf:byte(5) + buf:byte(6) * 256
+        local yo = buf:byte(7) + buf:byte(8) * 256
+        if xo > 32767 then xo = xo - 65536 end
+        if yo > 32767 then yo = yo - 65536 end
+        return { w = w, h = h, xoff = xo, yoff = yo }
     end
-    love.graphics.setColor = function() end
-    love.graphics.clear = function() end
-    love.graphics.getScissor = function() return nil end
-    love.graphics.setScissor = function() end
-    love.graphics.rectangle = function() end
-    _G.Debug = function() end
+    frameOf = function(picnum)
+        return frameHeader(picnum)
+    end
 
-    -- 重新加载 lib_love，避免与其他套件共享 buildList / mmap 状态。
+    -- 重新加载 lib_love（读地图数据用；避免与其他套件共享 mmap 状态）
     package.loaded["engine-love2d.lib_love"] = nil
     local ok, mod = pcall(require, "engine-love2d.lib_love")
     if not ok then
@@ -139,39 +162,99 @@ local function bootEngine()
     Lib.LoadMMap(CC.MMapFile[1], CC.MMapFile[2], CC.MMapFile[3],
                  CC.MMapFile[4], CC.MMapFile[5],
                  CC.MWidth, CC.MHeight, 20, 19)
-    local stub, fo = buildStubPicFile()
-    frameOf = fo
-    Lib.picFileCache[1] = stub
-    return Lib
+
+    -- 私有 EngineAPI 桩：getTile/setTile 转发到 lib_love 的真实 mmap 数据
+    local stub = {
+        debug = { log = function() end },
+        render = {
+            getClip = function() return { x = 0, y = 0, w = 1024, h = 768 } end,
+            setClip = function() end,
+            fillRect = function() end,
+            drawClouds = function() end,
+        },
+        map = {},
+        sprite = {},
+    }
+    stub.map.getTile = function(x, y, layer) return Lib.GetMMap(x, y, layer) end
+    -- SetMMap 在 lib_love 里是 local，只暴露 JY_SetMMap（与引擎实现同款桥接）
+    stub.map.setTile = function(x, y, layer, v) Lib.JY_SetMMap(x, y, layer, v) end
+    -- **必须复刻真实 drawHandle 的锚点语义**：
+    --   flag 的 0x1 位为 0 时，实际画在 (x - xoff, y - yoff)。
+    --   旧套件记录的是 `love.graphics.draw(img, xnew, ynew)`（PicLoadCache
+    --   内部已减过锚点），若这里只记 (x, y) 会整体偏移 → 相交判定全错
+    --   （实测 8 条 overlap 断言因此失败）。
+    stub.sprite.drawHandle = function(handle, x, y, flags, alpha)
+        if handle and handle.pic then
+            local px, py = x, y
+            local bit = require("framework.lib_bit")
+            if bit.band(flags or 0, 0x1) == 0 then
+                px = x - (handle.xoff or 0)
+                py = y - (handle.yoff or 0)
+            end
+            draws[#draws + 1] = { pic = handle.pic, x = px, y = py }
+        end
+        return true
+    end
+    rawset(_G, "EngineAPI", stub)
+
+    -- SpriteAtlas：注入假 atlas（frameId → handle），drawMain 才有 handle 可画
+    package.loaded["framework.sprite_atlas"] = nil
+    local SA = require("framework.sprite_atlas")
+    SA.clear()
+    local fakeAtlas = {
+        frameCount = 100000, cache = {}, meta = {},
+        grpBytes = "", offsets = {}, palette = {}, usage = "map",
+    }
+    setmetatable(fakeAtlas.cache, {
+        __index = function(t, slot)
+            if type(slot) ~= "number" then return nil end
+            local picnum = (slot - 1) * 2
+            local f = frameHeader(picnum)
+            if not f then return nil end
+            local h = { pic = picnum, w = f.w, h = f.h,
+                        xoff = f.xoff, yoff = f.yoff }
+            t[slot] = h
+            return h
+        end,
+    })
+    SA._injectForTest(0, fakeAtlas)
+
+    package.loaded["framework.map_render"] = nil
+    MR = require("framework.map_render")
+    MR.reset()
+    return MR
 end
 
 -- ---------------------------------------------------------------- 判据实现
 
 local function buildSortSignature(x, y)
-    Lib.BuildingSort(x, y, PLAYER_PIC)
+    MR.buildingSort(x, y, PLAYER_PIC)
+    local n = MR.buildingCount()
     local h = 0
-    for i = 1, Lib.buildNumber do
-        local e = Lib.buildList[i]
-        h = (h + (e.x * 7 + e.y * 131 + e.num * 65599) * i) % SIG_MOD
+    -- buildingAt 是 **0 基**（与 test_map_render.lua:203 的用法一致）
+    for i = 0, n - 1 do
+        local e = MR.buildingAt(i)
+        h = (h + (e.x * 7 + e.y * 131 + e.num * 65599) * (i + 1)) % SIG_MOD
     end
-    return Lib.buildNumber, h
+    return n, h
 end
 
 -- 主角在 build 层里的序号（1 基）
 local function playerBuildIndex()
-    for i = 1, Lib.buildNumber do
-        local e = Lib.buildList[i]
-        if e.num == PLAYER_SPRITE then return i end
+    local n = MR.buildingCount()
+    for i = 0, n - 1 do
+        local e = MR.buildingAt(i)
+        if e.num == PLAYER_SPRITE then return i + 1 end
     end
     return nil
 end
 
--- DrawMMap 发出的绘制序列里，主角是第几个「建筑层」绘制、其后还有多少条目
+-- drawMain 发出的绘制序列里，主角是第几个「建筑层」绘制、其后还有多少条目
 local function playerDrawPosition(x, y)
     draws = {}
-    Lib.DrawMMap(x, y, PLAYER_PIC)
+    MR.drawMain(x, y, PLAYER_PIC)
     local total = #draws
-    local buildStart = total - Lib.buildNumber + 1
+    local buildStart = total - MR.buildingCount() + 1
     local at
     for i = buildStart, total do
         if draws[i].pic == PLAYER_SPRITE then at = i end
@@ -223,13 +306,17 @@ end
 function TestMmapDepth.testBuildListDoesNotGrow()
     print("\n=== Test: 反复 BuildingSort 不增长 buildList ===")
     if not bootEngine() then return end
-    local initial = #Lib.buildList
+    local e0 = EXPECTED[1]
+    MR.buildingSort(e0[1], e0[2], PLAYER_PIC)
+    local initial = MR.buildingCount()
     for round = 1, 40 do
         local e = EXPECTED[(round - 1) % #EXPECTED + 1]
-        Lib.BuildingSort(e[1], e[2], PLAYER_PIC)
+        MR.buildingSort(e[1], e[2], PLAYER_PIC)
     end
-    TestHelper.assertEquals(initial, #Lib.buildList,
-        "40 次 BuildingSort 之后 buildList 长度不应变化（原版 memmove 是原地右旋）")
+    -- 回到同一个坐标，条目数必须与首次一致（原版 memmove 是原地右旋，数组不增长）
+    MR.buildingSort(e0[1], e0[2], PLAYER_PIC)
+    TestHelper.assertEquals(initial, MR.buildingCount(),
+        "40 次 BuildingSort 之后同一坐标的条目数不应变化（原版原地右旋）")
 end
 
 -- 判据 3：主角必须按排序位置参与那一趟绘制，不能最后单独补画。
@@ -272,7 +359,7 @@ function TestMmapDepth.testNoPositionDrawsPlayerLast()
             local drawIdx = playerDrawPosition(gx, gy)
             if drawIdx then
                 checked = checked + 1
-                if drawIdx == Lib.buildNumber then
+                if drawIdx == MR.buildingCount() then
                     bad[#bad + 1] = string.format("(%d,%d)", gx, gy)
                 end
             end

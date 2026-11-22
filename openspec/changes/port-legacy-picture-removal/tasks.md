@@ -92,19 +92,25 @@
 **Blast Radius**：`game/engine-love2d/lib_love.lua`、`game/engine-love2d/engine_love2d.lua`
 
 **DoD**：
-- [ ] 删 `lib_love.lua:233-683`（`LoadPallette`/`PicInit`/`picFileCache`/`PicCache`/
-      `PicFile`/`LoadPic`/`PicLoadFile`/`PicGetXY`/`PicLoadCache`/`JY_LoadPic`/
-      `DrawPicTinted`/`LoadPicture`/`pictureCache`/`ClearPictureCache`）
-- [ ] 删 `lib_love.lua:1075-1193`（`DrawMMap`）
-- [ ] 删 `lib_love.lua:1502-1584`（`DrawSMap`）
-- [ ] 删 `lib_love.lua:1666-1790`（`DrawWarMap`）
-- [ ] `engine_love2d.lua`：删旧 `EngineAPI.PicInit` / `EngineAPI.ShowSurface` /
-      `EngineAPI.ShowSlow` / `EngineAPI.LoadPicture` 4 个偷渡键（非契约）
-- [ ] `sprite.initSprites` 改走 `SpriteDecoder.loadPalette`（不再 `lib.PicInit`）
-- [ ] `sprite.clearPictureCache` 改清 `_picCache`
-- [ ] `grep -nE 'LoadPic|PicLoad|PicGetXY|PicInit|picFileCache|palletteIdx' lib_love.lua`（非注释）= 0
-- [ ] 全量测试零失败；三界面截图；`luac5.1 -p` / `luac55 -p` 零失败
-- [ ] 一个 commit
+- [x] 删旧贴图子系统（425 行）：`LoadPallette`/`color32Pallette`/`PicInit`/
+      `picFileCache`/`PicCache`/`PicFile`/`LoadPic`/`PicLoadFile`/`PicGetXY`/
+      `PicLoadCache`/`JY_LoadPic`/`DrawPicTinted`/`LoadPicture`/`pictureCache`/
+      `ClearPictureCache`
+- [x] 删 `DrawMMap` / `DrawSMap` / `DrawWarMap`（363 行；`JY_LoadPic` 已不存在）
+- [x] `engine_love2d.lua`：删 2 个偷渡键 `EngineAPI.PicInit` / `EngineAPI.LoadPicture`
+      （`ShowSurface` / `ShowSlow` 是 `present` 的底层，保留）
+- [x] `sprite.initSprites` 不再调 `lib.PicInit`（调色板归 framework，写进注释与日志）
+- [x] `sprite.clearPictureCache` 改清 `_picCache`（**修活体缺陷**：原来清的是
+      `lib_love.pictureCache`，而 `drawPictureFile` 用的是 `_picCache` —— 两张表）
+- [x] `lib_love.lua` 从 1795 行降到 **875 行**（-920 行）
+- [x] 旧链符号清零：`grep` 非注释命中 0（`LoadPic`/`PicLoad`/`PicGetXY`/
+      `PicInit`/`picFileCache`/`palletteIdx`/`DrawMMap`/`DrawSMap`/`DrawWarMap`）
+- [x] 全量测试 4072/0；`luac5.1 -p` / `luac55 -p` 零失败；
+      三界面截图（场景 `1efd2af3…` / 战斗 `6c8eb322…` md5 不变）
+- [x] 连带修复 3 个测试套件（它们断言的是旧链）：
+      `test_mmap_depth` 改走 `map_render`、`test_archive_dual_write` 改为
+      「旧链已消失」断言、`test_format_spec` 的 consumer 改指 `SpriteAtlas`
+- [x] 一个 commit
 
 ## Task 7：门禁 + 文档
 

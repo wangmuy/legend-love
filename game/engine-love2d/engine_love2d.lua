@@ -106,11 +106,18 @@ EngineAPI.render.getHeight = function()
 end
 
 -- sprite 模块
+--
+-- **paletteFile 现在无需引擎处理**（port-legacy-picture-removal Task 6）：
+--   原版 `PicInit` 的唯一作用是加载 256 色调色板，因为 RLE 精灵的像素值是
+--   调色板索引。现在 RLE 解码在 `framework/sprite_decoder.lua`，
+--   调色板由 `SpriteAtlas.loadArchive({paletteFile=...})` 自己读
+--   （`SpriteDecoder.loadPalette`，同样 ×4 放大）。
+--   所以引擎侧**不再需要调色板** —— 不是"静默丢弃"，是职责已转移。
 EngineAPI.sprite.initSprites = function(paletteFile)
-    -- 原版 PicInit 的唯一作用是加载调色板（RLE 精灵的像素值是调色板索引，
-    -- 不加载就全黑）。带参数时必须真的加载，不能静默丢弃。
-    if paletteFile ~= nil then
-        lib.PicInit(paletteFile)
+    if paletteFile ~= nil and EngineAPI.debug and EngineAPI.debug.log then
+        -- 留一条日志便于排查「以为引擎会加载调色板」的误解
+        EngineAPI.debug.log("sprite.initSprites: palette handled by framework "
+                            .. "(sprite_decoder.loadPalette), ignored: " .. tostring(paletteFile))
     end
 end
 
@@ -217,9 +224,17 @@ end
 -- handle 结构由 createFromRGBA/createFromEncoded 产生：
 --   { img=löve Image, w=, h=, xoff=, yoff= }
 -- 引擎不需要知道这个纹理来自 .idx/.grp 还是 PNG 图集。
+--- 清空「按文件名缓存的整图」
+--
+-- **修了一个活体缺陷**（port-legacy-picture-removal Task 6）：
+--   原实现调 `lib.ClearPictureCache()`，清的是 lib_love 里的 `pictureCache`
+--   （旧 `LoadPicture` 用的表，已随旧贴图子系统删除）；
+--   而真正在用的 `drawPictureFile` 用的是 `EngineAPI.sprite._picCache`
+--   （本文件 188-191 行）—— **两张不同的表**。
+--   于是 `jymain.lua` 调 `clearPictureCache()` 想清整图缓存时，
+--   `_picCache` 纹丝不动（内存只增不减，且换图不生效）。
 EngineAPI.sprite.clearPictureCache = function()
-    -- 对应 lib.LoadPicture("") 的隐式副作用：清空按文件名缓存的整图
-    lib.ClearPictureCache()
+    EngineAPI.sprite._picCache = {}
 end
 
 EngineAPI.sprite.drawHandle = function(handle, x, y, flags, alpha)
@@ -1145,9 +1160,10 @@ EngineAPI.SetDrawLoopFlag = function(flag)
     end
 end
 
-EngineAPI.PicInit = function(paletteFile)
-    lib.PicInit(paletteFile)
-end
+-- **已删除的偷渡键**（port-legacy-picture-removal Task 6）：
+--   `EngineAPI.PicInit`     → 调色板归 framework（见 sprite.initSprites）
+--   `EngineAPI.LoadPicture` → 用 `sprite.drawPictureFile`（真正在用的那个）
+-- 它们从来不是契约（engine_api.lua 没声明），只是 lib_love 的透传。
 
 EngineAPI.ShowSurface = function(flag)
     lib.ShowSurface(flag)
@@ -1155,10 +1171,6 @@ end
 
 EngineAPI.ShowSlow = function(delay, flag)
     lib.ShowSlow(delay, flag)
-end
-
-EngineAPI.LoadPicture = function(filename, x, y)
-    lib.LoadPicture(filename, x, y)
 end
 
 -- Love2D 引擎初始化

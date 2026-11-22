@@ -587,17 +587,17 @@ end
 -- 每项：{ name, kind, idx, grp, ... }
 M.FORMATS = {
     { name = "hdgrp",   family = "idx_grp_rle", idx = "resource/hdgrp.idx",   grp = "resource/hdgrp.grp",
-      consumer = "lib_love.PicLoadFile" },
+      consumer = "framework.sprite_atlas.loadArchive" },
     { name = "eft",     family = "idx_grp_rle", idx = "resource/eft.idx",     grp = "resource/eft.grp",
-      consumer = "lib_love.PicLoadFile" },
+      consumer = "framework.sprite_atlas.loadArchive" },
     { name = "warfld",  family = "idx_grp_rle", idx = "resource/warfld.idx",  grp = "resource/warfld.grp",
-      consumer = "lib_love.PicLoadFile" },
+      consumer = "framework.sprite_atlas.loadArchive" },
     { name = "cloud",   family = "idx_grp_rle", idx = "resource/cloud.idx",   grp = "resource/cloud.grp",
-      consumer = "lib_love.PicLoadFile" },
+      consumer = "framework.sprite_atlas.loadArchive" },
     { name = "title",   family = "idx_grp_rle", idx = "resource/title.idx",   grp = "resource/title.grp",
-      consumer = "lib_love.PicLoadFile" },
+      consumer = "framework.sprite_atlas.loadArchive" },
     { name = "mmap",    family = "idx_grp_rle", idx = "resource/mmap.idx",    grp = "resource/mmap.grp",
-      consumer = "lib_love.PicLoadFile", segments = { { offset = 0, count = 3731 } } },
+      consumer = "framework.sprite_atlas.loadArchive", segments = { { offset = 0, count = 3731 } } },
     { name = "talk",    family = "idx_grp_text", idx = "resource/talk.idx",   grp = "resource/talk.grp",
       consumer = "jymain.ReadTalk" },
     -- kdef 是「构建期」消费：mod_build.lua:892 的 local function extractKdef

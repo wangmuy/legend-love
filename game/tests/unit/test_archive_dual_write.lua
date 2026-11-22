@@ -149,25 +149,37 @@ function TestArchiveDualWrite.testNoSelfRecursion()
         "helper 体内不应再调 EngineAPI.sprite.loadArchive（双写已摘除）")
 end
 
--- ------------------------------------------------------------ ③ 引擎侧确实读 picFileCache
+-- ------------------------------------ ③ 历史：为什么曾经必须双写
 
-function TestArchiveDualWrite.testEngineMapDrawReadsPicCache()
-    print("\n=== Test: 引擎的地图绘制确实经过 PicLoadCache（这是必须双写的根因）===")
+--- **历史回归（已不再适用，保留作教训记录）**：
+--
+--   `port-map-render-native` 之前，引擎自己的 `DrawMMap/DrawSMap/DrawWarMap`
+--  经 `JY_LoadPic = PicLoadCache` 读 `picFileCache`，而 `SpriteAtlas` 不写它
+--  → 只写一套会地图全黑 → 需要 `LoadArchiveBoth` 双写。
+--
+-- `port-legacy-picture-removal`（2026-11-22）删掉了那一整条链：
+--   `lib_love` 的 LoadPic/PicLoadFile/PicLoadCache/JY_LoadPic/picFileCache
+--   与 DrawMMap/DrawSMap/DrawWarMap 全部移除；地图绘制改走
+--   `framework/map_render.lua` → `SpriteAtlas` → `sprite.drawHandle`。
+--   所以「双写」这个妥协本身已经没有必要，本套件的 ③ 改为**断言旧链已消失**。
+function TestArchiveDualWrite.testLegacyPicCacheChainRemoved()
+    print("\n=== Test: 旧的 picFileCache 贴图链已从 lib_love 删除 ===")
     local src = readSource("engine-love2d/lib_love.lua")
     TestHelper.assertNotNil(src, "应能读到 lib_love.lua")
+    local code = stripComments(src)
 
-    -- JY_LoadPic = PicLoadCache（别名）
-    TestHelper.assertNotNil(src:find("local JY_LoadPic = PicLoadCache", 1, true),
-        "应有 `local JY_LoadPic = PicLoadCache`（地图绘制的贴图上传入口）")
-
-    -- DrawSMap / DrawMMap / DrawWarMap 都要用 JY_LoadPic
-    for _, fn in ipairs({ "DrawSMap", "DrawMMap", "DrawWarMap" }) do
-        local fnStart = src:find("function " .. fn, 1, true)
-        TestHelper.assertNotNil(fnStart, "应有 " .. fn)
-        local fnEnd = src:find("\nend", fnStart)
-        local body = src:sub(fnStart, fnEnd)
-        TestHelper.assertNotNil(body:find("JY_LoadPic", 1, true),
-            fn .. " 应经 JY_LoadPic（= PicLoadCache）上传贴图")
+    for _, sym in ipairs({
+        "local JY_LoadPic = PicLoadCache",
+        "function PicLoadCache(",
+        "function PicLoadFile(",
+        "function PicGetXY(",
+        "function LoadPic(",
+        "function DrawMMap(",
+        "function DrawSMap(",
+        "function DrawWarMap(",
+    }) do
+        TestHelper.assertNil(code:find(sym, 1, true),
+            "lib_love 不应再有 " .. sym .. "（已随旧贴图子系统删除）")
     end
 end
 
@@ -212,7 +224,7 @@ function TestArchiveDualWrite.runAll()
     TestArchiveDualWrite.testJymainNoSingleWrite()
     TestArchiveDualWrite.testJymainUsesHelper()
     TestArchiveDualWrite.testNoSelfRecursion()
-    TestArchiveDualWrite.testEngineMapDrawReadsPicCache()
+    TestArchiveDualWrite.testLegacyPicCacheChainRemoved()
     TestArchiveDualWrite.testSingleWriteBreaksPicCache()
 
     return TestHelper.printSummary()
