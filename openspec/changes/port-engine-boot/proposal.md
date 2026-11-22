@@ -49,11 +49,13 @@ map_render / sprite_atlas / cloud_layer / status_page / MenuAsync 五条主链�
 
 ## What Changes
 
-1. **新增 4 个契约**（90 → 94）：
+1. **新增 5 个契约**（90 → 95）：
    - `app.install(runtime)` —— 唯一必须实现的「启动」契约
    - `app.requestQuit()` —— 宿主退出钩子
    - `render.beginFrame()` / `render.endFrame()` —— 成对的绘制边界
      （替代容易传反的 `setDrawLoopFlag(boolean)`，后者标 `@deprecated` 并保留转发）
+   - `time.formatNow(fmt)` —— 本地墙上时间（**修正**：原计划说不加，
+     但 `getTimeSeconds` 是单调计时而非 Unix 纪元秒，自己算日期会得到 1970-01-01）
 2. **新增 `game/framework/boot.lua`**：把 147 行装配序列搬进 framework。
    `Boot.install / update / draw / quit / requestQuit` 五个入口。
    `Boot.draw` 用 `pcall` 保证「出错也一定 endFrame」（否则绘制状态跨帧泄漏）。

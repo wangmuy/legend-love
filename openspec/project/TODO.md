@@ -85,6 +85,17 @@
     假装加载调色板
   - 新增 gate STEP J 锁死（负向对照已验证）
 
+- [x] ~~**入口/生命周期没有契约**~~ —— **已完成**（`port-engine-boot`，2026-11-22）
+  - 实测：`engine_api.lua` 90 个契约里**没有一个** load/update/draw/quit；
+    147 行装配序列只在 `main.lua` 的 `love.load()` 里
+  - 结果：新增 5 个契约（90 → 95）+ `framework/boot.lua`；
+    入口从「自己装配」变成 4 行转发（`Boot.install/update/draw/quit`）
+  - 顺带修：裸名 require 别名提到 framework（MUD 此前完全没有 → 跑不了 script 层）；
+    4 处主路径 io/os 收进契约（`time.formatNow` 1 个新契约 + `framework/clock.lua`）
+  - 实测验证：模拟 Godot 宿主（无 love / 无 lib / 只实现契约）
+    `app.install → update×3 → draw×3 → requestQuit → quit` 全部 OK
+  - 全量 4271/0；gate 新增 STEP F2（缝合层白名单）+ STEP L（清单存在性）
+
 - [x] ~~**26 处阻塞 `lib.Delay`**~~ —— **已完成**（`port-blocking-delay`）
   - `lib.Delay` = `love.timer.sleep` → 真阻塞主线程（实测 101ms）
   - 26 处全在事件协程里 → 换成 `WaitFrame`（协程里 `waitForTime` 协作式）

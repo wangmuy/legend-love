@@ -25,12 +25,12 @@
 
 ## EngineAPI 架构
 
-EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 15 个模块（render/sprite/map/input/audio/time/file/script/font/dialog/color/debug/coroutine/app/system）。所有引擎操作通过 `EngineAPI.*` 或 `lib.*` 调用，`game/script/` 中的脚本不直接依赖任何引擎。
+EngineAPI 是 `game/script/` 与底层游戏引擎之间的抽象层，覆盖 15 个模块（render/sprite/map/input/audio/time/file/script/font/dialog/color/debug/coroutine/app/system），当前 **95 个契约函数**。所有引擎操作通过 `EngineAPI.*` 调用（`_G.lib` 兼容层已于 `port-compat-layer-removal` 删除），`game/framework/` 与 `game/script/` 都不直接依赖任何引擎。
 
 ```
 game/script/ (游戏逻辑)
     → instruct_0~67 / JY.* / CC.*
-    → EngineAPI.* / lib.*
+    → EngineAPI.*            ← 唯一通道（_G.lib 已删除）
 
 game/
 ├── engine-love2d/     ← Love2D 引擎实现（可整体替换）
@@ -63,10 +63,30 @@ game/
 
 ### 换引擎方式
 
-1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 79 个函数
+**完整清单见 `engine-love2d/engine_api.lua` 文件头的「新引擎实现清单」。** 摘要：
+
+1. 实现 `engine-xxx/engine_xxx.lua`，实现 EngineAPI 全部 **95 个**函数
    （契约定义见 `engine-love2d/engine_api.lua`；本仓现有 4 个实现：LÖVE / MUD / Web / 测试桩）
-2. 实现对应的 `main.lua` 入口（Love2D 用 `love.*` 回调，MUD 用 `main()`）
-3. `framework/` 和 `script/` 完全不变
+2. `require("framework.require_aliases")` —— 裸名 require 别名
+   （`script/jymain.lua` 用 `require "lib_file"` 这种形态）
+3. 提供 `EngineAPI.init()`（**隐式约定**，契约文件里没声明但会被调用）
+4. 提供 3 个全局：`CONFIG`（`framework/config.lua`）、`CC`（`script/jyconst.lua`）、
+   `Byte`（`framework/lib_Byte`）—— 由 `framework/boot.lua` 负责设置
+5. 入口只需 4 行（**不必**再抄装配序列，那是 `framework/boot.lua` 的事）：
+
+   ```lua
+   local Boot = require("framework.boot")
+   Boot.install({ quit = function() ... end })   -- 一次
+   function _process(dt) Boot.update(dt) end      -- 每帧，dt 单位=秒
+   function _draw()      Boot.draw()   end        -- 每帧，必须在绘制回调内
+   function _exit()      Boot.quit()   end        -- 退出
+   ```
+
+6. `framework/` 和 `script/` 完全不变
+
+> **立即模式警告**：本抽象层是立即模式（每帧全量重画），`render.*` 必须在
+> 宿主的帧绘制回调内调用。Godot 的 `draw_string()` 在 `_draw()` 之外调用
+> **不报错、不警告、只是什么都不画** —— 表现是「逻辑在跑但屏幕全黑」。
 
 ## 事件驱动架构
 
@@ -199,7 +219,8 @@ game/debug.txt
 
 ### 错误处理
 
-- 使用 `lib.Debug()` 输出调试信息 (`CONFIG.Debug=1` 时写入 debug.txt)
+- 使用 `EngineAPI.debug.log()` 输出调试信息（`CONFIG.Debug=1` 时写入 debug.txt）
+  > `lib.Debug` 随 `_G.lib` 兼容层一起删除；`lib.*` 在 script/framework 层已归零
 - 对可能失败的操作使用 `pcall()`
 
 ### 缩进规范
@@ -252,6 +273,10 @@ end
 ```
 
 ## 原版实现参考
+
+> **注意**：以下 `lib.*` 与原版阻塞式循环是**原版 C 移植参考**，当前 Love2D 版
+> **不使用**这些写法 —— 事件驱动架构已把它们替换为 `EngineAPI.*` 契约 +
+> `AsyncGlobals`（见 `framework/async_globals.lua`）。保留它是为了对照原版语义。
 
 ```lua
 -- 原版阻塞式循环

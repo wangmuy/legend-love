@@ -64,10 +64,11 @@
 `game/engine-web/web_game_bridge.lua`、`tests/engine_test.lua`
 
 **DoD**：
-- [ ] 5 个别名写死在一处，require 时自动 install（幂等）
-- [ ] 4 引擎都改成 `require("framework.require_aliases")`
-- [ ] `web_game_bridge.lua` 的重复注册表统一过来
-- [ ] `engine_api.lua` 头部加「新引擎实现清单」：
+- [x] 5 个别名写死在一处，require 时自动 install（幂等）
+- [x] 4 引擎都改成 `require("framework.require_aliases")`
+      （MUD/Test 此前**完全没有** → 跑不了 script 层；Web 原有 26 个「顺带注册」）
+- [x] `web_game_bridge.lua` 的重复注册表统一过来（26 → 5）
+- [x] `engine_api.lua` 头部加「新引擎实现清单」：
       ① 实现 94 个契约 ② `require framework.require_aliases`
       ③ `EngineAPI.init()`（隐式约定） ④ 3 个全局（CONFIG/CC/Byte）
       ⑤ 6 步启动序列 ⑥ 每帧 3 个调用 + 绘制边界 ⑦ dt 单位 ⑧ 绘制时机
@@ -78,11 +79,17 @@
 `game_states.lua`、`lib_log.lua`、`framework/clock.lua`（新）
 
 **DoD**：
-- [ ] `ModIni.readFile` 优先 `EngineAPI.file.read`，兜底 `io.open`
-- [ ] `math.randomseed` 用 `EngineAPI.time.getTimeSeconds`，兜底 `os.time`
-- [ ] 存档时间戳 / 日志时间戳走 `framework/clock.lua`（不新增契约）
-- [ ] 日志时间戳失败时降级为「无时间戳」（不崩）
-- [ ] 新增 `test_engine_io_portability.lua`
+- [x] `ModIni.readFile` 优先 `EngineAPI.file.read`，兜底 `io.open`
+- [x] `math.randomseed` 用 `EngineAPI.time.getTimeSeconds` × 1000，兜底 `os.time`
+      **取毫秒不取秒**：getTimeSeconds 是单调计时（启动时恒 0.x），
+      floor 成秒永远是 0 → 每次启动随机序列相同
+- [x] 存档时间戳 / 日志时间戳走 `framework/clock.lua`
+      **修正原计划**：加了 1 个契约 `time.formatNow`（94 → 95）。
+      原计划说「用 getTimeSeconds 自己算 Y-M-D」是**语义错误** ——
+      getTimeSeconds 不是 Unix 纪元秒，自己算只会得到 1970-01-01，
+      且每次启动都一样，存档时间戳会变成明显错误的数据
+- [x] 日志时间戳失败时降级为 `"-"`（不崩）
+- [x] 新增 `test_engine_io_portability.lua`（54 断言）
 
 ## Task 7：门禁 + 测试 + 文档
 
@@ -90,13 +97,17 @@
 `test_require_aliases.lua`、`docs/screenshots/README.md`
 
 **DoD**：
-- [x] 新增 `test_boot.lua`（61 断言）
-- [x] gate 断言 `engine_api.lua` 含「新引擎实现清单」
-- [ ] gate STEP F 为 `framework/boot.lua` 开**显式**白名单
-      （它是缝合层，允许调 script 全局；但不能让别的模块借此漏过）
+- [x] 新增 `test_boot.lua`（61 断言）+ `test_require_aliases.lua`（45）
+      + `test_engine_io_portability.lua`（54）
+- [x] gate STEP L：`engine_api.lua` 含「新引擎实现清单」+ 写明
+      `framework.require_aliases`
+- [x] gate STEP F2：**显式白名单**（`boot|war_async`）登记允许 require
+      script 的 framework 模块；另断言「装配入口唯一（只有 boot）」
+      负向对照已验证 FAIL（往 status_page 加 require("script.jymain")）
 - [x] 修正 `docs/screenshots/README.md` 里 save-menu 的判据分类
       （原来标「逐字节稳定」是错的 —— 背景含随机云）
-- [x] 全量测试 4172/0；门禁 PASS；双版本 luac 零失败；场景/战斗 md5 不变
+- [x] 全量测试 **4271/0**；门禁 PASS；双版本 luac 零失败；
+      场景 `1efd2af3…` / 战斗 `6c8eb322…` md5 不变
 
 ## 依赖
 
