@@ -118,16 +118,18 @@
 `openspec/changes/engine-portability/change-manifest.md`、`docs/screenshots/README.md`
 
 **DoD**：
-- [ ] STEP D 删除「`lib_love.LoadPic` 仍存在」的说明段；
-      判据改为「4 引擎（含 engine-love2d）零 RLE 解码特征」
-- [ ] 新增 STEP J：`lib_love.lua` 零 `LoadPic|PicLoad|PicGetXY|picFileCache`
-- [ ] 负向对照：往 `lib_love.lua` 加一处 `PicLoadCache` → gate FAIL
-- [ ] 更新 `TODO.md`：删「`lib_love.LoadPic` 119 行 + 兼容层用途」条目
-- [ ] 更新 `change-manifest.md`：`port-native-api-completion` 的说明里
-      「119 行删不掉」改为「已由 port-legacy-picture-removal 拆除」
-- [ ] 更新 `docs/screenshots/README.md`：加 item-menu / item-grid / person-status 基线
-- [ ] 五门禁 + 全量测试
-- [ ] 一个 commit
+- [x] STEP D 删除「`lib_love.LoadPic` 仍存在」的说明段；
+      判据扩为「4 引擎（含 engine-love2d）零 RLE 解码特征」
+- [x] 新增 STEP J（2 条）：① `lib_love.lua` 零旧贴图符号
+      ② 三个 map 绘制契约都先取 `mapRender()`（缺失即抛错）
+- [x] 负向对照：往 `lib_love.lua` 加一处 `PicLoadCache` → gate FAIL ✓
+- [x] 顺带修门禁自身一个 bug：单文件 `grep -n` 输出是 `649:--`（**无文件名前缀**），
+      原排除规则 `:[0-9]+:\s*--` 匹配不到 → 注释被当代码。改为 `(^|:)[0-9]+:`
+- [x] 更新 `TODO.md`（旧贴图条目改为已完成，记录 -920 行）
+- [x] 更新 `change-manifest.md`（该 change 标为 Complete + 结果）
+- [x] `docs/screenshots/README.md` 的界面基线是前一个 change 加的，已就位
+- [x] 五门禁 + 全量测试 4072/0
+- [x] 一个 commit
 
 ## 依赖
 

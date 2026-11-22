@@ -201,8 +201,10 @@ parent_epic: null
   7. 修 `clearPictureCache` 清错表（清 `lib_love.pictureCache` 而非 `_picCache`）
 - **前提修正**：slice 记的是「要删 `LoadPic` 得先改旧事件脚本的调用方式」。
   **实测事件脚本零 `lib.`**；真正阻塞的是 3 个死契约 + dialog 逃逸舱 + 云子系统。
+- **结果**：`lib_love.lua` **1795 → 875 行**（-920）；全量测试 4072/0；
+  场景/战斗 md5 不变；新增 gate STEP J
 - **Depends On**: `port-compat-layer-removal`
-- **Status**: [ ] Not Started
+- **Status**: [x] Archived / Complete（port-legacy-picture-removal）
 
 ### Change: port-audio-semantics
 

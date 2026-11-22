@@ -76,6 +76,15 @@
   - ⚠️ **回归**：Task 4 改单写导致地图全黑，已由 `LoadArchiveBoth` 双写修复
     （见该 change tasks.md 的「回归修复」一节）
 
+- [x] ~~**`lib_love` 旧贴图子系统（425 行）+ 3 个地图绘制函数（363 行）**~~
+      —— **已完成**（`port-legacy-picture-removal`，2026-11-22）
+  - 实测推翻原前提：27808 个事件脚本零 `lib.*`，真正阻塞是 3 个死契约 +
+    dialog 逃逸舱 + 云子系统
+  - 结果：`lib_love.lua` **1795 → 875 行**（-920）
+  - 顺带修 2 个活体缺陷：`clearPictureCache` 清错表、`sprite.initSprites`
+    假装加载调色板
+  - 新增 gate STEP J 锁死（负向对照已验证）
+
 - [x] ~~**26 处阻塞 `lib.Delay`**~~ —— **已完成**（`port-blocking-delay`）
   - `lib.Delay` = `love.timer.sleep` → 真阻塞主线程（实测 101ms）
   - 26 处全在事件协程里 → 换成 `WaitFrame`（协程里 `waitForTime` 协作式）
@@ -181,8 +190,9 @@
   - 新增 2 个契约：`map.loadClouds`（云层加载+烘焙）、`sprite.clearPictureCache`
     （`lib.LoadPicture("")` 的隐式副作用）→ 契约数 88 → **90**
   - **`.idx/.grp` 现在对引擎彻底不透明**：`framework/sprite_decoder.lua` 解容器，
-    引擎只收 handle；`lib_love.lua` 的 `LoadPic` RLE 解码**只剩 3 个死契约的入口**
-    （`sprite.draw`/`drawTinted`/`loadArchive` 实测 0 消费者）
-    → 由 `port-legacy-picture-removal` 拆除
+    引擎只收 handle
+  - **`lib_love.LoadPic` 的 119 行已彻底删除**（`port-legacy-picture-removal` ✓ 2026-11-22）：
+    连同 `PicLoadFile/PicGetXY/PicLoadCache/picFileCache/DrawMMap/DrawSMap/DrawWarMap`
+    共 **920 行**（1795 → 875）。云子系统 190 行搬进 `framework/cloud_layer.lua`
   - 顺带修 2 个测试判据误报（`allsinbk` 死参数只认 `LoadSMap(`、
     `test_battle_flow_headless` 只 stub `lib.*` 没 stub `EngineAPI.map`）

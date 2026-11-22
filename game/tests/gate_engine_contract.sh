@@ -49,13 +49,13 @@ fi
 # ---------------------------------------- B. framework 无 love.* 直接调用
 log "=== STEP: B. framework 零 love.* 直接调用 ==="
 bad_b=$(grep -rn 'love\.' game/framework/*.lua 2>/dev/null \
-        | grep -vE ':[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+        | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_b" ] || bad_b=0
 if [ "$bad_b" -eq 0 ]; then
     log "  [PASS] framework/ 无 love.* 直接调用"
 else
     log "  [FAIL] framework/ 有 $bad_b 处 love.*："
-    grep -rn 'love\.' game/framework/*.lua | grep -vE ':[0-9]+:[[:space:]]*--' | head -5 | tee -a "$LOG"
+    grep -rn 'love\.' game/framework/*.lua | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | head -5 | tee -a "$LOG"
     fail=$((fail + 1))
 fi
 
@@ -63,7 +63,7 @@ fi
 log "=== STEP: C. framework 零 require engine-* ==="
 # **排除注释行**：注释里写「不 require("engine-*")」是说明文字，不是违规。
 # （实测踩过：map_render.lua 的负约束注释触发了这条判据。）
-bad_c=$(grep -rn 'require("engine' game/framework/*.lua 2>/dev/null        | grep -vE ':[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+bad_c=$(grep -rn 'require("engine' game/framework/*.lua 2>/dev/null        | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_c" ] || bad_c=0
 if [ "$bad_c" -eq 0 ]; then
     log "  [PASS] framework/ 无 require engine-*"
@@ -74,25 +74,24 @@ fi
 
 # --------------------- D. 引擎里不得有 RLE 解码逻辑（ADR-PORT-013）
 log "=== STEP: D. 引擎零 RLE 解码逻辑 ==="
-# 判据：引擎实现里不应出现调色板逐像素解码的关键特征
-bad_d=$(grep -rn 'palletteIdx\|paletteIdx\|color32Pallette' game/engine-mud/engine_mud.lua \
+# 判据：引擎实现里不应出现调色板逐像素解码的关键特征。
+#
+# **4 引擎全部纳入（含 engine-love2d）**：
+#   port-legacy-picture-removal（2026-11-22）删掉了 lib_love 的 425 行旧贴图
+#   子系统（含 LoadPic 的 119 行 RLE 解码 + picFileCache 链），因此原先
+#   「engine-love2d 豁免」与「LoadPic 仍存在」两段说明都不再成立，已删除。
+bad_d=$(grep -rn 'palletteIdx\|paletteIdx\|color32Pallette' \
+        game/engine-love2d/lib_love.lua \
+        game/engine-mud/engine_mud.lua \
         game/engine-web/engine_web.lua game/tests/engine_test.lua 2>/dev/null \
-        | grep -vE ':[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+        | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_d" ] || bad_d=0
 if [ "$bad_d" -eq 0 ]; then
-    log "  [PASS] MUD/Web/Test 三引擎无 RLE 解码逻辑（应住 framework/sprite_decoder.lua）"
+    log "  [PASS] LÖVE/MUD/Web/Test 四引擎无 RLE 解码逻辑（都应住 framework/sprite_decoder.lua）"
 else
     log "  [FAIL] 引擎里出现 RLE 解码特征 $bad_d 处（违反 ADR-PORT-013）"
     fail=$((fail + 1))
 fi
-# **豁免已摘除**（port-sprite-native-migration Task 7）：
-# `script/` 层已零 `lib.Pic*`（实测 0 处），所以不再为 engine-love2d 单开豁免。
-# 下面的 STEP D2 用同一判据检查（hard fail）。
-#
-# 注意：`lib_love.lua` 的 `LoadPic`（119 行 RLE 解码）**仍存在** ——
-# 它被 `PicLoadFile` 调用，而 `PicLoadFile` 仍被 `EngineAPI.sprite.loadArchive`
-# 消费（war_async 的双轨补丁需要它：引擎内部的 DrawWarMap 走 PicLoadCache
-# → picFileCache）。见 port-sprite-native-migration Task 6 的实测结论。
 
 # ---------------------------------------- D3. script/ 零 lib.Delay（含 fallback）
 log "=== STEP: D3. script/ 零 lib.Delay（阻塞主线程）==="
@@ -337,7 +336,7 @@ else
     fail=$((fail + 1))
 fi
 
-bad_i2=$(grep -nE '(^|[^A-Za-z0-9_])lib\.[A-Za-z]' game/engine-love2d/lib_love.lua 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+bad_i2=$(grep -nE '(^|[^A-Za-z0-9_])lib\.[A-Za-z]' game/engine-love2d/lib_love.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_i2" ] || bad_i2=0
 if [ "$bad_i2" -eq 0 ]; then
     log "  [PASS] lib_love.lua 代码行零 lib.*（无循环依赖）"
@@ -347,13 +346,39 @@ else
     fail=$((fail + 1))
 fi
 
-bad_i3=$(grep -rn 'rawget(_G, *"lib")' game/framework/*.lua game/script/*.lua         game/script/battle/*.lua game/main.lua 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+bad_i3=$(grep -rn 'rawget(_G, *"lib")' game/framework/*.lua game/script/*.lua         game/script/battle/*.lua game/main.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
 [ -n "$bad_i3" ] || bad_i3=0
 if [ "$bad_i3" -eq 0 ]; then
     log "  [PASS] framework/script/main 零 rawget(_G, \"lib\")"
 else
     log "  [FAIL] 仍有 $bad_i3 处 rawget(_G, \"lib\")："
     grep -rn 'rawget(_G, *"lib")' game/framework/*.lua game/script/*.lua         game/script/battle/*.lua game/main.lua 2>/dev/null         | grep -vE ':[0-9]+:[[:space:]]*--' | head -3 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
+# ---------------------------------------- J. 旧贴图子系统彻底删除
+log "=== STEP: J. lib_love 旧贴图子系统已删除（port-legacy-picture-removal）==="
+# 判据 ①：`lib_love.lua` 代码行零这些符号（注释豁免）。
+#   覆盖：RLE 解码入口（LoadPic）、档案链（PicLoad/PicGetXY/PicInit）、
+#   缓存（picFileCache）、调色板逐像素（palletteIdx/color32Pallette）、
+#   旧地图绘制（DrawMMap/DrawSMap/DrawWarMap —— 它们经 JY_LoadPic 读缓存）
+bad_j=$(grep -nE 'LoadPic|PicLoad|PicGetXY|PicInit|picFileCache|palletteIdx|color32Pallette|DrawMMap|DrawSMap|DrawWarMap'         game/engine-love2d/lib_love.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$bad_j" ] || bad_j=0
+if [ "$bad_j" -eq 0 ]; then
+    log "  [PASS] lib_love.lua 零旧贴图子系统符号（-920 行）"
+else
+    log "  [FAIL] lib_love.lua 仍有 $bad_j 处旧贴图子系统符号："
+    grep -nE 'LoadPic|PicLoad|PicGetXY|PicInit|picFileCache|palletteIdx|color32Pallette|DrawMMap|DrawSMap|DrawWarMap'         game/engine-love2d/lib_love.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | head -5 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
+# 判据 ②：三个 map 绘制契约都必须先取 mapRender()（缺失即抛错，不再回退旧实现）
+bad_j2=$(grep -c 'mapRender()' game/engine-love2d/engine_love2d.lua 2>/dev/null | tr -dc '0-9')
+[ -n "$bad_j2" ] || bad_j2=0
+if [ "$bad_j2" -ge 3 ]; then
+    log "  [PASS] 三个 map 绘制契约都先取 mapRender()（缺失即抛错）"
+else
+    log "  [FAIL] map 绘制契约未全部走 mapRender()（实测 $bad_j2 处，应 >= 3）"
     fail=$((fail + 1))
 fi
 
