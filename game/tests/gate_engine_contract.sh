@@ -401,6 +401,31 @@ else
     fail=$((fail + 1))
 fi
 
+# ------------------- L. 新引擎实现清单（Checklist）写在契约文件里
+log "=== STEP: L. engine_api.lua 含「新引擎实现清单」 ==="
+# 判据：契约文件里必须有这一节。
+#
+# 为什么用门禁锁文档：这段清单是「换引擎只需写 engine-xxx」的**唯一**书面
+# 依据，白名单式约定（EngineAPI.init / require_aliases / CONFIG/CC/Byte 全局 /
+# 启动序列 / dt 单位 / 绘制回调边界）全部在这里。误删之后代码仍能跑，
+# 但下一个人按契约实现新引擎会一路踩坑 —— 而且踩的是「跑起来才崩」的坑。
+#
+# 用 grep -F（固定串）：中文标题里没有正则特殊字符，固定串匹配最稳。
+if grep -qF '新引擎实现清单' game/engine-love2d/engine_api.lua 2>/dev/null; then
+    log "  [PASS] engine_api.lua 含「新引擎实现清单」章节"
+else
+    log "  [FAIL] engine_api.lua 缺「新引擎实现清单」章节（新引擎作者的唯一书面依据）"
+    fail=$((fail + 1))
+fi
+
+# 同章必须点到裸名别名的唯一注册处（清单第 2 条）
+if grep -qF 'framework.require_aliases' game/engine-love2d/engine_api.lua 2>/dev/null; then
+    log "  [PASS] 清单写明 require framework.require_aliases（裸名别名依赖）"
+else
+    log "  [FAIL] 清单未提 framework.require_aliases（script 层裸名 require 会崩）"
+    fail=$((fail + 1))
+fi
+
 # --------------------------------------------------------------- 汇总
 log "============================================"
 if [ "$fail" -eq 0 ]; then

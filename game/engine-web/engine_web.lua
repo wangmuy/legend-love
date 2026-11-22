@@ -1,6 +1,14 @@
 -- engine_web.lua
 -- Web/terminal EngineAPI implementation for Fengari Lua VM in browser
 -- All engine operations mapped to ANSI output + JSBridge communication
+--
+-- 裸名 require 别名（`require "lib_file"` 等）**不在本文件注册**，而是在
+-- engine-web/web_game_bridge.lua 的 `initWebFramework()` 里 require
+-- `framework.require_aliases`。原因：web 的装载顺序是
+-- 「引擎文件（本文件，用 loadLuaModule 直接执行）→ framework 模块
+-- （由 JS 侧 registerFrameworkModule 逐个注入 package.preload）→ script」，
+-- 本文件执行时 framework.* 还不在 package.preload 里，此刻 require 会失败。
+-- 注册点必须晚于 framework 注入、早于 script 加载 —— 只有 initWebFramework 满足。
 
 local EngineAPI = {}
 
