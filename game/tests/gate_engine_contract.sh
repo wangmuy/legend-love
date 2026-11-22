@@ -291,6 +291,53 @@ else
     fail=$((fail + 1))
 fi
 
+# ---------------------------- F2. 缝合层白名单（显式，不是默认放行）
+log "=== STEP: F2. framework 里允许 require script 的模块必须显式登记 ==="
+# **为什么需要这一条**（port-engine-boot）：
+#   `framework/boot.lua` 是「装配层」—— 它必须 require `script.jymain`
+#   来加载游戏逻辑。这是**设计上**的允许，不是漏判。
+#
+#   但「允许」必须是**白名单**形式：以后任何 framework 模块随手 require
+#   一个 script 模块，这里就会 FAIL。否则就是
+#   `port-ui-screens-verification` 发现过的那类问题（DoD 靠漏判成立，
+#   实际依赖方向已经反了却没人知道）。
+#
+# 判据只看**真的 require 了 script 模块**的形态（`require "script.xxx"` 或
+# `require(CONFIG.ScriptPath .. "xxx")`），不看「出现 ScriptPath 字样」——
+# `config.lua` 只是**定义** ScriptPath 常量，不是消费它。
+# 当前合法的两处：
+#   - boot.lua      → require(CONFIG.ScriptPath .. "jymain")  装配层
+#   - war_async.lua → require "script.battle.*"（战斗协程住 script，MOD 可覆盖）
+allow_script='boot|war_async'
+F2_CHECK=$(grep -rln -e 'require *("script\.' -e 'require *"script\.' \
+        -e 'require *(scriptPath *\.\.' -e 'require *(CONFIG\.ScriptPath' \
+        game/framework/*.lua 2>/dev/null \
+    | xargs -r -n1 basename 2>/dev/null \
+    | sed 's/\.lua$//' \
+    | grep -vE "^($allow_script)$" || true)
+n_f2=$(printf '%s' "$F2_CHECK" | grep -c . || true)
+[ -n "$n_f2" ] || n_f2=0
+if [ "$n_f2" -eq 0 ]; then
+    log "  [PASS] 只有白名单模块（$allow_script）require script/ 内容"
+else
+    log "  [FAIL] 未登记的 framework 模块 require 了 script/："
+    printf '%s\n' "$F2_CHECK" | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
+# 装配入口唯一：只允许 framework/boot.lua 加载 jymain 模块本体
+# 注意 boot.lua 里是 `pcall(require, scriptPath .. "jymain")` ——
+# require 后面跟的是**逗号**不是括号，模式里要允许空格/逗号
+boot_owners=$(grep -rEln 'require[[:space:](,]*scriptPath[[:space:]]*\.\.[[:space:]]*"jymain"' \
+        game/framework/*.lua 2>/dev/null \
+    | xargs -r -n1 basename 2>/dev/null | sed 's/\.lua$//' || true)
+if [ "$boot_owners" = "boot" ]; then
+    log "  [PASS] 装配入口唯一（framework/boot.lua）"
+else
+    log "  [FAIL] require jymain 的 framework 模块应为 boot，实测：${boot_owners:-（无）}"
+    fail=$((fail + 1))
+fi
+
 # ---------------------------- G. facade 层纯度
 log "=== STEP: G. facade 层不得读写游戏状态 ==="
 for f in render_facade flow_facade game_hooks; do
