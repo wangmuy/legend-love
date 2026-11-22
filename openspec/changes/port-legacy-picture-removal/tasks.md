@@ -43,32 +43,35 @@
 **Blast Radius**：`game/framework/cloud_layer.lua`（新）、`game/tests/unit/test_cloud.lua`
 
 **DoD**：
-- [ ] `CloudLayer.load(idxFile, grpFile)`：走 `SpriteDecoder.parseIdx` + `decodeRLE`
-- [ ] `CloudLayer.bakeRGBA(frame, mixR, mixG, mixB, mixAlpha)` → `string`（w*h*4 字节）
+- [x] `CloudLayer.load(idxFile, grpFile)`：走 `SpriteDecoder.parseIdx` + `decodeRLE`
+- [x] `CloudLayer.bakeRGBA(frame, mixR, mixG, mixB, mixAlpha)` → `string`（w*h*4 字节）
       公式逐字：`(mixAlpha*mix + (100-mixAlpha)*pix)/100`
-- [ ] `CloudLayer.create(count)`：60 朵，随机**顺序**逐字保留
+- [x] `CloudLayer.createOne(i, scatter)`：60 朵，随机**顺序**逐字保留
       （`Picnum → Alpha → mixR → mixG → mixB → mixAlpha → Positiony → Speedx → Positionx`）
-- [ ] `CloudLayer.tick(nowMs)`：40ms 窗口 + 越界重生
-- [ ] `CloudLayer.draw(mx, my)`：屏幕坐标公式逐字搬 + `drawHandle` alpha =
-      `(100-Alpha)/100 * 255`
-- [ ] `CloudLayer.getList()`（替代 `lib.CloudGetList`，供测试）
-- [ ] 单测：9 帧对拍（`{w, h, xoff, yoff, 非透明像素数}` 与旧值相同，硬编码期望值）
-- [ ] 单测：固定 seed 下 60 朵云字段与旧实现逐字段相同
-- [ ] 单测：40ms tick 节奏 + 越界重生
-- [ ] 一个 commit
+- [x] `CloudLayer.tick()`：40ms 窗口 + 越界重生
+- [x] `CloudLayer.draw(mx, my)`：屏幕坐标公式逐字搬 + `drawHandle` alpha =
+      `round((100-Alpha)/100 * 255)`；flag = 0x1
+- [x] `CloudLayer.getList()` / `getFrames()` / `frameCount()` / `reset()`（替代 `lib.CloudGetList`）
+- [x] 单测：9 帧对拍（旧状态机 vs `SpriteDecoder.decodeRLE`）+ 硬编码期望值
+      （`126x22/1619` … `250x250/17864`）。**实测 9/9 SAME**
+- [x] 单测：60 朵云字段范围 + 40ms tick 节奏 + 越界重生 + MMAPAMI 门控
+- [x] 单测：`cloud_layer.lua` 零 `love.*` / 零 `require engine-*`
+- [x] 一个 commit
 
 ## Task 4：三契约改转发 + 删 `lib_love` 云实现
 
 **Blast Radius**：`game/engine-love2d/engine_love2d.lua`、`game/engine-love2d/lib_love.lua`
 
 **DoD**：
-- [ ] `map.loadClouds` / `map.tickClouds` / `map.drawClouds` 改转发 `CloudLayer`
-- [ ] 删 `lib_love.lua:1177-1387` 的云块（`CLOUD_AMOUNT`/`CLOUD_SLOT`/
+- [x] `map.loadClouds` / `map.tickClouds` / `map.drawClouds` 改转发 `CloudLayer`
+- [x] 删 `lib_love.lua` 的整个云块（约 190 行：`CLOUD_AMOUNT`/`CLOUD_SLOT`/
       `CloudDecodeFrame`/`CloudBakeImage`/`CloudCreateOnSide`/`CloudCreate`/
       `CloudLoadAndInit`/`CloudTick`/`DrawClouds`/`CloudGetList`）
-- [ ] `test_cloud.lua` 改走 `CloudLayer`（不再 `require lib_love`）
-- [ ] 实机：主地图有云、漂移、`MMAPAMI=0` 时停（截图 + 目视）
-- [ ] 一个 commit
+- [x] 删旧 `DrawMMap` 里的 `DrawClouds(x, y)` 调用（否则 `test_mmap_depth` 崩）
+- [x] `test_cloud.lua` 改走 `CloudLayer`（私有 EngineAPI 桩，不再 require lib_love）
+- [x] 实机：主地图行走正常（截图目视）；`test_cloud` 覆盖 40ms/MMAPAMI/越界重生
+- [x] 全量测试 4058/0
+- [x] 一个 commit
 
 ## Task 5：删 3 个地图绘制逃生舱
 

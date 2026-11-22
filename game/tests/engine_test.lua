@@ -128,7 +128,9 @@ end
 EngineAPI.sprite._handleDraws = {}
 EngineAPI.sprite.drawHandle = function(handle, x, y, flags, alpha)
     logCall("sprite.drawHandle", x, y)
-    table.insert(EngineAPI.sprite._handleDraws, { handle = handle, x = x, y = y })
+    -- 记录 flags/alpha：云层与 map_render 都要断言「flag 位 / alpha 值」
+    table.insert(EngineAPI.sprite._handleDraws,
+        { handle = handle, x = x, y = y, flags = flags, alpha = alpha })
     return type(handle) == "table"
 end
 

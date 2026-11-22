@@ -312,8 +312,22 @@ EngineAPI.map.unload = function()
     lib.UnloadMMap()
 end
 
+--- 云层三条契约全部转发 `framework/cloud_layer.lua`
+--
+-- 为什么搬 framework（port-legacy-picture-removal Task 4）：
+--   旧实现 190 行住在 lib_love，但只有 2 行真碰引擎
+--   （`love.image.newImageData` / `love.graphics.draw`）。
+--   现在解码复用 `framework/sprite_decoder`、烘焙产出 RGBA 字节、
+--   绘制走 `sprite.drawHandle` —— 引擎只剩「上传字节」与「画句柄」。
+local function cloudLayer()
+    local ok, mod = pcall(require, "framework.cloud_layer")
+    if ok and mod then return mod end
+    return nil
+end
+
 EngineAPI.map.tickClouds = function()
-    lib.CloudTick()
+    local CL = cloudLayer()
+    if CL then return CL.tick() end
 end
 
 EngineAPI.map.getSceneSize = function()
@@ -325,8 +339,11 @@ EngineAPI.map.getSceneSize = function()
 end
 
 EngineAPI.map.loadClouds = function(idxFile, grpFile)
-    -- 云贴图需要逐像素调色板烘焙（CloudBakeImage），属引擎的 sprite 子系统
-    lib.CloudLoadAndInit(idxFile, grpFile)
+    local CL = cloudLayer()
+    if CL then
+        local CC = rawget(_G, "CC")
+        return CL.load(idxFile, grpFile, CC and CC.PaletteFile or nil)
+    end
 end
 
 EngineAPI.map.getBattleSize = function()
@@ -335,8 +352,8 @@ EngineAPI.map.getBattleSize = function()
 end
 
 EngineAPI.map.drawClouds = function(mx, my)
-    -- 云层绘制归引擎：需要逐像素调色板烘焙（CloudBakeImage），属 sprite 子系统
-    lib.DrawClouds(mx, my)
+    local CL = cloudLayer()
+    if CL then return CL.draw(mx, my) end
 end
 
 EngineAPI.map.setTile = function(x, y, layer, value)
