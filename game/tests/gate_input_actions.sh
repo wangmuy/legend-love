@@ -189,6 +189,45 @@ if [ "$fail" -eq 0 ]; then
 fi
 
 # --------------------------------------------------------------- 汇总
+# ------------------------ G. VK 迁移进度（分层判据）
+# **分层而不是一刀切**（2026-11-23）：
+#   · framework/ 的 VK 引用必须 = 0 → 硬断言（框架必须能复用到其它游戏）
+#   · script/ 的**活路径**（battle_flow_coroutines）= 0 → 硬断言
+#   · script/ 的**原版参考实现**（jymain 的 Game_MMap/ShowPersonStatus/
+#     SelectThing、battle_action/battle_flow）→ 只统计，不断言
+#
+# 为什么不给后者加硬断言：它们全部位于「被 async_globals 替换 / JY_Main
+# 从未被调用」的函数里，改它们等于修改无法运行、无法验证的代码。
+log "=== STEP: G. VK 迁移进度（framework 硬断言 / script 原版参考只统计）==="
+fw_vk=$(grep -rn 'VK_' game/framework/*.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$fw_vk" ] || fw_vk=0
+if [ "$fw_vk" -eq 0 ]; then
+    log "  [PASS] framework/ 零 VK 引用（全部走语义动作）"
+else
+    log "  [FAIL] framework/ 仍有 $fw_vk 处 VK 引用："
+    grep -rn 'VK_' game/framework/*.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | head -5 | tee -a "$LOG"
+    fail=$((fail + 1))
+fi
+
+# script 的活路径（战斗协程）必须归零
+live_vk=$(grep -n 'VK_' game/script/battle/battle_flow_coroutines.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$live_vk" ] || live_vk=0
+if [ "$live_vk" -eq 0 ]; then
+    log "  [PASS] script 活路径（battle_flow_coroutines）零 VK"
+else
+    log "  [FAIL] script 活路径仍有 $live_vk 处 VK（这是战斗的可达代码）"
+    fail=$((fail + 1))
+fi
+
+# script 的原版参考实现：只统计
+dead_vk=$(grep -rn 'VK_' game/script/jymain.lua game/script/battle/battle_action.lua         game/script/battle/battle_flow.lua 2>/dev/null         | grep -vE '(^|:)[0-9]+:[[:space:]]*--' | wc -l | tr -dc '0-9')
+[ -n "$dead_vk" ] || dead_vk=0
+log "  [INFO] script/ 原版参考实现仍有 $dead_vk 处 VK（不可达，保留作原版对照）"
+if [ "${STRICT_SCRIPT_VK:-0}" = "1" ] && [ "$dead_vk" -ne 0 ]; then
+    log "  [FAIL] --strict-script-vk 模式下 script/ 也必须归零（实测 $dead_vk）"
+    fail=$((fail + 1))
+fi
+
 log "============================================"
 if [ "$fail" -eq 0 ]; then
     log "[ ok ] 全部通过"

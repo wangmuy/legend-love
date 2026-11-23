@@ -190,6 +190,20 @@ function CoroutineScheduler:waitForKey()
     return self:yield("key")
 end
 
+--- 等待语义动作（input-action-layer Task 5 的协程通道）
+--
+-- 与 waitForKey 的对应关系：
+--   waitForKey  → yield("key")    → update 用 `_peekKeyInternal`（任意来源）
+--   waitForAction → yield("action") → update 用 `_getActionInternal`（任意来源）
+--
+-- **接受任意来源**（key/mouse/pad/touch/virt）—— 战斗协程就是靠这个被
+-- `battle_mouse` 注入的 `{action="ui.accept", source="mouse"}` 唤醒的。
+--
+-- @return string 动作名
+function CoroutineScheduler:waitForAction()
+    return self:yield("action")
+end
+
 -- 等待时间（事件驱动版本）
 -- @param seconds: 等待的秒数
 -- 注意：这个版本只yield一次，让出时间给love.draw，然后由外部控制是否继续等待

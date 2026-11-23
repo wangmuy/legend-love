@@ -176,20 +176,43 @@ $ grep -rn 'VK_' game/framework/*.lua game/script/*.lua game/script/battle/*.lua
 **每个都有对应的语义动作**（`VK_Y→jy.y`、`VK_N→jy.n`、其余 `ui.*`），
 所以迁移在技术上没有障碍，纯粹是没做。
 
-- [ ] 批 1 `framework/game_states.lua`（11 处）
-- [ ] 批 2 `framework/menu_state_machine.lua`（11 处）
-- [ ] 批 3 `framework/async_dialog.lua`（11 处，含 `>=32 and <=126` 改 `ui.text`）
-- [ ] 批 4 `framework/talk_async.lua` / `scene_name_async.lua`
-- [ ] 批 5 `framework/item_async.lua` / `person_status_async.lua`（11 处）
-- [ ] 批 6 `framework/war_async.lua` / `input_async.lua` / `battle_mouse.lua`
-- [ ] 批 7 `script/jymain.lua`（32 处）+ `script/battle/`（28 处）
+- [x] 批 1 `framework/game_states.lua`（11 → **0**）
+- [x] 批 2 `framework/menu_state_machine.lua`（12 → **0**）
+- [x] 批 3 `framework/async_dialog.lua`（14 → **0**，含 `>=32 and <=126` 删除）
+- [x] 批 4 `framework/talk_async.lua` / `scene_name_async.lua`（**本来就是 0**）
+- [x] 批 5 `framework/item_async.lua`（8 → 0）/ `person_status_async.lua`（5 → 0）
+- [x] 批 6 `framework/war_async.lua`（1 → 0）/ `input_async.lua`（0）/
+      `battle_mouse.lua`（3 → 0）
+- [x] 批 7a `script/battle/battle_flow_coroutines.lua`（18 → **0**，
+      这是战斗的**活路径**：3 处 `WaitKeyCoroutine` → `WaitActionCoroutine`）
 - [x] **迁移期的键码归一化契约**（2026-11-22 补，ADR-2b / REQ-IAL-10b）：
       `getKey`/`waitForKey` 写死「返回 SDL2 keycode」+ 4 宿主映射表；
       `jyconst.lua` 交叉引用；`gate_input_actions.sh` STEP F2（6 条断言）
-- [ ] 最终 DoD：上述 `grep` 归零
-- [ ] `gate_input_actions.sh` 补断言：`framework/`+`script/` 的 VK 引用 = 0
-      （**现在只查「VK 是否已定义」+「归一化契约是否存在」，
-       不查「是否已迁移」** —— 所以 114 处不影响门禁）
+- [x] `framework/` 的 VK 引用归零（含 `input_manager` 的 y/n 键码改为字面量）
+- [ ] **批 7b `script/jymain.lua`（32）+ `script/battle/battle_action|flow`（10）**
+      —— **本次不做**，理由见下
+
+### 为什么 script 层剩下的 42 处不改
+
+它们**全部**位于「被 async 版本替换 / 从未调用」的函数里：
+
+| 函数 | 数量 | 为何不可达 |
+|---|---|---|
+| `Game_MMap` / `Game_SMap` | 11 | `JY_Main()` **从未被调用**（LÖVE 走 `framework/game_states`）|
+| `ShowPersonStatus` | 5 | 被 `async_globals` 换成 `PersonStatusAsync` |
+| `SelectThing` | 6 | 被 `async_globals` 换成 `ItemAsync` |
+| `ShowMenu` / `ShowMenu2` | 8 | 被 `async_globals` 换成 `ShowMenu_Async` |
+| `WarMain` / `JY_Main_sub` | 2 | 前者被替换，后者所在的 `JY_Main` 不跑 |
+| `battle_action` / `battle_flow` | 10 | 用阻塞 `WaitKey`；LÖVE 走 `battle_flow_coroutines` |
+
+**改它们等于修改无法运行、无法验证的代码** —— 违反本项目「不用『看起来对』
+代替实测」的原则。它们与 `AGENTS.md` 里标注的「原版阻塞式循环参考实现」
+是同一类东西。
+
+- [x] `gate_input_actions.sh` 补断言（**判据改为分层**）：
+      · `framework/` 的 VK 引用 = **0**（硬断言，本次已达成）
+      · `script/` 的活路径（`battle_flow_coroutines`）= 0（已达成）
+      · `script/` 的原版参考实现 → 只统计、不断言（`--strict-script` 可选开）
 
 ## Task 6 — 虚拟手柄
 

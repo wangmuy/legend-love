@@ -18,6 +18,16 @@ end
 -- WaitKeyCoroutine 是 WaitKey 的别名，保持命名一致性
 InputAsync.WaitKeyCoroutine = InputAsync.WaitKey
 
+--- 等待语义动作（协程版）——`WaitKeyCoroutine` 的动作版
+--
+-- 战斗协程用 `WaitKeyCoroutine()` 等玩家选目标/确认；迁移到动作层用本函数。
+-- 语义对齐：都经 scheduler 的 yield，都**接受任意来源**（鼠标也能推进战斗）。
+--
+-- @return string 动作名
+InputAsync.WaitActionCoroutine = function()
+    return CoroutineScheduler.getInstance():waitForAction()
+end
+
 --- 等待按键（带超时，**绕过 disableInput**，协程版本）
 --
 -- 与 WaitKeyTimeout 的差别只有一处：用 scheduler 的内部取键

@@ -351,9 +351,11 @@ function TestBattleMouse.testMoveLoopSyncsBeforeWorkingCopy()
     TestHelper.assertNotNil(moveStart, "找到 War_MoveCoroutine")
     local body = src:sub(moveStart, moveStart + 6000)
 
-    local waitPos = body:find("InputAsync.WaitKeyCoroutine()")
+    -- Task 5 批 7 迁移后是 WaitActionCoroutine（语义动作版，同样先于光标同步）
+    local waitPos = body:find("InputAsync.WaitActionCoroutine()")
+        or body:find("InputAsync.WaitKeyCoroutine()")
     local syncPos = body:find("x, y = WAR.MoveCursorX, WAR.MoveCursorY")
-    TestHelper.assertNotNil(waitPos, "找到 WaitKey 调用")
+    TestHelper.assertNotNil(waitPos, "找到 WaitAction/Key 调用")
     TestHelper.assertNotNil(syncPos, "找到光标同步代码")
 
     TestHelper.assertTrue(syncPos > waitPos,

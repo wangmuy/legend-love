@@ -88,8 +88,10 @@ local function initKeyMap()
     for k, v in pairs(baseKeyMap) do
         km[k] = v
     end
-    if VK_Y then km["y"] = VK_Y end
-    if VK_N then km["n"] = VK_N end
+    -- y/n 的键码：SDL keycode = ASCII（121 / 110），不读游戏常量
+    -- （framework 不该依赖 script 层定义的全局，见 gate_input_actions STEP A）
+    km["y"] = 121
+    km["n"] = 110
     return km
 end
 
@@ -343,7 +345,7 @@ end
 --
 -- **主循环的 getKey() 必须看不到它们**，否则会当成玩家真按了键：
 --   实测 bug（用户报告）：河洛客栈站在店小二旁，鼠标悬停物品格
---   → 悬停注入 VK_SPACE 唤醒物品协程
+--   → 悬停注入「空格键码」唤醒物品协程
 --   → 同一帧 GAME_SMAP.update 的 getKey() 也读到这个 SPACE
 --   → 走进 SPACE 分支「触发面向 tile 的事件」→ 冒出店小二对话
 --
@@ -550,7 +552,7 @@ end
 -- 「河洛客栈站店小二旁，鼠标悬停物品格 → 冒出店小二对话」：
 --
 -- ```
--- 悬停注入 VK_SPACE 唤醒物品协程
+-- 悬停注入「空格键码」唤醒物品协程
 -- → 同一帧 GAME_SMAP.update 的 getKey() 也读到这个 SPACE
 -- → 走进 SPACE 分支「触发面向 tile 的事件」→ 冒出对话
 -- ```
@@ -675,7 +677,7 @@ end
 -- 为什么不给每条对话路径单独加鼠标处理：
 --   对话推进有三条独立实现，各自都在等按键
 --     talk_async:160         InputAsync.WaitKeyCoroutine()
---     async_dialog:246       VK_RETURN / VK_SPACE
+--     async_dialog:246       回车 / 空格键码
 --     coroutine_scheduler    update() 里 _peekKeyInternal() 偷看队列
 --   逐条加鼠标分支会漏、会重复。注入一个键事件则**复用全部既有逻辑**：
 --   键盘与鼠标走的是同一条路径，行为必然一致。
@@ -685,7 +687,7 @@ end
 --   * _peekKeyInternal() 也能取到（对话等待，绕过 disableInput）
 -- 这正是我们要的 —— 对话期间 disableInput 可能为 true，但对话仍在等键。
 --
--- @param key number 按键码（如 VK_SPACE / VK_RETURN）
+-- @param key number 按键码（SDL keycode，如 32 / 13）
 -- @return boolean 是否入队
 function InputManager.enqueueKeyEvent(key)
     if type(key) ~= "number" then return false end

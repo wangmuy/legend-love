@@ -243,34 +243,40 @@ function AsyncDialog:handleInput()
     local okIM, InputManager = pcall(require, "framework.input_manager")
     if not okIM then InputManager = nil end
 
-    local key = EngineAPI.input.getKey()
-    -- 注意：**不再「没有键就直接 return」**
-    -- 字母现在走动作队列（ui.text），动作事件不产生 key。
-    -- 两个通道都空时才提前返回，否则会漏掉纯动作输入。
-    local hasAction = InputManager and InputManager.peekAction
-                              and InputManager.peekAction() ~= nil
-    if key == -1 and not hasAction then
+    -- 统一走**动作队列**（input-action-layer Task 5 批 3）
+    --
+    -- 对话框是模态的：`disableInput` 可能为 true（别的 UI 置的），但对话
+    -- 本身必须能收输入。所以用 `_peekActionInternal`（绕过 disableInput、
+    -- 不过滤 source —— 鼠标点击推进对话是合法行为）。
+    --
+    -- **不再读 `EngineAPI.input.getKey()`**：它只收 source=="key"，
+    -- 会漏掉鼠标推进对话（这是 ADR-3 之后的正确行为差）。
+    local action = InputManager and InputManager.getInstance()
+                                and InputManager.getInstance():_peekActionInternal()
+    if action == nil then
         return
     end
-    
+    -- 已有动作就消费掉（下面各分支按 actionName 处理）
+    if InputManager and InputManager.getAction then InputManager.getAction() end
+
     if currentDialog.type == "message" then
-        if key == VK_RETURN or key == VK_SPACE then
+        if action == "ui.accept" then
             self:closeDialog(true)
         end
     elseif currentDialog.type == "yesno" then
-        if key == VK_ESCAPE then
+        if action == "ui.cancel" then
             self:closeDialog(false)
-        elseif key == VK_RETURN or key == VK_SPACE then
+        elseif action == "ui.accept" then
             self:closeDialog(currentDialog.selected == 1)
-        elseif key == VK_UP or key == VK_DOWN then
+        elseif action == "ui.up" or action == "ui.down" then
             currentDialog.selected = currentDialog.selected == 1 and 2 or 1
         end
     elseif currentDialog.type == "input" then
         -- 文本输入改走**动作队列**（input-action-layer REQ-IAL-3b）
         --
-        -- 历史缺陷（实测）：原实现依赖 VK_BACKSPACE 与 `key >= 32 and key <= 126`，
+        -- 历史缺陷（实测）：原实现依赖「退格键码」与 `key >= 32 and key <= 126`，
         -- 但 baseKeyMap 只映射 9 个键，字母在 onKeyPressed 里就被丢弃，
-        -- 且 VK_BACKSPACE 从未定义（比较恒 false）。结果输入框有三重失效：
+        -- 且那个常量从未定义（比较恒 false）。结果输入框有三重失效：
         -- 打不出字 / 退格无效 / 只能 RETURN 提交空串。
         --
         -- 现在：可打印字符由 InputBindings.resolveKey 降级成 ui.text 事件，
@@ -301,36 +307,40 @@ function AsyncDialog:handleInput()
                 ev = InputManager.getActionEvent()
             end
         end
-        -- 键盘旧路径保留为兜底（动作层没消费到时仍能工作）
+        -- 兜底：用上面已经取到的 `action`（动作层没消费到时仍能工作）
+        --
+        -- 注意**不再有** `key >= 32 and key <= 126` 这条：可打印字符现在
+        -- 一定走 `ui.text`（`InputBindings.resolveKey` 对所有键生效，
+        -- 不受 baseKeyMap 白名单限制），所以那个 ASCII 分支是死代码。
         if not handled then
-            if key == VK_ESCAPE then
+            if action == "ui.cancel" then
                 self:closeDialog(nil)
-            elseif key == VK_RETURN then
+            elseif action == "ui.accept" then
                 self:closeDialog(currentDialog.input)
-            elseif VK_BACKSPACE and key == VK_BACKSPACE then
+            elseif action == "ui.backspace" then
                 if #currentDialog.input > 0 then
                     currentDialog.input = string.sub(currentDialog.input, 1, -2)
                 end
-            elseif key >= 32 and key <= 126 then
-                if #currentDialog.input < currentDialog.maxLength then
-                    currentDialog.input = currentDialog.input .. string.char(key)
-                end
+            elseif action == "ui.text" then
+                -- ui.text 的字符在事件里（不是动作名），这里只能靠
+                -- 上面的 `getActionEvent` 主循环处理。落到这里说明
+                -- 主循环已消费完，无字符可用 → 什么也不做。
             end
         end
     elseif currentDialog.type == "select" then
-        if key == VK_ESCAPE then
+        if action == "ui.cancel" then
             self:closeDialog(nil)
-        elseif key == VK_RETURN then
+        elseif action == "ui.accept" then
             local item = currentDialog.items[currentDialog.selected]
             if item then
                 self:closeDialog(item.value)
             end
-        elseif key == VK_UP then
+        elseif action == "ui.up" then
             currentDialog.selected = currentDialog.selected - 1
             if currentDialog.selected < 1 then
                 currentDialog.selected = #currentDialog.items
             end
-        elseif key == VK_DOWN then
+        elseif action == "ui.down" then
             currentDialog.selected = currentDialog.selected + 1
             if currentDialog.selected > #currentDialog.items then
                 currentDialog.selected = 1
@@ -454,7 +464,7 @@ end
 -- 鼠标点击（REQ-MS2-7）
 --
 -- 「是/否」框点「否」却选中「是」的根因：
---   原来鼠标在对话里只会注入一个 VK_SPACE，而 SPACE 的语义是
+--   原来鼠标在对话里只会注入一个「空格键码」，而空格的语义是
 --   「确认当前选项」—— 默认选中的是「是」，于是点哪儿都变「是」。
 --
 -- 所以对话里的鼠标不能一律翻译成 SPACE，要按类型分开：

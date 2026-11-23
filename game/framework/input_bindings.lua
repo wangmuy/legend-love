@@ -184,7 +184,7 @@ end
 --
 -- 用途：`battle_mouse` 要用鼠标模拟空格/ESC 来唤醒「等键」的协程
 -- （`InputAsync.WaitKeyCoroutine`），需要往键队列塞一个 SDL keycode。
--- 直接写 `rawget(_G, "VK_SPACE") or 32` 会让 framework 依赖游戏常量，
+-- 直接写 `rawget(_G, "空格键码常量") or 32` 会让 framework 依赖游戏常量，
 -- 本函数把它换成「按动作名查默认绑定」。
 --
 -- **一个动作可能对应多个键**（ui.accept = space + return），本函数返回

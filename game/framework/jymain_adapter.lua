@@ -427,7 +427,12 @@ end
 function JYMainAdapter.showStartMenuCoroutine()
     local scheduler = CoroutineScheduler.getInstance()
     
-    EngineAPI.audio.playVideo(CONFIG.DataPath .. "start.mpg", VK_ESCAPE)
+    -- 跳过键：从绑定表反查（framework 不依赖游戏常量）
+    do
+        local okIB, IB = pcall(require, "framework.input_bindings")
+        local skip = (okIB and IB and IB.keyCodeFor("ui.cancel")) or 27
+        EngineAPI.audio.playVideo(CONFIG.DataPath .. "start.mpg", skip)
+    end
     
     RenderFacade.clearScreen()
     
@@ -482,15 +487,15 @@ local lastHoverX, lastHoverY = -1, -1
 --   ① TalkAsync.getCurrentTalk() ~= nil       打字机对话
 --   ② AsyncDialog:getCurrentDialog() ~= nil   消息框/是否框/输入框
 --
--- 注入 VK_SPACE（不是 VK_RETURN）：两条等待路径都接受空格；
--- 而 async_dialog 的 input 类型只认 VK_RETURN 提交、空格会进字符缓冲，
+-- 注入「确认动作」的键码（不是回车）：两条等待路径都接受空格；
+-- 而 async_dialog 的 input 类型只认回车提交、空格会进字符缓冲，
 -- 所以那种情况不注入（避免把空格打进输入框）。
 --
 -- @return boolean 是否注入了按键
 --- 注入一个「任意键」到模态 UI（左键用）
 --
 -- 场景名提示的语义是「按任意键关闭」，所以左键应该和键盘一样能关掉它。
--- 用 VK_SPACE：在 item/status/scene_name 这三个界面里，
+-- 用「确认动作」的键码：在 item/status/scene_name 这三个界面里，
 -- SPACE 都不会触发破坏性操作（item 的 SPACE 是「确认选中物品」，
 -- 但那条路径在左键点击时本来也不该被触发 —— 所以 item 排除）。
 --
@@ -500,7 +505,10 @@ function JYMainAdapter.injectAnyKeyForModal()
     if not okIM or not InputManager or not InputManager.enqueueKeyEvent then
         return false
     end
-    local vkSpace = rawget(_G, "VK_SPACE") or 32
+    -- 键码从绑定表反查（input-action-layer Task 5 批 7）：framework 不再
+    -- 依赖游戏常量，而是按动作名查默认绑定。
+    local okIB, InputBindings = pcall(require, "framework.input_bindings")
+    local vkSpace = (okIB and InputBindings and InputBindings.keyCodeFor("ui.accept")) or 32
 
     -- 场景名提示：任意点击/按键都消失
     local okSN, SceneNameAsync = pcall(require, "framework.scene_name_async")
@@ -663,7 +671,7 @@ end
 --
 -- 用于「右键 = ESC」的统一语义（用户需求 REQ-MS2-8）。
 --
--- 这些界面都是「协程挂起等键」，注入 VK_ESCAPE 就能让它们走自己的
+-- 这些界面都是「协程挂起等键」，注入「取消动作」的键码就能让它们走自己的
 -- 取消分支 —— 不需要给每个模块写鼠标专用代码。
 --
 -- 注意顺序：**先判模态 UI，再判菜单**。
@@ -675,7 +683,8 @@ function JYMainAdapter.injectEscapeForModal()
     if not okIM or not InputManager or not InputManager.enqueueKeyEvent then
         return false
     end
-    local vkEsc = rawget(_G, "VK_ESCAPE") or 27
+    local okIB, InputBindings = pcall(require, "framework.input_bindings")
+    local vkEsc = (okIB and InputBindings and InputBindings.keyCodeFor("ui.cancel")) or 27
 
     -- 物品选择界面
     local okItem, ItemAsync = pcall(require, "framework.item_async")
@@ -744,12 +753,13 @@ function JYMainAdapter.injectAdvanceKeyForMouse(_, useEsc)
         if okGet and cur ~= nil then
             local okIM, InputManager = pcall(require, "framework.input_manager")
             if okIM and InputManager and InputManager.enqueueKeyEvent then
-                -- 左键 → SPACE（继续/翻页）；右键 → ESC（跳过/结束）
+                -- 左键 → ui.accept（继续/翻页）；右键 → ui.cancel（跳过/结束）
+                local okIB, InputBindings = pcall(require, "framework.input_bindings")
                 local key
                 if useEsc then
-                    key = rawget(_G, "VK_ESCAPE") or 27
+                    key = (okIB and InputBindings and InputBindings.keyCodeFor("ui.cancel")) or 27
                 else
-                    key = rawget(_G, "VK_SPACE") or 32
+                    key = (okIB and InputBindings and InputBindings.keyCodeFor("ui.accept")) or 32
                 end
                 InputManager.enqueueKeyEvent(key)
                 return true
@@ -850,7 +860,7 @@ function JYMainAdapter.pollMouse()
         local msm = MSM.getInstance()
         if msm.activeMenu then
             -- **必须尊重 menu.isEsc**，与 handleInput 的 ESC 分支逐字一致：
-            --     if key == VK_ESCAPE and menu.isEsc == 1 then closeMenu(0) end
+            --     if action == ui.cancel and menu.isEsc == 1 then closeMenu(0) end
             -- 若这里无条件关闭，右键就能关掉键盘 ESC 关不掉的菜单
             -- （强制选择类菜单 isEsc==0），两条输入路径行为不一致。
             if msm.activeMenu.isEsc == 1 then

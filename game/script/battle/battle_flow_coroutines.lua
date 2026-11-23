@@ -21,6 +21,8 @@ local CoroutineScheduler = require("framework.coroutine_scheduler")
 local MenuAsync = require("framework.menu_async")
 local AsyncMessageBox = require("framework.async_message_box")
 local InputAsync = require("framework.input_async")
+-- 语义动作（input-action-layer Task 5 批 7）
+local InputActions = require("framework.input_actions")
 local PersonStatusAsync = require("framework.person_status_async")
 
 local warState = {
@@ -427,7 +429,7 @@ local SelectAttackTargetCoroutine = function(wugong, level)
         WAR.MoveCursorX = x
         WAR.MoveCursorY = y
         
-        local key = InputAsync.WaitKeyCoroutine()
+        local action = InputAsync.WaitActionCoroutine()
 
         -- 同 War_MoveCoroutine：等键返回后立刻读回全局光标
         if WAR.MoveCursorX and WAR.MoveCursorY
@@ -437,7 +439,7 @@ local SelectAttackTargetCoroutine = function(wugong, level)
         
         local x2, y2 = x, y
         
-        if key == VK_UP then
+        if action == InputActions.UP then
             if fightscope == 1 then
                 WAR.DrawMode = nil
                 WAR.MoveCursorX = nil
@@ -446,7 +448,7 @@ local SelectAttackTargetCoroutine = function(wugong, level)
             else
                 y2 = y - 1
             end
-        elseif key == VK_DOWN then
+        elseif action == InputActions.DOWN then
             if fightscope == 1 then
                 WAR.DrawMode = nil
                 WAR.MoveCursorX = nil
@@ -455,7 +457,7 @@ local SelectAttackTargetCoroutine = function(wugong, level)
             else
                 y2 = y + 1
             end
-        elseif key == VK_LEFT then
+        elseif action == InputActions.LEFT then
             if fightscope == 1 then
                 WAR.DrawMode = nil
                 WAR.MoveCursorX = nil
@@ -464,7 +466,7 @@ local SelectAttackTargetCoroutine = function(wugong, level)
             else
                 x2 = x - 1
             end
-        elseif key == VK_RIGHT then
+        elseif action == InputActions.RIGHT then
             if fightscope == 1 then
                 WAR.DrawMode = nil
                 WAR.MoveCursorX = nil
@@ -473,7 +475,7 @@ local SelectAttackTargetCoroutine = function(wugong, level)
             else
                 x2 = x + 1
             end
-        elseif key == VK_SPACE or key == VK_RETURN then
+        elseif action == InputActions.ACCEPT then
             if fightscope == 2 then
                 WAR.DrawMode = nil
                 WAR.MoveCursorX = nil
@@ -485,7 +487,7 @@ local SelectAttackTargetCoroutine = function(wugong, level)
                 WAR.MoveCursorY = nil
                 return x, y
             end
-        elseif key == VK_ESCAPE then
+        elseif action == InputActions.CANCEL then
             WAR.DrawMode = nil
             WAR.MoveCursorX = nil
             WAR.MoveCursorY = nil
@@ -815,7 +817,7 @@ War_MoveCoroutine = function()
         WAR.MoveCursorY = y
         
         -- 等待按键（绘制由 game_states.lua 的 draw 函数处理）
-        local key = InputAsync.WaitKeyCoroutine()
+        local action = InputAsync.WaitActionCoroutine()
 
         -- **等键返回后立刻读回全局光标**（鼠标支持 REQ-MS4-1）
         --
@@ -832,19 +834,19 @@ War_MoveCoroutine = function()
             x, y = WAR.MoveCursorX, WAR.MoveCursorY
         end
         
-        EngineAPI.debug.log("War_MoveCoroutine: key=" .. key .. " at (" .. x .. "," .. y .. ")")
+        EngineAPI.debug.log("War_MoveCoroutine: action=" .. tostring(action) .. " at (" .. x .. "," .. y .. ")")
         
         local x2, y2 = x, y
         
-        if key == VK_UP then
+        if action == InputActions.UP then
             y2 = y - 1
-        elseif key == VK_DOWN then
+        elseif action == InputActions.DOWN then
             y2 = y + 1
-        elseif key == VK_LEFT then
+        elseif action == InputActions.LEFT then
             x2 = x - 1
-        elseif key == VK_RIGHT then
+        elseif action == InputActions.RIGHT then
             x2 = x + 1
-        elseif key == VK_SPACE or key == VK_RETURN then
+        elseif action == InputActions.ACCEPT then
             -- 确认移动
             if x == x0 and y == y0 then
                 -- 没有移动，返回取消
@@ -860,7 +862,7 @@ War_MoveCoroutine = function()
             WAR.MoveCursorY = nil
             War_MovePersonCoroutine(x, y)
             return 7
-        elseif key == VK_ESCAPE then
+        elseif action == InputActions.CANCEL then
             -- 取消
             EngineAPI.debug.log("War_MoveCoroutine: cancelled")
             WAR.DrawMode = nil
@@ -1278,24 +1280,24 @@ War_ExecuteMenuCoroutine = function(flag, thingid)
         WAR.MoveCursorX = x
         WAR.MoveCursorY = y
         
-        local key = InputAsync.WaitKeyCoroutine()
+        local action = InputAsync.WaitActionCoroutine()
         
         local x2, y2 = x, y
         
-        if key == VK_UP then
+        if action == InputActions.UP then
             y2 = y - 1
-        elseif key == VK_DOWN then
+        elseif action == InputActions.DOWN then
             y2 = y + 1
-        elseif key == VK_LEFT then
+        elseif action == InputActions.LEFT then
             x2 = x - 1
-        elseif key == VK_RIGHT then
+        elseif action == InputActions.RIGHT then
             x2 = x + 1
-        elseif key == VK_SPACE or key == VK_RETURN then
+        elseif action == InputActions.ACCEPT then
             WAR.DrawMode = nil
             WAR.MoveCursorX = nil
             WAR.MoveCursorY = nil
             return War_ExecuteMenu_SubCoroutine(x, y, flag, thingid)
-        elseif key == VK_ESCAPE then
+        elseif action == InputActions.CANCEL then
             WAR.DrawMode = nil
             WAR.MoveCursorX = nil
             WAR.MoveCursorY = nil
