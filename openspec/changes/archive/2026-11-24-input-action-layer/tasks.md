@@ -273,4 +273,4 @@ $ grep -rn 'VK_' game/framework/*.lua game/script/*.lua game/script/battle/*.lua
 - [ ] `getVector` 的真实消费方（Hades 式战斗或摇杆菜单光标）
   —— 若 3 个月内无实现，按 design 的 SPECULATIVE 条款重估
 - [ ] VR 输入实现（需先有 VR 渲染管线）
-- [ ] 归档：`/openspec-archive-change input-action-layer`
+- [x] 归档：`openspec archive input-action-layer -y --skip-specs`
