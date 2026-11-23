@@ -71,6 +71,17 @@ InputActions.SOURCES = {
 -- }
 InputActions.EVENT_KEYS = {
     "action", "source", "value", "char", "position", "index", "ray", "time",
+    -- keyCode：产生这个动作的**原始键码**（SDL keycode）。
+    --
+    -- 为什么动作事件还需要键码：有两个消费方需要「具体哪个键」而不是
+    -- 「什么语义」——
+    --   ① AutoMove 的 drain 机制（`JY.InputDrain.key`）：中断自动移动后
+    --      要吃掉**那一个键**的后续 repeat，而 `ui.accept` 同时对应
+    --      space / return，光看动作名分不出是哪个
+    --   ② 调试/日志想还原物理按键
+    --
+    -- 非键盘来源（mouse/pad/touch/vr）没有键码，字段为 nil。
+    "keyCode",
 }
 
 -- ---------------------------------------------------------------------------

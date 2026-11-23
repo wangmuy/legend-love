@@ -93,6 +93,25 @@ local function initKeyMap()
     return km
 end
 
+--- LÖVE 键名 → SDL keycode（动作事件带 keyCode 用）
+--
+-- 与 initKeyMap 的区别：initKeyMap 每次新建一张表（热路径别用），
+-- 这里只在「按键产生动作」时查一次，且只查一个键。
+--
+-- 未映射的键（字母等）返回该键的 ASCII 码（LÖVE 的单字符键名本身就是字符）。
+-- 这样 `AutoMove` 的 drain 对字母键也能工作。
+local function gameKeyOf(loveKeyName)
+    if type(loveKeyName) ~= "string" then return nil end
+    local km = initKeyMap()
+    local code = km[loveKeyName]
+    if code then return code end
+    -- 单字符键名（"y" / "n" / "a"）→ ASCII
+    if #loveKeyName == 1 then
+        return loveKeyName:byte(1)
+    end
+    return nil
+end
+
 local instance = nil
 
 function InputManager.getInstance()
@@ -184,6 +203,9 @@ function InputManager:onKeyPressed(key, scancode, isrepeat)
                 action = action,
                 source = "key",
                 char = char,
+                -- 原始键码：AutoMove 的 drain 机制需要「具体哪个键」
+                -- （`ui.accept` 同时对应 space/return，光看动作名分不出）
+                keyCode = gameKeyOf(key),
             })
         end
     end
@@ -244,11 +266,23 @@ function InputManager:onKeyReleased(key, scancode)
     end)
 end
 
+-- 惰性引用 InputBindings（顶层 require 会与 input_bindings → input_actions 形成环）
+local InputBindingsForRepeat
+local function getBindingsForRepeat()
+    if InputBindingsForRepeat == nil then
+        local ok, mod = pcall(require, "framework.input_bindings")
+        InputBindingsForRepeat = ok and mod or false
+    end
+    return InputBindingsForRepeat or nil
+end
+
 -- 更新按键重复
 function InputManager:update(dt)
     if not keyRepeatEnabled then
         return
     end
+
+    InputBindingsForRepeat = getBindingsForRepeat()
     
     local currentTime = getTimeSeconds()
     
@@ -271,7 +305,27 @@ function InputManager:update(dt)
                     key = gameKey,
                     time = currentTime
                 })
-                
+
+                -- **动作队列也要发 repeat**（input-action-layer Task 5 的前置）
+                --
+                -- 为什么必须补：菜单长按连翻、状态页长按翻页都靠 repeat 事件。
+                -- 原来的 repeat 只进键队列 → 迁移到动作队列后这些功能会静默失效
+                -- （按一下能动、按住不动），属于「迁移后才暴露」的坑。
+                --
+                -- 用反向映射把 gameKey（SDL keycode）转回动作名。
+                if InputBindingsForRepeat then
+                    local action = InputBindingsForRepeat.actionForKeyCode(gameKey)
+                    if action then
+                        InputManager.enqueueAction({
+                            action = action,
+                            source = "key",
+                            -- repeat 与 pressed 用同一 action；消费者本来就
+                            -- 逐个处理事件，不区分首次/重复
+                            keyCode = gameKey,
+                        })
+                    end
+                end
+
                 timer.repeatCount = timer.repeatCount + 1
                 timer.lastRepeatTime = currentTime
             end
@@ -457,6 +511,8 @@ function InputManager.enqueueAction(event)
         index = event.index,
         ray = event.ray,
         time = event.time or getTimeSeconds(),
+        -- 产生该动作的原始键码（仅键盘来源有；见 input_actions.EVENT_KEYS 注释）
+        keyCode = event.keyCode,
     }
     actionQueue[actionTail] = clean
     actionTail = nextTail
@@ -483,6 +539,100 @@ end
 function InputManager.getAction()
     local event = InputManager.getActionEvent()
     if event then return event.action end
+    return nil
+end
+
+--- 取出一个**只来自键盘**的动作（迁移期对齐 `getKey()` 的 source 过滤）
+--
+-- # 为什么必须有这个函数（不是可以直接用 getAction）
+--
+-- `getKey()` 会**跳过** `source ~= "key"` 的事件 —— 这是 ADR-3 修的
+-- 「河洛客栈站店小二旁，鼠标悬停物品格 → 冒出店小二对话」：
+--
+-- ```
+-- 悬停注入 VK_SPACE 唤醒物品协程
+-- → 同一帧 GAME_SMAP.update 的 getKey() 也读到这个 SPACE
+-- → 走进 SPACE 分支「触发面向 tile 的事件」→ 冒出对话
+-- ```
+--
+-- 而 `getAction()` **不看 source**。所以「地图主循环」这类
+-- 「只能由玩家真按键驱动」的地方，直接换成 `getAction()` 会让那个 bug 回归。
+--
+-- 本函数是 `getKey()` 的**语义镜像**：只消费 `source == "key"` 的动作，
+-- 其余（mouse / pad / touch / compat）**留在队列里**给别的消费方
+-- （协程等待、对话推进）—— 与 getKey 跳过而不丢弃的行为一致。
+--
+-- @return string|nil 动作名；没有键盘动作时返回 nil
+function InputManager.getActionKeyOnly()
+    if InputManager.disableInput then
+        return nil
+    end
+
+    -- 从队头向后扫，找到第一个 source=="key" 的动作并**就地摘除**
+    -- （不能用「弹出再放回」，那会把非键盘事件挪到队尾，破坏 FIFO 顺序）
+    local i = actionHead
+    while i ~= actionTail do
+        local event = actionQueue[i]
+        if event and event.source == "key" then
+            local name = event.action
+            -- 就地摘除：把 i 之后的元素前移一位（队列容量 64，代价可忽略）
+            local j = i
+            while j ~= actionTail do
+                local nextIdx = j + 1
+                if nextIdx > maxActionQueueSize then nextIdx = 1 end
+                actionQueue[j] = actionQueue[nextIdx]
+                j = nextIdx
+            end
+            -- actionTail 前移一位（相当于少了一个元素）
+            local newTail = actionTail - 1
+            if newTail < 1 then newTail = maxActionQueueSize end
+            actionQueue[newTail] = nil
+            actionTail = newTail
+            return name
+        end
+        i = i + 1
+        if i > maxActionQueueSize then i = 1 end
+        -- 防死循环：环形队列最多 maxActionQueueSize 个元素
+        if i == actionHead then break end
+    end
+    return nil
+end
+
+--- 取出一个**只来自键盘**的完整动作事件（消费）
+--
+-- 与 `getActionKeyOnly()` 的区别：这个返回**整个事件表**（含 `keyCode`），
+-- 供需要「具体哪个键」的消费方用（典型：AutoMove 的 drain 机制）。
+--
+-- 与 `getActionEvent()` 的区别：那个不过滤 source。
+--
+-- @return table|nil
+function InputManager.getActionEventKeyOnly()
+    if InputManager.disableInput then
+        return nil
+    end
+
+    local i = actionHead
+    while i ~= actionTail do
+        local event = actionQueue[i]
+        if event and event.source == "key" then
+            -- 就地摘除（保持其余事件的相对顺序）
+            local j = i
+            while j ~= actionTail do
+                local nextIdx = j + 1
+                if nextIdx > maxActionQueueSize then nextIdx = 1 end
+                actionQueue[j] = actionQueue[nextIdx]
+                j = nextIdx
+            end
+            local newTail = actionTail - 1
+            if newTail < 1 then newTail = maxActionQueueSize end
+            actionQueue[newTail] = nil
+            actionTail = newTail
+            return event
+        end
+        i = i + 1
+        if i > maxActionQueueSize then i = 1 end
+        if i == actionHead then break end
+    end
     return nil
 end
 
@@ -560,6 +710,26 @@ function InputManager:peekKey()
     end
     
     return -1
+end
+
+-- 内部方法：查看动作队列里下一个**任意来源**的动作，不消费、绕过 disableInput
+--
+-- 这是 `_peekKeyInternal()` 的动作版镜像。为什么两者都需要：
+--
+--   对话推进（`scheduler:307`）/ 场景名关闭（`input_async:46`）走的是
+--   「偷看队列」而不是「消费」—— 因为它们要在**不确定**是否该处理时
+--   先看有没有输入（例如对话期间 disableInput=true，但对话本身仍在等）。
+--
+--   而且它们接受**任意来源**（鼠标点击推进对话是合法行为），
+--   这正是 `_peekKeyInternal` 不过滤 source 的原因。
+--
+-- @return string|nil 动作名
+function InputManager:_peekActionInternal()
+    local event = InputManager.peekActionEvent()
+    if event then
+        return event.action
+    end
+    return nil
 end
 
 -- 内部方法：查看队列中的下一个按键但不消费（绕过 disableInput）

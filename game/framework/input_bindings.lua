@@ -122,6 +122,64 @@ function InputBindings.resolve(source, name)
     return m[name]
 end
 
+--- 反查用的「键名 → SDL keycode」表
+--
+-- **为什么不直接用 `input_manager` 的 `baseKeyMap`**：它是那个模块的
+-- local 变量，不可跨模块访问。这里复制一份是**有意的重复** ——
+-- 两份必须同步，所以下方门禁会断言两边键集合一致（防漂移）。
+local _reverseKeyMap = {
+    ["escape"] = 27,
+    [" "] = 32,
+    ["space"] = 32,
+    ["return"] = 13,
+    ["backspace"] = 8,
+    ["up"] = 1073741906,
+    ["down"] = 1073741905,
+    ["left"] = 1073741904,
+    ["right"] = 1073741903,
+}
+
+local function baseKeyMapForReverse()
+    return _reverseKeyMap
+end
+
+--- 把 **SDL keycode** 反查成动作名（按键重复用）
+--
+-- 为什么需要它：`InputManager:update` 的按键重复逻辑手上只有 `gameKey`
+-- （SDL keycode 整数，来自 `baseKeyMap`），但要往**动作队列**发 repeat。
+-- 没有反向映射就只能发键队列的 repeat → 迁移到动作队列的消费方
+-- （菜单长按连翻、状态页长按翻页）会静默失效。
+--
+-- 与 `resolveKey` 的关系：`resolveKey` 是「LÖVE 键名字符串 → 动作」，
+-- 本函数是「SDL keycode 整数 → 动作」。两者查的是**同一张绑定表**，
+-- 只是查表键不同：
+--
+-- ```lua
+--   baseKeyMap["up"] = 1073741906      -- LÖVE 键名 → SDL keycode
+--   activeBindings.key["up"] = "ui.up" -- LÖVE 键名 → 动作
+--   ─────────────────────────────────────────────────────
+--   actionForKeyCode(1073741906) = "ui.up"   ← 本函数（两步合一）
+-- ```
+--
+-- **不缓存**：绑定表可以通过 `bind()` 在运行时改（设置界面/测试），
+-- 缓存会让改动不生效。这个函数只在「按键重复」路径调用（有 keyRepeatTimers
+-- 时每帧每键一次，实测最多同时 1~2 个键），开销可忽略。
+--
+-- @param keyCode number SDL keycode
+-- @return string|nil 动作名
+function InputBindings.actionForKeyCode(keyCode)
+    if type(keyCode) ~= "number" then return nil end
+
+    -- 反查：keyCode → LÖVE 键名（可能多个键名映到同一码，如 " " 与 "space"）
+    local keyName = nil
+    for name, code in pairs(baseKeyMapForReverse()) do
+        if code == keyCode then keyName = name; break end
+    end
+    if not keyName then return nil end
+
+    return InputBindings.resolve("key", keyName)
+end
+
 --- 把「键名」解析成动作（含文本输入降级）
 --
 -- 除了查表，还处理两类**规则型**映射（不适合写进静态表）：

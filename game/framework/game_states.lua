@@ -4,6 +4,8 @@
 
 local GameHooks = require("framework.game_hooks")
 local RenderFacade = require("framework.render_facade")
+local InputActions = require("framework.input_actions")
+local InputManager = require("framework.input_manager")
 local GameStates = {}
 
 -- 导入必要的模块
@@ -413,10 +415,16 @@ handlers["GAME_MMAP"] = {
                 -- 冻结期间：暂停推进，但保留路径（对话结束后继续走完）
                 return
             end
-            local keypress = EngineAPI.input.getKey()
-            if keypress ~= -1 then
+            -- 按键中断（input-action-layer Task 5 批 1）
+            --
+            -- **必须用 getActionEventKeyOnly 而不是动作名**：AutoMove 的 drain
+            -- 机制记的是「具体哪个键」（`JY.InputDrain.key`），因为
+            -- `ui.accept` 同时对应 space 与 return —— 光看动作名分不出是哪个，
+            -- 会吃掉错误的键的 repeat。所以这里取带 keyCode 的完整事件。
+            local ev = InputManager.getActionEventKeyOnly()
+            if ev then
                 -- 按键中断：吃掉这次按键与后续 repeat，不响应为方向移动
-                AutoMove.interruptByKey(keypress)
+                AutoMove.interruptByKey(ev.keyCode or 0)
                 return
             end
             -- 步进节流：未到间隔就不推进（否则 60fps 下 60 格/秒 = 瞬移）
@@ -428,33 +436,39 @@ handlers["GAME_MMAP"] = {
             end
             -- 路径走完或中断，落到下面的普通逻辑
         elseif AutoMove.isDraining() then
-            -- drain 期间吞掉被中断的那个键的 repeat
-            local keypress = EngineAPI.input.getKey()
-            if keypress ~= -1 and AutoMove.shouldDrainKey(keypress) then
+            -- drain 期间吞掉被中断的那个键的 repeat（同样需要 keyCode）
+            local ev = InputManager.getActionEventKeyOnly()
+            if ev and AutoMove.shouldDrainKey(ev.keyCode or 0) then
                 return
             end
         end
         
         -- 原有的Game_MMap逻辑(除去渲染部分)
         local direct = -1
-        local keypress = EngineAPI.input.getKey()
-        
-        if keypress ~= -1 then
+        -- **语义动作**（input-action-layer Task 5 批 1）
+        --
+        -- 用 `getActionKeyOnly()` 而不是 `pollAction()`：地图主循环只能由
+        -- **玩家真按键**驱动。鼠标悬停会注入 `{action="ui.accept", source="mouse"}`，
+        -- 若这里不过滤 source，就会出现「站在店小二旁悬停物品格 → 冒出对话」
+        -- （ADR-3 记录的真实 bug）。`getActionKeyOnly` 是 `getKey()` 的语义镜像。
+        local action = InputManager.getActionKeyOnly()
+
+        if action ~= nil then
             JY.MyTick = 0
-            if keypress == VK_ESCAPE then
+            if action == InputActions.CANCEL then
                 startMenuCoroutine()
                 if JY.Status == getStateId("GAME_FIRSTMMAP") then
                     return
                 end
                 JY.oldMMapX = -1
                 JY.oldMMapY = -1
-            elseif keypress == VK_UP then
+            elseif action == InputActions.UP then
                 direct = 0
-            elseif keypress == VK_DOWN then
+            elseif action == InputActions.DOWN then
                 direct = 3
-            elseif keypress == VK_LEFT then
+            elseif action == InputActions.LEFT then
                 direct = 2
-            elseif keypress == VK_RIGHT then
+            elseif action == InputActions.RIGHT then
                 direct = 1
             end
         end
@@ -723,17 +737,14 @@ handlers["GAME_SMAP"] = {
             end
         end
         
-        -- 处理输入
+        -- 处理输入（input-action-layer Task 5 批 1）
         local x, y
-        local keypress = EngineAPI.input.getKey()
         local direct = -1
-        
-        -- 检查是否正在显示人物状态或物品选择，如果是则跳过按键处理
-        -- 注意：现在统一通过 InputManager.disableInput 实现
-        local InputManager = require("framework.input_manager")
-        if InputManager.disableInput then
-            keypress = -1  -- 忽略按键
-        end
+
+        -- 取一个**键盘来源**的完整动作事件（带 keyCode，AutoMove drain 需要）
+        -- 用 KeyOnly 变体：地图主循环不能吃鼠标注入的动作（河洛客栈 bug）
+        local ev = InputManager.getActionEventKeyOnly()
+        local action = ev and ev.action or nil
 
         -- REQ-MS3-3 / REQ-MS3-5：自动移动优先于按键（与 MMAP 同构）
         -- 同样必须先确认玩家可以行动（见 MMAP 分支的注释）
@@ -745,8 +756,8 @@ handlers["GAME_SMAP"] = {
             if not AutoMove.canPlayerAct() then
                 return
             end
-            if keypress ~= -1 then
-                AutoMove.interruptByKey(keypress)
+            if ev then
+                AutoMove.interruptByKey(ev.keyCode or 0)
                 return
             end
             if not AutoMove.readyToStep() then
@@ -756,7 +767,7 @@ handlers["GAME_SMAP"] = {
                 return
             end
         elseif AutoMove.isDraining() then
-            if keypress ~= -1 and AutoMove.shouldDrainKey(keypress) then
+            if ev and AutoMove.shouldDrainKey(ev.keyCode or 0) then
                 return
             end
         end
@@ -768,21 +779,21 @@ handlers["GAME_SMAP"] = {
         -- `JY.CurrentD >= 0` 的 nil 防护：CurrentD 可能尚未初始化
         -- （测试环境 / 早期初始化顺序），此时 `>=` 会抛 "compare number with nil"
         local _eventRunning2 = JY.CurrentD ~= nil and JY.CurrentD >= 0
-        if keypress ~= -1 and not _eventRunning2 then
+        if action ~= nil and not _eventRunning2 then
             JY.MyTick = 0
-            if keypress == VK_ESCAPE then
+            if action == InputActions.CANCEL then
                 startMenuCoroutine()
                 JY.oldSMapX = -1
                 JY.oldSMapY = -1
-            elseif keypress == VK_UP then
+            elseif action == InputActions.UP then
                 direct = 0
-            elseif keypress == VK_DOWN then
+            elseif action == InputActions.DOWN then
                 direct = 3
-            elseif keypress == VK_LEFT then
+            elseif action == InputActions.LEFT then
                 direct = 2
-            elseif keypress == VK_RIGHT then
+            elseif action == InputActions.RIGHT then
                 direct = 1
-            elseif keypress == VK_SPACE or keypress == VK_RETURN then
+            elseif action == InputActions.ACCEPT then
                 EngineAPI.debug.log("GAME_SMAP.update: SPACE/RETURN pressed")
                 if JY.Base["人方向"] >= 0 then
                     local targetX = JY.Base["人X1"] + CC.DirectX[JY.Base["人方向"] + 1]
