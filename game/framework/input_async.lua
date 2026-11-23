@@ -60,6 +60,38 @@ end
 -- 等待按键（带超时，协程版本）
 -- @param timeout: 超时时间（秒）
 -- @return: 按键值，如果超时返回-1
+--- 等待语义动作（带超时，绕过 disableInput）——`WaitKeyTimeoutBypass` 的动作版
+--
+-- 为什么需要它：`item_async` / `person_status_async` 在菜单打开期间用
+-- `WaitKeyTimeoutBypass(0.05)` 轮询按键（菜单置 `disableInput=true`，
+-- 但菜单自己仍要收键）。迁移到动作队列后需要一一对应的版本。
+--
+-- 语义与 WaitKeyTimeoutBypass 完全对齐：偷看（不消费）→ 有则消费并返回
+-- **动作名**；超时返回 nil（原版返回 -1，动作名是字符串所以用 nil）。
+--
+-- @param timeout number 秒
+-- @return string|nil 动作名
+function InputAsync.WaitActionTimeoutBypass(timeout)
+    local scheduler = CoroutineScheduler.getInstance()
+    local InputManager = require("framework.input_manager")
+    local startTime = EngineAPI.time.getTimeSeconds()
+
+    while true do
+        local im = InputManager.getInstance()
+        local action = im:_peekActionInternal()
+        if action ~= nil then
+            im.getActionEvent()   -- 消费
+            return action
+        end
+
+        if EngineAPI.time.getTimeSeconds() - startTime >= timeout then
+            return nil
+        end
+
+        scheduler:yield("input_timeout")
+    end
+end
+
 function InputAsync.WaitKeyTimeout(timeout)
     local scheduler = CoroutineScheduler.getInstance()
     local startTime = EngineAPI.time.getTimeSeconds()

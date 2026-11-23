@@ -12,6 +12,8 @@ local MenuAsync = require("framework.menu_async")
 local AsyncMessageBox = require("framework.async_message_box")
 local AsyncDialog = require("framework.async_dialog")
 local InputAsync = require("framework.input_async")
+-- 语义动作（input-action-layer Task 5 批 5）
+local InputActions = require("framework.input_actions")
 
 -- 当前显示的物品选择状态（用于draw函数）
 local currentItemSelect = nil
@@ -214,10 +216,11 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
         --
         -- 换成 WaitKeyTimeout 的原因：悬停需要「不按键也能让协程醒一次」。
         -- 用 50ms 超时轮询：既能让悬停及时生效，又完全不碰键队列。
-        local keypress = InputAsync.WaitKeyTimeoutBypass(0.05)
+        -- 语义动作（input-action-layer Task 5 批 5）
+        local action = InputAsync.WaitActionTimeoutBypass(0.05)
 
         -- 处理按键
-        if keypress == VK_ESCAPE then
+        if action == InputActions.CANCEL then
             -- ESC取消选择
             currentItemSelect = nil  -- 清除显示状态
             local InputManager = require("framework.input_manager")
@@ -226,7 +229,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
                 Debug("ItemAsync.SelectThingGridAsync: ESC pressed, disableInput set to false")
             end
             return -1
-        elseif keypress == VK_RETURN or keypress == VK_SPACE then
+        elseif action == InputActions.ACCEPT then
             -- 确认选择
             if selectedItem then
                 currentItemSelect = nil  -- 清除显示状态
@@ -234,7 +237,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
                 InputManager.disableInput = false
                 return selectedItem.id
             end
-        elseif keypress == VK_UP then
+        elseif action == InputActions.UP then
             -- 向上移动
             local currentPos = selectedIndex - pageStart + 1
             local currentRow = math.ceil(currentPos / xnum)
@@ -252,7 +255,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
                 local lastRowStart = newPageStart + (math.ceil(newPageCount / xnum) - 1) * xnum
                 selectedIndex = math.min(lastRowStart + currentCol - 1, newPageEnd)
             end
-        elseif keypress == VK_DOWN then
+        elseif action == InputActions.DOWN then
             -- 向下移动
             local currentPos = selectedIndex - pageStart + 1
             local currentRow = math.ceil(currentPos / xnum)
@@ -268,7 +271,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
                 local newPageStart = (currentPage - 1) * itemsPerPage + 1
                 selectedIndex = math.min(newPageStart + currentCol - 1, itemCount)
             end
-        elseif keypress == VK_LEFT then
+        elseif action == InputActions.LEFT then
             -- 向左移动
             if selectedIndex > pageStart then
                 selectedIndex = selectedIndex - 1
@@ -278,7 +281,7 @@ function ItemAsync.SelectThingGridAsync(items, itemCount)
                 local newPageEnd = math.min(currentPage * itemsPerPage, itemCount)
                 selectedIndex = newPageEnd
             end
-        elseif keypress == VK_RIGHT then
+        elseif action == InputActions.RIGHT then
             -- 向右移动
             if selectedIndex < pageEnd then
                 selectedIndex = selectedIndex + 1
@@ -432,7 +435,7 @@ function ItemAsync.handleMouseHover(mx, my)
     -- 为什么：物品格协程挂在 WaitKeyCoroutine 上，只在「键事件到来」时迭代。
     -- 若悬停靠注入键唤醒，而注入频率高于消费频率（协程有 waitForTime 帧
     -- 不消费键），键就会在队列里积压。等鼠标停在「已选中」的格子上
-    -- （此时不再产生 pending），下一个残留键被消费 → keypress=VK_SPACE、
+    -- （此时不再产生 pending），下一个残留键被消费 → action=ui.accept、
     -- pending=nil → 走确认分支 → **自动卖出**。
     -- 实测复现：12 帧内队列从 -1 变成常驻 32。
     --
@@ -454,7 +457,7 @@ function ItemAsync.handleMouseClick(mx, my)
         -- 只记录意图，**不注入键**
         --
         -- 注入键会被协程的「等待按键」分支先消费掉：
-        --   WaitKeyTimeoutBypass 返回 32 → 走 VK_SPACE 分支
+        --   WaitActionTimeoutBypass 返回 "ui.accept" → 走确认分支
         --   → return selectedItem.id（旧值，还没读到 pending）
         --   → 永远轮不到循环顶部去消费 pending。
         --

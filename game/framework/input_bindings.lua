@@ -180,6 +180,29 @@ function InputBindings.actionForKeyCode(keyCode)
     return InputBindings.resolve("key", keyName)
 end
 
+--- 反查：动作名 → 默认 SDL keycode（注入合成键用）
+--
+-- 用途：`battle_mouse` 要用鼠标模拟空格/ESC 来唤醒「等键」的协程
+-- （`InputAsync.WaitKeyCoroutine`），需要往键队列塞一个 SDL keycode。
+-- 直接写 `rawget(_G, "VK_SPACE") or 32` 会让 framework 依赖游戏常量，
+-- 本函数把它换成「按动作名查默认绑定」。
+--
+-- **一个动作可能对应多个键**（ui.accept = space + return），本函数返回
+-- **第一个**匹配（按 `_reverseKeyMap` 的遍历顺序）。对「模拟确认」这个
+-- 用途无所谓是哪个键 —— 消费者只比较动作。
+--
+-- @param action string 动作名
+-- @return number|nil SDL keycode
+function InputBindings.keyCodeFor(action)
+    if type(action) ~= "string" then return nil end
+    for name, code in pairs(_reverseKeyMap) do
+        if InputBindings.resolve("key", name) == action then
+            return code
+        end
+    end
+    return nil
+end
+
 --- 把「键名」解析成动作（含文本输入降级）
 --
 -- 除了查表，还处理两类**规则型**映射（不适合写进静态表）：

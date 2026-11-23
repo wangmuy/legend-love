@@ -42,6 +42,8 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
     local teamnum = GetTeamNum()
     local scheduler = CoroutineScheduler.getInstance()
     local InputAsync = require("framework.input_async")
+-- 语义动作（input-action-layer Task 5 批 5）
+local InputActions = require("framework.input_actions")
     
     if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
         EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: modules loaded")
@@ -82,9 +84,10 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
         --
         -- 若用纯 WaitKey + 注入键唤醒，会和物品清单一样出现键积压，
         -- 表现为「悬停一会儿自己翻页」。
-        local keypress = InputAsync.WaitKeyTimeoutBypass(0.05)
+        -- 语义动作（input-action-layer Task 5 批 5）
+        local action = InputAsync.WaitActionTimeoutBypass(0.05)
         if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
-            EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: key pressed=" .. tostring(keypress))
+            EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: action=" .. tostring(action))
         end
 
         -- **先消费鼠标意图**（REQ-MS2-10）
@@ -105,10 +108,10 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
                 break
             end
             -- 消费完继续（不把唤醒键当键盘输入）
-            keypress = -1
+            action = nil
         end
         
-        if keypress == VK_ESCAPE then
+        if action == InputActions.CANCEL then
             if EngineAPI and EngineAPI.debug and EngineAPI.debug.log then
                 EngineAPI.debug.log("PersonStatusAsync.ShowStatusCoroutine: ESC pressed, exiting")
             end
@@ -118,13 +121,13 @@ function PersonStatusAsync.ShowStatusCoroutine(teamid)
             local InputManager = require("framework.input_manager")
             InputManager.disableInput = false
             break
-        elseif keypress == VK_UP then
+        elseif action == InputActions.UP then
             teamid = teamid - 1
-        elseif keypress == VK_DOWN then
+        elseif action == InputActions.DOWN then
             teamid = teamid + 1
-        elseif keypress == VK_LEFT then
+        elseif action == InputActions.LEFT then
             page = page - 1
-        elseif keypress == VK_RIGHT then
+        elseif action == InputActions.RIGHT then
             page = page + 1
         end
         

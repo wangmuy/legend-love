@@ -207,8 +207,10 @@ function WarAsync.WarMainCoroutine(warid, isexp)
             
             -- 处理自动战斗取消
             if WAR.AutoFight == 1 then
-                local keypress = EngineAPI.input.getKey()
-                if keypress == VK_SPACE or keypress == VK_RETURN then
+                -- 语义动作（input-action-layer Task 5 批 6）
+                -- 只收键盘来源：战斗中的空格是玩家真按的，不是鼠标注入
+                local action = require("framework.input_manager").getActionKeyOnly()
+                if action == require("framework.input_actions").ACCEPT then
                     WAR.AutoFight = 0
                 end
             end

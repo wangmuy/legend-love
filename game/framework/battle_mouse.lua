@@ -130,7 +130,7 @@ end
 
 --- 鼠标点击：把光标挪过去并确认
 --
--- 实现方式：挪光标 + 注入一个 VK_SPACE。
+-- 实现方式：挪光标 + 注入一个 ui.accept 动作（及等价的合成键）。
 --
 -- **与物品清单不同，这里注入键是安全的**：
 --   War_MoveCoroutine 用的是纯 WaitKeyCoroutine（没有 waitForTime 循环），
@@ -165,9 +165,15 @@ function BattleMouse.clickAt(mx, my)
     WAR.MoveCursorY = gy
 
     -- 注入确认动作（协程在 WaitKeyCoroutine 上等，消费一次即返回）
+    --
+    -- **键码从绑定表反查**（input-action-layer Task 5 批 6）：
+    -- 原来写 `rawget(_G, 游戏常量) or 32` —— framework 依赖游戏常量。
+    -- 改为 `InputBindings.keyCodeFor("ui.accept")`，framework 自洽。
     local okIM, InputManager = pcall(require, "framework.input_manager")
+    local okIB, InputBindings = pcall(require, "framework.input_bindings")
     if okIM and InputManager and InputManager.enqueueKeyEvent then
-        InputManager.enqueueKeyEvent(rawget(_G, "VK_SPACE") or 32)
+        local code = (okIB and InputBindings and InputBindings.keyCodeFor("ui.accept")) or 32
+        InputManager.enqueueKeyEvent(code)
     end
     -- 同时入动作队列（ADR-3）：新消费方按 source="mouse" 识别来源
     if okIM and InputManager and InputManager.enqueueAction then
@@ -183,8 +189,10 @@ function BattleMouse.cancel()
     if not ok then return false end
 
     local okIM, InputManager = pcall(require, "framework.input_manager")
+    local okIB, InputBindings = pcall(require, "framework.input_bindings")
     if okIM and InputManager and InputManager.enqueueKeyEvent then
-        InputManager.enqueueKeyEvent(rawget(_G, "VK_ESCAPE") or 27)
+        local code = (okIB and InputBindings and InputBindings.keyCodeFor("ui.cancel")) or 27
+        InputManager.enqueueKeyEvent(code)
     end
     -- 同时入动作队列（ADR-3）
     if okIM and InputManager and InputManager.enqueueAction then
