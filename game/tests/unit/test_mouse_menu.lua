@@ -42,6 +42,20 @@ local function installStubs()
         },
         debug = { log = function() end },
     })
+    -- Task 5 迁移后 menu_state_machine 惰性 require("framework.input_manager")
+    -- 调 getActionKeyOnly，这里装桩让它读 TestHelper._actionQueue。
+    -- **临时替换方法**（不是替换整个 package.loaded 条目 —— 那样会泄漏到
+    -- 其他套件，实测「单跑通过、全量失败」）
+    local realIM = package.loaded["framework.input_manager"] or require("framework.input_manager")
+    saved.imGetActionKeyOnly = realIM.getActionKeyOnly
+    saved.imGetActionEventKeyOnly = realIM.getActionEventKeyOnly
+    realIM.getActionKeyOnly = function()
+        local ev = table.remove(TestHelper._actionQueue, 1)
+        return ev and ev.action or nil
+    end
+    realIM.getActionEventKeyOnly = function()
+        return table.remove(TestHelper._actionQueue, 1)
+    end
     rawset(_G, "CC", { MenuBorderPixel = 5, RowPixel = 4 })
     rawset(_G, "DrawString", function() end)
     rawset(_G, "Cls", function() end)
@@ -58,7 +72,8 @@ local function installStubs()
 end
 
 local function restoreStubs(saved)
-    for k, v in pairs(saved) do rawset(_G, k, v) end
+    for k, v in pairs(saved) do rawset(_G, k, v) end    package.loaded["framework.input_manager"] = saved.inputManager
+    TestHelper.clearActionQueue()
 end
 
 local function freshMenu()
@@ -129,6 +144,7 @@ function TestMouseMenu.testUpDownIsNavigationNotToggle()
     local before = M.isEnabled()
     keyQueue = { _G.VK_DOWN }
     TestHelper.setKeyQueue(keyQueue)
+    TestHelper.setActionQueue(keyQueue)  -- Task 5 迁移后菜单走语义动作
     msm:handleInput()
 
     TestHelper.assertEquals(before, M.isEnabled(),
@@ -151,6 +167,7 @@ function TestMouseMenu.testEnterTogglesAndKeepsMenuOpen()
     local before = M.isEnabled()
     keyQueue = { _G.VK_RETURN }
     TestHelper.setKeyQueue(keyQueue)
+    TestHelper.setActionQueue(keyQueue)  -- Task 5 迁移后菜单走语义动作
     msm:handleInput()
     msm:pollCallback()
 

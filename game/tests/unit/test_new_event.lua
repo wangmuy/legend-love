@@ -376,6 +376,17 @@ local menuBooted = false
 local function bootMenuEnv()
     if menuBooted then return end
     menuBooted = true
+    -- **清空输入队列**：menu_state_machine 现在读**动作队列**
+    -- （input-action-layer Task 5），而动作队列是 input_manager 的模块内
+    -- local 状态 —— 前面套件残留一个动作就会让本套件的菜单"自己动"
+    -- （实测：残留 ui.up 导致嵌套菜单测试的 selectMenuItem 被覆盖）。
+    do
+        local okIM, IM = pcall(require, "framework.input_manager")
+        if okIM and IM then
+            IM.clearActionQueue()
+            pcall(function() IM.getInstance():clearQueue() end)
+        end
+    end
     bootHeadless()
     rawset(_G, "Cls", function() end)
     rawset(_G, "DrawBox", function() end)

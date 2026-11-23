@@ -192,6 +192,28 @@ function T.testLongPressProducesRepeatActions()
     EngineAPI.time.getTimeSeconds = savedGetTime
 end
 
+-- ---------------------------------------------------------------- 菜单快捷选择
+
+function T.testMenuShortcutIsDeclaredByMenuNotFramework()
+    print("\n=== Test: 菜单快捷选择由描述符声明（framework 零 jy.*）===")
+    local src
+    for _, p in ipairs({ "framework/menu_state_machine.lua",
+                         "../game/framework/menu_state_machine.lua" }) do
+        local f = io.open(p, "r")
+        if f then src = f:read("*a"); f:close(); break end
+    end
+    TestHelper.assertNotNil(src, "应能读到 menu_state_machine.lua")
+
+    -- 去掉注释再检查（注释里说明 jy.y 是允许的）
+    local code = src:gsub("%-%-%[%[.-%]%]%]", ""):gsub("%-%-[^\n]*", "")
+    TestHelper.assertNil(code:find('"jy%.y"'),
+        'framework 不得硬编码 "jy.y"（那是游戏私有动作，会让框架绑死本游戏）')
+    TestHelper.assertNil(code:find('"jy%.n"'),
+        'framework 不得硬编码 "jy.n"')
+    TestHelper.assertNotNil(code:find("menu%.shortcut"),
+        "应改为读菜单描述符的 shortcut 字段")
+end
+
 function T.runAll()
     print("\n" .. string.rep("=", 60))
     print("输入动作迁移基础设施（input-action-layer Task 5 前置）")
@@ -207,6 +229,7 @@ function T.runAll()
     T.testNegativeControlSourceFilterMatters()
     T.testRealKeypressProducesActionWithKeyCode()
     T.testLongPressProducesRepeatActions()
+    T.testMenuShortcutIsDeclaredByMenuNotFramework()
 
     return TestHelper.printSummary()
 end

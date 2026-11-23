@@ -270,6 +270,55 @@ function TestHelper.clearKeyQueue()
     TestHelper._keyQueue = {}
 end
 
+-- --- 动作队列注入（input-action-layer Task 5 迁移后）---
+--
+-- 迁移后 framework 走**语义动作**（`getActionKeyOnly`）而不是 VK 整数，
+-- 所以测试注入的形态也要跟着变。两套注入**并存**：
+--   setKeyQueue(keys)      → 旧的 EngineAPI.input.getKey 桩（迁移未完成的部分）
+--   setActionQueue(acts)   → 新的动作队列（已迁移的部分）
+--
+-- 动作可以用动作名（"ui.up"）或 VK 常量（自动转成动作名）——
+-- 后者是为了让老测试少改：`VK_UP` → `"ui.up"`。
+TestHelper._actionQueue = {}
+
+--- 把 VK 整数或动作名归一成动作名
+local function toActionName(v)
+    if type(v) == "string" then return v end
+    local G = _G
+    if v == G.VK_UP or v == 1073741906 then return "ui.up" end
+    if v == G.VK_DOWN or v == 1073741905 then return "ui.down" end
+    if v == G.VK_LEFT or v == 1073741904 then return "ui.left" end
+    if v == G.VK_RIGHT or v == 1073741903 then return "ui.right" end
+    if v == G.VK_ESCAPE or v == 27 then return "ui.cancel" end
+    if v == G.VK_RETURN or v == 13 then return "ui.accept" end
+    if v == G.VK_SPACE or v == 32 then return "ui.accept" end
+    if v == G.VK_BACKSPACE or v == 8 then return "ui.backspace" end
+    if v == G.VK_Y or v == 121 then return "jy.y" end
+    if v == G.VK_N or v == 110 then return "jy.n" end
+    return nil
+end
+
+--- 注入动作序列（按顺序被 getActionKeyOnly 取走）
+-- 接受动作名（"ui.up"）或 VK 整数（自动转换）
+function TestHelper.setActionQueue(acts)
+    TestHelper._actionQueue = {}
+    for i = 1, #(acts or {}) do
+        local name = toActionName(acts[i])
+        if name then
+            TestHelper._actionQueue[#TestHelper._actionQueue + 1] = {
+                action = name, source = "key", keyCode = type(acts[i]) == "number" and acts[i] or nil,
+            }
+        end
+    end
+end
+
+function TestHelper.clearActionQueue()
+    TestHelper._actionQueue = {}
+end
+
+--- 让 mock 的 InputManager 读 TestHelper._actionQueue
+TestHelper.actionQueueMock = toActionName
+
 function TestHelper.mockLib()
     _G.lib = {
         Debug = function() end,
@@ -883,6 +932,12 @@ function TestHelper.setup()
     TestHelper.resetCounts()
     TestHelper.mockGlobals()
     TestHelper.resetAllModules()
+    -- **清空注入队列**：动作队列是 input_manager 内部的 local 状态，
+    -- `resetAllModules()` 重载模块表不一定重置它（取决于是否已 require）。
+    -- 残留会让**下一个**套件的菜单/地图误读一个不属于它的输入
+    -- （实测：new_event 的嵌套菜单测试被前面套件残留的 ui.up 吃掉了）。
+    TestHelper.clearKeyQueue()
+    TestHelper.clearActionQueue()
 end
 
 -- 测试后的清理

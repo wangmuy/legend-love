@@ -10,6 +10,20 @@ MenuStateMachine.__index = MenuStateMachine
 -- Settings 是纯逻辑模块（无引擎依赖），TextBoxLayout 同样（引擎无关纯模块），
 -- 引入它们不会让本文件依赖具体引擎。
 local Settings = require("framework.settings")
+-- 语义动作（input-action-layer Task 5 批 2）：菜单不再比较 VK 整数
+local InputActions = require("framework.input_actions")
+-- 取键盘来源的动作（KeyOnly 变体，见 handleInput 的注释）
+--
+-- **必须惰性 require**：多个测试套件会把 `package.loaded`
+-- ["framework.input_manager"] 置 nil 以重建模块（隔离状态），
+-- 顶层 require 会让本模块永远持有**第一个**表 —— 实测
+-- 「单跑通过、全量失败」（全量里更早的套件已重建过它）。
+--
+-- 惰性 require 每次都拿当前表，配合测试用「临时替换方法」（而不是替换
+-- package.loaded 条目）即可两边都稳。
+local function getInputManager()
+    return require("framework.input_manager")
+end
 local TextBoxLayout = require("framework.text_box_layout")
 
 -- 菜单状态
@@ -434,13 +448,18 @@ function MenuStateMachine:handleInput()
         return
     end
     
-    local key = EngineAPI.input.getKey()
-    if key == -1 then
+    -- 语义动作（input-action-layer Task 5 批 2）
+    --
+    -- 菜单只响应**键盘**：鼠标点击走 mouse_menu 自己的命中检测直接调
+    -- `selectMenuItem()`，不经过这里。用 KeyOnly 变体可避免「鼠标注入的
+    -- ui.accept 被菜单当成空格键」这类来源混淆。
+    local action = getInputManager().getActionKeyOnly()
+    if action == nil then
         return
     end
-    
+
     -- 处理ESC键
-    if key == VK_ESCAPE then
+    if action == InputActions.CANCEL then
         if menu.isEsc == 1 then
             self:closeMenu(0)
             return
@@ -463,9 +482,9 @@ function MenuStateMachine:handleInput()
         local valueItem = menu.newMenu[1]
         local desc = valueItem and valueItem[2]
         if type(desc) == "table" and desc.kind == "number" then
-            if key == VK_UP or key == VK_DOWN then
+            if action == InputActions.UP or action == InputActions.DOWN then
                 local step = desc.step or 1
-                if key == VK_DOWN then step = -step end
+                if action == InputActions.DOWN then step = -step end
                 local v = (desc.pending or 0) + step
                 local lo = desc.min or 0
                 local hi = desc.max or 100
@@ -474,7 +493,7 @@ function MenuStateMachine:handleInput()
                 if v > hi then v = hi end
                 desc.pending = v
                 return
-            elseif key == VK_SPACE or key == VK_RETURN then
+            elseif action == InputActions.ACCEPT then
                 -- 唯一的提交点：写 user 层并触发 onChange → 引擎应用音量
                 Settings.set(desc.key, desc.pending)
                 self:closeMenu(valueItem[4])
@@ -484,7 +503,7 @@ function MenuStateMachine:handleInput()
     end
 
     -- 处理方向键
-    if key == VK_DOWN then
+    if action == InputActions.DOWN then
         menu.prevCurrent = menu.current
         menu.current = menu.current + 1
         if menu.current > (menu.start + menu.num - 1) then
@@ -494,7 +513,7 @@ function MenuStateMachine:handleInput()
             menu.start = 1
             menu.current = 1
         end
-    elseif key == VK_UP then
+    elseif action == InputActions.UP then
         menu.prevCurrent = menu.current
         menu.current = menu.current - 1
         if menu.current < menu.start then
@@ -504,7 +523,7 @@ function MenuStateMachine:handleInput()
             menu.current = menu.newNumItem
             menu.start = menu.current - menu.num + 1
         end
-    elseif key == VK_LEFT then
+    elseif action == InputActions.LEFT then
         menu.current = menu.current - 1
         if menu.current < 1 then
             menu.current = menu.newNumItem
@@ -512,7 +531,7 @@ function MenuStateMachine:handleInput()
         if menu.current < menu.start then
             menu.start = menu.current
         end
-    elseif key == VK_RIGHT then
+    elseif action == InputActions.RIGHT then
         menu.current = menu.current + 1
         if menu.current > menu.newNumItem then
             menu.current = 1
@@ -520,17 +539,34 @@ function MenuStateMachine:handleInput()
         if menu.current > (menu.start + menu.num - 1) then
             menu.start = menu.current - menu.num + 1
         end
-    elseif key == VK_SPACE or key == VK_RETURN then
+    elseif action == InputActions.ACCEPT then
         self:selectMenuItem()
-    elseif key == VK_Y then
-        if menu.newNumItem >= 1 then
-            menu.current = 1
-            self:selectMenuItem()
-        end
-    elseif key == VK_N then
-        if menu.newNumItem >= 2 then
-            menu.current = 2
-            self:selectMenuItem()
+    else
+        -- **快捷选择**（原版「按 Y 选是 / 按 N 选否」）
+        --
+        -- framework 不得硬编码 `jy.y` / `jy.n`（那会让框架绑死本游戏，
+        -- 见 gate_input_actions.sh STEP A）。改为由**菜单描述符**自己声明：
+        --
+        -- ```lua
+        -- menu.shortcut = {
+        --     { action = "jy.y", index = 1 },
+        --     { action = "jy.n", index = 2 },
+        -- }
+        -- ```
+        --
+        -- 未声明时无快捷选择（与改造前「菜单不传 shortcut 就没这功能」一致）。
+        local shortcuts = menu.shortcut
+        if type(shortcuts) == "table" then
+            for _, sc in ipairs(shortcuts) do
+                if sc.action == action then
+                    if type(sc.index) == "number" and sc.index >= 1
+                        and sc.index <= menu.newNumItem then
+                        menu.current = sc.index
+                        self:selectMenuItem()
+                    end
+                    break
+                end
+            end
         end
     end
 
@@ -773,7 +809,7 @@ function MenuStateMachine:hoverAt(x, y)
     menu.prevCurrent = menu.current
     menu.current = hit
 
-    -- 滚动跟随（与 VK_DOWN / VK_UP 的处理一致）
+    -- 滚动跟随（与 ui.down / ui.up 的处理一致）
     if menu.current > (menu.start + menu.num - 1) then
         menu.start = menu.current - menu.num + 1
     elseif menu.current < menu.start then

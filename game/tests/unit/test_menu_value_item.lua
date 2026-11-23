@@ -32,6 +32,7 @@ local function installStubs()
         VK_RETURN = rawget(_G, "VK_RETURN"),
         VK_SPACE = rawget(_G, "VK_SPACE"),
         VK_ESCAPE = rawget(_G, "VK_ESCAPE"),
+        inputManager = package.loaded["framework.input_manager"],
     }
 
     rawset(_G, "lib", {
@@ -52,6 +53,19 @@ local function installStubs()
         },
         debug = { log = function() end },
     })
+    -- Task 5 迁移后 menu_state_machine 调 `InputManager.getActionKeyOnly()`。
+    -- **临时替换方法**（不是替换整个 package.loaded 条目 —— 那样会泄漏到
+    -- 其他套件，实测「单跑通过、全量失败」）。
+    local realIM = package.loaded["framework.input_manager"] or require("framework.input_manager")
+    saved.imGetActionKeyOnly = realIM.getActionKeyOnly
+    saved.imGetActionEventKeyOnly = realIM.getActionEventKeyOnly
+    realIM.getActionKeyOnly = function()
+        local ev = table.remove(TestHelper._actionQueue, 1)
+        return ev and ev.action or nil
+    end
+    realIM.getActionEventKeyOnly = function()
+        return table.remove(TestHelper._actionQueue, 1)
+    end
     rawset(_G, "CC", { MenuBorderPixel = 5, RowPixel = 4 })
     rawset(_G, "DrawString", function() end)
     rawset(_G, "Cls", function() end)
@@ -78,6 +92,13 @@ local function restoreStubs(saved)
             _G[k] = v
         end
     end
+    -- 恢复被临时替换的方法（见 installStubs 的注释）
+    local realIM = package.loaded["framework.input_manager"]
+    if realIM and saved.imGetActionKeyOnly ~= nil then
+        realIM.getActionKeyOnly = saved.imGetActionKeyOnly
+        realIM.getActionEventKeyOnly = saved.imGetActionEventKeyOnly
+    end
+    TestHelper.clearActionQueue()
 end
 
 local function pressKeys(keys)
@@ -86,6 +107,9 @@ local function pressKeys(keys)
     -- framework 已改用 EngineAPI.input.getKey（Task 3），
     -- 同步注入到共享队列，否则 lib 桩收不到键
     TestHelper.setKeyQueue(keys)
+    -- **Task 5 迁移后菜单走语义动作**：同时注入动作队列
+    -- （动作名由 VK 整数自动转换，测试的 keys 仍是 VK，不用改）
+    TestHelper.setActionQueue(keys)
 end
 
 -- 统计 Settings.set 被调用的次数
